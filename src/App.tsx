@@ -1,3 +1,19 @@
+import {
+
+  MAX_ENERGY,
+
+  ENERGY_REGEN_INTERVAL,
+
+  NERVE_REGEN_INTERVAL,
+
+  regenerateResources,
+
+  getEnergyTimeRemaining,
+
+  getNerveTimeRemaining,
+
+} from "./systems/resourceSystem";
+
 import React, {
   useEffect,
   useMemo,
