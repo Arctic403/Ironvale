@@ -1,4 +1,4 @@
-import { getItem, Item, DistanceZone } from "./data/gameData";
+import { getItem, Item, DistanceZone } from "../data/gameData";
 
 export type BodyPart = "head" | "chest" | "stomach" | "arms" | "legs";
 
