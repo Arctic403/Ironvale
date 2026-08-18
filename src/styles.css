@@ -8,7 +8,6 @@
 
   --bg: #05050b;
   --panel: rgba(14, 13, 27, .86);
-  --panel2: rgba(22, 19, 42, .92);
 
   --purple: #8b5cff;
   --purple2: #b16cff;
@@ -16,10 +15,8 @@
   --green: #54e6a8;
   --red: #ff5c70;
   --yellow: #ffc857;
-  --orange: #ff925c;
 
   --muted: #858aa6;
-  --line: rgba(157, 126, 255, .18);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -127,20 +124,14 @@ button:focus-visible {
       rgba(139,92,255,.32),
       rgba(66,217,255,.12)
     );
-
-  color: #fff;
 }
 
 .logo span span {
   color: var(--purple2);
-
-  text-shadow:
-    0 0 20px rgba(177,108,255,.45);
 }
 
 .wallet {
   text-align: right;
-
   margin-left: auto;
 }
 
@@ -151,7 +142,8 @@ button:focus-visible {
 .crime-stats span,
 .job-rewards span,
 .record-grid span,
-.stat-card span {
+.stat-card span,
+.nerve-display span {
   display: block;
 
   color: #6e748c;
@@ -173,14 +165,6 @@ button:focus-visible {
   margin-top: 2px;
 }
 
-.small-button,
-.nav-button,
-.job-button,
-.crime-button,
-.quit-button {
-  cursor: pointer;
-}
-
 .small-button {
   border:
     1px solid rgba(255,255,255,.1);
@@ -193,6 +177,8 @@ button:focus-visible {
   padding: 9px 12px;
 
   border-radius: 9px;
+
+  cursor: pointer;
 }
 
 /* PLAYER BAR */
@@ -207,7 +193,7 @@ button:focus-visible {
   display: grid;
 
   grid-template-columns:
-    1.5fr repeat(4, 1fr);
+    1.3fr repeat(5, 1fr);
 
   gap: 14px;
 
@@ -228,6 +214,42 @@ button:focus-visible {
   color: #e6e8f5;
 
   font-size: 13px;
+}
+
+.regen-text {
+  display: block;
+
+  margin-top: 4px;
+
+  color: #667087;
+
+  font-size: 8px;
+}
+
+.mini-nerve-bar {
+  height: 3px;
+
+  overflow: hidden;
+
+  border-radius: 99px;
+
+  background:
+    rgba(255,255,255,.07);
+
+  margin-top: 6px;
+
+  width: 70px;
+}
+
+.mini-nerve-bar div {
+  height: 100%;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--purple),
+      var(--cyan)
+    );
 }
 
 /* LAYOUT */
@@ -313,6 +335,8 @@ button:focus-visible {
 
   font-weight: 700;
 
+  cursor: pointer;
+
   transition: .18s;
 }
 
@@ -346,8 +370,6 @@ button:focus-visible {
   color: #666b80;
 }
 
-/* CONTENT */
-
 .content-card {
   min-width: 0;
 
@@ -355,6 +377,8 @@ button:focus-visible {
 
   padding: 24px;
 }
+
+/* HEADINGS */
 
 .section-heading {
   display: flex;
@@ -412,6 +436,40 @@ button:focus-visible {
   font-weight: 900;
 }
 
+.nerve-display {
+  padding: 11px 14px;
+
+  border-radius: 10px;
+
+  background:
+    rgba(139,92,255,.08);
+
+  border:
+    1px solid rgba(139,92,255,.2);
+
+  min-width: 100px;
+}
+
+.nerve-display strong {
+  display: block;
+
+  margin-top: 4px;
+
+  color: #dcd7ff;
+
+  font-size: 17px;
+}
+
+.nerve-display small {
+  display: block;
+
+  color: #697089;
+
+  margin-top: 4px;
+
+  font-size: 8px;
+}
+
 /* DASHBOARD */
 
 .city-dashboard,
@@ -446,6 +504,34 @@ button:focus-visible {
   margin-top: 7px;
 
   font-size: 18px;
+}
+
+.nerve-bar {
+  height: 6px;
+
+  margin-top: 10px;
+
+  overflow: hidden;
+
+  border-radius: 99px;
+
+  background:
+    rgba(255,255,255,.06);
+}
+
+.nerve-bar div {
+  height: 100%;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--purple),
+      var(--cyan)
+    );
+
+  border-radius: inherit;
+
+  transition: width .3s ease;
 }
 
 /* PANELS */
@@ -699,6 +785,8 @@ button:focus-visible {
   letter-spacing: .7px;
 
   white-space: nowrap;
+
+  cursor: pointer;
 }
 
 .crime-button:disabled,
@@ -894,6 +982,8 @@ button:focus-visible {
   padding: 9px 12px;
 
   border-radius: 8px;
+
+  cursor: pointer;
 }
 
 /* CHARACTER */
@@ -1021,6 +1111,15 @@ button:focus-visible {
 /* MOBILE */
 
 @media (
+  max-width: 1000px
+) {
+  .player-bar {
+    grid-template-columns:
+      repeat(3, 1fr);
+  }
+}
+
+@media (
   max-width: 850px
 ) {
   .game-layout {
@@ -1047,11 +1146,6 @@ button:focus-visible {
     margin-top: 0;
   }
 
-  .player-bar {
-    grid-template-columns:
-      repeat(2, 1fr);
-  }
-
   .crime-stats {
     grid-template-columns:
       repeat(3, 1fr);
@@ -1074,6 +1168,9 @@ button:focus-visible {
   .player-bar {
     margin-left: 12px;
     margin-right: 12px;
+
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
   .game-layout {
@@ -1111,5 +1208,9 @@ button:focus-visible {
   .nav-card {
     grid-template-columns:
       repeat(2, 1fr);
+  }
+
+  .section-heading {
+    flex-direction: column;
   }
 }
