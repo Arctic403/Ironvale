@@ -1,8 +1,9 @@
 import { CombatStats } from "./progressionSystem";
-import { PLAYER_PROFILES, PlayerProfile } from "../data/playerProfiles";
+import { PLAYER_PROFILES, type PlayerProfile } from "../data/playerProfiles";
 
-// Re-export so App.tsx can import directly from combatSystem
-export { PLAYER_PROFILES, PlayerProfile };
+// Type-safe re-exports for App.tsx
+export { PLAYER_PROFILES };
+export type { PlayerProfile };
 
 export type CombatDifficulty = "easy" | "fair" | "dangerous" | "very-dangerous";
 export type Opponent = PlayerProfile;
