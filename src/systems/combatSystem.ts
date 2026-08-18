@@ -1,7 +1,7 @@
 import { CombatStats } from "./progressionSystem";
 import { PLAYER_PROFILES, PlayerProfile } from "../data/playerProfiles";
 
-// Re-export PLAYER_PROFILES and PlayerProfile so App.tsx can import them directly from here
+// Re-export so App.tsx can import them directly from combatSystem.ts
 export { PLAYER_PROFILES, PlayerProfile };
 
 export type CombatDifficulty = "easy" | "fair" | "dangerous" | "very-dangerous";
