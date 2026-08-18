@@ -1,20 +1,18 @@
-export type JobSkill =
-  | "driving"
-  | "logistics"
-  | "streetKnowledge"
-  | "awareness"
-  | "discipline"
-  | "defense"
-  | "strength"
-  | "endurance"
-  | "mechanics"
-  | "computing"
-  | "cybersecurity"
-  | "analysis"
-  | "finance"
-  | "negotiation";
+import {
+  Skill,
+  Skills,
+  EMPTY_SKILLS,
+  skillLabel,
+  meetsSkillRequirements,
+} from "./skills";
 
-export type JobSkills = Record<JobSkill, number>;
+export type InterviewQuestion = {
+  question: string;
+
+  answers: string[];
+
+  correct: number;
+};
 
 export type JobPerk = {
   name: string;
@@ -23,10 +21,12 @@ export type JobPerk = {
 
 export type JobPosition = {
   id: string;
+
   title: string;
+
   salary: number;
 
-  requirements: Partial<JobSkills>;
+  requirements: Partial<Skills>;
 
   perks: JobPerk[];
 
@@ -35,48 +35,36 @@ export type JobPosition = {
 
 export type Job = {
   id: string;
+
   company: string;
+
   title: string;
 
   description: string;
 
-  skills: JobSkill[];
+  skills: Skill[];
 
-  primarySkill: JobSkill;
+  primarySkill: Skill;
+
+  secondarySkills: Skill[];
 
   positions: JobPosition[];
 
-  basePerformance: number;
+  interview: InterviewQuestion[];
 };
 
-export const EMPTY_JOB_SKILLS: JobSkills = {
-  driving: 0,
-  logistics: 0,
-  streetKnowledge: 0,
-
-  awareness: 0,
-  discipline: 0,
-  defense: 0,
-
-  strength: 0,
-  endurance: 0,
-  mechanics: 0,
-
-  computing: 0,
-  cybersecurity: 0,
-  analysis: 0,
-
-  finance: 0,
-  negotiation: 0,
-};
+export const EMPTY_JOB_SKILLS = EMPTY_SKILLS;
 
 export const JOBS: Job[] = [
   {
     id: "riftexpress",
+
     company: "RiftExpress",
+
     title: "Delivery",
+
     description:
-      "Move packages across RiftCity. A practical career that rewards route knowledge, efficiency and driving experience.",
+      "Move packages across RiftCity while learning its streets, routes and logistics network.",
 
     skills: [
       "driving",
@@ -86,12 +74,58 @@ export const JOBS: Job[] = [
 
     primarySkill: "streetKnowledge",
 
-    basePerformance: 75,
+    secondarySkills: [
+      "driving",
+      "logistics",
+    ],
+
+    interview: [
+      {
+        question:
+          "A delivery is running late. What should you do?",
+
+        answers: [
+          "Take the fastest safe route you know.",
+          "Ignore the delivery.",
+          "Wait until tomorrow.",
+        ],
+
+        correct: 0,
+      },
+
+      {
+        question:
+          "A customer says their package is damaged.",
+
+        answers: [
+          "Hide the damage.",
+          "Report it properly.",
+          "Blame another driver.",
+        ],
+
+        correct: 1,
+      },
+
+      {
+        question:
+          "You are given several deliveries at once.",
+
+        answers: [
+          "Deliver them randomly.",
+          "Plan an efficient route.",
+          "Refuse the deliveries.",
+        ],
+
+        correct: 1,
+      },
+    ],
 
     positions: [
       {
         id: "delivery-trainee",
+
         title: "Trainee Courier",
+
         salary: 55,
 
         requirements: {},
@@ -99,7 +133,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Route Familiarity",
-            description: "+0.5% travel efficiency",
+            description:
+              "+0.5% travel efficiency.",
           },
         ],
 
@@ -109,7 +144,9 @@ export const JOBS: Job[] = [
 
       {
         id: "courier",
+
         title: "Courier",
+
         salary: 70,
 
         requirements: {
@@ -119,17 +156,20 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Efficient Routes",
-            description: "+1% travel efficiency",
+            description:
+              "+1% travel efficiency.",
           },
         ],
 
         description:
-          "You've learned the basic streets and delivery routes.",
+          "You understand the city's basic routes.",
       },
 
       {
         id: "senior-courier",
+
         title: "Senior Courier",
+
         salary: 90,
 
         requirements: {
@@ -140,21 +180,25 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Fast Routes",
-            description: "+2% travel efficiency",
+            description:
+              "+2% travel efficiency.",
           },
           {
             name: "Package Sense",
-            description: "+1% item discovery",
+            description:
+              "+1% item discovery.",
           },
         ],
 
         description:
-          "You know the city's routes better than most.",
+          "You're becoming one of RiftExpress's reliable couriers.",
       },
 
       {
         id: "route-specialist",
+
         title: "Route Specialist",
+
         salary: 120,
 
         requirements: {
@@ -166,26 +210,31 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Master Routes",
-            description: "+3% travel efficiency",
+            description:
+              "+3% travel efficiency.",
           },
           {
             name: "Courier Instinct",
-            description: "+2% item discovery",
+            description:
+              "+2% item discovery.",
           },
         ],
 
         description:
-          "You're now one of RiftExpress's most reliable couriers.",
+          "A veteran courier trusted with the city's most difficult routes.",
       },
     ],
   },
 
   {
     id: "riftshield",
+
     company: "RiftShield Security",
+
     title: "Security",
+
     description:
-      "Protect businesses and people around RiftCity while developing awareness, discipline and defensive experience.",
+      "Protect businesses and people while developing awareness, discipline and defensive skills.",
 
     skills: [
       "awareness",
@@ -195,12 +244,58 @@ export const JOBS: Job[] = [
 
     primarySkill: "awareness",
 
-    basePerformance: 75,
+    secondarySkills: [
+      "discipline",
+      "defense",
+    ],
+
+    interview: [
+      {
+        question:
+          "You notice suspicious behaviour outside a business.",
+
+        answers: [
+          "Investigate carefully and follow procedure.",
+          "Ignore it.",
+          "Immediately start a fight.",
+        ],
+
+        correct: 0,
+      },
+
+      {
+        question:
+          "A customer becomes aggressive.",
+
+        answers: [
+          "Escalate immediately.",
+          "Stay calm and de-escalate.",
+          "Leave your post.",
+        ],
+
+        correct: 1,
+      },
+
+      {
+        question:
+          "Your supervisor gives you a security procedure.",
+
+        answers: [
+          "Follow it.",
+          "Ignore it.",
+          "Make up your own rules.",
+        ],
+
+        correct: 0,
+      },
+    ],
 
     positions: [
       {
         id: "security-trainee",
+
         title: "Security Trainee",
+
         salary: 65,
 
         requirements: {},
@@ -208,17 +303,20 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Watchful",
-            description: "+0.5% awareness effectiveness",
+            description:
+              "+0.5% awareness effectiveness.",
           },
         ],
 
         description:
-          "Learn the fundamentals of security work.",
+          "Learn the fundamentals of security.",
       },
 
       {
         id: "security-guard",
+
         title: "Security Guard",
+
         salary: 85,
 
         requirements: {
@@ -228,7 +326,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Alert",
-            description: "+1% crime detection",
+            description:
+              "+1% crime detection.",
           },
         ],
 
@@ -238,7 +337,9 @@ export const JOBS: Job[] = [
 
       {
         id: "senior-guard",
+
         title: "Senior Security Officer",
+
         salary: 110,
 
         requirements: {
@@ -249,11 +350,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Sharp Eye",
-            description: "+2% crime detection",
+            description:
+              "+2% crime detection.",
           },
           {
             name: "Composed",
-            description: "+1% penalty resistance",
+            description:
+              "+1% penalty resistance.",
           },
         ],
 
@@ -263,7 +366,9 @@ export const JOBS: Job[] = [
 
       {
         id: "security-specialist",
+
         title: "Security Specialist",
+
         salary: 145,
 
         requirements: {
@@ -275,11 +380,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Threat Assessment",
-            description: "+3% crime detection",
+            description:
+              "+3% crime detection.",
           },
           {
             name: "Controlled Response",
-            description: "+2% penalty resistance",
+            description:
+              "+2% penalty resistance.",
           },
         ],
 
@@ -291,10 +398,13 @@ export const JOBS: Job[] = [
 
   {
     id: "ironworks",
+
     company: "Ironworks Construction",
+
     title: "Construction",
+
     description:
-      "Build RiftCity while developing physical strength, endurance and mechanical knowledge.",
+      "Build RiftCity while developing strength, endurance and mechanical knowledge.",
 
     skills: [
       "strength",
@@ -304,12 +414,58 @@ export const JOBS: Job[] = [
 
     primarySkill: "strength",
 
-    basePerformance: 75,
+    secondarySkills: [
+      "endurance",
+      "mechanics",
+    ],
+
+    interview: [
+      {
+        question:
+          "You discover unsafe equipment at a work site.",
+
+        answers: [
+          "Use it anyway.",
+          "Report it and secure the area.",
+          "Hide the problem.",
+        ],
+
+        correct: 1,
+      },
+
+      {
+        question:
+          "A heavy task requires two people.",
+
+        answers: [
+          "Ask for assistance.",
+          "Risk doing it alone.",
+          "Walk away.",
+        ],
+
+        correct: 0,
+      },
+
+      {
+        question:
+          "Your supervisor gives you a safety instruction.",
+
+        answers: [
+          "Follow it.",
+          "Ignore it.",
+          "Do the opposite.",
+        ],
+
+        correct: 0,
+      },
+    ],
 
     positions: [
       {
         id: "construction-trainee",
+
         title: "Construction Trainee",
+
         salary: 60,
 
         requirements: {},
@@ -317,7 +473,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Hard Worker",
-            description: "+0.5% stamina efficiency",
+            description:
+              "+0.5% stamina efficiency.",
           },
         ],
 
@@ -327,7 +484,9 @@ export const JOBS: Job[] = [
 
       {
         id: "construction-worker",
+
         title: "Construction Worker",
+
         salary: 80,
 
         requirements: {
@@ -337,7 +496,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Conditioned",
-            description: "+1% energy efficiency",
+            description:
+              "+1% energy efficiency.",
           },
         ],
 
@@ -347,7 +507,9 @@ export const JOBS: Job[] = [
 
       {
         id: "skilled-tradesman",
+
         title: "Skilled Tradesman",
+
         salary: 105,
 
         requirements: {
@@ -358,11 +520,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Built Tough",
-            description: "+2% energy efficiency",
+            description:
+              "+2% energy efficiency.",
           },
           {
             name: "Practical Hands",
-            description: "+1% equipment effectiveness",
+            description:
+              "+1% equipment effectiveness.",
           },
         ],
 
@@ -372,7 +536,9 @@ export const JOBS: Job[] = [
 
       {
         id: "site-specialist",
+
         title: "Site Specialist",
+
         salary: 135,
 
         requirements: {
@@ -384,11 +550,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Heavy Duty",
-            description: "+3% energy efficiency",
+            description:
+              "+3% energy efficiency.",
           },
           {
             name: "Technical Hands",
-            description: "+2% equipment effectiveness",
+            description:
+              "+2% equipment effectiveness.",
           },
         ],
 
@@ -400,10 +568,13 @@ export const JOBS: Job[] = [
 
   {
     id: "rifttech",
+
     company: "RiftTech Solutions",
+
     title: "Technology",
+
     description:
-      "Maintain systems, analyze networks and develop the technical skills that power RiftCity.",
+      "Maintain systems, analyze networks and develop the technical skills powering RiftCity.",
 
     skills: [
       "computing",
@@ -413,10 +584,58 @@ export const JOBS: Job[] = [
 
     primarySkill: "computing",
 
+    secondarySkills: [
+      "cybersecurity",
+      "analysis",
+    ],
+
+    interview: [
+      {
+        question:
+          "A computer suddenly stops responding.",
+
+        answers: [
+          "Start randomly deleting files.",
+          "Diagnose the problem systematically.",
+          "Ignore it.",
+        ],
+
+        correct: 1,
+      },
+
+      {
+        question:
+          "You discover a security vulnerability.",
+
+        answers: [
+          "Report it.",
+          "Sell the information.",
+          "Ignore it.",
+        ],
+
+        correct: 0,
+      },
+
+      {
+        question:
+          "Two systems are producing conflicting data.",
+
+        answers: [
+          "Guess which is correct.",
+          "Analyze the source of the discrepancy.",
+          "Delete both.",
+        ],
+
+        correct: 1,
+      },
+    ],
+
     positions: [
       {
         id: "tech-trainee",
+
         title: "Junior Technician",
+
         salary: 75,
 
         requirements: {},
@@ -424,7 +643,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Technical Foundation",
-            description: "+0.5% technology effectiveness",
+            description:
+              "+0.5% technology effectiveness.",
           },
         ],
 
@@ -434,7 +654,9 @@ export const JOBS: Job[] = [
 
       {
         id: "technician",
+
         title: "IT Technician",
+
         salary: 100,
 
         requirements: {
@@ -444,7 +666,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "System Knowledge",
-            description: "+1% technology effectiveness",
+            description:
+              "+1% technology effectiveness.",
           },
         ],
 
@@ -454,7 +677,9 @@ export const JOBS: Job[] = [
 
       {
         id: "security-technician",
+
         title: "Security Technician",
+
         salary: 135,
 
         requirements: {
@@ -465,11 +690,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Network Sense",
-            description: "+2% cyber success",
+            description:
+              "+2% cyber success.",
           },
           {
             name: "System Analysis",
-            description: "+1% information gathering",
+            description:
+              "+1% information gathering.",
           },
         ],
 
@@ -479,7 +706,9 @@ export const JOBS: Job[] = [
 
       {
         id: "cyber-specialist",
+
         title: "Cybersecurity Specialist",
+
         salary: 180,
 
         requirements: {
@@ -491,11 +720,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Cyber Expertise",
-            description: "+3% cyber success",
+            description:
+              "+3% cyber success.",
           },
           {
             name: "Deep Analysis",
-            description: "+2% information gathering",
+            description:
+              "+2% information gathering.",
           },
         ],
 
@@ -507,10 +738,13 @@ export const JOBS: Job[] = [
 
   {
     id: "riftcapital",
+
     company: "Rift Capital",
+
     title: "Finance",
+
     description:
-      "Analyze money, negotiate deals and learn how RiftCity's economy actually works.",
+      "Analyze money, negotiate deals and learn how RiftCity's economy works.",
 
     skills: [
       "finance",
@@ -520,10 +754,58 @@ export const JOBS: Job[] = [
 
     primarySkill: "finance",
 
+    secondarySkills: [
+      "analysis",
+      "negotiation",
+    ],
+
+    interview: [
+      {
+        question:
+          "A deal looks profitable but carries hidden risk.",
+
+        answers: [
+          "Investigate the risk first.",
+          "Take the deal immediately.",
+          "Ignore the numbers.",
+        ],
+
+        correct: 0,
+      },
+
+      {
+        question:
+          "A client disagrees with your proposal.",
+
+        answers: [
+          "Listen and negotiate.",
+          "End the conversation.",
+          "Threaten them.",
+        ],
+
+        correct: 0,
+      },
+
+      {
+        question:
+          "Two investments have different risk levels.",
+
+        answers: [
+          "Compare their returns and risks.",
+          "Choose randomly.",
+          "Always choose the bigger number.",
+        ],
+
+        correct: 0,
+      },
+    ],
+
     positions: [
       {
         id: "finance-trainee",
+
         title: "Finance Assistant",
+
         salary: 70,
 
         requirements: {},
@@ -531,7 +813,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Money Sense",
-            description: "+0.5% financial efficiency",
+            description:
+              "+0.5% financial efficiency.",
           },
         ],
 
@@ -541,7 +824,9 @@ export const JOBS: Job[] = [
 
       {
         id: "financial-clerk",
+
         title: "Financial Clerk",
+
         salary: 95,
 
         requirements: {
@@ -551,7 +836,8 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Market Awareness",
-            description: "+1% marketplace efficiency",
+            description:
+              "+1% marketplace efficiency.",
           },
         ],
 
@@ -561,7 +847,9 @@ export const JOBS: Job[] = [
 
       {
         id: "financial-analyst",
+
         title: "Financial Analyst",
+
         salary: 130,
 
         requirements: {
@@ -572,11 +860,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Market Analysis",
-            description: "+2% marketplace efficiency",
+            description:
+              "+2% marketplace efficiency.",
           },
           {
             name: "Deal Sense",
-            description: "+1% negotiation effectiveness",
+            description:
+              "+1% negotiation effectiveness.",
           },
         ],
 
@@ -586,7 +876,9 @@ export const JOBS: Job[] = [
 
       {
         id: "investment-specialist",
+
         title: "Investment Specialist",
+
         salary: 175,
 
         requirements: {
@@ -598,11 +890,13 @@ export const JOBS: Job[] = [
         perks: [
           {
             name: "Capital Insight",
-            description: "+3% marketplace efficiency",
+            description:
+              "+3% marketplace efficiency.",
           },
           {
             name: "Negotiator",
-            description: "+2% negotiation effectiveness",
+            description:
+              "+2% negotiation effectiveness.",
           },
         ],
 
@@ -613,53 +907,43 @@ export const JOBS: Job[] = [
   },
 ];
 
-export function getJob(jobId: string | null) {
-  if (!jobId) return undefined;
+export function getJob(
+  id: string | null
+) {
+  if (!id) return undefined;
 
-  return JOBS.find(job => job.id === jobId);
+  return JOBS.find(
+    job => job.id === id
+  );
 }
 
 export function getCurrentPosition(
   job: Job | undefined,
-  positionIndex: number
+  position: number
 ) {
   if (!job) return undefined;
 
   return job.positions[
     Math.min(
-      positionIndex,
+      position,
       job.positions.length - 1
     )
   ];
 }
 
-export function meetsRequirements(
-  skills: JobSkills,
-  requirements: Partial<JobSkills>
-) {
-  return Object.entries(requirements).every(
-    ([skill, required]) =>
-      skills[skill as JobSkill] >=
-      (required ?? 0)
-  );
-}
-
-export function getNextPosition(
+export function getNextPromotion(
   job: Job | undefined,
-  currentPosition: number,
-  skills: JobSkills
+  position: number,
+  skills: Skills
 ) {
   if (!job) return undefined;
 
-  const nextIndex = currentPosition + 1;
+  const next =
+    job.positions[position + 1];
 
-  if (nextIndex >= job.positions.length) {
-    return undefined;
-  }
+  if (!next) return undefined;
 
-  const next = job.positions[nextIndex];
-
-  return meetsRequirements(
+  return meetsSkillRequirements(
     skills,
     next.requirements
   )
@@ -668,28 +952,7 @@ export function getNextPosition(
 }
 
 export function formatSkillName(
-  skill: JobSkill
+  skill: Skill
 ) {
-  const names: Record<JobSkill, string> = {
-    driving: "Driving",
-    logistics: "Logistics",
-    streetKnowledge: "Street Knowledge",
-
-    awareness: "Awareness",
-    discipline: "Discipline",
-    defense: "Defense",
-
-    strength: "Strength",
-    endurance: "Endurance",
-    mechanics: "Mechanics",
-
-    computing: "Computing",
-    cybersecurity: "Cybersecurity",
-    analysis: "Analysis",
-
-    finance: "Finance",
-    negotiation: "Negotiation",
-  };
-
-  return names[skill];
+  return skillLabel(skill);
 }
