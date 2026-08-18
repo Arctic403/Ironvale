@@ -5,34 +5,10 @@ export interface WeaponOption {
   name: string;
   type: "primary" | "secondary" | "melee" | "temporary";
   baseDamage: number;
-  accuracy: number; // 0 - 100
-  critChance: number; // 0 - 100
+  accuracy: number;
+  critChance: number;
+  icon: string;
 }
-
-export interface DynamicFighter {
-  id: string;
-  name: string;
-  level: number;
-  health: number;
-  maxHealth: number;
-  strength: number;
-  defense: number;
-  speed: number;
-  dexterity: number;
-  weapon: WeaponOption;
-}
-
-export interface TurnLog {
-  attacker: string;
-  defender: string;
-  actionText: string;
-  damage: number;
-  isCrit: boolean;
-  isMiss: boolean;
-  hitPart?: BodyPart;
-}
-
-// --- Legacy Exports for App.tsx Compatibility ---
 
 export interface CombatStats {
   strength: number;
@@ -52,7 +28,26 @@ export interface PlayerProfile {
   maxHealth: number;
   cashReward: number;
   stats: CombatStats;
+  weapons?: WeaponOption[];
 }
+
+export interface TurnLog {
+  id: string;
+  attacker: string;
+  defender: string;
+  actionText: string;
+  damage: number;
+  isCrit: boolean;
+  isMiss: boolean;
+  hitPart?: BodyPart;
+}
+
+export const DEFAULT_WEAPONS: WeaponOption[] = [
+  { id: "primary", name: "AK-47", type: "primary", baseDamage: 32, accuracy: 75, critChance: 18, icon: "🔫" },
+  { id: "secondary", name: "9mm Pistol", type: "secondary", baseDamage: 22, accuracy: 85, critChance: 12, icon: "🔫" },
+  { id: "melee", name: "Combat Knife", type: "melee", baseDamage: 18, accuracy: 92, critChance: 25, icon: "🔪" },
+  { id: "temporary", name: "Pepper Spray", type: "temporary", baseDamage: 10, accuracy: 98, critChance: 5, icon: "🌶️" },
+];
 
 export const PLAYER_PROFILES: PlayerProfile[] = [
   {
@@ -66,6 +61,7 @@ export const PLAYER_PROFILES: PlayerProfile[] = [
     maxHealth: 80,
     cashReward: 150,
     stats: { strength: 4, defense: 3, speed: 4, dexterity: 4 },
+    weapons: [DEFAULT_WEAPONS[1], DEFAULT_WEAPONS[2]],
   },
   {
     id: "target-2",
@@ -78,6 +74,7 @@ export const PLAYER_PROFILES: PlayerProfile[] = [
     maxHealth: 120,
     cashReward: 400,
     stats: { strength: 8, defense: 7, speed: 6, dexterity: 6 },
+    weapons: [DEFAULT_WEAPONS[0], DEFAULT_WEAPONS[2]],
   },
   {
     id: "target-3",
@@ -90,6 +87,7 @@ export const PLAYER_PROFILES: PlayerProfile[] = [
     maxHealth: 200,
     cashReward: 1000,
     stats: { strength: 15, defense: 14, speed: 12, dexterity: 10 },
+    weapons: [DEFAULT_WEAPONS[0], DEFAULT_WEAPONS[1], DEFAULT_WEAPONS[2]],
   },
 ];
 
@@ -127,8 +125,6 @@ export function simulateCombat(
   };
 }
 
-// --- Dynamic Interactive Turn-Based Combat ---
-
 const BODY_PARTS: { part: BodyPart; multiplier: number; label: string }[] = [
   { part: "head", multiplier: 1.8, label: "Head" },
   { part: "chest", multiplier: 1.2, label: "Chest" },
@@ -138,25 +134,26 @@ const BODY_PARTS: { part: BodyPart; multiplier: number; label: string }[] = [
 ];
 
 export function executeCombatTurn(
-  attacker: DynamicFighter,
-  defender: DynamicFighter,
-  selectedWeapon?: WeaponOption
-): { updatedDefender: DynamicFighter; log: TurnLog } {
-  const weapon = selectedWeapon || attacker.weapon;
-
+  attackerName: string,
+  attackerStats: CombatStats,
+  defenderName: string,
+  defenderStats: CombatStats,
+  weapon: WeaponOption
+): { damage: number; log: TurnLog } {
   const hitChance = Math.min(
     95,
-    Math.max(15, weapon.accuracy + (attacker.dexterity - defender.speed) * 2)
+    Math.max(15, weapon.accuracy + (attackerStats.dexterity - defenderStats.speed) * 2)
   );
   const roll = Math.random() * 100;
 
   if (roll > hitChance) {
     return {
-      updatedDefender: defender,
+      damage: 0,
       log: {
-        attacker: attacker.name,
-        defender: defender.name,
-        actionText: `${attacker.name} attacked ${defender.name} with ${weapon.name} but missed!`,
+        id: Math.random().toString(),
+        attacker: attackerName,
+        defender: defenderName,
+        actionText: `${attackerName} fired ${weapon.name} at ${defenderName} but MISSED!`,
         damage: 0,
         isCrit: false,
         isMiss: true,
@@ -169,22 +166,22 @@ export function executeCombatTurn(
   const critMultiplier = isCrit ? 1.75 : 1.0;
 
   const rawDamage =
-    (weapon.baseDamage + attacker.strength * 1.5 - defender.defense * 0.8) *
+    (weapon.baseDamage + attackerStats.strength * 1.2 - defenderStats.defense * 0.6) *
     target.multiplier *
     critMultiplier;
 
-  const finalDamage = Math.max(5, Math.floor(rawDamage + (Math.random() * 6 - 3)));
-  const newHealth = Math.max(0, defender.health - finalDamage);
+  const finalDamage = Math.max(4, Math.floor(rawDamage + (Math.random() * 6 - 3)));
 
-  const actionText = `${attacker.name} hit ${defender.name} in the ${target.label} with ${weapon.name} for ${finalDamage} damage! ${
+  const actionText = `${attackerName} hit ${defenderName} in the ${target.label} with ${weapon.name} for ${finalDamage} damage! ${
     isCrit ? "🎯 CRITICAL HIT!" : ""
   }`;
 
   return {
-    updatedDefender: { ...defender, health: newHealth },
+    damage: finalDamage,
     log: {
-      attacker: attacker.name,
-      defender: defender.name,
+      id: Math.random().toString(),
+      attacker: attackerName,
+      defender: defenderName,
       actionText,
       damage: finalDamage,
       isCrit,
