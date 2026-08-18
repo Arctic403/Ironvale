@@ -27,11 +27,13 @@ import {
   gymUnlocked,
 } from "./systems/gymSystem";
 import {
+  DEFAULT_WEAPONS,
   PLAYER_PROFILES,
   PlayerProfile,
   calculateWinChance,
   simulateCombat,
 } from "./systems/combatSystem";
+import { InteractiveCombatView } from "./views/Combat";
 import {
   EDUCATION,
   ITEMS,
@@ -475,6 +477,7 @@ export function useRiftCity() {
   const attack = (opponent: PlayerProfile) => {
     if (blocked()) return log("You cannot attack right now.");
     if (gameState.energy < 10) return log("You need at least 10 energy to attack.");
+    setGameState((prev) => ({ ...prev, energy: prev.energy - 10, attacks: prev.attacks + 1 }));
     setCombatOpponent(opponent);
     setCombatMessage(`Target acquired: ${opponent.name}. Ready to engage.`);
     setCurrentScreen("combat");
@@ -493,7 +496,7 @@ export function useRiftCity() {
       };
 
       const result = simulateCombat("You", playerEffectiveStats, maxHealth, combatOpponent);
-      const s = { ...prev, energy: prev.energy - 10, attacks: prev.attacks + 1 };
+      const s = { ...prev, attacks: prev.attacks + 1 };
 
       if (result.winner === "player") {
         s.fightsWon++;
@@ -725,6 +728,7 @@ export function useRiftCity() {
     encounter,
     setEncounter,
     combatOpponent,
+    setCombatOpponent,
     combatMessage,
     commitCrime,
     train,
@@ -1132,41 +1136,93 @@ function Crimes({ g }: { g: ReturnType<typeof useRiftCity> }) {
 }
 
 function Combat({ g }: { g: ReturnType<typeof useRiftCity> }) {
+  if (g.combatOpponent) {
+    return (
+      <InteractiveCombatView
+        player={{
+          id: "player",
+          name: "You",
+          level: g.level,
+          health: g.gameState.health,
+          maxHealth: g.maxHealth,
+          stats: g.gameState.stats,
+          weapons: DEFAULT_WEAPONS,
+        }}
+        enemy={{
+          id: g.combatOpponent.id,
+          name: g.combatOpponent.name,
+          level: g.combatOpponent.level,
+          health: g.combatOpponent.health,
+          maxHealth: g.combatOpponent.maxHealth,
+          stats: g.combatOpponent.stats,
+          weapons: g.combatOpponent.weapons || DEFAULT_WEAPONS,
+          cashReward: g.combatOpponent.cashReward,
+          xpReward: g.combatOpponent.level * 25,
+        }}
+        onFinish={(outcome, enemy, finalPlayerHealth) => {
+          let cashEarned = 0;
+          let xpEarned = enemy.xpReward || 50;
+
+          if (outcome === "mug") {
+            cashEarned = Math.floor((enemy.cashReward || 100) * (0.4 + Math.random() * 0.4));
+            xpEarned = Math.floor(xpEarned * 0.25);
+          } else if (outcome === "leave") {
+            xpEarned = Math.floor(xpEarned * 1.5);
+          }
+
+          g.setGameState((prev) => ({
+            ...prev,
+            cash: prev.cash + cashEarned,
+            xp: prev.xp + xpEarned,
+            health: finalPlayerHealth,
+            fightsWon: prev.fightsWon + 1,
+          }));
+
+          g.log(
+            `COMBAT VICTORY (${outcome.toUpperCase()}): Earned ${cashEarned ? `$${cashEarned}` : ""} and ${xpEarned} XP.`,
+            "combat"
+          );
+          g.setCombatOpponent(null);
+          g.setCurrentScreen("city");
+        }}
+        onDefeat={(finalPlayerHealth) => {
+          g.setGameState((prev) => ({
+            ...prev,
+            health: 0,
+            fightsLost: prev.fightsLost + 1,
+            hospitalUntil: Date.now() + HOSPITAL_MINUTES * 60000,
+          }));
+          g.log("COMBAT LOSS: Knocked out and hospitalized.", "failure");
+          g.setCombatOpponent(null);
+          g.setCurrentScreen("city");
+        }}
+      />
+    );
+  }
+
   return (
-    <>
-      <Panel title="Available Targets">
-        <div className="ui-grid two-col">
-          {PLAYER_PROFILES.map((o) => (
-            <div className="card target-card" key={o.id}>
-              <div className="card-header-split">
-                <span className="card-tag">LV {o.level}</span>
-                <span className="status-badge">{o.status}</span>
-              </div>
-              <h3>{o.name}</h3>
-              <p>{o.title} · {o.location}</p>
-              <div className="data-list">
-                <div className="data-row"><span>Health</span><b>{o.health}/{o.maxHealth}</b></div>
-                <div className="data-row"><span>Reward</span><b>{money(o.cashReward)}</b></div>
-                <div className="data-row"><span>Win Chance</span><b>{calculateWinChance(g.gameState.stats, o.stats)}%</b></div>
-              </div>
-              <Button onClick={() => g.attack(o)} disabled={Boolean(g.gameState.jailUntil || g.gameState.hospitalUntil) || g.gameState.energy < 10}>
-                Attack (10 ⚡)
-              </Button>
+    <Panel title="Available Targets">
+      <div className="ui-grid two-col">
+        {PLAYER_PROFILES.map((o) => (
+          <div className="card target-card" key={o.id}>
+            <div className="card-header-split">
+              <span className="card-tag">LV {o.level}</span>
+              <span className="status-badge">{o.status}</span>
             </div>
-          ))}
-        </div>
-      </Panel>
-      {g.combatOpponent && (
-        <Panel title={`Engagement: ${g.combatOpponent.name}`}>
-          <div className="combat-console">
-            <p>{g.combatMessage}</p>
-            <Button onClick={g.resolveAttack} disabled={g.gameState.energy < 10}>
-              Execute Strike
+            <h3>{o.name}</h3>
+            <p>{o.title} · {o.location}</p>
+            <div className="data-list">
+              <div className="data-row"><span>Health</span><b>{o.health}/{o.maxHealth}</b></div>
+              <div className="data-row"><span>Reward</span><b>{money(o.cashReward)}</b></div>
+              <div className="data-row"><span>Win Chance</span><b>{calculateWinChance(g.gameState.stats, o.stats)}%</b></div>
+            </div>
+            <Button onClick={() => g.attack(o)} disabled={Boolean(g.gameState.jailUntil || g.gameState.hospitalUntil) || g.gameState.energy < 10}>
+              Attack (10 ⚡)
             </Button>
           </div>
-        </Panel>
-      )}
-    </>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
