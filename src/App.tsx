@@ -28,7 +28,6 @@ import {
 } from "./systems/gymSystem";
 import {
   DEFAULT_WEAPONS,
-  PLAYER_PROFILES,
   PlayerProfile,
   calculateWinChance,
   simulateCombat,
