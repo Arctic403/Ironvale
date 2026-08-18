@@ -782,147 +782,170 @@ function App() {
   const title = nav.find((n) => n.id === g.currentScreen)?.label || "RiftCity";
 
   return (
-    <div className="app-shell">
-      {/* HEADER BAR */}
-      <header className="topbar">
-        <div>
-          <strong>RIFTCITY</strong>
-          <span className="muted" style={{ marginLeft: "6px" }}>CORE</span>
+    <div className="layout-root">
+      {/* LEFT NAVIGATION RAIL */}
+      <aside className="nav-rail">
+        <div className="brand">
+          <h2>RIFTCITY</h2>
+          <span className="badge">v2.0</span>
         </div>
-        <div className="topstats">
-          <span>LV {g.level}</span>
-          <span>💵 {money(g.gameState.cash)}</span>
-          <span>🏦 {money(g.gameState.bank)}</span>
-          <span>💎 {g.gameState.points} Points</span>
-        </div>
-      </header>
-
-      {/* RESOURCE BARS PANEL */}
-      <section style={styles.resourcePanel}>
-        <div style={styles.meterContainer}>
-          <div style={styles.meterHeader}>
-            <span style={{ ...styles.meterTitle, color: '#e74c3c' }}>⚡ Energy</span>
-            <span>{g.gameState.energy} / {MAX_ENERGY}</span>
-          </div>
-          <div style={styles.track}>
-            <div style={{ ...styles.fill, width: `${energyPct}%`, backgroundColor: '#e74c3c' }} />
-          </div>
-        </div>
-
-        <div style={styles.meterContainer}>
-          <div style={styles.meterHeader}>
-            <span style={{ ...styles.meterTitle, color: '#e67e22' }}>🔥 Nerve</span>
-            <span>{g.gameState.nerve} / {g.maxNerve}</span>
-          </div>
-          <div style={styles.track}>
-            <div style={{ ...styles.fill, width: `${nervePct}%`, backgroundColor: '#e67e22' }} />
-          </div>
-        </div>
-
-        <div style={styles.meterContainer}>
-          <div style={styles.meterHeader}>
-            <span style={{ ...styles.meterTitle, color: '#f1c40f' }}>😊 Happiness</span>
-            <span>{Math.floor(g.gameState.happiness)} / {maxHappy}</span>
-          </div>
-          <div style={styles.track}>
-            <div style={{ ...styles.fill, width: `${happyPct}%`, backgroundColor: '#f1c40f' }} />
-          </div>
-        </div>
-
-        <div style={styles.meterContainer}>
-          <div style={styles.meterHeader}>
-            <span style={{ ...styles.meterTitle, color: '#2ecc71' }}>❤️ Life</span>
-            <span>{Math.floor(g.gameState.health)} / {g.maxHealth}</span>
-          </div>
-          <div style={styles.track}>
-            <div style={{ ...styles.fill, width: `${lifePct}%`, backgroundColor: '#2ecc71' }} />
-          </div>
-        </div>
-      </section>
-
-      {/* SIDEBAR NAVIGATION */}
-      <aside className="sidebar">
-        {nav.map((n) => (
-          <button className={g.currentScreen === n.id ? "nav active" : "nav"} onClick={() => g.setCurrentScreen(n.id)} key={n.id}>
-            <span>{n.icon}</span>
-            {n.label}
+        <nav className="nav-list">
+          {nav.map((n) => (
+            <button
+              key={n.id}
+              className={`nav-item ${g.currentScreen === n.id ? "active" : ""}`}
+              onClick={() => g.setCurrentScreen(n.id)}
+            >
+              <span className="nav-icon">{n.icon}</span>
+              <span className="nav-label">{n.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="nav-footer">
+          <button className="btn-secondary" onClick={g.randomEncounter}>
+            🎲 Explore
           </button>
-        ))}
-        <div className="side-bottom">
-          <button onClick={g.randomEncounter}>🎲 Random Encounter</button>
           <button
+            className="btn-danger-ghost"
             onClick={() => {
-              if (confirm("Reset your RiftCity save?")) g.resetGame();
+              if (confirm("Reset save data?")) g.resetGame();
             }}
           >
-            ↻ Reset Save
+            ↻ Reset
           </button>
         </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
-      <main className="content">
-        <div className="page-head">
-          <div>
-            <div className="eyebrow">RIFTCITY / {g.gameState.currentLocation.toUpperCase()}</div>
-            <h1>{title}</h1>
-          </div>
-          <div className="bars">
-            <div>
-              <small>XP {levelInfo.currentXp}/100</small>
-              <div className="bar">
-                <i style={{ width: `${levelInfo.currentXp}%` }} />
+      <div className="main-wrapper">
+        {/* TOP STATUS BAR */}
+        <header className="top-status-bar">
+          <div className="user-level">
+            <span className="level-badge">LV {g.level}</span>
+            <div className="xp-container">
+              <div className="xp-text">XP {levelInfo.currentXp}/100</div>
+              <div className="bar-track">
+                <div className="bar-fill xp" style={{ width: `${levelInfo.currentXp}%` }} />
               </div>
             </div>
           </div>
-        </div>
-
-        {g.gameState.jailUntil && <div className="alert jail">🔒 JAILED · {formatTime(timeLeft(g.gameState.jailUntil))} remaining</div>}
-        {g.gameState.hospitalUntil && <div className="alert hospital">🏥 HOSPITAL · {formatTime(timeLeft(g.gameState.hospitalUntil))} remaining</div>}
-
-        {g.currentScreen === "character" && <Character g={g} />}
-        {g.currentScreen === "city" && <City g={g} />}
-        {g.currentScreen === "crimes" && <Crimes g={g} />}
-        {g.currentScreen === "combat" && <Combat g={g} />}
-        {g.currentScreen === "gym" && <GymView g={g} />}
-        {g.currentScreen === "jobs" && <Jobs g={g} />}
-        {g.currentScreen === "items" && <Items g={g} />}
-        {g.currentScreen === "missions" && <Missions g={g} />}
-        {g.currentScreen === "education" && <Education g={g} />}
-        {g.currentScreen === "property" && <PropertyView g={g} />}
-        {g.currentScreen === "market" && <Market g={g} />}
-        {g.currentScreen === "faction" && <Faction g={g} />}
-        {g.currentScreen === "awards" && <Awards g={g} />}
-
-        <section className="panel activity">
-          <div className="panel-title">
-            <span>Activity Log</span>
-            <small>Latest events</small>
+          <div className="currency-bar">
+            <div className="currency-item">💵 {money(g.gameState.cash)}</div>
+            <div className="currency-item">🏦 {money(g.gameState.bank)}</div>
+            <div className="currency-item">💎 {g.gameState.points} Pts</div>
           </div>
-          {g.gameState.activities.slice(0, 10).map((a) => (
-            <div className={`activity-row ${a.type}`} key={a.id}>
-              <span>{new Date(a.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-              <b>{a.type.toUpperCase()}</b>
-              <p>{a.text}</p>
-            </div>
-          ))}
-        </section>
-      </main>
+        </header>
 
+        {/* VITAL METERS ROW */}
+        <section className="vitals-row">
+          <div className="vital-card">
+            <div className="vital-header">
+              <span>⚡ Energy</span>
+              <span className="vital-val">{g.gameState.energy}/{MAX_ENERGY}</span>
+            </div>
+            <div className="bar-track">
+              <div className="bar-fill energy" style={{ width: `${energyPct}%` }} />
+            </div>
+          </div>
+
+          <div className="vital-card">
+            <div className="vital-header">
+              <span>🔥 Nerve</span>
+              <span className="vital-val">{g.gameState.nerve}/{g.maxNerve}</span>
+            </div>
+            <div className="bar-track">
+              <div className="bar-fill nerve" style={{ width: `${nervePct}%` }} />
+            </div>
+          </div>
+
+          <div className="vital-card">
+            <div className="vital-header">
+              <span>😊 Happiness</span>
+              <span className="vital-val">{Math.floor(g.gameState.happiness)}/{maxHappy}</span>
+            </div>
+            <div className="bar-track">
+              <div className="bar-fill happy" style={{ width: `${happyPct}%` }} />
+            </div>
+          </div>
+
+          <div className="vital-card">
+            <div className="vital-header">
+              <span>❤️ Life</span>
+              <span className="vital-val">{Math.floor(g.gameState.health)}/{g.maxHealth}</span>
+            </div>
+            <div className="bar-track">
+              <div className="bar-fill life" style={{ width: `${lifePct}%` }} />
+            </div>
+          </div>
+        </section>
+
+        {/* SCREEN CONTAINER */}
+        <main className="screen-container">
+          <div className="screen-header">
+            <span className="location-tag">LOCATION: {g.gameState.currentLocation.toUpperCase()}</span>
+            <h1>{title}</h1>
+          </div>
+
+          {g.gameState.jailUntil && (
+            <div className="status-alert jail">
+              🔒 JAILED · {formatTime(timeLeft(g.gameState.jailUntil))} remaining
+            </div>
+          )}
+          {g.gameState.hospitalUntil && (
+            <div className="status-alert hospital">
+              🏥 HOSPITAL · {formatTime(timeLeft(g.gameState.hospitalUntil))} remaining
+            </div>
+          )}
+
+          {g.currentScreen === "character" && <Character g={g} />}
+          {g.currentScreen === "city" && <City g={g} />}
+          {g.currentScreen === "crimes" && <Crimes g={g} />}
+          {g.currentScreen === "combat" && <Combat g={g} />}
+          {g.currentScreen === "gym" && <GymView g={g} />}
+          {g.currentScreen === "jobs" && <Jobs g={g} />}
+          {g.currentScreen === "items" && <Items g={g} />}
+          {g.currentScreen === "missions" && <Missions g={g} />}
+          {g.currentScreen === "education" && <Education g={g} />}
+          {g.currentScreen === "property" && <PropertyView g={g} />}
+          {g.currentScreen === "market" && <Market g={g} />}
+          {g.currentScreen === "faction" && <Faction g={g} />}
+          {g.currentScreen === "awards" && <Awards g={g} />}
+
+          {/* ACTIVITY FEED */}
+          <section className="card activity-card">
+            <div className="card-header">
+              <h3>Activity Log</h3>
+            </div>
+            <div className="activity-list">
+              {g.gameState.activities.slice(0, 8).map((a) => (
+                <div className={`activity-item ${a.type}`} key={a.id}>
+                  <span className="time">{new Date(a.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="type-tag">{a.type.toUpperCase()}</span>
+                  <p className="desc">{a.text}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
+
+      {/* ENCOUNTER MODAL */}
       {g.encounter && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <span className="eyebrow">RANDOM ENCOUNTER</span>
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <span className="modal-tag">RANDOM ENCOUNTER</span>
             <h2>{g.encounter.title}</h2>
             <p>{g.encounter.text}</p>
-            {g.encounter.choices.map((c, i) => (
-              <button className="choice" key={i} onClick={() => g.chooseEncounter(c)}>
-                {c.label}
+            <div className="modal-actions">
+              {g.encounter.choices.map((c, i) => (
+                <button className="btn-primary" key={i} onClick={() => g.chooseEncounter(c)}>
+                  {c.label}
+                </button>
+              ))}
+              <button className="btn-secondary" onClick={() => g.setEncounter(null)}>
+                Leave
               </button>
-            ))}
-            <button className="ghost" onClick={() => g.setEncounter(null)}>
-              Leave
-            </button>
+            </div>
           </div>
         </div>
       )}
@@ -932,18 +955,18 @@ function App() {
 
 function Panel({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`panel ${className}`}>
-      <div className="panel-title">
-        <span>{title}</span>
+    <section className={`card ${className}`}>
+      <div className="card-header">
+        <h3>{title}</h3>
       </div>
-      {children}
+      <div className="card-body">{children}</div>
     </section>
   );
 }
 
 function Button({ children, onClick, disabled = false, className = "" }: { children: React.ReactNode; onClick: () => void; disabled?: boolean; className?: string }) {
   return (
-    <button className={`action ${className}`} disabled={disabled} onClick={onClick}>
+    <button className={`btn-primary ${className}`} disabled={disabled} onClick={onClick}>
       {children}
     </button>
   );
@@ -953,101 +976,67 @@ function Character({ g }: { g: ReturnType<typeof useRiftCity> }) {
   const [amount, setAmount] = useState("100");
   const n = Math.max(0, Number(amount) || 0);
   return (
-    <div className="grid two">
+    <div className="ui-grid two-col">
       <Panel title="Combat Stats">
-        <div className="stat-grid">
+        <div className="stats-list">
           {Object.entries(g.gameState.stats).map(([k, v]) => (
-            <div className="stat" key={k}>
-              <span>{k}</span>
-              <strong>{(v as number).toFixed(2)}</strong>
+            <div className="stat-row" key={k}>
+              <span className="stat-name">{k}</span>
+              <strong className="stat-val">{(v as number).toFixed(2)}</strong>
             </div>
           ))}
         </div>
       </Panel>
       <Panel title="Core Resources">
-        <div className="resource-grid">
-          <div>
-            <b>❤️ Health</b>
-            <span>
-              {Math.floor(g.gameState.health)} / {g.maxHealth}
-            </span>
+        <div className="data-list">
+          <div className="data-row">
+            <span>❤️ Health</span>
+            <b>{Math.floor(g.gameState.health)} / {g.maxHealth}</b>
           </div>
-          <div>
-            <b>⚡ Energy</b>
-            <span>
-              {g.gameState.energy} / {MAX_ENERGY}
-            </span>
+          <div className="data-row">
+            <span>⚡ Energy</span>
+            <b>{g.gameState.energy} / {MAX_ENERGY}</b>
           </div>
-          <div>
-            <b>🧠 Nerve</b>
-            <span>
-              {g.gameState.nerve} / {g.maxNerve}
-            </span>
+          <div className="data-row">
+            <span>🧠 Nerve</span>
+            <b>{g.gameState.nerve} / {g.maxNerve}</b>
           </div>
-          <div>
-            <b>😊 Happiness</b>
-            <span>
-              {Math.floor(g.gameState.happiness)} / {getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100}
-            </span>
+          <div className="data-row">
+            <span>😊 Happiness</span>
+            <b>{Math.floor(g.gameState.happiness)} / {getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100}</b>
           </div>
         </div>
       </Panel>
-      <Panel title="Progress">
-        <div className="rows">
-          <p>
-            <span>Crime experience</span>
+      <Panel title="Progress Overview">
+        <div className="data-list">
+          <div className="data-row">
+            <span>Crime Experience</span>
             <b>{g.gameState.crimeExperience}</b>
-          </p>
-          <p>
-            <span>Gym experience</span>
+          </div>
+          <div className="data-row">
+            <span>Gym Experience</span>
             <b>{g.gameState.gymExperience}</b>
-          </p>
-          <p>
-            <span>Crimes</span>
-            <b>
-              {g.gameState.crimesCompleted} / {g.gameState.crimesFailed} failed
-            </b>
-          </p>
-          <p>
-            <span>Fights</span>
-            <b>
-              {g.gameState.fightsWon}W / {g.gameState.fightsLost}L
-            </b>
-          </p>
-          <p>
-            <span>Current job</span>
-            <b>{g.job?.title ?? "Unemployed"}</b>
-          </p>
-          <p>
-            <span>Property</span>
-            <b>{getProperty(g.gameState.ownedProperty)?.name}</b>
-          </p>
-        </div>
-      </Panel>
-      <Panel title="Bank">
-        <div className="bank">
-          <h3>{money(g.gameState.bank)}</h3>
-          <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <div>
-            <Button onClick={() => g.bankDeposit(n)}>Deposit</Button>
-            <Button onClick={() => g.bankWithdraw(n)}>Withdraw</Button>
+          </div>
+          <div className="data-row">
+            <span>Crimes Completed</span>
+            <b>{g.gameState.crimesCompleted} / {g.gameState.crimesFailed} failed</b>
+          </div>
+          <div className="data-row">
+            <span>Fight Record</span>
+            <b>{g.gameState.fightsWon}W / {g.gameState.fightsLost}L</b>
           </div>
         </div>
       </Panel>
-      <Panel title="Wallet & Equipment">
-        <div className="rows">
-          <p>
-            <span>Cash</span>
-            <b>{money(g.gameState.cash)}</b>
-          </p>
-          <p>
-            <span>Weapon</span>
-            <b>{getItem(g.gameState.equippedWeapon || "")?.name || "None"}</b>
-          </p>
-          <p>
-            <span>Armor</span>
-            <b>{getItem(g.gameState.equippedArmor || "")?.name || "None"}</b>
-          </p>
+      <Panel title="Bank Vault">
+        <div className="bank-control">
+          <h2 className="bank-balance">{money(g.gameState.bank)}</h2>
+          <div className="input-group">
+            <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <div className="btn-group">
+              <Button onClick={() => g.bankDeposit(n)}>Deposit</Button>
+              <Button onClick={() => g.bankWithdraw(n)}>Withdraw</Button>
+            </div>
+          </div>
         </div>
       </Panel>
     </div>
@@ -1057,21 +1046,21 @@ function Character({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function City({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
     <>
-      <div className="grid four">
+      <div className="ui-grid four-col">
         {LOCATIONS.map(([id, name, desc]) => (
-          <div className="card" key={id}>
-            <span className="eyebrow">LOCATION</span>
+          <div className="card location-card" key={id}>
+            <span className="card-tag">DISTRICT</span>
             <h3>{name}</h3>
             <p>{desc}</p>
             <Button onClick={() => g.travel(id)}>{g.gameState.currentLocation === id ? "Current Location" : "Travel"}</Button>
           </div>
         ))}
       </div>
-      <Panel title="City Interactions">
-        <div className="grid three">
-          <Button onClick={g.randomEncounter}>🎲 Explore</Button>
-          <Button onClick={() => g.setCurrentScreen("crimes")}>🕵️ Find Work</Button>
-          <Button onClick={() => g.setCurrentScreen("combat")}>⚔️ Find a Fight</Button>
+      <Panel title="District Actions">
+        <div className="ui-grid three-col">
+          <Button onClick={g.randomEncounter}>🎲 Explore Area</Button>
+          <Button onClick={() => g.setCurrentScreen("crimes")}>🕵️ Street Hustles</Button>
+          <Button onClick={() => g.setCurrentScreen("combat")}>⚔️ Arena Fights</Button>
         </div>
       </Panel>
     </>
@@ -1080,24 +1069,21 @@ function City({ g }: { g: ReturnType<typeof useRiftCity> }) {
 
 function Crimes({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
-    <div className="grid two">
+    <div className="ui-grid two-col">
       {CRIMES.map((c) => {
         const chance = crimeSuccessChance(c, g.gameState.crimeExperience, 1, getCrimeStatBonus(g.gameState.stats));
         const unlocked = crimeUnlocked(c, g.gameState.crimeExperience);
         return (
-          <div className={`card ${unlocked ? "" : "locked"}`} key={c.id}>
-            <div className="card-top">
-              <span className="tag">NERVE {c.nerve}</span>
-              <span className="chance">{unlocked ? `${chance.toFixed(0)}%` : `CE ${c.crimeExperienceRequired}`}</span>
+          <div className={`card crime-card ${unlocked ? "" : "disabled"}`} key={c.id}>
+            <div className="card-header-split">
+              <span className="card-tag">NERVE {c.nerve}</span>
+              <span className="chance-badge">{unlocked ? `${chance.toFixed(0)}% Success` : `Requires CE ${c.crimeExperienceRequired}`}</span>
             </div>
             <h3>{c.name}</h3>
             <p>{c.description}</p>
-            <div className="meter">
-              <i style={{ width: `${unlocked ? chance : 0}%` }} />
+            <div className="bar-track">
+              <div className="bar-fill crime" style={{ width: `${unlocked ? chance : 0}%` }} />
             </div>
-            <small>
-              Success chance · risk {c.risk}%
-            </small>
             <Button disabled={!unlocked || g.gameState.nerve < c.nerve} onClick={() => g.commitCrime(c)}>
               Commit Crime
             </Button>
@@ -1111,67 +1097,34 @@ function Crimes({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function Combat({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
     <>
-      <Panel title="Target Selection">
-        <p>Select an opponent to initiate combat. Check your win probability and combat stats before engaging.</p>
-        <div className="grid two">
+      <Panel title="Available Targets">
+        <div className="ui-grid two-col">
           {PLAYER_PROFILES.map((o) => (
-            <div className="card" key={o.id}>
-              <div className="card-top">
-                <span className="tag">LV {o.level}</span>
-                <span className="chance">{o.status}</span>
+            <div className="card target-card" key={o.id}>
+              <div className="card-header-split">
+                <span className="card-tag">LV {o.level}</span>
+                <span className="status-badge">{o.status}</span>
               </div>
               <h3>{o.name}</h3>
-              <p>
-                {o.title} · {o.location}
-              </p>
-              <div className="rows">
-                <p>
-                  <span>Health</span>
-                  <b>
-                    {o.health}/{o.maxHealth}
-                  </b>
-                </p>
-                <p>
-                  <span>Faction</span>
-                  <b>{o.faction}</b>
-                </p>
-                <p>
-                  <span>Weapon</span>
-                  <b>{o.weapon}</b>
-                </p>
-                <p>
-                  <span>Armor</span>
-                  <b>{o.armor}</b>
-                </p>
-                <p>
-                  <span>Reward Cash</span>
-                  <b>{money(o.cashReward)}</b>
-                </p>
+              <p>{o.title} · {o.location}</p>
+              <div className="data-list">
+                <div className="data-row"><span>Health</span><b>{o.health}/{o.maxHealth}</b></div>
+                <div className="data-row"><span>Reward</span><b>{money(o.cashReward)}</b></div>
+                <div className="data-row"><span>Win Chance</span><b>{calculateWinChance(g.gameState.stats, o.stats)}%</b></div>
               </div>
-              <div className="stat-grid">
-                {Object.entries(o.stats).map(([k, v]) => (
-                  <div className="stat" key={k}>
-                    <span>{k}</span>
-                    <strong>{(v as number).toFixed(0)}</strong>
-                  </div>
-                ))}
-              </div>
-              <p>
-                <small>Win chance: {calculateWinChance(g.gameState.stats, o.stats)}%</small>
-              </p>
               <Button onClick={() => g.attack(o)} disabled={Boolean(g.gameState.jailUntil || g.gameState.hospitalUntil) || g.gameState.energy < 10}>
-                Attack · 10 ⚡
+                Attack (10 ⚡)
               </Button>
             </div>
           ))}
         </div>
       </Panel>
       {g.combatOpponent && (
-        <Panel title={`Combat Engagement: ${g.combatOpponent.name}`}>
-          <div className="combat-box">
+        <Panel title={`Engagement: ${g.combatOpponent.name}`}>
+          <div className="combat-console">
             <p>{g.combatMessage}</p>
             <Button onClick={g.resolveAttack} disabled={g.gameState.energy < 10}>
-              Execute Attack
+              Execute Strike
             </Button>
           </div>
         </Panel>
@@ -1183,29 +1136,28 @@ function Combat({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function GymView({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
     <>
-      <div className="gym-switch">
+      <div className="gym-selector">
         {GYMS.filter((x) => !x.jailOnly).map((x) => (
           <button
-            className={g.gym.id === x.id ? "selected" : ""}
             key={x.id}
+            className={`gym-btn ${g.gym.id === x.id ? "active" : ""}`}
             disabled={!gymUnlocked(x, g.gameState.gymExperience)}
             onClick={() => g.buyGym(x.id)}
           >
-            {x.name}
+            <span>{x.name}</span>
             <small>{gymUnlocked(x, g.gameState.gymExperience) ? money(x.membershipCost) : `EXP ${x.gymExpRequired}`}</small>
           </button>
         ))}
       </div>
-      <Panel title={`${g.gym.name} · ${g.gym.energyCost} Energy / session`}>
-        <p>{g.gym.description}</p>
-        <div className="grid four">
+      <Panel title={`${g.gym.name} · (${g.gym.energyCost} Energy per set)`}>
+        <div className="ui-grid four-col">
           {TRAINING_STATS.map((s) => (
-            <div className="card mini" key={s.id}>
-              <span className="icon">{s.icon}</span>
+            <div className="card train-card" key={s.id}>
+              <span className="train-icon">{s.icon}</span>
               <h3>{s.name}</h3>
               <p>{s.description}</p>
               <Button disabled={!canTrainStat(g.gym, s.id) || g.gameState.energy < g.gym.energyCost} onClick={() => g.train(s.id)}>
-                Train ({g.gym.energyCost} ⚡)
+                Train
               </Button>
             </div>
           ))}
@@ -1217,44 +1169,33 @@ function GymView({ g }: { g: ReturnType<typeof useRiftCity> }) {
 
 function Jobs({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
-    <>
-      <Panel title="Employment">
-        <p>Jobs provide stable hourly cash payouts directly to your wallet.</p>
-      </Panel>
-      <div className="grid two">
-        {JOBS.map((j) => (
-          <div className="card" key={j.id}>
-            <span className="eyebrow">{j.company}</span>
-            <h3>{j.title}</h3>
-            <p>{j.description}</p>
-            <div className="rows">
-              <p>
-                <span>Hourly payout</span>
-                <b>{money(j.salary)}</b>
-              </p>
-              <p>
-                <span>Status</span>
-                <b>{g.gameState.currentJob === j.id ? "Current Job" : "Available"}</b>
-              </p>
-            </div>
-            <Button onClick={() => g.joinJob(j.id)}>{g.gameState.currentJob === j.id ? "Current Job" : "Take Job"}</Button>
+    <div className="ui-grid two-col">
+      {JOBS.map((j) => (
+        <div className="card job-card" key={j.id}>
+          <span className="card-tag">{j.company}</span>
+          <h3>{j.title}</h3>
+          <p>{j.description}</p>
+          <div className="data-row">
+            <span>Hourly Salary</span>
+            <b>{money(j.salary)}</b>
           </div>
-        ))}
-      </div>
-    </>
+          <Button onClick={() => g.joinJob(j.id)}>{g.gameState.currentJob === j.id ? "Current Position" : "Apply Now"}</Button>
+        </div>
+      ))}
+    </div>
   );
 }
 
 function Items({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
-    <div className="grid three">
+    <div className="ui-grid three-col">
       {ITEMS.map((i) => (
-        <div className="card" key={i.id}>
-          <span className="tag">{i.type}</span>
+        <div className="card item-card" key={i.id}>
+          <span className="card-tag">{i.type.toUpperCase()}</span>
           <h3>{i.name}</h3>
           <p>{i.description}</p>
-          <strong>{money(i.price)}</strong>
-          <div className="button-row">
+          <strong className="item-price">{money(i.price)}</strong>
+          <div className="btn-group">
             <Button onClick={() => g.buyItem(i.id)}>Buy</Button>
             {(g.gameState.inventory[i.id] || 0) > 0 && (
               <Button onClick={() => (i.type === "weapon" || i.type === "armor" ? g.equip(i.id) : g.useItem(i.id))}>
@@ -1262,7 +1203,7 @@ function Items({ g }: { g: ReturnType<typeof useRiftCity> }) {
               </Button>
             )}
           </div>
-          <small>Owned: {g.gameState.inventory[i.id] || 0}</small>
+          <span className="item-count">Owned: {g.gameState.inventory[i.id] || 0}</span>
         </div>
       ))}
     </div>
@@ -1271,21 +1212,22 @@ function Items({ g }: { g: ReturnType<typeof useRiftCity> }) {
 
 function Missions({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
-    <div className="grid two">
+    <div className="ui-grid two-col">
       {MISSIONS.map((m) => {
         const p = g.missionProgress(m);
         const done = g.gameState.completedMissions.includes(m.id);
         return (
-          <div className="card" key={m.id}>
-            <span className="eyebrow">MISSION</span>
+          <div className="card mission-card" key={m.id}>
+            <span className="card-tag">MISSION</span>
             <h3>{m.name}</h3>
             <p>{m.description}</p>
-            <div className="meter">
-              <i style={{ width: `${Math.min(100, (p / m.target) * 100)}%` }} />
+            <div className="bar-track">
+              <div className="bar-fill mission" style={{ width: `${Math.min(100, (p / m.target) * 100)}%` }} />
             </div>
-            <p>
-              {Math.min(p, m.target).toLocaleString()} / {m.target.toLocaleString()}
-            </p>
+            <div className="data-row">
+              <span>Progress</span>
+              <b>{Math.min(p, m.target).toLocaleString()} / {m.target.toLocaleString()}</b>
+            </div>
             <Button disabled={done || p < m.target} onClick={() => g.claimMission(m.id)}>
               {done ? "Claimed" : "Claim Reward"}
             </Button>
@@ -1299,37 +1241,25 @@ function Missions({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function Education({ g }: { g: ReturnType<typeof useRiftCity> }) {
   return (
     <>
-      <Panel title="Active Course">
+      <Panel title="Active Course Status">
         {g.education ? (
-          <>
+          <div className="course-active">
             <h3>{g.education.name}</h3>
-            <p>
-              Started {new Date(g.gameState.educationStartedAt || Date.now()).toLocaleString()} · {g.education.durationHours}h
-            </p>
+            <p>Duration: {g.education.durationHours} hours</p>
             <Button onClick={g.finishEducation}>Check Completion</Button>
-          </>
+          </div>
         ) : (
-          <p>No active course.</p>
+          <p>No course currently active.</p>
         )}
       </Panel>
-      <div className="grid two">
+      <div className="ui-grid two-col">
         {EDUCATION.map((c) => (
-          <div className="card" key={c.id}>
+          <div className="card course-card" key={c.id}>
             <h3>{c.name}</h3>
             <p>{c.description}</p>
-            <div className="rows">
-              <p>
-                <span>Cost</span>
-                <b>{money(c.cost)}</b>
-              </p>
-              <p>
-                <span>Time</span>
-                <b>{c.durationHours}h</b>
-              </p>
-              <p>
-                <span>Requirement</span>
-                <b>Level {c.levelRequired}</b>
-              </p>
+            <div className="data-list">
+              <div className="data-row"><span>Cost</span><b>{money(c.cost)}</b></div>
+              <div className="data-row"><span>Time</span><b>{c.durationHours}h</b></div>
             </div>
             <Button
               disabled={g.gameState.educationCompleted.includes(c.id) || Boolean(g.education) || g.gameState.cash < c.cost}
@@ -1347,28 +1277,19 @@ function Education({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function PropertyView({ g }: { g: ReturnType<typeof useRiftCity> }) {
   const current = getProperty(g.gameState.ownedProperty)?.price || 0;
   return (
-    <div className="grid two">
+    <div className="ui-grid two-col">
       {PROPERTIES.map((p) => (
-        <div className={`card ${p.price < current ? "locked" : ""}`} key={p.id}>
-          <span className="eyebrow">PROPERTY</span>
+        <div className={`card property-card ${p.price < current ? "disabled" : ""}`} key={p.id}>
+          <span className="card-tag">REAL ESTATE</span>
           <h3>{p.name}</h3>
           <p>{p.description}</p>
-          <div className="rows">
-            <p>
-              <span>Price</span>
-              <b>{money(p.price)}</b>
-            </p>
-            <p>
-              <span>Health bonus</span>
-              <b>+{p.maxHealthBonus}</b>
-            </p>
-            <p>
-              <span>Nerve bonus</span>
-              <b>+{p.nerveBonus}</b>
-            </p>
+          <div className="data-list">
+            <div className="data-row"><span>Price</span><b>{money(p.price)}</b></div>
+            <div className="data-row"><span>Health Bonus</span><b>+{p.maxHealthBonus}</b></div>
+            <div className="data-row"><span>Nerve Bonus</span><b>+{p.nerveBonus}</b></div>
           </div>
           <Button disabled={p.price < current || g.gameState.cash < p.price} onClick={() => g.buyProperty(p.id)}>
-            {g.gameState.ownedProperty === p.id ? "Current Home" : "Move In"}
+            {g.gameState.ownedProperty === p.id ? "Current Residence" : "Purchase"}
           </Button>
         </div>
       ))}
@@ -1379,25 +1300,22 @@ function PropertyView({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function Market({ g }: { g: ReturnType<typeof useRiftCity> }) {
   const goods = Object.keys(g.gameState.market);
   return (
-    <Panel title="City Market">
-      <p>Prices fluctuate dynamically. Buy low and sell high across trade goods.</p>
-      <div className="grid four">
-        {goods.map((id) => {
-          return (
-            <div className="card mini" key={id}>
-              <span className="tag">TRADEABLE</span>
-              <h3>{id.toUpperCase()}</h3>
-              <p>Current price: {money(g.gameState.market[id])}</p>
-              <small>Owned: {g.gameState.inventory[id] || 0}</small>
-              <div className="button-row">
-                <Button onClick={() => g.tradeMarket(id, true)}>Buy</Button>
-                <Button onClick={() => g.tradeMarket(id, false)} disabled={!g.gameState.inventory[id]}>
-                  Sell
-                </Button>
-              </div>
+    <Panel title="Dynamic Commodities Market">
+      <div className="ui-grid four-col">
+        {goods.map((id) => (
+          <div className="card market-card" key={id}>
+            <span className="card-tag">COMMODITY</span>
+            <h3>{id.toUpperCase()}</h3>
+            <p>Unit Price: {money(g.gameState.market[id])}</p>
+            <span className="item-count">Owned: {g.gameState.inventory[id] || 0}</span>
+            <div className="btn-group">
+              <Button onClick={() => g.tradeMarket(id, true)}>Buy</Button>
+              <Button onClick={() => g.tradeMarket(id, false)} disabled={!g.gameState.inventory[id]}>
+                Sell
+              </Button>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </Panel>
   );
@@ -1406,20 +1324,19 @@ function Market({ g }: { g: ReturnType<typeof useRiftCity> }) {
 function Faction({ g }: { g: ReturnType<typeof useRiftCity> }) {
   const factions = ["Iron Syndicate", "Rift Guard", "Dock Union"];
   return (
-    <Panel title="Faction">
-      <p>Faction reputation unlocks status and earns points. Membership is persistent.</p>
-      <div className="grid three">
+    <Panel title="Faction Headquarters">
+      <div className="ui-grid three-col">
         {factions.map((f) => (
-          <div className={`card ${g.gameState.faction && g.gameState.faction !== f ? "locked" : ""}`} key={f}>
+          <div className={`card faction-card ${g.gameState.faction && g.gameState.faction !== f ? "disabled" : ""}`} key={f}>
             <h3>{f}</h3>
-            <p>{g.gameState.faction === f ? `Reputation: ${g.gameState.factionReputation}` : "Join for $500"}</p>
+            <p>{g.gameState.faction === f ? `Reputation: ${g.gameState.factionReputation}` : "Entry Fee: $500"}</p>
             <Button disabled={Boolean(g.gameState.faction) && g.gameState.faction !== f} onClick={() => g.joinFaction(f)}>
-              {g.gameState.faction === f ? "Member" : "Join"}
+              {g.gameState.faction === f ? "Member" : "Join Faction"}
             </Button>
           </div>
         ))}
       </div>
-      {g.gameState.faction && <Button onClick={g.workFaction}>Work for faction · 10 ⚡</Button>}
+      {g.gameState.faction && <Button className="mt-4" onClick={g.workFaction}>Complete Faction Work (10 ⚡)</Button>}
     </Panel>
   );
 }
@@ -1436,82 +1353,22 @@ function Awards({ g }: { g: ReturnType<typeof useRiftCity> }) {
 
   return (
     <>
-      <Panel title="Awards & Merits">
-        <p>Permanent milestones grant merit points.</p>
-        <div className="grid three">
+      <Panel title="Milestones & Achievements">
+        <div className="ui-grid three-col">
           {awards.map(([name, done]) => (
-            <div className={`card ${done ? "" : "locked"}`} key={name}>
+            <div className={`card achievement-card ${done ? "unlocked" : "locked"}`} key={name}>
               <h3>{name}</h3>
-              <p>{done ? "Unlocked" : "Locked"}</p>
+              <span className="status-text">{done ? "Unlocked" : "Locked"}</span>
               {done && !g.gameState.achievements.includes(name) && <Button onClick={() => g.earnMerit(name)}>Claim Merit</Button>}
             </div>
           ))}
         </div>
-        <div className="rows">
-          <p>
-            <span>Merits</span>
-            <b>{g.gameState.merits}</b>
-          </p>
-          <p>
-            <span>Points</span>
-            <b>{g.gameState.points}</b>
-          </p>
-          <p>
-            <span>Daily streak</span>
-            <b>{g.gameState.dailyStreak}</b>
-          </p>
-          <p>
-            <span>Bank interest earned</span>
-            <b>{money(g.gameState.bankInterest)}</b>
-          </p>
-        </div>
       </Panel>
-      <Panel title="Daily">
-        <p>{g.gameState.lastDailyClaim && Date.now() - g.gameState.lastDailyClaim < DAILY_INTERVAL ? "Claimed for today." : "Ready to claim."}</p>
-        <Button onClick={g.claimDaily}>Claim Daily Reward</Button>
+      <Panel title="Daily Rewards">
+        <Button onClick={g.claimDaily}>Claim Daily Bonus</Button>
       </Panel>
     </>
   );
 }
-
-// INLINE RESOURCE BAR STYLES
-const styles: { [key: string]: React.CSSProperties } = {
-  resourcePanel: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '12px',
-    backgroundColor: '#1b1d22',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    margin: '12px 16px',
-    border: '1px solid #2d3139',
-  },
-  meterContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-  },
-  meterHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '0.8rem',
-    fontWeight: '600',
-    color: '#a0a5b1',
-  },
-  meterTitle: {
-    fontWeight: 'bold',
-  },
-  track: {
-    width: '100%',
-    height: '8px',
-    backgroundColor: '#0f1013',
-    borderRadius: '4px',
-    overflow: 'hidden',
-  },
-  fill: {
-    height: '100%',
-    transition: 'width 0.3s ease-in-out',
-  },
-};
 
 export default App;
