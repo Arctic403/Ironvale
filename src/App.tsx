@@ -322,70 +322,76 @@ export function useRiftCity() {
     const id = window.setInterval(() => {
       const now = Date.now();
       setGameState((prev) => {
-        let s = { ...prev };
         let changed = false;
-        if (s.energy < MAX_ENERGY) {
-          const ticks = Math.floor((now - s.lastEnergyUpdate) / ENERGY_REGEN_INTERVAL);
+        const updates: Partial<SaveData> = {};
+
+        if (prev.energy < MAX_ENERGY) {
+          const ticks = Math.floor((now - prev.lastEnergyUpdate) / ENERGY_REGEN_INTERVAL);
           if (ticks > 0) {
-            s.energy = Math.min(MAX_ENERGY, s.energy + ticks);
-            s.lastEnergyUpdate += ticks * ENERGY_REGEN_INTERVAL;
+            updates.energy = Math.min(MAX_ENERGY, prev.energy + ticks);
+            updates.lastEnergyUpdate = prev.lastEnergyUpdate + ticks * ENERGY_REGEN_INTERVAL;
             changed = true;
           }
-        } else s.lastEnergyUpdate = now;
+        } else {
+          updates.lastEnergyUpdate = now;
+        }
 
-        if (s.nerve < maxNerve) {
-          const ticks = Math.floor((now - s.lastNerveUpdate) / NERVE_REGEN_INTERVAL);
+        if (prev.nerve < maxNerve) {
+          const ticks = Math.floor((now - prev.lastNerveUpdate) / NERVE_REGEN_INTERVAL);
           if (ticks > 0) {
-            s.nerve = Math.min(maxNerve, s.nerve + ticks);
-            s.lastNerveUpdate += ticks * NERVE_REGEN_INTERVAL;
+            updates.nerve = Math.min(maxNerve, prev.nerve + ticks);
+            updates.lastNerveUpdate = prev.lastNerveUpdate + ticks * NERVE_REGEN_INTERVAL;
             changed = true;
           }
-        } else s.lastNerveUpdate = now;
+        } else {
+          updates.lastNerveUpdate = now;
+        }
 
-        if (s.happiness < (property?.maxHappiness ?? 100)) {
-          const ticks = Math.floor((now - s.lastHappinessUpdate) / HAPPINESS_TICK);
+        const maxHap = property?.maxHappiness ?? 100;
+        if (prev.happiness < maxHap) {
+          const ticks = Math.floor((now - prev.lastHappinessUpdate) / HAPPINESS_TICK);
           if (ticks > 0) {
-            s.happiness = Math.min(property?.maxHappiness ?? 100, s.happiness + ticks * 5);
-            s.lastHappinessUpdate += ticks * HAPPINESS_TICK;
+            updates.happiness = Math.min(maxHap, prev.happiness + ticks * 5);
+            updates.lastHappinessUpdate = prev.lastHappinessUpdate + ticks * HAPPINESS_TICK;
             changed = true;
           }
         }
 
-        if (s.health < maxHealth && !s.hospitalUntil && !s.jailUntil) {
-          s.health = Math.min(maxHealth, s.health + 1);
+        if (prev.health < maxHealth && !prev.hospitalUntil && !prev.jailUntil) {
+          updates.health = Math.min(maxHealth, prev.health + 1);
           changed = true;
         }
 
-        if (s.jailUntil && now >= s.jailUntil) {
-          s.jailUntil = null;
+        if (prev.jailUntil && now >= prev.jailUntil) {
+          updates.jailUntil = null;
           changed = true;
         }
 
-        if (s.hospitalUntil && now >= s.hospitalUntil) {
-          s.hospitalUntil = null;
-          s.health = maxHealth;
+        if (prev.hospitalUntil && now >= prev.hospitalUntil) {
+          updates.hospitalUntil = null;
+          updates.health = maxHealth;
           changed = true;
         }
 
-        if (s.bank > 0 && now - (s.lastBankInterest || now) >= BANK_INTEREST_INTERVAL) {
-          const days = Math.floor((now - s.lastBankInterest) / BANK_INTEREST_INTERVAL);
+        if (prev.bank > 0 && now - (prev.lastBankInterest || now) >= BANK_INTEREST_INTERVAL) {
+          const days = Math.floor((now - prev.lastBankInterest) / BANK_INTEREST_INTERVAL);
           if (days > 0) {
-            const interest = Math.floor(s.bank * 0.01 * days);
-            s.bank += interest;
-            s.bankInterest += interest;
-            s.lastBankInterest += days * BANK_INTEREST_INTERVAL;
+            const interest = Math.floor(prev.bank * 0.01 * days);
+            updates.bank = prev.bank + interest;
+            updates.bankInterest = prev.bankInterest + interest;
+            updates.lastBankInterest = prev.lastBankInterest + days * BANK_INTEREST_INTERVAL;
             changed = true;
           }
         }
 
-        if (s.currentJob && now - s.lastJobPayment >= JOB_PAY_INTERVAL && job) {
-          const ticks = Math.floor((now - s.lastJobPayment) / JOB_PAY_INTERVAL);
-          s.cash += job.salary * ticks;
-          s.lastJobPayment += ticks * JOB_PAY_INTERVAL;
+        if (prev.currentJob && now - prev.lastJobPayment >= JOB_PAY_INTERVAL && job) {
+          const ticks = Math.floor((now - prev.lastJobPayment) / JOB_PAY_INTERVAL);
+          updates.cash = (updates.cash ?? prev.cash) + job.salary * ticks;
+          updates.lastJobPayment = prev.lastJobPayment + ticks * JOB_PAY_INTERVAL;
           changed = true;
         }
 
-        return changed ? s : prev;
+        return changed ? { ...prev, ...updates } : prev;
       });
     }, 1000);
     return () => window.clearInterval(id);
@@ -776,7 +782,6 @@ function App() {
   const energyNextTick = g.gameState.energy >= MAX_ENERGY ? 0 : Math.max(0, ENERGY_REGEN_INTERVAL - ((now - g.gameState.lastEnergyUpdate) % ENERGY_REGEN_INTERVAL));
   const nerveNextTick = g.gameState.nerve >= g.maxNerve ? 0 : Math.max(0, NERVE_REGEN_INTERVAL - ((now - g.gameState.lastNerveUpdate) % NERVE_REGEN_INTERVAL));
   const happyNextTick = g.gameState.happiness >= maxHappy ? 0 : Math.max(0, HAPPINESS_TICK - ((now - g.gameState.lastHappinessUpdate) % HAPPINESS_TICK));
-  const healthNextTick = g.gameState.health >= g.maxHealth ? 0 : Math.max(0, HEALTH_REGEN_INTERVAL - (now % HEALTH_REGEN_INTERVAL));
 
   const nav: { id: Screen; label: string; icon: string }[] = [
     { id: "character", label: "Character", icon: "👤" },
@@ -909,7 +914,7 @@ function App() {
                 <>
                   <h2>❤️ Health</h2>
                   <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '12px 0' }}>{Math.floor(g.gameState.health)} / {g.maxHealth}</p>
-                  <p style={{ color: '#a1a1aa' }}>{g.gameState.health >= g.maxHealth ? "Full health" : `Next +1 tick in: ${formatTime(healthNextTick)}`}</p>
+                  <p style={{ color: '#a1a1aa' }}>{g.gameState.health >= g.maxHealth ? "Full health" : "Regenerates over time"}</p>
                 </>
               )}
 
@@ -1185,7 +1190,7 @@ function Combat({ g }: { g: ReturnType<typeof useRiftCity> }) {
           g.setCombatOpponent(null);
           g.setCurrentScreen("city");
         }}
-        onDefeat={(finalPlayerHealth) => {
+        onDefeat={() => {
           g.setGameState((prev) => ({
             ...prev,
             health: 0,
@@ -1429,7 +1434,11 @@ function Faction({ g }: { g: ReturnType<typeof useRiftCity> }) {
           </div>
         ))}
       </div>
-      {g.gameState.faction && <Button className="mt-4" onClick={g.workFaction}>Complete Faction Work (10 ⚡)</Button>}
+      {g.gameState.faction && (
+        <div style={{ marginTop: '16px' }}>
+          <Button onClick={g.workFaction}>Complete Faction Work (10 ⚡)</Button>
+        </div>
+      )}
     </Panel>
   );
 }
