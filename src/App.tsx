@@ -6,10 +6,8 @@ import React, {
 
 import {
   MAX_ENERGY,
+  ENERGY_REGEN_INTERVAL,
   NERVE_REGEN_INTERVAL,
-  regenerateResources,
-  getEnergyTimeRemaining,
-  getNerveTimeRemaining,
 } from "./systems/resourceSystem";
 
 import {
@@ -26,11 +24,18 @@ import {
   OPPONENTS,
   Opponent,
   resolveCombat,
+  calculateWinChance,
+  calculateCombatPower,
+  getCombatDifficulty,
+  getCombatDifficultyLabel,
 } from "./systems/combatSystem";
 
 import {
   GYMS,
   Gym,
+  TrainingStat,
+  TRAINING_STATS,
+  applyTraining,
 } from "./systems/gymSystem";
 
 import {
@@ -235,33 +240,30 @@ function loadSave(): SaveData {
         ...fresh,
         ...parsed,
 
-        /*
-         * Resource timer migration.
-         *
-         * Older saves only had
-         * lastNerveUpdate.
-         */
-        lastEnergyUpdate:
-          typeof parsed.lastEnergyUpdate ===
-          "number"
-            ? parsed.lastEnergyUpdate
-            : typeof parsed.lastNerveUpdate ===
-              "number"
-            ? parsed.lastNerveUpdate
-            : fresh.lastEnergyUpdate,
+        stats: {
+          ...fresh.stats,
+          ...(parsed.stats ||
+            {}),
+        },
 
-        lastNerveUpdate:
-          typeof parsed.lastNerveUpdate ===
-          "number"
-            ? parsed.lastNerveUpdate
-            : fresh.lastNerveUpdate,
+        inventory:
+          parsed.inventory ||
+          {},
+
+        activities:
+          parsed.activities ||
+          fresh.activities,
+
+        educationCompleted:
+          parsed.educationCompleted ||
+          [],
+
+        completedMissions:
+          parsed.completedMissions ||
+          [],
       };
     }
 
-    /*
-     * Migration from the old
-     * RiftCity save.
-     */
     const old =
       localStorage.getItem(
         "riftcity-unified-v1"
@@ -271,11 +273,8 @@ function loadSave(): SaveData {
       const oldSave =
         JSON.parse(old);
 
-      const migrated =
-        freshSave();
-
       return {
-        ...migrated,
+        ...freshSave(),
 
         cash:
           typeof oldSave.cash ===
@@ -294,12 +293,6 @@ function loadSave(): SaveData {
           "number"
             ? oldSave.energy
             : 100,
-
-        lastEnergyUpdate:
-          Date.now(),
-
-        lastNerveUpdate:
-          Date.now(),
 
         currentJob:
           oldSave.currentJob ||
@@ -364,7 +357,7 @@ function duration(
   const remaining =
     seconds % 60;
 
-  if (minutes > 60) {
+  if (minutes >= 60) {
     const hours =
       Math.floor(
         minutes / 60
@@ -454,10 +447,12 @@ function App() {
     0;
 
   const propertyGym =
-    property?.gymBonus || 0;
+    property?.gymBonus ||
+    0;
 
   const propertyNerve =
-    property?.nerveBonus || 0;
+    property?.nerveBonus ||
+    0;
 
   const maxHealth =
     getMaxHealth(
@@ -491,9 +486,6 @@ function App() {
         save.educationActive
     ) || null;
 
-  /*
-   * Clock.
-   */
   useEffect(() => {
     const timer =
       window.setInterval(
@@ -523,42 +515,83 @@ function App() {
         };
 
         /*
-         * ENERGY + NERVE
-         *
-         * These now use completely
-         * independent regeneration
-         * timers.
+         * ENERGY
          */
-        const resources =
-          regenerateResources(
-            {
-              energy:
-                current.energy,
-
-              nerve:
-                current.nerve,
-
-              lastEnergyUpdate:
-                current.lastEnergyUpdate,
-
-              lastNerveUpdate:
-                current.lastNerveUpdate,
-            },
-            now,
-            maxNerve
+        const energyTicks =
+          Math.floor(
+            (now -
+              current.lastEnergyUpdate) /
+              ENERGY_REGEN_INTERVAL
           );
 
-        updated.energy =
-          resources.energy;
+        if (
+          energyTicks > 0
+        ) {
+          updated.energy =
+            Math.min(
+              MAX_ENERGY,
+              current.energy +
+                energyTicks
+            );
 
-        updated.lastEnergyUpdate =
-          resources.lastEnergyUpdate;
+          updated.lastEnergyUpdate =
+            current.lastEnergyUpdate +
+            energyTicks *
+              ENERGY_REGEN_INTERVAL;
+        }
 
-        updated.nerve =
-          resources.nerve;
+        /*
+         * Keep full energy timestamp
+         * fresh so we don't build up
+         * an unnecessary backlog.
+         */
+        if (
+          updated.energy >=
+          MAX_ENERGY
+        ) {
+          updated.energy =
+            MAX_ENERGY;
 
-        updated.lastNerveUpdate =
-          resources.lastNerveUpdate;
+          updated.lastEnergyUpdate =
+            now;
+        }
+
+        /*
+         * NERVE
+         */
+        const nerveTicks =
+          Math.floor(
+            (now -
+              current.lastNerveUpdate) /
+              NERVE_REGEN_INTERVAL
+          );
+
+        if (
+          nerveTicks > 0
+        ) {
+          updated.nerve =
+            Math.min(
+              maxNerve,
+              current.nerve +
+                nerveTicks
+            );
+
+          updated.lastNerveUpdate =
+            current.lastNerveUpdate +
+            nerveTicks *
+              NERVE_REGEN_INTERVAL;
+        }
+
+        if (
+          updated.nerve >=
+          maxNerve
+        ) {
+          updated.nerve =
+            maxNerve;
+
+          updated.lastNerveUpdate =
+            now;
+        }
 
         /*
          * JOB PAY
@@ -675,9 +708,6 @@ function App() {
     maxNerve,
   ]);
 
-  /*
-   * Save.
-   */
   useEffect(() => {
     localStorage.setItem(
       SAVE_KEY,
@@ -733,8 +763,7 @@ function App() {
       crimeSuccessChance(
         crime,
         save.crimeExperience,
-        save.stats
-          .intelligence,
+        0,
         getCrimeStatBonus(
           save.stats
         )
@@ -880,13 +909,14 @@ function App() {
   }
 
   function train(
-    gym: Gym
+    gym: Gym,
+    stat: TrainingStat
   ) {
     if (
       jailed
     ) {
       setMessage(
-        "You can't train here while jailed."
+        "You can't train while jailed."
       );
 
       return;
@@ -912,10 +942,38 @@ function App() {
 
     update(
       (current) => {
-        const gain =
+        const trainedStats =
+          applyTraining(
+            current.stats,
+            gym,
+            stat
+          );
+
+        const statInfo =
+          TRAINING_STATS.find(
+            (item) =>
+              item.id ===
+              stat
+          );
+
+        const propertyMultiplier =
           1 +
           propertyGym /
             100;
+
+        const actualGain =
+          gym.gain *
+          propertyMultiplier;
+
+        const finalStats = {
+          ...trainedStats,
+
+          [stat]:
+            current.stats[
+              stat
+            ] +
+            actualGain,
+        };
 
         return addActivity(
           {
@@ -929,49 +987,39 @@ function App() {
               current.gymSessions +
               1,
 
-            stats: {
-              strength:
-                current.stats
-                  .strength +
-                (gym.gains
-                  .strength ||
-                  0) *
-                  gain,
-
-              defense:
-                current.stats
-                  .defense +
-                (gym.gains
-                  .defense ||
-                  0) *
-                  gain,
-
-              speed:
-                current.stats
-                  .speed +
-                (gym.gains
-                  .speed ||
-                  0) *
-                  gain,
-
-              dexterity:
-                current.stats
-                  .dexterity +
-                (gym.gains
-                  .dexterity ||
-                  0) *
-                  gain,
-            },
+            stats:
+              finalStats,
 
             xp:
               current.xp +
               5,
           },
 
-          `${gym.name} training complete. +5 XP.`,
+          `${gym.name}: ${statInfo?.name || stat} +${actualGain.toFixed(
+            2
+          )}.`,
           "gym"
         );
       }
+    );
+
+    const statInfo =
+      TRAINING_STATS.find(
+        (item) =>
+          item.id ===
+          stat
+      );
+
+    const actualGain =
+      gym.gain *
+      (1 +
+        propertyGym /
+          100);
+
+    setMessage(
+      `${statInfo?.icon || ""} ${statInfo?.name || stat} +${actualGain.toFixed(
+        2
+      )}.`
     );
   }
 
@@ -1537,7 +1585,10 @@ function App() {
   const nervePercent =
     Math.round(
       (save.nerve /
-        maxNerve) *
+        Math.max(
+          1,
+          maxNerve
+        )) *
         100
     );
 
@@ -1553,21 +1604,6 @@ function App() {
       (save.energy /
         MAX_ENERGY) *
         100
-    );
-
-  const energyTimeRemaining =
-    getEnergyTimeRemaining(
-      save.energy,
-      now,
-      save.lastEnergyUpdate
-    );
-
-  const nerveTimeRemaining =
-    getNerveTimeRemaining(
-      save.nerve,
-      maxNerve,
-      now,
-      save.lastNerveUpdate
     );
 
   const nextNerveAt =
@@ -1664,16 +1700,6 @@ function App() {
               }}
             />
           </div>
-
-          {save.energy <
-            MAX_ENERGY && (
-            <small>
-              +1 in{" "}
-              {duration(
-                energyTimeRemaining
-              )}
-            </small>
-          )}
         </div>
 
         <div>
@@ -1694,16 +1720,6 @@ function App() {
               }}
             />
           </div>
-
-          {save.nerve <
-            maxNerve && (
-            <small>
-              +1 in{" "}
-              {duration(
-                nerveTimeRemaining
-              )}
-            </small>
-          )}
         </div>
 
         <div>
@@ -1760,7 +1776,7 @@ function App() {
               ],
               [
                 "combat",
-                "⚔️ Combat",
+                "⚔️ Players",
               ],
               [
                 "gym",
@@ -1835,6 +1851,9 @@ function App() {
                 {screen ===
                 "city"
                   ? "THE CITY"
+                  : screen ===
+                    "combat"
+                  ? "PLAYERS"
                   : screen
                       .charAt(0)
                       .toUpperCase() +
@@ -1899,9 +1918,6 @@ function App() {
             "combat" && (
             <CombatScreen
               save={save}
-              level={
-                levelInfo.level
-              }
               jailed={
                 jailed
               }
@@ -2046,17 +2062,6 @@ function CityScreen({
     screen: Screen
   ) => void;
 }) {
-  const nerveTime =
-    save.nerve <
-    maxNerve
-      ? getNerveTimeRemaining(
-          save.nerve,
-          maxNerve,
-          now,
-          save.lastNerveUpdate
-        )
-      : 0;
-
   return (
     <>
       <div className="city-dashboard">
@@ -2086,7 +2091,8 @@ function CityScreen({
             <small>
               +1 in{" "}
               {duration(
-                nerveTime
+                nextNerveAt -
+                  now
               )}
             </small>
           )}
@@ -2121,8 +2127,8 @@ function CityScreen({
 
         <ActionCard
           icon="⚔️"
-          title="Find a Fight"
-          description="Test your combat stats."
+          title="Find a Player"
+          description="Pick someone in RiftCity and test your build."
           onClick={() =>
             setScreen(
               "combat"
@@ -2133,7 +2139,7 @@ function CityScreen({
         <ActionCard
           icon="🏋️"
           title="Train"
-          description="Spend Energy to improve your stats."
+          description="Spend Energy and choose exactly what to train."
           onClick={() =>
             setScreen("gym")
           }
@@ -2198,17 +2204,6 @@ function CrimeScreen({
         NERVE_REGEN_INTERVAL
       : null;
 
-  const nerveTime =
-    save.nerve <
-    maxNerve
-      ? getNerveTimeRemaining(
-          save.nerve,
-          maxNerve,
-          now,
-          save.lastNerveUpdate
-        )
-      : 0;
-
   return (
     <>
       <div className="resource-heading">
@@ -2228,7 +2223,8 @@ function CrimeScreen({
           <small>
             Next nerve in{" "}
             {duration(
-              nerveTime
+              nextNerve -
+                now
             )}
           </small>
         )}
@@ -2301,9 +2297,10 @@ function CrimeScreen({
               crimeSuccessChance(
                 crime,
                 save.crimeExperience,
-                save.stats
-                  .intelligence,
-                0
+                0,
+                getCrimeStatBonus(
+                  save.stats
+                )
               );
 
             return (
@@ -2437,27 +2434,416 @@ function CrimeScreen({
 }
 
 /* =========================
-   COMBAT
+   COMBAT / PLAYERS
 ========================= */
 
 function CombatScreen({
   save,
-  level,
   jailed,
   onFight,
 }: {
   save: SaveData;
-  level: number;
   jailed: boolean;
   onFight: (
     opponent: Opponent
   ) => void;
 }) {
+  const playerPower =
+    calculateCombatPower(
+      save.stats
+    );
+
   return (
     <div className="list">
       <div className="panel">
         <p className="eyebrow">
-          COMBAT STATS
+          YOUR COMBAT POWER
+        </p>
+
+        <h3>
+          {playerPower.toFixed(
+            1
+          )}
+        </h3>
+
+        <div className="stats-grid">
+          <Stat
+            label="Strength"
+            value={
+              save.stats
+                .strength
+            }
+          />
+
+          <Stat
+            label="Defense"
+            value={
+              save.stats
+                .defense
+            }
+          />
+
+          <Stat
+            label="Speed"
+            value={
+              save.stats.speed
+            }
+          />
+
+          <Stat
+            label="Dexterity"
+            value={
+              save.stats
+                .dexterity
+            }
+          />
+        </div>
+
+        <p>
+          Choose your opponent based on
+          their actual stats. There are no
+          artificial combat level gates.
+        </p>
+      </div>
+
+      {OPPONENTS.map(
+        (opponent) => {
+          const difficulty =
+            getCombatDifficulty(
+              save.stats,
+              opponent.stats
+            );
+
+          const difficultyLabel =
+            getCombatDifficultyLabel(
+              difficulty
+            );
+
+          const chance =
+            calculateWinChance(
+              save.stats,
+              opponent.stats
+            );
+
+          const opponentPower =
+            calculateCombatPower(
+              opponent.stats
+            );
+
+          return (
+            <div
+              className="list-card"
+              key={
+                opponent.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  {
+                    difficultyLabel
+                  }
+                </span>
+
+                <h3>
+                  {
+                    opponent.name
+                  }
+                </h3>
+
+                <p>
+                  {
+                    opponent.description
+                  }
+                </p>
+
+                <div className="stats-grid">
+                  <Stat
+                    label="Strength"
+                    value={
+                      opponent
+                        .stats
+                        .strength
+                    }
+                  />
+
+                  <Stat
+                    label="Defense"
+                    value={
+                      opponent
+                        .stats
+                        .defense
+                    }
+                  />
+
+                  <Stat
+                    label="Speed"
+                    value={
+                      opponent
+                        .stats
+                        .speed
+                    }
+                  />
+
+                  <Stat
+                    label="Dexterity"
+                    value={
+                      opponent
+                        .stats
+                        .dexterity
+                    }
+                  />
+                </div>
+
+                <small>
+                  Combat Power:{" "}
+                  {
+                    opponentPower.toFixed(
+                      1
+                    )
+                  }
+                  {" • "}
+                  Estimated Win Chance:{" "}
+                  {
+                    Math.floor(
+                      chance
+                    )
+                  }
+                  %
+                </small>
+              </div>
+
+              <button
+                className="job-button"
+                disabled={
+                  jailed
+                }
+                onClick={() =>
+                  onFight(
+                    opponent
+                  )
+                }
+              >
+                {jailed
+                  ? "JAILED"
+                  : "ATTACK"}
+              </button>
+            </div>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   GYM
+========================= */
+
+function GymScreen({
+  save,
+  level,
+  jailed,
+  onTrain,
+}: {
+  save: SaveData;
+  level: number;
+  jailed: boolean;
+  onTrain: (
+    gym: Gym,
+    stat: TrainingStat
+  ) => void;
+}) {
+  const [
+    selectedGym,
+    setSelectedGym,
+  ] = useState<string>(
+    GYMS[0]?.id ||
+      ""
+  );
+
+  const gym =
+    GYMS.find(
+      (item) =>
+        item.id ===
+        selectedGym
+    ) ||
+    GYMS[0];
+
+  return (
+    <div className="list">
+      <div className="panel">
+        <p className="eyebrow">
+          TRAINING
+        </p>
+
+        <h3>
+          Energy:{" "}
+          {Math.floor(
+            save.energy
+          )}
+          /{MAX_ENERGY}
+        </h3>
+
+        <p>
+          Pick a gym, then choose exactly
+          which combat stat you want to
+          improve.
+        </p>
+      </div>
+
+      <div className="panel">
+        <p className="eyebrow">
+          CHOOSE YOUR GYM
+        </p>
+
+        <div className="gym-selector">
+          {GYMS.map(
+            (item) => {
+              const locked =
+                level <
+                item.levelRequired;
+
+              return (
+                <button
+                  key={
+                    item.id
+                  }
+                  className={`gym-option ${
+                    selectedGym ===
+                    item.id
+                      ? "active"
+                      : ""
+                  }`}
+                  disabled={
+                    locked
+                  }
+                  onClick={() =>
+                    setSelectedGym(
+                      item.id
+                    )
+                  }
+                >
+                  <strong>
+                    {
+                      item.name
+                    }
+                  </strong>
+
+                  <small>
+                    {locked
+                      ? `LEVEL ${item.levelRequired}`
+                      : `+${item.gain.toFixed(
+                          2
+                        )} stat`}
+                  </small>
+                </button>
+              );
+            }
+          )}
+        </div>
+      </div>
+
+      {gym && (
+        <div className="panel">
+          <p className="eyebrow">
+            {gym.name}
+          </p>
+
+          <h3>
+            Choose your training
+          </h3>
+
+          <p>
+            {gym.description}
+          </p>
+
+          <div className="training-grid">
+            {TRAINING_STATS.map(
+              (stat) => {
+                const locked =
+                  level <
+                  gym.levelRequired;
+
+                const insufficient =
+                  save.energy <
+                  gym.energyCost;
+
+                const gain =
+                  gym.gain;
+
+                return (
+                  <button
+                    key={
+                      stat.id
+                    }
+                    className="training-card"
+                    disabled={
+                      locked ||
+                      jailed ||
+                      insufficient
+                    }
+                    onClick={() =>
+                      onTrain(
+                        gym,
+                        stat.id
+                      )
+                    }
+                  >
+                    <span className="training-icon">
+                      {
+                        stat.icon
+                      }
+                    </span>
+
+                    <strong>
+                      {
+                        stat.name
+                      }
+                    </strong>
+
+                    <small>
+                      {stat.description}
+                    </small>
+
+                    <div>
+                      +{gain.toFixed(
+                        2
+                      )}
+                    </div>
+
+                    <em>
+                      -{
+                        gym.energyCost
+                      } Energy
+                    </em>
+                  </button>
+                );
+              }
+            )}
+          </div>
+
+          {jailed && (
+            <p>
+              You cannot train while
+              jailed.
+            </p>
+          )}
+
+          {save.energy <
+            gym.energyCost && (
+            <p>
+              You need{" "}
+              {
+                gym.energyCost
+              } Energy to train here.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="panel">
+        <p className="eyebrow">
+          YOUR BUILD
         </p>
 
         <div className="stats-grid">
@@ -2493,216 +2879,6 @@ function CombatScreen({
           />
         </div>
       </div>
-
-      {OPPONENTS.map(
-        (opponent) => {
-          const locked =
-            level <
-            opponent.level;
-
-          return (
-            <div
-              className="list-card"
-              key={
-                opponent.id
-              }
-            >
-              <div>
-                <span className="job-tag">
-                  LEVEL{" "}
-                  {
-                    opponent.level
-                  }
-                </span>
-
-                <h3>
-                  {
-                    opponent.name
-                  }
-                </h3>
-
-                <p>
-                  Health:{" "}
-                  {
-                    opponent.health
-                  }
-                </p>
-              </div>
-
-              <button
-                className="job-button"
-                disabled={
-                  locked ||
-                  jailed
-                }
-                onClick={() =>
-                  onFight(
-                    opponent
-                  )
-                }
-              >
-                {locked
-                  ? `LEVEL ${opponent.level}`
-                  : jailed
-                  ? "JAILED"
-                  : "ATTACK"}
-              </button>
-            </div>
-          );
-        }
-      )}
-    </div>
-  );
-}
-
-/* =========================
-   GYM
-========================= */
-
-function GymScreen({
-  save,
-  level,
-  jailed,
-  onTrain,
-}: {
-  save: SaveData;
-  level: number;
-  jailed: boolean;
-  onTrain: (
-    gym: Gym
-  ) => void;
-}) {
-  const energyTime =
-    save.energy <
-    MAX_ENERGY
-      ? getEnergyTimeRemaining(
-          save.energy,
-          Date.now(),
-          save.lastEnergyUpdate
-        )
-      : 0;
-
-  return (
-    <div className="list">
-      <div className="panel">
-        <p className="eyebrow">
-          TRAINING
-        </p>
-
-        <h3>
-          Energy:{" "}
-          {Math.floor(
-            save.energy
-          )}
-          /100
-        </h3>
-
-        {save.energy <
-          MAX_ENERGY && (
-          <small>
-            +1 in{" "}
-            {duration(
-              energyTime
-            )}
-          </small>
-        )}
-
-        <p>
-          Energy regenerates automatically.
-          Spend it to permanently improve
-          your combat stats.
-        </p>
-      </div>
-
-      {GYMS.map(
-        (gym) => {
-          const locked =
-            level <
-            gym.levelRequired;
-
-          return (
-            <div
-              className="list-card"
-              key={
-                gym.id
-              }
-            >
-              <div>
-                <span className="job-tag">
-                  LEVEL{" "}
-                  {
-                    gym.levelRequired
-                  }
-                </span>
-
-                <h3>
-                  {gym.name}
-                </h3>
-
-                <p>
-                  {
-                    gym.description
-                  }
-                </p>
-
-                <small>
-                  Energy:{" "}
-                  {
-                    gym.energyCost
-                  }
-                  {" • "}
-                  STR +
-                  {
-                    gym.gains
-                      .strength ||
-                    0
-                  }
-                  {" • "}
-                  DEF +
-                  {
-                    gym.gains
-                      .defense ||
-                    0
-                  }
-                  {" • "}
-                  SPD +
-                  {
-                    gym.gains
-                      .speed ||
-                    0
-                  }
-                  {" • "}
-                  DEX +
-                  {
-                    gym.gains
-                      .dexterity ||
-                    0
-                  }
-                </small>
-              </div>
-
-              <button
-                className="job-button"
-                disabled={
-                  locked ||
-                  jailed ||
-                  save.energy <
-                    gym.energyCost
-                }
-                onClick={() =>
-                  onTrain(
-                    gym
-                  )
-                }
-              >
-                {locked
-                  ? `LEVEL ${gym.levelRequired}`
-                  : "TRAIN"}
-              </button>
-            </div>
-          );
-        }
-      )}
     </div>
   );
 }
