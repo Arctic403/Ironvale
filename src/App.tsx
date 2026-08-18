@@ -145,6 +145,7 @@ type SaveData = {
 const SAVE_KEY = "riftcity-core-v5";
 const JOB_PAY_INTERVAL = 60 * 60 * 1000;
 const HAPPINESS_TICK = 15 * 60 * 1000;
+const HEALTH_REGEN_INTERVAL = 60 * 1000;
 const JAIL_MINUTES = 2;
 const HOSPITAL_MINUTES = 2;
 const BASE_HAPPINESS = 100;
@@ -758,10 +759,23 @@ function App() {
   const levelInfo = getLevel(g.gameState.xp);
   const maxHappy = getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100;
 
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const energyPct = Math.min(100, (g.gameState.energy / MAX_ENERGY) * 100);
   const nervePct = Math.min(100, (g.gameState.nerve / g.maxNerve) * 100);
   const happyPct = Math.min(100, (g.gameState.happiness / maxHappy) * 100);
   const lifePct = Math.min(100, (g.gameState.health / g.maxHealth) * 100);
+
+  const energyNextTick = g.gameState.energy >= MAX_ENERGY ? 0 : Math.max(0, ENERGY_REGEN_INTERVAL - ((now - g.gameState.lastEnergyUpdate) % ENERGY_REGEN_INTERVAL));
+  const nerveNextTick = g.gameState.nerve >= g.maxNerve ? 0 : Math.max(0, NERVE_REGEN_INTERVAL - ((now - g.gameState.lastNerveUpdate) % NERVE_REGEN_INTERVAL));
+  const happyNextTick = g.gameState.happiness >= maxHappy ? 0 : Math.max(0, HAPPINESS_TICK - ((now - g.gameState.lastHappinessUpdate) % HAPPINESS_TICK));
+  const healthNextTick = g.gameState.health >= g.maxHealth ? 0 : Math.max(0, HEALTH_REGEN_INTERVAL - (now % HEALTH_REGEN_INTERVAL));
 
   const nav: { id: Screen; label: string; icon: string }[] = [
     { id: "character", label: "Character", icon: "👤" },
@@ -781,10 +795,14 @@ function App() {
 
   const title = nav.find((n) => n.id === g.currentScreen)?.label || "RiftCity";
 
+  const toggleTooltip = (type: string) => {
+    setActiveTooltip((prev) => (prev === type ? null : type));
+  };
+
   return (
-    <div className="layout-root">
+    <div className="layout-root" onClick={() => setActiveTooltip(null)}>
       {/* LEFT NAVIGATION RAIL */}
-      <aside className="nav-rail">
+      <aside className="nav-rail" onClick={(e) => e.stopPropagation()}>
         <div className="brand">
           <h2>RIFTCITY</h2>
           <span className="badge">v2.0</span>
@@ -818,66 +836,99 @@ function App() {
 
       {/* MAIN CONTENT AREA */}
       <div className="main-wrapper">
-        {/* TOP STATUS BAR */}
-        <header className="top-status-bar">
+        {/* TOP STATUS BAR WITH COMPACT METERS */}
+        <header className="top-status-bar" onClick={(e) => e.stopPropagation()}>
           <div className="user-level">
             <span className="level-badge">LV {g.level}</span>
             <div className="xp-container">
               <div className="xp-text">XP {levelInfo.currentXp}/100</div>
-              <div className="bar-track">
+              <div className="bar-track compact">
                 <div className="bar-fill xp" style={{ width: `${levelInfo.currentXp}%` }} />
               </div>
             </div>
           </div>
+
+          {/* COMPACT RESOURCE METER STRIP */}
+          <div className="compact-vitals">
+            {/* ENERGY */}
+            <div className="compact-vital-item" onClick={() => toggleTooltip("energy")}>
+              <span className="vital-icon">⚡</span>
+              <div className="vital-bar-wrap">
+                <div className="bar-track compact">
+                  <div className="bar-fill energy" style={{ width: `${energyPct}%` }} />
+                </div>
+              </div>
+              <span className="vital-num">{g.gameState.energy}</span>
+              {activeTooltip === "energy" && (
+                <div className="resource-popover">
+                  <strong>⚡ Energy</strong>
+                  <div className="popover-val">{g.gameState.energy} / {MAX_ENERGY}</div>
+                  <small>{g.gameState.energy >= MAX_ENERGY ? "Fully charged" : `Next +1 in: ${formatTime(energyNextTick)}`}</small>
+                </div>
+              )}
+            </div>
+
+            {/* NERVE */}
+            <div className="compact-vital-item" onClick={() => toggleTooltip("nerve")}>
+              <span className="vital-icon">🔥</span>
+              <div className="vital-bar-wrap">
+                <div className="bar-track compact">
+                  <div className="bar-fill nerve" style={{ width: `${nervePct}%` }} />
+                </div>
+              </div>
+              <span className="vital-num">{g.gameState.nerve}</span>
+              {activeTooltip === "nerve" && (
+                <div className="resource-popover">
+                  <strong>🔥 Nerve</strong>
+                  <div className="popover-val">{g.gameState.nerve} / {g.maxNerve}</div>
+                  <small>{g.gameState.nerve >= g.maxNerve ? "At capacity" : `Next +1 in: ${formatTime(nerveNextTick)}`}</small>
+                </div>
+              )}
+            </div>
+
+            {/* HAPPINESS */}
+            <div className="compact-vital-item" onClick={() => toggleTooltip("happy")}>
+              <span className="vital-icon">😊</span>
+              <div className="vital-bar-wrap">
+                <div className="bar-track compact">
+                  <div className="bar-fill happy" style={{ width: `${happyPct}%` }} />
+                </div>
+              </div>
+              <span className="vital-num">{Math.floor(g.gameState.happiness)}</span>
+              {activeTooltip === "happy" && (
+                <div className="resource-popover">
+                  <strong>😊 Happiness</strong>
+                  <div className="popover-val">{Math.floor(g.gameState.happiness)} / {maxHappy}</div>
+                  <small>{g.gameState.happiness >= maxHappy ? "Max happiness" : `Next +5 in: ${formatTime(happyNextTick)}`}</small>
+                </div>
+              )}
+            </div>
+
+            {/* HEALTH */}
+            <div className="compact-vital-item" onClick={() => toggleTooltip("health")}>
+              <span className="vital-icon">❤️</span>
+              <div className="vital-bar-wrap">
+                <div className="bar-track compact">
+                  <div className="bar-fill life" style={{ width: `${lifePct}%` }} />
+                </div>
+              </div>
+              <span className="vital-num">{Math.floor(g.gameState.health)}</span>
+              {activeTooltip === "health" && (
+                <div className="resource-popover">
+                  <strong>❤️ Health</strong>
+                  <div className="popover-val">{Math.floor(g.gameState.health)} / {g.maxHealth}</div>
+                  <small>{g.gameState.health >= g.maxHealth ? "Full health" : `Next +1 in: ${formatTime(healthNextTick)}`}</small>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="currency-bar">
             <div className="currency-item">💵 {money(g.gameState.cash)}</div>
             <div className="currency-item">🏦 {money(g.gameState.bank)}</div>
             <div className="currency-item">💎 {g.gameState.points} Pts</div>
           </div>
         </header>
-
-        {/* VITAL METERS ROW */}
-        <section className="vitals-row">
-          <div className="vital-card">
-            <div className="vital-header">
-              <span>⚡ Energy</span>
-              <span className="vital-val">{g.gameState.energy}/{MAX_ENERGY}</span>
-            </div>
-            <div className="bar-track">
-              <div className="bar-fill energy" style={{ width: `${energyPct}%` }} />
-            </div>
-          </div>
-
-          <div className="vital-card">
-            <div className="vital-header">
-              <span>🔥 Nerve</span>
-              <span className="vital-val">{g.gameState.nerve}/{g.maxNerve}</span>
-            </div>
-            <div className="bar-track">
-              <div className="bar-fill nerve" style={{ width: `${nervePct}%` }} />
-            </div>
-          </div>
-
-          <div className="vital-card">
-            <div className="vital-header">
-              <span>😊 Happiness</span>
-              <span className="vital-val">{Math.floor(g.gameState.happiness)}/{maxHappy}</span>
-            </div>
-            <div className="bar-track">
-              <div className="bar-fill happy" style={{ width: `${happyPct}%` }} />
-            </div>
-          </div>
-
-          <div className="vital-card">
-            <div className="vital-header">
-              <span>❤️ Life</span>
-              <span className="vital-val">{Math.floor(g.gameState.health)}/{g.maxHealth}</span>
-            </div>
-            <div className="bar-track">
-              <div className="bar-fill life" style={{ width: `${lifePct}%` }} />
-            </div>
-          </div>
-        </section>
 
         {/* SCREEN CONTAINER */}
         <main className="screen-container">
