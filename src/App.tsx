@@ -64,7 +64,13 @@ import {
   getProperty,
 } from "./data/gameData";
 
-export type Screen =
+import {
+  getCurrentPosition,
+  formatSkillName,
+  canJoinJob
+} from "./jobSystem";
+
+type Screen =
   | "city"
   | "crimes"
   | "combat"
@@ -76,7 +82,7 @@ export type Screen =
   | "property"
   | "character";
 
-export type ActivityType =
+type ActivityType =
   | "success"
   | "failure"
   | "spooked"
@@ -86,65 +92,47 @@ export type ActivityType =
   | "job"
   | "system";
 
-export type Activity = {
+type Activity = {
   id: number;
   text: string;
   type: ActivityType;
   time: number;
 };
 
-export type SaveData = {
+type SaveData = {
   cash: number;
   xp: number;
-
   energy: number;
   lastEnergyUpdate: number;
-
   nerve: number;
   lastNerveUpdate: number;
-
   health: number;
-
   crimeExperience: number;
-
   stats: CombatStats;
-
   gymExperience: number;
   gymMemberships: string[];
   activeGym: string;
-
   happiness: number;
   lastHappinessUpdate: number;
-
   currentJob: string | null;
   jobStartedAt: number;
   lastJobPayment: number;
-
   jailUntil: number | null;
-
   inventory: Record<string, number>;
-
   equippedWeapon: string | null;
   equippedArmor: string | null;
-
   ownedProperty: string | null;
-
   educationCompleted: string[];
   educationActive: string | null;
   educationStartedAt: number | null;
-
   completedMissions: string[];
-
   crimesCompleted: number;
   crimesFailed: number;
   crimesSpooked: number;
   timesJailed: number;
-
   fightsWon: number;
   fightsLost: number;
-
   gymSessions: number;
-
   activities: Activity[];
 };
 
@@ -170,12 +158,7 @@ function freshSave(): SaveData {
     lastNerveUpdate: now,
     health: 100,
     crimeExperience: 0,
-    stats: {
-      strength: 1,
-      defense: 1,
-      speed: 1,
-      dexterity: 1,
-    },
+    stats: { strength: 1, defense: 1, speed: 1, dexterity: 1 },
     gymExperience: 0,
     gymMemberships: ["premier-fitness"],
     activeGym: "premier-fitness",
@@ -200,14 +183,7 @@ function freshSave(): SaveData {
     fightsWon: 0,
     fightsLost: 0,
     gymSessions: 0,
-    activities: [
-      {
-        id: 1,
-        text: "Welcome to RiftCity.",
-        type: "system",
-        time: now,
-      },
-    ],
+    activities: [{ id: 1, text: "Welcome to RiftCity.", type: "system", time: now }],
   };
 }
 
@@ -220,10 +196,7 @@ function loadSave(): SaveData {
       return {
         ...fresh,
         ...parsed,
-        stats: {
-          ...fresh.stats,
-          ...(parsed.stats || {}),
-        },
+        stats: { ...fresh.stats, ...(parsed.stats || {}) },
         inventory: parsed.inventory || {},
         activities: parsed.activities || fresh.activities,
         educationCompleted: parsed.educationCompleted || [],
@@ -235,7 +208,6 @@ function loadSave(): SaveData {
         lastHappinessUpdate: typeof parsed.lastHappinessUpdate === "number" ? parsed.lastHappinessUpdate : Date.now(),
       };
     }
-
     const old = localStorage.getItem("riftcity-core-v2");
     if (old) {
       const oldSave = JSON.parse(old);
@@ -248,10 +220,7 @@ function loadSave(): SaveData {
         nerve: typeof oldSave.nerve === "number" ? oldSave.nerve : fresh.nerve,
         health: typeof oldSave.health === "number" ? oldSave.health : fresh.health,
         crimeExperience: typeof oldSave.crimeExperience === "number" ? oldSave.crimeExperience : 0,
-        stats: {
-          ...fresh.stats,
-          ...(oldSave.stats || {}),
-        },
+        stats: { ...fresh.stats, ...(oldSave.stats || {}) },
         currentJob: oldSave.currentJob || null,
         inventory: oldSave.inventory || {},
         equippedWeapon: oldSave.equippedWeapon || null,
@@ -265,11 +234,10 @@ function loadSave(): SaveData {
         timesJailed: oldSave.timesJailed || 0,
         fightsWon: oldSave.fightsWon || 0,
         fightsLost: oldSave.fightsLost || 0,
-        gymSessions: typeof oldSave.gymSessions === "number" ? oldSave.gymSessions : 0,
       };
     }
   } catch (e) {
-    console.error("Failed to parse save data:", e);
+    print("Error parsing save data:", e)
   }
   return freshSave();
 }
@@ -290,6 +258,10 @@ export function useRiftCity() {
     return currentProp ? currentProp.maxHappiness : BASE_HAPPINESS;
   }, [gameState.ownedProperty]);
 
+  const activeGymData = useMemo(() => {
+    return GYMS.find((g) => g.id === gameState.activeGym) || GYMS[0];
+  }, [gameState.activeGym]);
+
   const activeJobData = useMemo(() => {
     return JOBS.find((j) => j.id === gameState.currentJob) || null;
   }, [gameState.currentJob]);
@@ -297,16 +269,6 @@ export function useRiftCity() {
   const activeCourseData = useMemo(() => {
     return EDUCATION.find((c) => c.id === gameState.educationActive) || null;
   }, [gameState.educationActive]);
-
-  // VITAL DIAGNOSTIC FIX FOR THE GYM RENDERING CRASH:
-  // Dynamically resolve the gym object, falling back safely to the primary array element if state becomes un-synced.
-  const activeGymData = useMemo(() => {
-    const found = GYMS.find((g) => g.id === gameState.activeGym);
-    if (!found && GYMS.length > 0) {
-      return GYMS[0]; 
-    }
-    return found || null;
-  }, [gameState.activeGym]);
 
   const logActivity = (text: string, type: ActivityType) => {
     setGameState((prev) => ({
@@ -326,7 +288,6 @@ export function useRiftCity() {
   useEffect(() => {
     const ticker = setInterval(() => {
       const now = Date.now();
-
       setGameState((prev) => {
         let updated = { ...prev };
         let stateChanged = false;
@@ -366,7 +327,7 @@ export function useRiftCity() {
             updated.cash += activeJobData.payPerInterval * payTicks;
             updated.lastJobPayment = updated.lastJobPayment + payTicks * JOB_PAY_INTERVAL;
             stateChanged = true;
-            setTimeout(() => logActivity(`Received salary payment of $${activeJobData.payPerInterval * payTicks}.`, "job"), 0);
+            setTimeout(() => logActivity(`Received salary of $${activeJobData.payPerInterval * payTicks}.`, "job"), 0);
           }
         }
 
@@ -378,26 +339,11 @@ export function useRiftCity() {
         return stateChanged ? updated : prev;
       });
     }, 1000);
-
     return () => clearInterval(ticker);
   }, [maxNerve, maxHappiness, maxHealth, activeJobData]);
 
-  const checkAndCompleteEducation = () => {
-    if (!gameState.educationActive || !gameState.educationStartedAt || !activeCourseData) return;
-    const now = Date.now();
-    if (now >= gameState.educationStartedAt + activeCourseData.durationMs) {
-      setGameState((prev) => ({
-        ...prev,
-        educationCompleted: [...prev.educationCompleted, prev.educationActive!],
-        educationActive: null,
-        educationStartedAt: null,
-      }));
-      logActivity(`Completed course: ${activeCourseData.name}.`, "success");
-    }
-  };
-
   const commitCrime = (crime: Crime) => {
-    if (gameState.jailUntil) return logActivity("Incarcerated.", "system");
+    if (gameState.jailUntil) return logActivity("You cannot commit crimes while in jail.", "system");
     if (gameState.nerve < crime.nerveCost) return logActivity("Not enough nerve.", "system");
 
     setGameState((prev) => {
@@ -412,7 +358,7 @@ export function useRiftCity() {
         if (outcome.itemReward) {
           updated.inventory[outcome.itemReward] = (updated.inventory[outcome.itemReward] || 0) + 1;
         }
-        setTimeout(() => logActivity(`Success: ${crime.successText}`, "success"), 0);
+        setTimeout(() => logActivity(`Success! ${crime.successText}.`, "success"), 0);
       } else if (outcome.type === "spooked") {
         updated.crimesSpooked += 1;
         setTimeout(() => logActivity(`Spooked!`, "spooked"), 0);
@@ -421,9 +367,9 @@ export function useRiftCity() {
         if (outcome.jailed) {
           updated.timesJailed += 1;
           updated.jailUntil = Date.now() + JAIL_BASE_MINUTES * 60 * 1000;
-          setTimeout(() => logActivity(`Jailed! ${crime.failText}`, "jailed"), 0);
+          setTimeout(() => logActivity(`Busted! Sent to jail.`, "jailed"), 0);
         } else {
-          setTimeout(() => logActivity(`Failed! ${crime.failText}`, "failure"), 0);
+          setTimeout(() => logActivity(`Failed!`, "failure"), 0);
         }
       }
       return updated;
@@ -431,35 +377,27 @@ export function useRiftCity() {
   };
 
   const trainGymStat = (stat: TrainingStat, energyAmount: number) => {
-    if (gameState.jailUntil) return logActivity("Incarcerated.", "system");
+    if (gameState.jailUntil) return logActivity("You cannot train while in jail.", "system");
     if (gameState.energy < energyAmount) return logActivity("Not enough energy.", "system");
-
-    const currentGym = activeGymData;
-    if (!currentGym || !canTrainStat(currentGym, stat)) {
-      return logActivity("Cannot train this stat here.", "system");
-    }
+    if (!activeGymData || !canTrainStat(activeGymData, stat)) return logActivity("Cannot train that stat here.", "system");
 
     setGameState((prev) => {
       let updated = { ...prev };
       updated.energy -= energyAmount;
       updated.gymSessions += 1;
-
       const happyLoss = getTrainingHappinessLoss(energyAmount);
       updated.happiness = Math.max(0, updated.happiness - happyLoss);
-      updated.stats = applyTraining(updated.stats, stat, energyAmount, updated.happiness, currentGym);
-      
-      const gymXpGain = getGymExperienceGain(energyAmount, currentGym);
-      updated.gymExperience += gymXpGain;
+      updated.stats = applyTraining(updated.stats, stat, energyAmount, updated.happiness, activeGymData);
+      updated.gymExperience += getGymExperienceGain(energyAmount, activeGymData);
 
       const nextGym = getNextGym(updated.gymExperience);
       if (nextGym && !updated.gymMemberships.includes(nextGym.id)) {
         updated.gymMemberships.push(nextGym.id);
         updated.activeGym = nextGym.id;
-        setTimeout(() => logActivity(`Unlocked gym: ${nextGym.name}`, "system"), 0);
       }
-
       return updated;
     });
+    logActivity(`Trained ${stat} in ${activeGymData.name}.`, "gym");
   };
 
   return {
@@ -471,12 +409,11 @@ export function useRiftCity() {
     maxHealth,
     maxNerve,
     maxHappiness,
+    activeGymData,
     activeJobData,
     activeCourseData,
-    activeGymData, // Exported to ensure components render correctly!
     commitCrime,
     trainGymStat,
-    checkAndCompleteEducation,
     logActivity,
     resetGame: () => setGameState(freshSave()),
   };
