@@ -1,3 +1,5 @@
+import { getItem, Item, DistanceZone } from "./gameData";
+
 export type BodyPart = "head" | "chest" | "stomach" | "arms" | "legs";
 
 export interface WeaponOption {
@@ -8,6 +10,8 @@ export interface WeaponOption {
   accuracy: number;
   critChance: number;
   icon?: string;
+  optimalZone?: DistanceZone;
+  coverPenetration?: number;
 }
 
 export interface CombatStats {
@@ -27,6 +31,9 @@ export interface PlayerProfile {
   weapons?: WeaponOption[];
   cashReward?: number;
   xpReward?: number;
+  zone?: DistanceZone;
+  inCover?: boolean;
+  equippedWeaponId?: string;
 }
 
 export type DynamicFighter = PlayerProfile;
@@ -43,10 +50,50 @@ export interface TurnLog {
 }
 
 export const DEFAULT_WEAPONS: WeaponOption[] = [
-  { id: "primary", name: "AK-47", type: "primary", baseDamage: 32, accuracy: 75, critChance: 18, icon: "🔫" },
-  { id: "secondary", name: "9mm Pistol", type: "secondary", baseDamage: 22, accuracy: 85, critChance: 12, icon: "🔫" },
-  { id: "melee", name: "Combat Knife", type: "melee", baseDamage: 18, accuracy: 92, critChance: 25, icon: "🔪" },
-  { id: "temporary", name: "Pepper Spray", type: "temporary", baseDamage: 10, accuracy: 98, critChance: 5, icon: "🌶️" },
+  {
+    id: "primary",
+    name: "AK-47",
+    type: "primary",
+    baseDamage: 32,
+    accuracy: 75,
+    critChance: 18,
+    icon: "🔫",
+    optimalZone: "Mid",
+    coverPenetration: 0.4,
+  },
+  {
+    id: "secondary",
+    name: "9mm Pistol",
+    type: "secondary",
+    baseDamage: 22,
+    accuracy: 85,
+    critChance: 12,
+    icon: "🔫",
+    optimalZone: "Mid",
+    coverPenetration: 0.2,
+  },
+  {
+    id: "melee",
+    name: "Combat Knife",
+    type: "melee",
+    baseDamage: 18,
+    accuracy: 92,
+    critChance: 25,
+    icon: "🔪",
+    optimalZone: "Close",
+    coverPenetration: 0.1,
+  },
+  {
+    id: "temporary",
+    name: "Pepper Spray",
+    type: "temporary",
+    baseDamage: 10,
+    accuracy: 98,
+    critChance: 5,
+    icon: "🌶️",
+    optimalZone: "Close",
+    coverPenetration: 0.0,
+  },
 ];
 
 const BODY_PARTS: { part: BodyPart; multiplier: number; label: string }[] = [
@@ -57,9 +104,26 @@ const BODY_PARTS: { part: BodyPart; multiplier: number; label: string }[] = [
   { part: "legs", multiplier: 0.9, label: "Leg" },
 ];
 
-export function calculateWinChance(playerStats: CombatStats, opponentStats: CombatStats): number {
-  const pSum = playerStats.strength + playerStats.defense + playerStats.speed + playerStats.dexterity;
-  const oSum = opponentStats.strength + opponentStats.defense + opponentStats.speed + opponentStats.dexterity;
+const ZONE_DISTANCE_MAP: Record<DistanceZone, number> = {
+  Close: 1,
+  Mid: 2,
+  Long: 3,
+};
+
+export function calculateWinChance(
+  playerStats: CombatStats,
+  opponentStats: CombatStats
+): number {
+  const pSum =
+    playerStats.strength +
+    playerStats.defense +
+    playerStats.speed +
+    playerStats.dexterity;
+  const oSum =
+    opponentStats.strength +
+    opponentStats.defense +
+    opponentStats.speed +
+    opponentStats.dexterity;
   const chance = (pSum / (pSum + oSum)) * 100;
   return Math.min(95, Math.max(5, Math.round(chance)));
 }
@@ -69,16 +133,40 @@ export function executeCombatTurn(
   defender: DynamicFighter,
   weapon?: WeaponOption
 ): { updatedDefender: DynamicFighter; log: TurnLog } {
-  const activeWeapon =
+  // Resolve weapon from explicitly passed option, equipped item ID, or default list
+  let activeWeapon: WeaponOption =
     weapon ||
+    (attacker.equippedWeaponId
+      ? (getItem(attacker.equippedWeaponId) as WeaponOption)
+      : null) ||
     (attacker.weapons && attacker.weapons.length > 0
       ? attacker.weapons[Math.floor(Math.random() * attacker.weapons.length)]
       : DEFAULT_WEAPONS[1]);
 
-  const hitChance = Math.min(
-    95,
-    Math.max(15, activeWeapon.accuracy + (attacker.stats.dexterity - defender.stats.speed) * 2)
-  );
+  const defenderZone: DistanceZone = defender.zone || "Mid";
+  const optimalZone: DistanceZone = activeWeapon.optimalZone || "Close";
+  const coverPenetration = activeWeapon.coverPenetration || 0.0;
+
+  // Base accuracy combined with dexterity/speed difference
+  let accuracy =
+    activeWeapon.accuracy +
+    (attacker.stats.dexterity - defender.stats.speed) * 2;
+
+  // Spatial Penalty: Off-range calculation
+  if (optimalZone !== defenderZone) {
+    const zoneDelta = Math.abs(
+      ZONE_DISTANCE_MAP[optimalZone] - ZONE_DISTANCE_MAP[defenderZone]
+    );
+    accuracy -= zoneDelta * 25; // 25% accuracy drop per zone delta
+  }
+
+  // Spatial Penalty: Defender Cover mitigation
+  if (defender.inCover) {
+    const coverPenalty = 20 * (1 - coverPenetration);
+    accuracy -= coverPenalty;
+  }
+
+  const hitChance = Math.min(95, Math.max(15, accuracy));
 
   if (Math.random() * 100 > hitChance) {
     return {
@@ -99,15 +187,30 @@ export function executeCombatTurn(
   const isCrit = Math.random() * 100 < activeWeapon.critChance;
   const critMultiplier = isCrit ? 1.75 : 1.0;
 
-  const rawDamage =
-    (activeWeapon.baseDamage + attacker.stats.strength * 1.2 - defender.stats.defense * 0.6) *
+  let rawDamage =
+    (activeWeapon.baseDamage +
+      attacker.stats.strength * 1.2 -
+      defender.stats.defense * 0.6) *
     target.multiplier *
     critMultiplier;
 
-  const finalDamage = Math.max(4, Math.floor(rawDamage + (Math.random() * 6 - 3)));
+  // Optimal zone modifier
+  rawDamage *= optimalZone === defenderZone ? 1.2 : 0.8;
+
+  // Cover damage absorption (penetration bypasses cover reduction)
+  if (defender.inCover) {
+    rawDamage *= 0.5 + coverPenetration * 0.3;
+  }
+
+  const finalDamage = Math.max(
+    4,
+    Math.floor(rawDamage + (Math.random() * 6 - 3))
+  );
   const newHealth = Math.max(0, defender.health - finalDamage);
 
-  const actionText = `${attacker.name} hit ${defender.name} in the ${target.label} with ${activeWeapon.name} for ${finalDamage} damage!${
+  const actionText = `${attacker.name} hit ${defender.name} in the ${
+    target.label
+  } with ${activeWeapon.name} for ${finalDamage} damage!${
     isCrit ? " 🎯 CRITICAL HIT!" : ""
   }`;
 
@@ -129,16 +232,23 @@ export function executeCombatTurn(
   };
 }
 
-export function simulateCombat(attacker: PlayerProfile, defender: PlayerProfile) {
+export function simulateCombat(
+  attacker: PlayerProfile,
+  defender: PlayerProfile
+) {
   const winChance = calculateWinChance(attacker.stats, defender.stats);
   const isWin = Math.random() * 100 < winChance;
 
-  let currentAttacker = { ...attacker };
-  let currentDefender = { ...defender };
+  let currentAttacker = { ...attacker, zone: attacker.zone || "Mid" };
+  let currentDefender = { ...defender, zone: defender.zone || "Mid" };
   const logs: TurnLog[] = [];
   let rounds = 0;
 
-  while (currentAttacker.health > 0 && currentDefender.health > 0 && rounds < 20) {
+  while (
+    currentAttacker.health > 0 &&
+    currentDefender.health > 0 &&
+    rounds < 20
+  ) {
     rounds++;
     const turnResult = executeCombatTurn(currentAttacker, currentDefender);
     currentDefender = turnResult.updatedDefender;
