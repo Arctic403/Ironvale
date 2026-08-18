@@ -1,162 +1,1214 @@
-/* RIFTCITY JOB + CRIME SYSTEM */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
-.city-dashboard {
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  color: #eef1ff;
+  background: #05050b;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --bg: #05050b;
+  --panel: rgba(14, 13, 27, .82);
+  --panel-2: rgba(22, 19, 42, .9);
+
+  --purple: #8b5cff;
+  --purple2: #b16cff;
+  --cyan: #42d9ff;
+  --pink: #ff4fd8;
+  --green: #54e6a8;
+
+  --muted: #858aa6;
+  --line: rgba(157, 126, 255, .18);
+  --glow: 0 0 32px rgba(139, 92, 255, .18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  min-width: 100%;
+}
+
+body {
+  min-height: 100vh;
+
+  background:
+    radial-gradient(
+      circle at 15% 10%,
+      rgba(126, 67, 255, .17),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 85% 20%,
+      rgba(0, 214, 255, .10),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 55% 90%,
+      rgba(255, 43, 194, .08),
+      transparent 35%
+    ),
+    #05050b;
+}
+
+button {
+  font: inherit;
+}
+
+.app {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.app::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+
+  pointer-events: none;
+
+  opacity: .22;
+
+  background-image:
+    linear-gradient(
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.025) 1px,
+      transparent 1px
+    );
+
+  background-size: 48px 48px;
+
+  mask-image:
+    linear-gradient(
+      to bottom,
+      black,
+      transparent 85%
+    );
+}
+
+/* =========================
+   HEADER
+========================= */
+
+.topbar,
+.game-header {
+  height: 72px;
+
+  padding: 0 28px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  border-bottom:
+    1px solid rgba(255,255,255,.07);
+
+  background:
+    rgba(5,5,11,.72);
+
+  backdrop-filter: blur(18px);
+
+  position: relative;
+  z-index: 2;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  font-weight: 900;
+  letter-spacing: -1px;
+  font-size: 20px;
+}
+
+.logo > span:last-child span {
+  color: var(--purple2);
+
+  text-shadow:
+    0 0 20px rgba(177,108,255,.45);
+}
+
+.logo-mark {
+  width: 34px;
+  height: 34px;
+
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  place-items: center;
+
+  border:
+    1px solid rgba(177,108,255,.5);
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139,92,255,.32),
+      rgba(66,217,255,.12)
+    );
+
+  box-shadow:
+    0 0 25px rgba(139,92,255,.18);
+
+  color: #fff;
+}
+
+.status {
+  color: #9b9eb5;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  letter-spacing: 1.6px;
+}
+
+.status-dot {
+  display: inline-block;
+
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: var(--green);
+
+  box-shadow:
+    0 0 12px var(--green);
+
+  margin-right: 8px;
+}
+
+/* =========================
+   LANDING PAGE
+========================= */
+
+.landing .hero {
+  max-width: 1200px;
+
+  margin: 0 auto;
+
+  min-height:
+    calc(100vh - 72px);
+
+  display: grid;
+
+  grid-template-columns:
+    1fr .85fr;
+
+  gap: 60px;
+
+  align-items: center;
+
+  padding: 60px 28px;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+
+  color: var(--cyan);
+
+  font-size: 10px;
+  font-weight: 900;
+
+  letter-spacing: 2.5px;
+}
+
+h1 {
+  margin: 0;
+
+  font-size:
+    clamp(48px, 8vw, 88px);
+
+  line-height: .92;
+
+  letter-spacing: -5px;
+
+  text-shadow:
+    0 0 45px rgba(139,92,255,.15);
+}
+
+h1 span {
+  background:
+    linear-gradient(
+      90deg,
+      #fff,
+      var(--purple2),
+      var(--cyan)
+    );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+
+  color: transparent;
+}
+
+.intro {
+  max-width: 520px;
+
+  color: #999eb9;
+
+  line-height: 1.7;
+
+  font-size: 16px;
+
+  margin: 26px 0 32px;
+}
+
+.play-button {
+  border:
+    1px solid rgba(177,108,255,.5);
+
+  background:
+    linear-gradient(
+      135deg,
+      #7d4dff,
+      #a45bff 55%,
+      #4931a5
+    );
+
+  color: #fff;
+
+  padding: 15px 22px;
+
+  border-radius: 12px;
+
+  font-weight: 900;
+
+  letter-spacing: .8px;
+
+  box-shadow:
+    0 0 30px rgba(139,92,255,.25),
+    inset 0 1px rgba(255,255,255,.2);
+
+  cursor: pointer;
+
+  transition: .2s;
+}
+
+.play-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 42px rgba(139,92,255,.4);
+}
+
+.play-button span {
+  margin-left: 14px;
+}
+
+.city-card {
+  min-height: 430px;
+
+  border:
+    1px solid var(--line);
+
+  border-radius: 26px;
+
+  overflow: hidden;
+
+  position: relative;
+
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(139,92,255,.25),
+      transparent 35%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(25,20,48,.92),
+      rgba(7,8,18,.95)
+    );
+
+  box-shadow:
+    var(--glow);
+}
+
+.city-card::after {
+  content: "";
+
+  position: absolute;
+
+  inset: 22% -20% 0;
+
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 38px,
+      rgba(139,92,255,.12) 39px 40px
+    ),
+    linear-gradient(
+      155deg,
+      transparent 45%,
+      rgba(66,217,255,.12) 45.5%,
+      transparent 46%
+    );
+
+  transform:
+    perspective(300px)
+    rotateX(55deg);
+
+  transform-origin: bottom;
+}
+
+.city-glow {
+  position: absolute;
+
+  width: 220px;
+  height: 220px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(139,92,255,.22);
+
+  filter: blur(55px);
+
+  left: 50%;
+  top: 35%;
+
+  transform:
+    translate(-50%,-50%);
+}
+
+.city-info {
+  position: absolute;
+
+  left: 24px;
+  bottom: 22px;
+
+  z-index: 2;
+}
+
+.city-info span,
+.city-info strong {
+  display: block;
+}
+
+.city-info span {
+  font-size: 9px;
+
+  color: #767c99;
+
+  letter-spacing: 1.8px;
+
+  font-weight: 800;
+}
+
+.city-info strong {
+  margin-top: 6px;
+
+  font-size: 13px;
+
+  color: #c5c8dc;
+}
+
+/* =========================
+   GAME HEADER
+========================= */
+
+.game-shell {
+  padding-bottom: 40px;
+}
+
+.game-header {
+  position: sticky;
+  top: 0;
+
+  z-index: 5;
+}
+
+.wallet {
+  text-align: right;
+
+  margin-left: auto;
+  margin-right: 18px;
+}
+
+.wallet span {
+  display: block;
+
+  color: #727791;
+
+  font-size: 8px;
+
+  letter-spacing: 1.5px;
+
+  font-weight: 900;
+}
+
+.wallet strong {
+  color: #d9d4ff;
+
+  font-size: 17px;
+}
+
+.small-button {
+  border:
+    1px solid rgba(255,255,255,.1);
+
+  background:
+    rgba(255,255,255,.04);
+
+  color: #b8bdd2;
+
+  padding: 9px 12px;
+
+  border-radius: 9px;
+
+  cursor: pointer;
+}
+
+/* =========================
+   PLAYER BAR
+========================= */
+
+.player-bar {
+  max-width: 1250px;
+
+  margin: 18px auto 0;
+
+  padding: 13px 18px;
+
+  display: grid;
+
+  grid-template-columns:
+    1.5fr repeat(4,1fr);
+
+  gap: 14px;
+
+  border:
+    1px solid rgba(255,255,255,.07);
+
+  border-radius: 14px;
+
+  background:
+    rgba(12,11,23,.72);
+
+  box-shadow:
+    var(--glow);
+}
+
+.player-bar span {
+  display: block;
+
+  color: #666c86;
+
+  font-size: 8px;
+
+  letter-spacing: 1.5px;
+
+  font-weight: 900;
+}
+
+.player-bar strong {
+  display: block;
+
+  margin-top: 5px;
+
+  color: #e6e8f5;
+
+  font-size: 13px;
+}
+
+/* =========================
+   GAME LAYOUT
+========================= */
+
+.game-layout {
+  max-width: 1250px;
+
+  margin: 18px auto 0;
+
+  padding: 0 16px;
+
+  display: grid;
+
+  grid-template-columns:
+    210px 1fr;
+
+  gap: 16px;
+}
+
+.nav-card,
+.content-card {
+  border:
+    1px solid rgba(255,255,255,.075);
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(17,15,31,.9),
+      rgba(8,8,16,.88)
+    );
+
+  box-shadow:
+    var(--glow);
+}
+
+.nav-card {
+  align-self: start;
+
+  padding: 14px;
+
+  border-radius: 16px;
+
+  position: sticky;
+
+  top: 90px;
+}
+
+.nav-card .eyebrow {
+  margin:
+    5px 10px 12px;
+
+  color: #6f748d;
+}
+
+.nav-button {
+  width: 100%;
+
+  border:
+    1px solid transparent;
+
+  background: transparent;
+
+  color: #858aa2;
+
+  text-align: left;
+
+  padding: 12px 11px;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  margin-bottom: 4px;
+
+  font-weight: 700;
+
+  transition: .18s;
+}
+
+.nav-button:hover {
+  color: #fff;
+
+  background:
+    rgba(139,92,255,.08);
+}
+
+.nav-button.active {
+  color: #fff;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(139,92,255,.24),
+      rgba(139,92,255,.05)
+    );
+
+  border-color:
+    rgba(139,92,255,.18);
+
+  box-shadow:
+    inset 3px 0 var(--purple);
+}
+
+.reset-button {
+  margin-top: 20px;
+
+  color: #666b80;
+
+  font-size: 11px;
+}
+
+.content-card {
+  min-width: 0;
+
+  border-radius: 18px;
+
+  padding: 24px;
+}
+
+.section-heading {
+  display: flex;
+
+  align-items: flex-start;
+
+  justify-content: space-between;
+
   margin-bottom: 20px;
 }
 
-.city-dashboard > div {
+.section-heading h2 {
+  margin: 0;
+
+  font-size: 30px;
+
+  letter-spacing: -1.2px;
+}
+
+.level {
+  padding: 8px 10px;
+
+  border-radius: 9px;
+
+  background:
+    rgba(139,92,255,.12);
+
+  border:
+    1px solid rgba(139,92,255,.22);
+
+  color: #bba8ff;
+
+  font-size: 10px;
+
+  font-weight: 900;
+}
+
+/* =========================
+   CITY DASHBOARD
+========================= */
+
+.city-dashboard,
+.crime-summary {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3,1fr);
+
+  gap: 12px;
+
+  margin-bottom: 18px;
+}
+
+.city-dashboard > div,
+.crime-summary > div {
   padding: 18px;
 
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 12px;
+  border:
+    1px solid rgba(255,255,255,.075);
 
-  background: rgba(255,255,255,.025);
+  border-radius: 13px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,.035),
+      rgba(255,255,255,.012)
+    );
 }
 
 .city-dashboard span,
 .crime-summary span,
 .crime-stats-mini span,
+.job-rewards span,
 .progress-stat span {
   display: block;
 
-  color: #727b91;
+  color: #6e748c;
 
-  font-size: 9px;
+  font-size: 8px;
+
   font-weight: 900;
+
   letter-spacing: 1.5px;
 }
 
-.city-dashboard strong {
+.city-dashboard strong,
+.crime-summary strong {
   display: block;
+
   margin-top: 7px;
+
   font-size: 18px;
+}
+
+/* =========================
+   CITY ACTIONS
+========================= */
+
+.action-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2,1fr);
+
+  gap: 12px;
+}
+
+.action-card {
+  min-height: 140px;
+
+  padding: 20px;
+
+  text-align: left;
+
+  border:
+    1px solid rgba(255,255,255,.075);
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(22,18,42,.8),
+      rgba(11,10,20,.9)
+    );
+
+  color: #fff;
+
+  cursor: pointer;
+
+  transition: .2s;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+
+  border-color:
+    rgba(139,92,255,.4);
+
+  box-shadow:
+    0 0 30px rgba(139,92,255,.12);
+}
+
+.action-card span {
+  display: block;
+
+  font-size: 27px;
+
+  margin-bottom: 13px;
+}
+
+.action-card strong {
+  display: block;
+
+  font-size: 15px;
+}
+
+.action-card small {
+  display: block;
+
+  color: #747a93;
+
+  margin-top: 7px;
+
+  line-height: 1.5;
+}
+
+/* =========================
+   PANELS
+========================= */
+
+.panel {
+  padding: 20px;
+
+  border:
+    1px solid rgba(255,255,255,.075);
+
+  border-radius: 15px;
+
+  background:
+    rgba(255,255,255,.018);
+}
+
+.panel h3,
+.job-card h3 {
+  margin:
+    4px 0 7px;
+
+  font-size: 18px;
+}
+
+.panel p,
+.job-card p {
+  color: #7f849b;
+
+  line-height: 1.6;
+
+  font-size: 12px;
+}
+
+.job-tag {
+  color: var(--cyan) !important;
+
+  font-size: 8px !important;
+
+  font-weight: 900;
+
+  letter-spacing: 1.5px;
+
+  margin: 0 0 5px !important;
+}
+
+/* =========================
+   JOBS
+========================= */
+
+.jobs-list {
+  display: grid;
+
+  gap: 11px;
+
+  margin-top: 16px;
+}
+
+.job-card {
+  padding: 18px;
+
+  border:
+    1px solid rgba(255,255,255,.075);
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(22,19,40,.72),
+      rgba(10,10,19,.88)
+    );
+
+  transition: .18s;
+}
+
+.job-card:hover {
+  border-color:
+    rgba(139,92,255,.25);
+}
+
+.job-card.locked {
+  opacity: .55;
+}
+
+.job-card.owned {
+  border-color:
+    rgba(139,92,255,.4);
+
+  box-shadow:
+    0 0 28px rgba(139,92,255,.09);
+}
+
+.job-main {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 15px;
+
+  align-items: center;
+}
+
+.job-button,
+.crime-button,
+.upgrade-button,
+.collect-all-button {
+  border:
+    1px solid rgba(139,92,255,.35);
+
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(139,92,255,.32),
+      rgba(87,55,170,.25)
+    );
+
+  color: #eeeaff;
+
+  padding: 11px 14px;
+
+  font-size: 10px;
+
+  font-weight: 900;
+
+  letter-spacing: .7px;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+}
+
+.job-button:disabled,
+.crime-button:disabled {
+  opacity: .4;
+
+  cursor: not-allowed;
+}
+
+.job-rewards {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4,1fr);
+
+  gap: 8px;
+
+  margin-top: 14px;
+
+  padding-top: 13px;
+
+  border-top:
+    1px solid rgba(255,255,255,.06);
+}
+
+.job-rewards > div {
+  padding: 8px 0;
+}
+
+.job-rewards strong {
+  display: block;
+
+  margin-top: 5px;
+
+  color: #d6d9e8;
+
+  font-size: 11px;
+}
+
+.income-summary {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  padding: 18px;
+
+  border:
+    1px solid rgba(139,92,255,.22);
+
+  border-radius: 14px;
+
+  margin-bottom: 12px;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(139,92,255,.1),
+      rgba(66,217,255,.025)
+    );
+}
+
+.income-summary span {
+  color: #6e748c;
+
+  font-size: 8px;
+
+  letter-spacing: 1.5px;
+
+  font-weight: 900;
+}
+
+.income-summary strong {
+  display: block;
+
+  margin-top: 5px;
 }
 
 .income-summary small {
   display: block;
-  margin-top: 6px;
-  color: #7d8699;
-}
 
-.crime-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.crime-summary > div {
-  padding: 18px;
-
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 12px;
-
-  background: rgba(255,255,255,.025);
-}
-
-.crime-summary strong {
-  display: block;
-  margin-top: 7px;
-  font-size: 22px;
-}
-
-.crime-stats-mini {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.crime-stats-mini > div {
-  padding: 13px;
-
-  border-radius: 9px;
-
-  background: rgba(123,97,255,.08);
-}
-
-.crime-stats-mini strong {
-  display: block;
   margin-top: 5px;
+
+  color: #777d94;
 }
 
-.crime-card {
-  border-left: 3px solid rgba(123,97,255,.5);
-}
+.collect-all-button {
+  background:
+    linear-gradient(
+      135deg,
+      #7950ff,
+      #9b5cff
+    );
 
-.crime-button {
-  min-width: 105px;
-
-  padding: 12px 15px;
-
-  border: 0;
-  border-radius: 9px;
-
-  background: #9b3cff;
-
-  color: white;
-
-  font-weight: 900;
-
-  cursor: pointer;
-}
-
-.crime-button:disabled {
-  opacity: .45;
-  cursor: not-allowed;
+  color: #fff;
 }
 
 .quit-button {
   width: 100%;
 
   margin-top: 10px;
-  padding: 10px;
 
-  border: 1px solid rgba(255,255,255,.08);
+  padding: 9px;
+
+  border:
+    1px solid rgba(255,255,255,.06);
+
   border-radius: 8px;
 
   background: transparent;
 
-  color: #777f92;
+  color: #666b80;
 
   cursor: pointer;
+
+  font-size: 10px;
 }
 
 .quit-button:hover {
-  color: #ff7070;
-  border-color: rgba(255,80,80,.3);
+  color: #ff6f9f;
+
+  border-color:
+    rgba(255,80,130,.25);
+}
+
+/* =========================
+   CRIMES
+========================= */
+
+.crime-stats-mini {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4,1fr);
+
+  gap: 8px;
+
+  margin-bottom: 15px;
+}
+
+.crime-stats-mini > div {
+  padding: 12px;
+
+  border:
+    1px solid rgba(255,79,216,.1);
+
+  border-radius: 10px;
+
+  background:
+    rgba(255,79,216,.025);
+}
+
+.crime-stats-mini strong {
+  display: block;
+
+  margin-top: 5px;
+
+  color: #d8baff;
+}
+
+.crime-card {
+  border-left:
+    2px solid rgba(255,79,216,.45);
+}
+
+.crime-button {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,63,178,.27),
+      rgba(139,53,177,.22)
+    );
+
+  border-color:
+    rgba(255,79,216,.3);
+}
+
+.crime-button:hover:not(:disabled) {
+  box-shadow:
+    0 0 20px rgba(255,79,216,.16);
+}
+
+/* =========================
+   MISSIONS
+========================= */
+
+.mission-objectives {
+  display: grid;
+
+  gap: 9px;
+
+  margin:
+    18px 0 24px;
+
+  color: #9ea3ba;
+
+  font-size: 12px;
+}
+
+/* =========================
+   CHARACTER
+========================= */
+
+.stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4,1fr);
+
+  gap: 11px;
+}
+
+.stat,
+.stat-wide {
+  padding: 18px;
+
+  border:
+    1px solid rgba(255,255,255,.07);
+
+  border-radius: 13px;
+
+  background:
+    rgba(255,255,255,.018);
+}
+
+.stat span {
+  display: block;
+
+  color: #686e87;
+
+  font-size: 8px;
+
+  letter-spacing: 1.5px;
+
+  font-weight: 900;
+}
+
+.stat strong {
+  display: block;
+
+  margin-top: 7px;
+
+  font-size: 17px;
 }
 
 .stat-wide {
   grid-column: 1 / -1;
-
-  padding: 22px;
-
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 14px;
-
-  background: rgba(255,255,255,.025);
 }
 
 .stat-wide h3 {
-  margin-top: 0;
+  margin: 0;
+
+  font-size: 14px;
 }
 
 .progress-stat {
   margin-top: 16px;
 }
 
-.progress-stat > span {
-  display: inline-block;
-}
-
 .progress-stat > strong {
   float: right;
 
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .progress-bar {
@@ -168,9 +1220,10 @@
 
   overflow: hidden;
 
-  border-radius: 10px;
+  border-radius: 8px;
 
-  background: rgba(255,255,255,.06);
+  background:
+    rgba(255,255,255,.055);
 }
 
 .progress-bar div {
@@ -178,20 +1231,203 @@
 
   border-radius: inherit;
 
-  background: linear-gradient(
-    90deg,
-    #765dff,
-    #35cfff
-  );
+  background:
+    linear-gradient(
+      90deg,
+      var(--purple),
+      var(--cyan)
+    );
+
+  box-shadow:
+    0 0 12px rgba(66,217,255,.3);
 }
 
+/* =========================
+   MESSAGE
+========================= */
+
+.message {
+  margin-top: 16px;
+
+  padding: 12px 14px;
+
+  border:
+    1px solid rgba(66,217,255,.1);
+
+  border-radius: 10px;
+
+  background:
+    rgba(66,217,255,.025);
+
+  color: #8d93aa;
+
+  font-size: 11px;
+}
+
+/* =========================
+   MOBILE
+========================= */
+
 @media (max-width: 800px) {
+
+  .topbar,
+  .game-header {
+    padding: 0 15px;
+  }
+
+  .landing .hero {
+    grid-template-columns: 1fr;
+
+    gap: 28px;
+
+    padding-top: 55px;
+  }
+
+  .city-card {
+    min-height: 260px;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-card {
+    position: static;
+
+    display: flex;
+
+    gap: 5px;
+
+    overflow-x: auto;
+
+    padding: 7px;
+  }
+
+  .nav-card .eyebrow,
+  .reset-button {
+    display: none;
+  }
+
+  .nav-button {
+    min-width: max-content;
+
+    margin: 0;
+
+    text-align: center;
+  }
+
+  .player-bar {
+    margin-left: 10px;
+    margin-right: 10px;
+
+    grid-template-columns:
+      repeat(2,1fr);
+  }
+
+  .player-bar > div:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .content-card {
+    padding: 16px;
+  }
+
   .city-dashboard,
   .crime-summary {
     grid-template-columns: 1fr;
   }
 
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-rewards {
+    grid-template-columns:
+      repeat(2,1fr);
+  }
+
   .crime-stats-mini {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns:
+      repeat(2,1fr);
+  }
+
+  .stats {
+    grid-template-columns:
+      repeat(2,1fr);
+  }
+
+  h1 {
+    letter-spacing: -3px;
+  }
+
+  .job-main {
+    align-items: flex-start;
+  }
+
+  .job-button,
+  .crime-button {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+
+  .logo {
+    font-size: 17px;
+  }
+
+  .logo-mark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .wallet {
+    margin-right: 8px;
+  }
+
+  .wallet strong {
+    font-size: 14px;
+  }
+
+  .small-button {
+    padding: 8px;
+    font-size: 10px;
+  }
+
+  .content-card {
+    border-radius: 14px;
+  }
+
+  .section-heading h2 {
+    font-size: 25px;
+  }
+
+  .job-main {
+    flex-direction: column;
+  }
+
+  .job-button,
+  .crime-button {
+    width: 100%;
+  }
+
+  .income-summary {
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 14px;
+  }
+
+  .collect-all-button {
+    width: 100%;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-wide {
+    grid-column: auto;
   }
 }
