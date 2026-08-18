@@ -7,6 +7,8 @@ export type Job = {
   levelRequired: number;
 };
 
+export type DistanceZone = 'Close' | 'Mid' | 'Long';
+
 export type Item = {
   id: string;
   name: string;
@@ -20,6 +22,14 @@ export type Item = {
     | "misc";
   price: number;
   effect?: number;
+  
+  /*
+   * Spatial Combat System extensions
+   */
+  optimalRange?: DistanceZone;
+  accuracy?: number;
+  moveCost?: number;
+  coverPenetration?: number;
 };
 
 export type Mission = {
@@ -134,7 +144,11 @@ export const ITEMS: Item[] = [
       "A cheap weapon carried by people who expect trouble.",
     type: "weapon",
     price: 250,
-    effect: 5,
+    effect: 8,
+    optimalRange: "Close",
+    accuracy: 85,
+    moveCost: 1,
+    coverPenetration: 0.1,
   },
 
   {
@@ -144,7 +158,11 @@ export const ITEMS: Item[] = [
       "Simple, effective and easy to find.",
     type: "weapon",
     price: 600,
-    effect: 10,
+    effect: 15,
+    optimalRange: "Close",
+    accuracy: 75,
+    moveCost: 1,
+    coverPenetration: 0.2,
   },
 
   {
@@ -154,7 +172,11 @@ export const ITEMS: Item[] = [
       "A basic firearm for serious situations.",
     type: "weapon",
     price: 2500,
-    effect: 20,
+    effect: 35,
+    optimalRange: "Mid",
+    accuracy: 70,
+    moveCost: 2,
+    coverPenetration: 0.4,
   },
 
   {
