@@ -1,4 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  JOBS,
+  EMPTY_JOB_SKILLS,
+  JobSkill,
+  JobSkills,
+  getJob,
+  getCurrentPosition,
+  formatSkillName,
+  meetsRequirements,
+} from "./jobSystem";
 
 type Screen =
   | "city"
@@ -7,29 +22,18 @@ type Screen =
   | "missions"
   | "character";
 
-type Job = {
-  id: string;
-  name: string;
-  description: string;
-  salary: number;
-  minLevel: number;
-  stat: keyof WorkStats;
-};
-
-type WorkStats = {
-  labor: number;
-  technical: number;
-  security: number;
-  business: number;
-};
+type CrimeType =
+  | "theft"
+  | "burglary"
+  | "robbery"
+  | "cyber";
 
 type Crime = {
   id: string;
   name: string;
   description: string;
-  type: keyof CrimeStats;
+  type: CrimeType;
   difficulty: number;
-  minLevel: number;
   minStat: number;
   minEnergy: number;
   minReward: number;
@@ -51,36 +55,58 @@ type SaveData = {
   reputation: number;
 
   currentJob: string | null;
-  jobRank: number;
+
+  jobPosition: number;
+
   workDays: number;
 
-  workStats: WorkStats;
+  employmentStarted: number;
+
+  jobPerformance: number;
+
+  jobSkills: JobSkills;
+
   crimeStats: CrimeStats;
 
   crimesCompleted: number;
+
   crimesFailed: number;
 
   lastPayday: number;
-  crimeCooldowns: Record<string, number>;
+
+  crimeCooldowns: Record<
+    string,
+    number
+  >;
 };
 
-const SAVE_KEY = "riftcity-v2-save";
+const SAVE_KEY =
+  "riftcity-v3-save";
+
+const DAY =
+  24 * 60 * 60 * 1000;
 
 const defaultSave: SaveData = {
   cash: 1000,
+
   xp: 0,
+
   energy: 100,
+
   reputation: 0,
 
   currentJob: null,
-  jobRank: 0,
+
+  jobPosition: 0,
+
   workDays: 0,
 
-  workStats: {
-    labor: 0,
-    technical: 0,
-    security: 0,
-    business: 0,
+  employmentStarted: Date.now(),
+
+  jobPerformance: 75,
+
+  jobSkills: {
+    ...EMPTY_JOB_SKILLS,
   },
 
   crimeStats: {
@@ -91,93 +117,29 @@ const defaultSave: SaveData = {
   },
 
   crimesCompleted: 0,
+
   crimesFailed: 0,
 
   lastPayday: Date.now(),
+
   crimeCooldowns: {},
 };
-
-const JOBS: Job[] = [
-  {
-    id: "street-cleaner",
-    name: "Street Cleaner",
-    description:
-      "A basic city job. Low pay, but a reliable way to build your work record.",
-    salary: 75,
-    minLevel: 1,
-    stat: "labor",
-  },
-  {
-    id: "delivery",
-    name: "Delivery Rider",
-    description:
-      "Deliver packages around RiftCity and improve your street knowledge.",
-    salary: 100,
-    minLevel: 2,
-    stat: "labor",
-  },
-  {
-    id: "construction",
-    name: "Construction Worker",
-    description:
-      "Hard physical work with better pay and strong labor progression.",
-    salary: 150,
-    minLevel: 3,
-    stat: "labor",
-  },
-  {
-    id: "security",
-    name: "Security Guard",
-    description:
-      "Protect businesses and develop security experience.",
-    salary: 325,
-    minLevel: 8,
-    stat: "security",
-  },
-  {
-    id: "technician",
-    name: "IT Technician",
-    description:
-      "Maintain systems and develop valuable technical skills.",
-    salary: 450,
-    minLevel: 12,
-    stat: "technical",
-  },
-  {
-    id: "analyst",
-    name: "Financial Analyst",
-    description:
-      "Analyze money flows and develop advanced business knowledge.",
-    salary: 650,
-    minLevel: 16,
-    stat: "business",
-  },
-  {
-    id: "executive",
-    name: "Corporate Executive",
-    description:
-      "A high-level career for established players.",
-    salary: 1000,
-    minLevel: 22,
-    stat: "business",
-  },
-];
 
 const CRIMES: Crime[] = [
   {
     id: "pickpocket",
     name: "Pickpocket",
     description:
-      "Target an unsuspecting pedestrian. Low reward, low difficulty.",
+      "Target an unsuspecting pedestrian. Low reward and low risk.",
     type: "theft",
     difficulty: 10,
-    minLevel: 1,
     minStat: 0,
     minEnergy: 5,
     minReward: 30,
-    maxReward: 100,
+    maxReward: 85,
     xp: 8,
   },
+
   {
     id: "shoplift",
     name: "Shoplifting",
@@ -185,13 +147,13 @@ const CRIMES: Crime[] = [
       "Steal merchandise from a small local store.",
     type: "theft",
     difficulty: 25,
-    minLevel: 2,
     minStat: 10,
     minEnergy: 8,
-    minReward: 75,
-    maxReward: 200,
+    minReward: 65,
+    maxReward: 180,
     xp: 12,
   },
+
   {
     id: "burglary",
     name: "Residential Burglary",
@@ -199,27 +161,27 @@ const CRIMES: Crime[] = [
       "Break into a residence and search for valuables.",
     type: "burglary",
     difficulty: 45,
-    minLevel: 4,
     minStat: 15,
     minEnergy: 12,
-    minReward: 150,
-    maxReward: 450,
+    minReward: 140,
+    maxReward: 400,
     xp: 20,
   },
+
   {
     id: "store-robbery",
     name: "Store Robbery",
     description:
-      "A dangerous crime with a significantly higher payout.",
+      "A dangerous crime with a significantly larger payout.",
     type: "robbery",
     difficulty: 70,
-    minLevel: 7,
     minStat: 25,
     minEnergy: 18,
-    minReward: 400,
-    maxReward: 1200,
+    minReward: 350,
+    maxReward: 950,
     xp: 35,
   },
+
   {
     id: "cyber",
     name: "System Intrusion",
@@ -227,13 +189,13 @@ const CRIMES: Crime[] = [
       "Attempt to compromise a poorly secured computer system.",
     type: "cyber",
     difficulty: 75,
-    minLevel: 10,
     minStat: 25,
     minEnergy: 15,
-    minReward: 600,
-    maxReward: 1800,
+    minReward: 500,
+    maxReward: 1400,
     xp: 40,
   },
+
   {
     id: "major-robbery",
     name: "Major Robbery",
@@ -241,394 +203,813 @@ const CRIMES: Crime[] = [
       "A serious operation with a major potential payout.",
     type: "robbery",
     difficulty: 110,
-    minLevel: 15,
     minStat: 50,
     minEnergy: 25,
-    minReward: 1500,
-    maxReward: 5000,
+    minReward: 1200,
+    maxReward: 3500,
     xp: 65,
   },
 ];
 
 function loadSave(): SaveData {
   try {
-    const saved = localStorage.getItem(SAVE_KEY);
+    const raw =
+      localStorage.getItem(
+        SAVE_KEY
+      );
 
-    if (!saved) return defaultSave;
+    if (!raw) {
+      return {
+        ...defaultSave,
+        jobSkills: {
+          ...EMPTY_JOB_SKILLS,
+        },
+      };
+    }
+
+    const parsed =
+      JSON.parse(raw);
 
     return {
       ...defaultSave,
-      ...JSON.parse(saved),
+      ...parsed,
+
+      jobSkills: {
+        ...EMPTY_JOB_SKILLS,
+        ...(parsed.jobSkills || {}),
+      },
+
+      crimeStats: {
+        ...defaultSave.crimeStats,
+        ...(parsed.crimeStats || {}),
+      },
     };
   } catch {
-    return defaultSave;
+    return {
+      ...defaultSave,
+      jobSkills: {
+        ...EMPTY_JOB_SKILLS,
+      },
+    };
   }
 }
 
-function randomBetween(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function randomBetween(
+  min: number,
+  max: number
+) {
+  return Math.floor(
+    Math.random() *
+      (max - min + 1)
+  ) + min;
+}
+
+function formatTime(
+  milliseconds: number
+) {
+  const seconds = Math.max(
+    0,
+    Math.ceil(
+      milliseconds / 1000
+    )
+  );
+
+  const hours =
+    Math.floor(
+      seconds / 3600
+    );
+
+  const minutes =
+    Math.floor(
+      (seconds % 3600) / 60
+    );
+
+  const secs =
+    seconds % 60;
+
+  return `${hours}h ${minutes}m ${secs}s`;
 }
 
 export default function App() {
-  const [entered, setEntered] = useState(false);
-  const [screen, setScreen] = useState<Screen>("city");
+  const [entered, setEntered] =
+    useState(false);
 
-  const [save, setSave] = useState<SaveData>(loadSave);
+  const [screen, setScreen] =
+    useState<Screen>("city");
 
-  const [message, setMessage] = useState(
-    "Welcome to RiftCity. Build your life. Take your chances."
-  );
+  const [save, setSave] =
+    useState<SaveData>(
+      loadSave
+    );
 
-  const [now, setNow] = useState(Date.now());
+  const [message, setMessage] =
+    useState(
+      "Welcome to RiftCity. Build your life. Take your chances."
+    );
+
+  const [now, setNow] =
+    useState(Date.now());
 
   useEffect(() => {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify(save)
+    );
   }, [save]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setNow(Date.now());
-    }, 1000);
+    const timer =
+      setInterval(
+        () =>
+          setNow(
+            Date.now()
+          ),
+        1000
+      );
 
-    return () => clearInterval(timer);
+    return () =>
+      clearInterval(timer);
   }, []);
 
-  const level = Math.floor(save.xp / 100) + 1;
-  const xpIntoLevel = save.xp % 100;
+  const level =
+    Math.floor(
+      save.xp / 100
+    ) + 1;
 
-  const currentJob = JOBS.find(
-    job => job.id === save.currentJob
-  );
+  const xpIntoLevel =
+    save.xp % 100;
+
+  const currentJob =
+    getJob(
+      save.currentJob
+    );
+
+  const currentPosition =
+    getCurrentPosition(
+      currentJob,
+      save.jobPosition
+    );
+
+  const nextPosition =
+    currentJob &&
+    save.jobPosition <
+      currentJob.positions
+        .length - 1
+      ? currentJob.positions[
+          save.jobPosition + 1
+        ]
+      : undefined;
 
   const paydayReady =
-    now - save.lastPayday >= 24 * 60 * 60 * 1000;
+    now -
+      save.lastPayday >=
+    DAY;
 
-  const nextPayday = Math.max(
-    0,
-    24 * 60 * 60 * 1000 - (now - save.lastPayday)
-  );
+  const paydayRemaining =
+    Math.max(
+      0,
+      DAY -
+        (now -
+          save.lastPayday)
+    );
 
-  const formatTime = (milliseconds: number) => {
-    const totalSeconds = Math.ceil(milliseconds / 1000);
+  const totalCrimeSkill =
+    Object.values(
+      save.crimeStats
+    ).reduce(
+      (a, b) => a + b,
+      0
+    );
 
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+  const loyaltyDays =
+    currentJob
+      ? Math.floor(
+          (now -
+            save.employmentStarted) /
+            DAY
+        )
+      : 0;
 
-    return `${hours}h ${minutes}m ${seconds}s`;
-  };
+  const totalJobSkill =
+    currentJob
+      ? currentJob.skills.reduce(
+          (total, skill) =>
+            total +
+            save.jobSkills[
+              skill
+            ],
+          0
+        )
+      : 0;
 
-  const chooseJob = (job: Job) => {
-    if (level < job.minLevel) {
+  const nextPromotionReady =
+    !!nextPosition &&
+    meetsRequirements(
+      save.jobSkills,
+      nextPosition.requirements
+    );
+
+  const chooseJob = (
+    jobId: string
+  ) => {
+    const job =
+      getJob(jobId);
+
+    if (!job) return;
+
+    if (
+      save.currentJob ===
+      job.id
+    ) {
       setMessage(
-        `${job.name} requires Level ${job.minLevel}.`
+        "You're already employed here."
       );
+
       return;
     }
 
-    if (save.currentJob === job.id) {
-      setMessage(`You already work as a ${job.name}.`);
-      return;
-    }
+    setSave(
+      current => ({
+        ...current,
 
-    setSave(current => ({
-      ...current,
-      currentJob: job.id,
-      jobRank: 1,
-    }));
+        currentJob:
+          job.id,
+
+        jobPosition: 0,
+
+        employmentStarted:
+          Date.now(),
+
+        jobPerformance: 75,
+      })
+    );
 
     setMessage(
-      `You are now employed as a ${job.name}.`
+      `You joined ${job.company} as a ${job.positions[0].title}.`
     );
   };
 
   const workShift = () => {
-    if (!currentJob) {
-      setMessage("You need a job first.");
+    if (
+      !currentJob ||
+      !currentPosition
+    ) {
       setScreen("job");
+
+      setMessage(
+        "You need a job before you can work."
+      );
+
       return;
     }
 
-    if (save.energy < 20) {
+    if (
+      save.energy < 20
+    ) {
       setMessage(
         "You're too exhausted to work. Rest first."
       );
+
       return;
     }
 
-    const stat = currentJob.stat;
+    const primary =
+      currentJob.primarySkill;
 
-    setSave(current => {
-      const oldStat = current.workStats[stat];
-
-      return {
-        ...current,
-        energy: current.energy - 20,
-        xp: current.xp + 15,
-        workDays: current.workDays + 1,
-        workStats: {
-          ...current.workStats,
-          [stat]: Math.min(100, oldStat + 1),
-        },
-      };
-    });
-
-    setMessage(
-      `You completed a ${currentJob.name} shift. Work experience increased.`
-    );
-  };
-
-  const collectPaycheck = () => {
-    if (!currentJob) {
-      setMessage("You don't currently have a job.");
-      return;
-    }
-
-    if (!paydayReady) {
-      setMessage(
-        `Your next paycheck arrives in ${formatTime(nextPayday)}.`
+    const secondary =
+      currentJob.skills.filter(
+        skill =>
+          skill !== primary
       );
+
+    const primaryGain =
+      Math.random() <
+      0.85
+        ? 1
+        : 0;
+
+    const secondaryGain =
+      Math.random() <
+      0.25
+        ? 1
+        : 0;
+
+    setSave(
+      current => ({
+        ...current,
+
+        energy:
+          current.energy -
+          20,
+
+        xp:
+          current.xp + 5,
+
+        workDays:
+          current.workDays + 1,
+
+        jobPerformance:
+          Math.min(
+            100,
+            current.jobPerformance +
+              1
+          ),
+
+        jobSkills: {
+          ...current.jobSkills,
+
+          [primary]:
+            Math.min(
+              100,
+              current.jobSkills[
+                primary
+              ] +
+                primaryGain
+            ),
+
+          [secondary[0]]:
+            Math.min(
+              100,
+              current.jobSkills[
+                secondary[0]
+              ] +
+                secondaryGain
+            ),
+        },
+      })
+    );
+
+    setMessage(
+      `Shift completed. ${formatSkillName(primary)} is improving.`
+    );
+  };
+
+  const promote = () => {
+    if (
+      !currentJob ||
+      !nextPosition
+    ) {
+      setMessage(
+        "There are no further promotions available."
+      );
+
       return;
     }
 
-    const rankBonus =
-      1 + Math.max(0, save.jobRank - 1) * 0.08;
+    if (
+      !meetsRequirements(
+        save.jobSkills,
+        nextPosition.requirements
+      )
+    ) {
+      setMessage(
+        "You haven't developed the required skills yet."
+      );
 
-    const salary = Math.floor(
-      currentJob.salary * rankBonus
+      return;
+    }
+
+    setSave(
+      current => ({
+        ...current,
+
+        jobPosition:
+          current.jobPosition +
+          1,
+
+        jobPerformance:
+          Math.min(
+            100,
+            current.jobPerformance +
+              5
+          ),
+      })
     );
-
-    setSave(current => ({
-      ...current,
-      cash: current.cash + salary,
-      xp: current.xp + 20,
-      lastPayday: Date.now(),
-    }));
 
     setMessage(
-      `Payday! You received $${salary.toLocaleString()}.`
+      `PROMOTED — You are now ${nextPosition.title}.`
     );
   };
+
+  const collectPaycheck =
+    () => {
+      if (
+        !currentJob ||
+        !currentPosition
+      ) {
+        setMessage(
+          "You don't currently have a job."
+        );
+
+        return;
+      }
+
+      if (!paydayReady) {
+        setMessage(
+          `Your paycheck arrives in ${formatTime(
+            paydayRemaining
+          )}.`
+        );
+
+        return;
+      }
+
+      const performanceMultiplier =
+        0.9 +
+        save.jobPerformance /
+          1000;
+
+      const loyaltyBonus =
+        Math.min(
+          0.10,
+          loyaltyDays *
+            0.001
+        );
+
+      const salary =
+        Math.floor(
+          currentPosition.salary *
+            performanceMultiplier *
+            (1 +
+              loyaltyBonus)
+        );
+
+      setSave(
+        current => ({
+          ...current,
+
+          cash:
+            current.cash +
+            salary,
+
+          xp:
+            current.xp + 10,
+
+          lastPayday:
+            Date.now(),
+
+          jobPerformance:
+            Math.max(
+              60,
+              current.jobPerformance -
+                2
+            ),
+        })
+      );
+
+      setMessage(
+        `PAYDAY — $${salary.toLocaleString()} deposited.`
+      );
+    };
 
   const quitJob = () => {
     if (!currentJob) return;
 
-    setSave(current => ({
-      ...current,
-      currentJob: null,
-      jobRank: 0,
-    }));
+    setSave(
+      current => ({
+        ...current,
+
+        currentJob: null,
+
+        jobPosition: 0,
+
+        employmentStarted:
+          Date.now(),
+
+        jobPerformance: 75,
+      })
+    );
 
     setMessage(
-      `You quit your job as a ${currentJob.name}.`
+      `You left ${currentJob.company}. Your skills remain with you.`
     );
   };
 
-  const commitCrime = (crime: Crime) => {
-    const stat = save.crimeStats[crime.type];
+  const commitCrime = (
+    crime: Crime
+  ) => {
+    const stat =
+      save.crimeStats[
+        crime.type
+      ];
 
-    if (level < crime.minLevel) {
-      setMessage(
-        `${crime.name} requires Level ${crime.minLevel}.`
-      );
-      return;
-    }
-
-    if (stat < crime.minStat) {
+    if (
+      stat <
+      crime.minStat
+    ) {
       setMessage(
         `${crime.name} requires ${crime.minStat} ${crime.type} skill.`
       );
+
       return;
     }
 
-    if (save.energy < crime.minEnergy) {
+    if (
+      save.energy <
+      crime.minEnergy
+    ) {
       setMessage(
-        `You need ${crime.minEnergy} energy for this crime.`
+        `You need ${crime.minEnergy} energy.`
       );
+
       return;
     }
 
     const cooldown =
-      save.crimeCooldowns[crime.id] || 0;
+      save.crimeCooldowns[
+        crime.id
+      ] || 0;
 
-    if (cooldown > now) {
+    if (
+      cooldown > now
+    ) {
       setMessage(
-        `${crime.name} is on cooldown for ${formatTime(
+        `${crime.name} is cooling down for ${formatTime(
           cooldown - now
         )}.`
       );
+
       return;
     }
 
-    /*
-      Success chance is intentionally conservative.
+    const jobBonus =
+      currentJob?.skills.includes(
+        "cybersecurity"
+      ) &&
+      crime.type ===
+        "cyber"
+        ? 3
+        : currentJob?.skills.includes(
+              "awareness"
+            ) &&
+            crime.type !==
+              "cyber"
+          ? 1
+          : 0;
 
-      Character level helps.
-      Crime-specific skill helps.
-      Difficulty pulls the chance down.
-
-      This keeps progression meaningful without
-      letting players instantly become unstoppable.
-    */
-
-    const successChance = Math.max(
-      12,
-      Math.min(
-        92,
-        55 +
-          stat * 0.45 +
-          level * 0.75 -
-          crime.difficulty
-      )
-    );
-
-    const roll = Math.random() * 100;
-
-    const succeeded = roll <= successChance;
-
-    const cooldownLength =
-      crime.type === "robbery"
-        ? 45 * 60 * 1000
-        : 20 * 60 * 1000;
-
-    if (succeeded) {
-      const reward = randomBetween(
-        crime.minReward,
-        crime.maxReward
-      );
-
-      const statIncrease =
-        Math.random() < 0.65 ? 1 : 0;
-
-      setSave(current => ({
-        ...current,
-        cash: current.cash + reward,
-        xp: current.xp + crime.xp,
-        energy: current.energy - crime.minEnergy,
-        reputation: current.reputation + 1,
-        crimesCompleted: current.crimesCompleted + 1,
-        crimeCooldowns: {
-          ...current.crimeCooldowns,
-          [crime.id]: now + cooldownLength,
-        },
-        crimeStats: {
-          ...current.crimeStats,
-          [crime.type]: Math.min(
-            100,
-            current.crimeStats[crime.type] + statIncrease
-          ),
-        },
-      }));
-
-      setMessage(
-        `SUCCESS — ${crime.name} earned you $${reward.toLocaleString()}.`
-      );
-    } else {
-      setSave(current => ({
-        ...current,
-        xp: current.xp + Math.floor(crime.xp / 3),
-        energy: current.energy - crime.minEnergy,
-        crimesFailed: current.crimesFailed + 1,
-        crimeCooldowns: {
-          ...current.crimeCooldowns,
-          [crime.id]: now + cooldownLength,
-        },
-        crimeStats: {
-          ...current.crimeStats,
-          [crime.type]: Math.min(
-            100,
-            current.crimeStats[crime.type] +
-              (Math.random() < 0.35 ? 1 : 0)
-          ),
-        },
-      }));
-
-      setMessage(
-        `FAILED — You failed the ${crime.name}. No money earned.`
-      );
-    }
-  };
-
-  const rest = () => {
-    if (save.energy >= 100) {
-      setMessage("You already have full energy.");
-      return;
-    }
-
-    setSave(current => ({
-      ...current,
-      energy: 100,
-    }));
-
-    setMessage("You rested. Energy restored.");
-  };
-
-  const completeMission = () => {
-    if (save.energy < 30) {
-      setMessage(
-        "You need at least 30 energy."
-      );
-      return;
-    }
-
-    setSave(current => ({
-      ...current,
-      cash: current.cash + 400,
-      xp: current.xp + 50,
-      energy: current.energy - 30,
-      reputation: current.reputation + 5,
-    }));
-
-    setMessage(
-      "Mission complete. +$400, +50 XP and +5 reputation."
-    );
-  };
-
-  const resetGame = () => {
-    if (!confirm("Reset your RiftCity progress?")) {
-      return;
-    }
-
-    localStorage.removeItem(SAVE_KEY);
-
-    setSave({
-      ...defaultSave,
-      lastPayday: Date.now(),
-    });
-
-    setMessage("RiftCity progress reset.");
-  };
-
-  const crimeSuccessEstimate = (crime: Crime) => {
-    const stat = save.crimeStats[crime.type];
-
-    return Math.max(
-      12,
-      Math.min(
-        92,
-        Math.round(
+    const successChance =
+      Math.max(
+        12,
+        Math.min(
+          92,
           55 +
             stat * 0.45 +
-            level * 0.75 -
+            level * 0.5 +
+            jobBonus -
             crime.difficulty
         )
-      )
+      );
+
+    const success =
+      Math.random() * 100 <=
+      successChance;
+
+    const cooldownLength =
+      crime.type ===
+      "robbery"
+        ? 45 *
+          60 *
+          1000
+        : 20 *
+          60 *
+          1000;
+
+    if (success) {
+      const reward =
+        randomBetween(
+          crime.minReward,
+          crime.maxReward
+        );
+
+      setSave(
+        current => ({
+          ...current,
+
+          cash:
+            current.cash +
+            reward,
+
+          xp:
+            current.xp +
+            crime.xp,
+
+          energy:
+            current.energy -
+            crime.minEnergy,
+
+          reputation:
+            current.reputation +
+            1,
+
+          crimesCompleted:
+            current.crimesCompleted +
+            1,
+
+          crimeCooldowns: {
+            ...current.crimeCooldowns,
+
+            [crime.id]:
+              now +
+              cooldownLength,
+          },
+
+          crimeStats: {
+            ...current.crimeStats,
+
+            [crime.type]:
+              Math.min(
+                100,
+                current.crimeStats[
+                  crime.type
+                ] +
+                  (Math.random() <
+                  0.65
+                    ? 1
+                    : 0)
+              ),
+          },
+        })
+      );
+
+      setMessage(
+        `SUCCESS — $${reward.toLocaleString()} earned.`
+      );
+    } else {
+      setSave(
+        current => ({
+          ...current,
+
+          xp:
+            current.xp +
+            Math.floor(
+              crime.xp / 3
+            ),
+
+          energy:
+            current.energy -
+            crime.minEnergy,
+
+          crimesFailed:
+            current.crimesFailed +
+            1,
+
+          crimeCooldowns: {
+            ...current.crimeCooldowns,
+
+            [crime.id]:
+              now +
+              cooldownLength,
+          },
+
+          crimeStats: {
+            ...current.crimeStats,
+
+            [crime.type]:
+              Math.min(
+                100,
+                current.crimeStats[
+                  crime.type
+                ] +
+                  (Math.random() <
+                  0.35
+                    ? 1
+                    : 0)
+              ),
+          },
+        })
+      );
+
+      setMessage(
+        `FAILED — The ${crime.name} went wrong.`
+      );
+    }
+  };
+
+  const crimeSuccessEstimate =
+    (crime: Crime) => {
+      const stat =
+        save.crimeStats[
+          crime.type
+        ];
+
+      return Math.max(
+        12,
+        Math.min(
+          92,
+          Math.round(
+            55 +
+              stat * 0.45 +
+              level * 0.5 -
+              crime.difficulty
+          )
+        )
+      );
+    };
+
+  const rest = () => {
+    if (
+      save.energy >= 100
+    ) {
+      setMessage(
+        "You already have full energy."
+      );
+
+      return;
+    }
+
+    setSave(
+      current => ({
+        ...current,
+        energy: 100,
+      })
+    );
+
+    setMessage(
+      "Energy restored."
     );
   };
 
-  const totalCrimeSkill = useMemo(() => {
-    return Object.values(save.crimeStats).reduce(
-      (a, b) => a + b,
-      0
+  const completeMission =
+    () => {
+      if (
+        save.energy < 30
+      ) {
+        setMessage(
+          "You need at least 30 energy."
+        );
+
+        return;
+      }
+
+      setSave(
+        current => ({
+          ...current,
+
+          cash:
+            current.cash +
+            250,
+
+          xp:
+            current.xp + 30,
+
+          energy:
+            current.energy -
+            30,
+
+          reputation:
+            current.reputation +
+            3,
+        })
+      );
+
+      setMessage(
+        "Mission complete. +$250 and +30 XP."
+      );
+    };
+
+  const resetGame = () => {
+    if (
+      !confirm(
+        "Reset your RiftCity progress?"
+      )
+    ) {
+      return;
+    }
+
+    const fresh = {
+      ...defaultSave,
+
+      lastPayday:
+        Date.now(),
+
+      employmentStarted:
+        Date.now(),
+
+      jobSkills: {
+        ...EMPTY_JOB_SKILLS,
+      },
+    };
+
+    localStorage.removeItem(
+      SAVE_KEY
     );
-  }, [save.crimeStats]);
+
+    setSave(fresh);
+
+    setMessage(
+      "RiftCity progress reset."
+    );
+  };
 
   if (!entered) {
     return (
       <main className="app landing">
         <header className="topbar">
           <div className="logo">
-            <span className="logo-mark">R</span>
+            <span className="logo-mark">
+              R
+            </span>
+
             <span>
               RIFT<span>CITY</span>
             </span>
@@ -649,29 +1030,39 @@ export default function App() {
             <h1>
               YOUR CITY.
               <br />
-              <span>YOUR RULES.</span>
+              <span>
+                YOUR RULES.
+              </span>
             </h1>
 
             <p className="intro">
-              Work. Build your skills. Take risks.
-              Make your place in RiftCity.
+              Work. Build your skills.
+              Take risks. Make your
+              place in RiftCity.
             </p>
 
             <button
               className="play-button"
-              onClick={() => setEntered(true)}
+              onClick={() =>
+                setEntered(true)
+              }
             >
-              ENTER RIFTCITY <span>→</span>
+              ENTER RIFTCITY
+              <span>→</span>
             </button>
           </div>
 
           <div className="city-card">
             <div className="city-glow" />
-            <div className="city-grid" />
 
             <div className="city-info">
-              <span>CITY STATUS</span>
-              <strong>AWAITING PLAYER</strong>
+              <span>
+                CITY STATUS
+              </span>
+
+              <strong>
+                AWAITING PLAYER
+              </strong>
             </div>
           </div>
         </section>
@@ -683,7 +1074,10 @@ export default function App() {
     <main className="app game-shell">
       <header className="game-header">
         <div className="logo">
-          <span className="logo-mark">R</span>
+          <span className="logo-mark">
+            R
+          </span>
+
           <span>
             RIFT<span>CITY</span>
           </span>
@@ -691,8 +1085,10 @@ export default function App() {
 
         <div className="wallet">
           <span>CASH</span>
+
           <strong>
-            ${save.cash.toLocaleString()}
+            $
+            {save.cash.toLocaleString()}
           </strong>
         </div>
 
@@ -707,27 +1103,37 @@ export default function App() {
       <section className="player-bar">
         <div>
           <span>PLAYER</span>
-          <strong>PlayerOne</strong>
+          <strong>
+            PlayerOne
+          </strong>
         </div>
 
         <div>
           <span>LEVEL</span>
-          <strong>{level}</strong>
+          <strong>
+            {level}
+          </strong>
         </div>
 
         <div>
           <span>XP</span>
-          <strong>{xpIntoLevel}/100</strong>
+          <strong>
+            {xpIntoLevel}/100
+          </strong>
         </div>
 
         <div>
           <span>ENERGY</span>
-          <strong>{save.energy}/100</strong>
+          <strong>
+            {save.energy}/100
+          </strong>
         </div>
 
         <div>
           <span>REPUTATION</span>
-          <strong>{save.reputation}</strong>
+          <strong>
+            {save.reputation}
+          </strong>
         </div>
       </section>
 
@@ -753,15 +1159,19 @@ export default function App() {
                   ? "nav-button active"
                   : "nav-button"
               }
-              onClick={() => setScreen(item)}
+              onClick={() =>
+                setScreen(item)
+              }
             >
-              {item === "city"
+              {item ===
+              "city"
                 ? "🏙️ City"
                 : item === "job"
                 ? "💼 Job"
                 : item === "crimes"
                 ? "🔪 Crimes"
-                : item === "missions"
+                : item ===
+                  "missions"
                 ? "🎯 Missions"
                 : "👤 Character"}
             </button>
@@ -769,7 +1179,9 @@ export default function App() {
 
           <button
             className="nav-button reset-button"
-            onClick={resetGame}
+            onClick={
+              resetGame
+            }
           >
             ↻ Reset Game
           </button>
@@ -783,11 +1195,14 @@ export default function App() {
               </p>
 
               <h2>
-                {screen === "city"
+                {screen ===
+                "city"
                   ? "THE CITY"
-                  : screen === "job"
+                  : screen ===
+                    "job"
                   ? "YOUR CAREER"
-                  : screen === "crimes"
+                  : screen ===
+                    "crimes"
                   ? "CRIMES"
                   : screen.toUpperCase()}
               </h2>
@@ -798,39 +1213,41 @@ export default function App() {
             </span>
           </div>
 
-          {screen === "city" && (
+          {screen ===
+            "city" && (
             <>
               <div className="city-dashboard">
                 <div>
-                  <span>CURRENT JOB</span>
+                  <span>
+                    CURRENT JOB
+                  </span>
+
                   <strong>
                     {currentJob
-                      ? currentJob.name
+                      ? currentPosition?.title
                       : "UNEMPLOYED"}
                   </strong>
                 </div>
 
                 <div>
-                  <span>DAILY PAY</span>
+                  <span>
+                    DAILY PAY
+                  </span>
+
                   <strong>
-                    {currentJob
-                      ? `$${Math.floor(
-                          currentJob.salary *
-                            (1 +
-                              Math.max(
-                                0,
-                                save.jobRank - 1
-                              ) *
-                                0.08)
-                        ).toLocaleString()}`
+                    {currentPosition
+                      ? `$${currentPosition.salary}`
                       : "$0"}
                   </strong>
                 </div>
 
                 <div>
-                  <span>CRIME SKILL</span>
+                  <span>
+                    JOB SKILL
+                  </span>
+
                   <strong>
-                    {totalCrimeSkill}
+                    {totalJobSkill}
                   </strong>
                 </div>
               </div>
@@ -842,29 +1259,41 @@ export default function App() {
                     setScreen("job")
                   }
                 >
-                  <span>💼</span>
+                  <span>
+                    💼
+                  </span>
+
                   <strong>
                     Work
                   </strong>
+
                   <small>
-                    Build your career and
-                    collect your daily pay.
+                    Build your career,
+                    skills and
+                    promotions.
                   </small>
                 </button>
 
                 <button
                   className="action-card"
                   onClick={() =>
-                    setScreen("crimes")
+                    setScreen(
+                      "crimes"
+                    )
                   }
                 >
-                  <span>🔪</span>
+                  <span>
+                    🔪
+                  </span>
+
                   <strong>
                     Commit a Crime
                   </strong>
+
                   <small>
-                    Risk energy for potential
-                    cash and crime XP.
+                    Risk energy for
+                    potential cash
+                    and crime XP.
                   </small>
                 </button>
 
@@ -874,13 +1303,17 @@ export default function App() {
                     completeMission
                   }
                 >
-                  <span>🎯</span>
+                  <span>
+                    🎯
+                  </span>
+
                   <strong>
                     Mission
                   </strong>
+
                   <small>
                     Complete structured
-                    objectives for rewards.
+                    objectives.
                   </small>
                 </button>
 
@@ -888,19 +1321,25 @@ export default function App() {
                   className="action-card"
                   onClick={rest}
                 >
-                  <span>🏠</span>
+                  <span>
+                    🏠
+                  </span>
+
                   <strong>
                     Rest
                   </strong>
+
                   <small>
-                    Restore your energy.
+                    Restore your
+                    energy.
                   </small>
                 </button>
               </div>
             </>
           )}
 
-          {screen === "job" && (
+          {screen ===
+            "job" && (
             <>
               {!currentJob ? (
                 <div className="panel">
@@ -909,92 +1348,91 @@ export default function App() {
                   </p>
 
                   <h3>
-                    Choose your career
+                    Choose your
+                    career
                   </h3>
 
                   <p>
-                    You can only hold one job
-                    at a time. Work shifts to
-                    slowly improve the skill
-                    associated with your career.
+                    Jobs are never
+                    level locked.
+                    Your skills are
+                    what determine
+                    how far you can
+                    climb.
                   </p>
 
                   <div className="jobs-list">
-                    {JOBS.map(job => (
-                      <div
-                        className={
-                          level >= job.minLevel
-                            ? "job-card"
-                            : "job-card locked"
-                        }
-                        key={job.id}
-                      >
-                        <div className="job-main">
-                          <div>
-                            <p className="job-tag">
-                              {level >=
-                              job.minLevel
-                                ? "AVAILABLE"
-                                : `🔒 LEVEL ${job.minLevel}`}
-                            </p>
+                    {JOBS.map(
+                      job => (
+                        <div
+                          className="job-card"
+                          key={job.id}
+                        >
+                          <div className="job-main">
+                            <div>
+                              <p className="job-tag">
+                                {job.company}
+                              </p>
 
-                            <h3>
-                              {job.name}
-                            </h3>
+                              <h3>
+                                {job.title}
+                              </h3>
 
-                            <p>
-                              {job.description}
-                            </p>
+                              <p>
+                                {
+                                  job.description
+                                }
+                              </p>
+                            </div>
+
+                            <button
+                              className="job-button"
+                              onClick={() =>
+                                chooseJob(
+                                  job.id
+                                )
+                              }
+                            >
+                              APPLY
+                            </button>
                           </div>
 
-                          <button
-                            className="job-button"
-                            disabled={
-                              level <
-                              job.minLevel
-                            }
-                            onClick={() =>
-                              chooseJob(
-                                job
-                              )
-                            }
-                          >
-                            TAKE JOB
-                          </button>
-                        </div>
+                          <div className="job-rewards">
+                            <div>
+                              <span>
+                                SKILLS
+                              </span>
 
-                        <div className="job-rewards">
-                          <div>
-                            <span>
-                              DAILY PAY
-                            </span>
-                            <strong>
-                              $
-                              {job.salary.toLocaleString()}
-                            </strong>
-                          </div>
+                              <strong>
+                                {job.skills
+                                  .map(
+                                    formatSkillName
+                                  )
+                                  .join(
+                                    " • "
+                                  )}
+                              </strong>
+                            </div>
 
-                          <div>
-                            <span>
-                              SKILL
-                            </span>
-                            <strong>
-                              {job.stat}
-                            </strong>
-                          </div>
+                            <div>
+                              <span>
+                                START PAY
+                              </span>
 
-                          <div>
-                            <span>
-                              REQUIRED
-                            </span>
-                            <strong>
-                              LVL{" "}
-                              {job.minLevel}
-                            </strong>
+                              <strong>
+                                $
+                                {
+                                  job
+                                    .positions[0]
+                                    .salary
+                                }
+                                /day
+                              </strong>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 </div>
               ) : (
@@ -1002,25 +1440,23 @@ export default function App() {
                   <div className="income-summary">
                     <div>
                       <span>
-                        CURRENT JOB
+                        CURRENT EMPLOYMENT
                       </span>
 
                       <strong>
-                        {currentJob.name}
+                        {
+                          currentPosition?.title
+                        }
                       </strong>
 
                       <small>
-                        Rank {save.jobRank} • $
-                        {Math.floor(
-                          currentJob.salary *
-                            (1 +
-                              Math.max(
-                                0,
-                                save.jobRank -
-                                  1
-                              ) *
-                                0.08)
-                        ).toLocaleString()}
+                        {
+                          currentJob.company
+                        }{" "}
+                        • $
+                        {
+                          currentPosition?.salary
+                        }
                         /day
                       </small>
                     </div>
@@ -1034,62 +1470,79 @@ export default function App() {
                       {paydayReady
                         ? "COLLECT PAY"
                         : formatTime(
-                            nextPayday
+                            paydayRemaining
                           )}
                     </button>
                   </div>
 
                   <div className="job-card owned">
                     <p className="job-tag">
-                      EMPLOYED
+                      {
+                        currentJob.company
+                      }
                     </p>
 
                     <h3>
-                      {currentJob.name}
+                      {
+                        currentPosition?.title
+                      }
                     </h3>
 
                     <p>
-                      {currentJob.description}
+                      {
+                        currentPosition?.description
+                      }
                     </p>
 
                     <div className="job-rewards">
                       <div>
                         <span>
-                          RANK
+                          POSITION
                         </span>
-                        <strong>
-                          {save.jobRank}
-                        </strong>
-                      </div>
 
-                      <div>
-                        <span>
-                          WORK DAYS
-                        </span>
                         <strong>
-                          {save.workDays}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>
-                          SKILL
-                        </span>
-                        <strong>
+                          {save.jobPosition +
+                            1}
+                          /
                           {
-                            save.workStats[
-                              currentJob.stat
-                            ]
+                            currentJob
+                              .positions
+                              .length
                           }
                         </strong>
                       </div>
 
                       <div>
                         <span>
-                          ENERGY
+                          LOYALTY
                         </span>
+
                         <strong>
-                          -20 / shift
+                          {loyaltyDays} days
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>
+                          PERFORMANCE
+                        </span>
+
+                        <strong>
+                          {
+                            save.jobPerformance
+                          }%
+                        </strong>
+                      </div>
+
+                      <div>
+                        <span>
+                          SHIFTS
+                        </span>
+
+                        <strong>
+                          {
+                            save.workDays
+                          }
                         </strong>
                       </div>
                     </div>
@@ -1103,13 +1556,179 @@ export default function App() {
                       WORK SHIFT
                     </button>
 
+                    {nextPosition && (
+                      <div className="panel" style={{ marginTop: 14 }}>
+                        <p className="job-tag">
+                          NEXT PROMOTION
+                        </p>
+
+                        <h3>
+                          {
+                            nextPosition.title
+                          }
+                        </h3>
+
+                        <p>
+                          Requires:
+                        </p>
+
+                        {Object.entries(
+                          nextPosition.requirements
+                        ).map(
+                          ([
+                            skill,
+                            required,
+                          ]) => (
+                            <div
+                              className="progress-stat"
+                              key={skill}
+                            >
+                              <span>
+                                {formatSkillName(
+                                  skill as JobSkill
+                                )}
+                              </span>
+
+                              <strong>
+                                {
+                                  save
+                                    .jobSkills[
+                                      skill as JobSkill
+                                    ]
+                                }
+                                /
+                                {
+                                  required
+                                }
+                              </strong>
+
+                              <div className="progress-bar">
+                                <div
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      (save
+                                        .jobSkills[
+                                          skill as JobSkill
+                                        ] /
+                                        (required ||
+                                          1)) *
+                                        100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        )}
+
+                        <button
+                          className="upgrade-button"
+                          disabled={
+                            !nextPromotionReady
+                          }
+                          onClick={
+                            promote
+                          }
+                          style={{
+                            marginTop: 14,
+                          }}
+                        >
+                          {nextPromotionReady
+                            ? "CLAIM PROMOTION"
+                            : "KEEP WORKING"}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="panel" style={{ marginTop: 14 }}>
+                      <p className="job-tag">
+                        CAREER SKILLS
+                      </p>
+
+                      {currentJob.skills.map(
+                        skill => (
+                          <div
+                            className="progress-stat"
+                            key={skill}
+                          >
+                            <span>
+                              {formatSkillName(
+                                skill
+                              )}
+                            </span>
+
+                            <strong>
+                              {
+                                save
+                                  .jobSkills[
+                                    skill
+                                  ]
+                              }
+                              /100
+                            </strong>
+
+                            <div className="progress-bar">
+                              <div
+                                style={{
+                                  width: `${
+                                    save
+                                      .jobSkills[
+                                        skill
+                                      ]
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+
+                    <div className="panel" style={{ marginTop: 14 }}>
+                      <p className="job-tag">
+                        POSITION PERKS
+                      </p>
+
+                      {currentPosition?.perks.map(
+                        perk => (
+                          <div
+                            key={
+                              perk.name
+                            }
+                            style={{
+                              padding:
+                                "9px 0",
+                              borderBottom:
+                                "1px solid rgba(255,255,255,.05)",
+                            }}
+                          >
+                            <strong>
+                              {perk.name}
+                            </strong>
+
+                            <p
+                              style={{
+                                margin:
+                                  "4px 0 0",
+                              }}
+                            >
+                              {
+                                perk.description
+                              }
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </div>
+
                     <button
                       className="quit-button"
                       onClick={
                         quitJob
                       }
                     >
-                      QUIT JOB
+                      LEAVE COMPANY
                     </button>
                   </div>
                 </>
@@ -1117,31 +1736,39 @@ export default function App() {
             </>
           )}
 
-          {screen === "crimes" && (
+          {screen ===
+            "crimes" && (
             <>
               <div className="crime-summary">
                 <div>
                   <span>
-                    CRIMES COMPLETED
+                    COMPLETED
                   </span>
+
                   <strong>
-                    {save.crimesCompleted}
+                    {
+                      save.crimesCompleted
+                    }
                   </strong>
                 </div>
 
                 <div>
                   <span>
-                    CRIMES FAILED
+                    FAILED
                   </span>
+
                   <strong>
-                    {save.crimesFailed}
+                    {
+                      save.crimesFailed
+                    }
                   </strong>
                 </div>
 
                 <div>
                   <span>
-                    TOTAL CRIME SKILL
+                    CRIME SKILL
                   </span>
+
                   <strong>
                     {totalCrimeSkill}
                   </strong>
@@ -1151,146 +1778,173 @@ export default function App() {
               <div className="crime-stats-mini">
                 {Object.entries(
                   save.crimeStats
-                ).map(([type, value]) => (
-                  <div key={type}>
-                    <span>
-                      {type.toUpperCase()}
-                    </span>
-                    <strong>
-                      {value}
-                    </strong>
-                  </div>
-                ))}
+                ).map(
+                  ([
+                    type,
+                    value,
+                  ]) => (
+                    <div
+                      key={type}
+                    >
+                      <span>
+                        {type.toUpperCase()}
+                      </span>
+
+                      <strong>
+                        {value}
+                      </strong>
+                    </div>
+                  )
+                )}
               </div>
 
               <div className="jobs-list">
-                {CRIMES.map(crime => {
-                  const stat =
-                    save.crimeStats[
-                      crime.type
-                    ];
+                {CRIMES.map(
+                  crime => {
+                    const stat =
+                      save
+                        .crimeStats[
+                        crime.type
+                      ];
 
-                  const cooldown =
-                    save.crimeCooldowns[
-                      crime.id
-                    ] || 0;
+                    const cooldown =
+                      save
+                        .crimeCooldowns[
+                        crime.id
+                      ] || 0;
 
-                  const onCooldown =
-                    cooldown > now;
-
-                  const locked =
-                    level <
-                      crime.minLevel ||
-                    stat <
+                    const locked =
+                      stat <
                       crime.minStat;
 
-                  return (
-                    <div
-                      className={
-                        locked
-                          ? "job-card locked"
-                          : "job-card crime-card"
-                      }
-                      key={crime.id}
-                    >
-                      <div className="job-main">
-                        <div>
-                          <p className="job-tag">
-                            {level <
-                            crime.minLevel
-                              ? `🔒 LEVEL ${crime.minLevel}`
-                              : stat <
-                                crime.minStat
-                              ? `🔒 ${crime.type.toUpperCase()} ${crime.minStat}`
-                              : onCooldown
-                              ? "COOLDOWN"
-                              : "AVAILABLE"}
-                          </p>
+                    const onCooldown =
+                      cooldown >
+                      now;
 
-                          <h3>
-                            {crime.name}
-                          </h3>
+                    return (
+                      <div
+                        className={
+                          locked
+                            ? "job-card locked"
+                            : "job-card crime-card"
+                        }
+                        key={
+                          crime.id
+                        }
+                      >
+                        <div className="job-main">
+                          <div>
+                            <p className="job-tag">
+                              {locked
+                                ? `🔒 ${crime.type.toUpperCase()} ${crime.minStat}`
+                                : onCooldown
+                                ? "COOLDOWN"
+                                : "AVAILABLE"}
+                            </p>
 
-                          <p>
-                            {crime.description}
-                          </p>
-                        </div>
+                            <h3>
+                              {
+                                crime.name
+                              }
+                            </h3>
 
-                        <button
-                          className="crime-button"
-                          disabled={
-                            locked ||
-                            onCooldown
-                          }
-                          onClick={() =>
-                            commitCrime(
-                              crime
-                            )
-                          }
-                        >
-                          {onCooldown
-                            ? formatTime(
-                                cooldown -
-                                  now
-                              )
-                            : "COMMIT"}
-                        </button>
-                      </div>
+                            <p>
+                              {
+                                crime.description
+                              }
+                            </p>
+                          </div>
 
-                      <div className="job-rewards">
-                        <div>
-                          <span>
-                            SUCCESS
-                          </span>
-                          <strong>
-                            {
-                              crimeSuccessEstimate(
+                          <button
+                            className="crime-button"
+                            disabled={
+                              locked ||
+                              onCooldown
+                            }
+                            onClick={() =>
+                              commitCrime(
                                 crime
                               )
                             }
-                            %
-                          </strong>
+                          >
+                            {onCooldown
+                              ? formatTime(
+                                  cooldown -
+                                    now
+                                )
+                              : "COMMIT"}
+                          </button>
                         </div>
 
-                        <div>
-                          <span>
-                            REWARD
-                          </span>
-                          <strong>
-                            $
-                            {crime.minReward.toLocaleString()}
-                            -
-                            $
-                            {crime.maxReward.toLocaleString()}
-                          </strong>
-                        </div>
+                        <div className="job-rewards">
+                          <div>
+                            <span>
+                              SUCCESS
+                            </span>
 
-                        <div>
-                          <span>
-                            ENERGY
-                          </span>
-                          <strong>
-                            -{crime.minEnergy}
-                          </strong>
-                        </div>
+                            <strong>
+                              {
+                                crimeSuccessEstimate(
+                                  crime
+                                )
+                              }
+                              %
+                            </strong>
+                          </div>
 
-                        <div>
-                          <span>
-                            SKILL
-                          </span>
-                          <strong>
-                            {crime.type}
-                          </strong>
+                          <div>
+                            <span>
+                              REWARD
+                            </span>
+
+                            <strong>
+                              $
+                              {
+                                crime.minReward
+                              }
+                              -
+                              $
+                              {
+                                crime.maxReward
+                              }
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              ENERGY
+                            </span>
+
+                            <strong>
+                              -
+                              {
+                                crime.minEnergy
+                              }
+                            </strong>
+                          </div>
+
+                          <div>
+                            <span>
+                              SKILL
+                            </span>
+
+                            <strong>
+                              {
+                                crime.type
+                              }
+                            </strong>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  }
+                )}
               </div>
             </>
           )}
 
-          {screen === "missions" && (
+          {screen ===
+            "missions" && (
             <div className="panel">
               <p className="job-tag">
                 ACTIVE MISSION
@@ -1302,21 +1956,27 @@ export default function App() {
 
               <p>
                 Establish yourself in
-                RiftCity. Complete the
-                mission while your job and
-                crime progression develop
-                separately.
+                RiftCity. Build your
+                career, develop your
+                skills and make your
+                first money.
               </p>
 
               <div className="mission-objectives">
                 <div>
-                  ✓ Build your character
+                  ✓ Find a career
                 </div>
+
                 <div>
-                  ✓ Earn money
+                  ✓ Work a shift
                 </div>
+
                 <div>
-                  ✓ Develop your skills
+                  ✓ Develop a skill
+                </div>
+
+                <div>
+                  ✓ Take your first risk
                 </div>
               </div>
 
@@ -1326,18 +1986,22 @@ export default function App() {
                   completeMission
                 }
               >
-                COMPLETE MISSION{" "}
-                <span>→</span>
+                COMPLETE MISSION
+                <span>
+                  →
+                </span>
               </button>
             </div>
           )}
 
-          {screen === "character" && (
+          {screen ===
+            "character" && (
             <div className="stats">
               <div className="stat">
                 <span>
                   CHARACTER
                 </span>
+
                 <strong>
                   PlayerOne
                 </strong>
@@ -1347,6 +2011,7 @@ export default function App() {
                 <span>
                   LEVEL
                 </span>
+
                 <strong>
                   {level}
                 </strong>
@@ -1356,6 +2021,7 @@ export default function App() {
                 <span>
                   CASH
                 </span>
+
                 <strong>
                   $
                   {save.cash.toLocaleString()}
@@ -1364,44 +2030,9 @@ export default function App() {
 
               <div className="stat">
                 <span>
-                  XP
-                </span>
-                <strong>
-                  {save.xp}
-                </strong>
-              </div>
-
-              <div className="stat">
-                <span>
-                  WORK DAYS
-                </span>
-                <strong>
-                  {save.workDays}
-                </strong>
-              </div>
-
-              <div className="stat">
-                <span>
-                  CRIMES
-                </span>
-                <strong>
-                  {save.crimesCompleted}
-                </strong>
-              </div>
-
-              <div className="stat">
-                <span>
-                  CRIMES FAILED
-                </span>
-                <strong>
-                  {save.crimesFailed}
-                </strong>
-              </div>
-
-              <div className="stat">
-                <span>
                   REPUTATION
                 </span>
+
                 <strong>
                   {save.reputation}
                 </strong>
@@ -1409,33 +2040,54 @@ export default function App() {
 
               <div className="stat-wide">
                 <h3>
-                  WORK STATS
+                  CAREER SKILLS
                 </h3>
 
-                {Object.entries(
-                  save.workStats
-                ).map(([stat, value]) => (
-                  <div
-                    className="progress-stat"
-                    key={stat}
-                  >
-                    <span>
-                      {stat.toUpperCase()}
-                    </span>
-
-                    <strong>
-                      {value}/100
-                    </strong>
-
-                    <div className="progress-bar">
+                {currentJob ? (
+                  currentJob.skills.map(
+                    skill => (
                       <div
-                        style={{
-                          width: `${value}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                        className="progress-stat"
+                        key={skill}
+                      >
+                        <span>
+                          {formatSkillName(
+                            skill
+                          )}
+                        </span>
+
+                        <strong>
+                          {
+                            save
+                              .jobSkills[
+                                skill
+                              ]
+                          }
+                          /100
+                        </strong>
+
+                        <div className="progress-bar">
+                          <div
+                            style={{
+                              width: `${
+                                save
+                                  .jobSkills[
+                                    skill
+                                  ]
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  )
+                ) : (
+                  <p>
+                    Find a job to begin
+                    developing career
+                    skills.
+                  </p>
+                )}
               </div>
 
               <div className="stat-wide">
@@ -1445,28 +2097,33 @@ export default function App() {
 
                 {Object.entries(
                   save.crimeStats
-                ).map(([stat, value]) => (
-                  <div
-                    className="progress-stat"
-                    key={stat}
-                  >
-                    <span>
-                      {stat.toUpperCase()}
-                    </span>
+                ).map(
+                  ([
+                    stat,
+                    value,
+                  ]) => (
+                    <div
+                      className="progress-stat"
+                      key={stat}
+                    >
+                      <span>
+                        {stat.toUpperCase()}
+                      </span>
 
-                    <strong>
-                      {value}/100
-                    </strong>
+                      <strong>
+                        {value}/100
+                      </strong>
 
-                    <div className="progress-bar">
-                      <div
-                        style={{
-                          width: `${value}%`,
-                        }}
-                      />
+                      <div className="progress-bar">
+                        <div
+                          style={{
+                            width: `${value}%`,
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </div>
           )}
