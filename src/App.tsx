@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { executeCombatTurn, DynamicFighter } from "./CombatSystem";
+import { DistanceZone } from "./gameData";
 
 export function useRiftCity() {
   const [gameState, setGameState] = useState<SaveData>(() => loadSave());
@@ -10,16 +12,25 @@ export function useRiftCity() {
   const level = getLevel(gameState.xp).level;
   const property = getProperty(gameState.ownedProperty);
   const maxHealth = getMaxHealth(property?.maxHealthBonus ?? 0);
-  const maxNerve = 10 + Math.min(50, Math.floor(gameState.crimeExperience / 100) * 5) + (property?.nerveBonus ?? 0);
+  const maxNerve =
+    10 +
+    Math.min(50, Math.floor(gameState.crimeExperience / 100) * 5) +
+    (property?.nerveBonus ?? 0);
   const gym = GYMS.find((g) => g.id === gameState.activeGym) ?? GYMS[0];
   const job = getJob(gameState.currentJob);
-  const education = EDUCATION.find((e) => e.id === gameState.educationActive) ?? null;
-  const travelLocked = Boolean(gameState.travelCooldownUntil && gameState.travelCooldownUntil > Date.now());
+  const education =
+    EDUCATION.find((e) => e.id === gameState.educationActive) ?? null;
+  const travelLocked = Boolean(
+    gameState.travelCooldownUntil && gameState.travelCooldownUntil > Date.now()
+  );
 
   const log = (text: string, type: ActivityType = "system") =>
     setGameState((s) => ({
       ...s,
-      activities: [{ id: Date.now() + Math.random(), text, type, time: Date.now() }, ...s.activities].slice(0, 60),
+      activities: [
+        { id: Date.now() + Math.random(), text, type, time: Date.now() },
+        ...s.activities,
+      ].slice(0, 60),
     }));
 
   useEffect(() => {
@@ -36,10 +47,13 @@ export function useRiftCity() {
 
         // Energy
         if (prev.energy < MAX_ENERGY) {
-          const ticks = Math.floor((now - prev.lastEnergyUpdate) / ENERGY_REGEN_INTERVAL);
+          const ticks = Math.floor(
+            (now - prev.lastEnergyUpdate) / ENERGY_REGEN_INTERVAL
+          );
           if (ticks > 0) {
             updates.energy = Math.min(MAX_ENERGY, prev.energy + ticks);
-            updates.lastEnergyUpdate = prev.lastEnergyUpdate + ticks * ENERGY_REGEN_INTERVAL;
+            updates.lastEnergyUpdate =
+              prev.lastEnergyUpdate + ticks * ENERGY_REGEN_INTERVAL;
             changed = true;
           }
         } else {
@@ -48,10 +62,13 @@ export function useRiftCity() {
 
         // Nerve
         if (prev.nerve < maxNerve) {
-          const ticks = Math.floor((now - prev.lastNerveUpdate) / NERVE_REGEN_INTERVAL);
+          const ticks = Math.floor(
+            (now - prev.lastNerveUpdate) / NERVE_REGEN_INTERVAL
+          );
           if (ticks > 0) {
             updates.nerve = Math.min(maxNerve, prev.nerve + ticks);
-            updates.lastNerveUpdate = prev.lastNerveUpdate + ticks * NERVE_REGEN_INTERVAL;
+            updates.lastNerveUpdate =
+              prev.lastNerveUpdate + ticks * NERVE_REGEN_INTERVAL;
             changed = true;
           }
         } else {
@@ -61,16 +78,26 @@ export function useRiftCity() {
         // Happiness
         const maxHap = property?.maxHappiness ?? 100;
         if (prev.happiness < maxHap) {
-          const ticks = Math.floor((now - prev.lastHappinessUpdate) / HAPPINESS_TICK);
+          const ticks = Math.floor(
+            (now - prev.lastHappinessUpdate) / HAPPINESS_TICK
+          );
           if (ticks > 0) {
-            updates.happiness = Math.min(maxHap, prev.happiness + ticks * 5);
-            updates.lastHappinessUpdate = prev.lastHappinessUpdate + ticks * HAPPINESS_TICK;
+            updates.happiness = Math.min(
+              maxHap,
+              prev.happiness + ticks * 5
+            );
+            updates.lastHappinessUpdate =
+              prev.lastHappinessUpdate + ticks * HAPPINESS_TICK;
             changed = true;
           }
         }
 
         // Health
-        if (prev.health < maxHealth && !prev.hospitalUntil && !prev.jailUntil) {
+        if (
+          prev.health < maxHealth &&
+          !prev.hospitalUntil &&
+          !prev.jailUntil
+        ) {
           updates.health = Math.min(maxHealth, prev.health + 1);
           changed = true;
         }
@@ -87,23 +114,36 @@ export function useRiftCity() {
         }
 
         // Bank Interest
-        if (prev.bank > 0 && now - (prev.lastBankInterest || now) >= BANK_INTEREST_INTERVAL) {
-          const days = Math.floor((now - (prev.lastBankInterest || now)) / BANK_INTEREST_INTERVAL);
+        if (
+          prev.bank > 0 &&
+          now - (prev.lastBankInterest || now) >= BANK_INTEREST_INTERVAL
+        ) {
+          const days = Math.floor(
+            (now - (prev.lastBankInterest || now)) / BANK_INTEREST_INTERVAL
+          );
           if (days > 0) {
             const interest = Math.floor(prev.bank * 0.01 * days);
             updates.bank = prev.bank + interest;
             updates.bankInterest = (prev.bankInterest || 0) + interest;
-            updates.lastBankInterest = (prev.lastBankInterest || now) + days * BANK_INTEREST_INTERVAL;
+            updates.lastBankInterest =
+              (prev.lastBankInterest || now) + days * BANK_INTEREST_INTERVAL;
             changed = true;
           }
         }
 
         // Job Salary
-        if (prev.currentJob && now - prev.lastJobPayment >= JOB_PAY_INTERVAL && job) {
-          const ticks = Math.floor((now - prev.lastJobPayment) / JOB_PAY_INTERVAL);
+        if (
+          prev.currentJob &&
+          now - prev.lastJobPayment >= JOB_PAY_INTERVAL &&
+          job
+        ) {
+          const ticks = Math.floor(
+            (now - prev.lastJobPayment) / JOB_PAY_INTERVAL
+          );
           if (ticks > 0) {
             updates.cash = (updates.cash ?? prev.cash) + job.salary * ticks;
-            updates.lastJobPayment = prev.lastJobPayment + ticks * JOB_PAY_INTERVAL;
+            updates.lastJobPayment =
+              prev.lastJobPayment + ticks * JOB_PAY_INTERVAL;
             changed = true;
           }
         }
@@ -119,12 +159,21 @@ export function useRiftCity() {
 
   // Crimes Logic
   const commitCrime = (crime: Crime) => {
-    if (blocked()) return log(gameState.jailUntil ? "You are in jail." : "You are in hospital.");
-    if (!crimeUnlocked(crime, gameState.crimeExperience)) return log("Crime experience is too low.");
+    if (blocked())
+      return log(
+        gameState.jailUntil ? "You are in jail." : "You are in hospital."
+      );
+    if (!crimeUnlocked(crime, gameState.crimeExperience))
+      return log("Crime experience is too low.");
     if (gameState.nerve < crime.nerve) return log("Not enough nerve.");
 
     setGameState((prev) => {
-      const chance = crimeSuccessChance(crime, prev.crimeExperience, 1, getCrimeStatBonus(prev.stats));
+      const chance = crimeSuccessChance(
+        crime,
+        prev.crimeExperience,
+        1,
+        getCrimeStatBonus(prev.stats)
+      );
       const roll = Math.random() * 100;
       const outcome =
         roll < chance * 0.08
@@ -141,7 +190,10 @@ export function useRiftCity() {
 
       if (outcome === "critical") {
         const reward = Math.floor(randomReward(crime) * 1.75);
-        log(`CRITICAL SUCCESS: ${crime.name} paid ${money(reward)}.`, "critical");
+        log(
+          `CRITICAL SUCCESS: ${crime.name} paid ${money(reward)}.`,
+          "critical"
+        );
         return {
           ...prev,
           nerve: nextNerve,
@@ -178,7 +230,10 @@ export function useRiftCity() {
       }
 
       if (outcome === "critical-fail") {
-        log(`CRITICAL FAIL: ${crime.name}. You barely escaped.`, "critical");
+        log(
+          `CRITICAL FAIL: ${crime.name}. You barely escaped.`,
+          "critical"
+        );
         return {
           ...prev,
           nerve: nextNerve,
@@ -203,7 +258,8 @@ export function useRiftCity() {
     if (gameState.energy < cost) return log("Not enough energy to train.");
 
     setGameState((prev) => {
-      const gained = amount * gym.multiplier * (1 + prev.happiness / 200);
+      const gained =
+        amount * gym.multiplier * (1 + prev.happiness / 200);
       log(`Trained ${stat} +${gained.toFixed(2)}.`);
       return {
         ...prev,
@@ -217,12 +273,77 @@ export function useRiftCity() {
     });
   };
 
-  // Combat System Methods
+  // --- SPATIAL COMBAT SYSTEM METHODS ---
   const startCombat = (opponent: PlayerProfile) => {
     if (blocked()) return log("Cannot fight right now.");
     if (gameState.energy < 10) return log("Requires 10 Energy to attack.");
-    setCombatOpponent(opponent);
-    setCombatMessage(`Initiated attack on ${opponent.name}. Choose your action.`);
+
+    const preparedOpponent: PlayerProfile = {
+      ...opponent,
+      zone: opponent.zone || "Long",
+      inCover: opponent.inCover ?? true,
+    };
+
+    setCombatOpponent(preparedOpponent);
+    setCombatMessage(
+      `Initiated attack on ${opponent.name}. Distance: ${preparedOpponent.zone}.`
+    );
+  };
+
+  const moveZone = (newZone: DistanceZone) => {
+    if (!combatOpponent) return;
+    setGameState((s) => ({ ...s, combatZone: newZone, combatInCover: false }));
+    setCombatMessage(`Repositioned to ${newZone} Range.`);
+    executeEnemyCounterTurn();
+  };
+
+  const toggleCover = () => {
+    if (!combatOpponent) return;
+    setGameState((s) => ({ ...s, combatInCover: !s.combatInCover }));
+    setCombatMessage(
+      !gameState.combatInCover
+        ? "Took cover behind local terrain."
+        : "Stepped out of cover."
+    );
+    executeEnemyCounterTurn();
+  };
+
+  const executeEnemyCounterTurn = () => {
+    if (!combatOpponent || combatOpponent.health <= 0) return;
+
+    const playerFighter: DynamicFighter = {
+      id: "player",
+      name: "Operative",
+      level,
+      health: gameState.health,
+      maxHealth,
+      stats: gameState.stats,
+      zone: gameState.combatZone || "Mid",
+      inCover: gameState.combatInCover || false,
+      equippedWeaponId: gameState.equippedWeaponId || "pistol",
+    };
+
+    const counter = executeCombatTurn(combatOpponent, playerFighter);
+
+    setGameState((prev) => {
+      const nextHealth = counter.updatedDefender.health;
+      if (nextHealth <= 0) {
+        setCombatMessage(`Defeat! ${combatOpponent.name} knocked you out.`);
+        setCombatOpponent(null);
+        log(
+          `Defeated in combat by ${combatOpponent.name}. Sent to hospital.`,
+          "jailed"
+        );
+        return {
+          ...prev,
+          health: 0,
+          hospitalUntil: Date.now() + 15 * 60000,
+        };
+      }
+
+      setCombatMessage((msg) => `${msg} | ${counter.log.actionText}`);
+      return { ...prev, health: nextHealth };
+    });
   };
 
   const executeCombatRound = (action: "attack" | "defend" | "flee") => {
@@ -237,55 +358,63 @@ export function useRiftCity() {
         return;
       }
       setCombatMessage("Escape failed! Opponent took advantage.");
+      executeEnemyCounterTurn();
+      return;
     }
 
-    const userPower = gameState.stats.strength * 1.2 + gameState.stats.speed * 0.8;
-    const oppPower = combatOpponent.stats.strength * 1.1 + combatOpponent.stats.speed * 0.9;
-    const isDefending = action === "defend";
+    if (action === "defend") {
+      toggleCover();
+      return;
+    }
 
-    const userDamage = Math.max(5, Math.floor((userPower / Math.max(1, combatOpponent.stats.defense)) * 12 * (Math.random() * 0.4 + 0.8)));
-    const rawOppDamage = Math.floor((oppPower / Math.max(1, gameState.stats.defense)) * 10 * (Math.random() * 0.4 + 0.8));
-    const oppDamage = isDefending ? Math.floor(rawOppDamage * 0.4) : rawOppDamage;
+    const playerFighter: DynamicFighter = {
+      id: "player",
+      name: "Operative",
+      level,
+      health: gameState.health,
+      maxHealth,
+      stats: gameState.stats,
+      zone: gameState.combatZone || "Mid",
+      inCover: gameState.combatInCover || false,
+      equippedWeaponId: gameState.equippedWeaponId || "pistol",
+    };
 
-    setGameState((prev) => {
-      const nextHealth = Math.max(0, prev.health - oppDamage);
-      const userWon = userDamage >= combatOpponent.health;
-      const userLost = nextHealth <= 0;
+    const turnResult = executeCombatTurn(playerFighter, combatOpponent);
+    const updatedEnemy = turnResult.updatedDefender;
 
-      if (userWon) {
-        const rewardXp = Math.floor(combatOpponent.level * 15);
-        const rewardCash = Math.floor(combatOpponent.level * 40 * (Math.random() + 0.5));
-        setCombatMessage(`Victory! Defeated ${combatOpponent.name}. Looted ${money(rewardCash)} and earned ${rewardXp} XP.`);
-        setCombatOpponent(null);
-        log(`Won combat against ${combatOpponent.name}.`, "success");
-        return {
-          ...prev,
-          energy: Math.max(0, prev.energy - 10),
-          cash: prev.cash + rewardCash,
-          xp: prev.xp + rewardXp,
-          health: Math.min(maxHealth, prev.health + 5),
-        };
-      }
+    if (updatedEnemy.health <= 0) {
+      const rewardXp = Math.floor(combatOpponent.level * 15);
+      const rewardCash = Math.floor(
+        combatOpponent.level * 40 * (Math.random() + 0.5)
+      );
+      setCombatMessage(
+        `Victory! Defeated ${combatOpponent.name}. Looted ${money(
+          rewardCash
+        )} and earned ${rewardXp} XP.`
+      );
+      setCombatOpponent(null);
+      log(`Won combat against ${combatOpponent.name}.`, "success");
 
-      if (userLost) {
-        setCombatMessage(`Defeat! ${combatOpponent.name} knocked you out.`);
-        setCombatOpponent(null);
-        log(`Defeated in combat by ${combatOpponent.name}. Sent to hospital.`, "jailed");
-        return {
-          ...prev,
-          energy: Math.max(0, prev.energy - 10),
-          health: 0,
-          hospitalUntil: Date.now() + 15 * 60000,
-        };
-      }
-
-      setCombatMessage(`Dealt ${userDamage} dmg to ${combatOpponent.name}. Took ${oppDamage} dmg ${isDefending ? "(Defending)" : ""}.`);
-      return {
+      setGameState((prev) => ({
         ...prev,
-        energy: action === "attack" ? Math.max(0, prev.energy - 10) : prev.energy,
-        health: nextHealth,
-      };
-    });
+        energy: Math.max(0, prev.energy - 10),
+        cash: prev.cash + rewardCash,
+        xp: prev.xp + rewardXp,
+        health: Math.min(maxHealth, prev.health + 5),
+      }));
+      return;
+    }
+
+    setCombatOpponent(updatedEnemy);
+    setCombatMessage(turnResult.log.actionText);
+
+    // Trigger enemy response after player attack
+    executeEnemyCounterTurn();
+
+    setGameState((prev) => ({
+      ...prev,
+      energy: Math.max(0, prev.energy - 10),
+    }));
   };
 
   return {
@@ -308,6 +437,8 @@ export function useRiftCity() {
     commitCrime,
     trainStat,
     startCombat,
+    moveZone,
+    toggleCover,
     executeCombatRound,
   };
 }
