@@ -81,8 +81,11 @@ type SaveData = {
 
   energy: number;
 
-  nerve: number;
-  lastNerveUpdate: number;
+lastEnergyUpdate: number;
+
+nerve: number;
+
+lastNerveUpdate: number;
 
   health: number;
 
