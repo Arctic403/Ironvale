@@ -142,6 +142,8 @@ type SaveData = {
   activities: Activity[];
 };
 
+type ActiveModal = "energy" | "nerve" | "happy" | "health" | null;
+
 const SAVE_KEY = "riftcity-core-v5";
 const JOB_PAY_INTERVAL = 60 * 60 * 1000;
 const HAPPINESS_TICK = 15 * 60 * 1000;
@@ -759,18 +761,13 @@ function App() {
   const levelInfo = getLevel(g.gameState.xp);
   const maxHappy = getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100;
 
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const energyPct = Math.min(100, (g.gameState.energy / MAX_ENERGY) * 100);
-  const nervePct = Math.min(100, (g.gameState.nerve / g.maxNerve) * 100);
-  const happyPct = Math.min(100, (g.gameState.happiness / maxHappy) * 100);
-  const lifePct = Math.min(100, (g.gameState.health / g.maxHealth) * 100);
 
   const energyNextTick = g.gameState.energy >= MAX_ENERGY ? 0 : Math.max(0, ENERGY_REGEN_INTERVAL - ((now - g.gameState.lastEnergyUpdate) % ENERGY_REGEN_INTERVAL));
   const nerveNextTick = g.gameState.nerve >= g.maxNerve ? 0 : Math.max(0, NERVE_REGEN_INTERVAL - ((now - g.gameState.lastNerveUpdate) % NERVE_REGEN_INTERVAL));
@@ -795,14 +792,10 @@ function App() {
 
   const title = nav.find((n) => n.id === g.currentScreen)?.label || "RiftCity";
 
-  const toggleTooltip = (type: string) => {
-    setActiveTooltip((prev) => (prev === type ? null : type));
-  };
-
   return (
-    <div className="layout-root" onClick={() => setActiveTooltip(null)}>
+    <div className="layout-root">
       {/* LEFT NAVIGATION RAIL */}
-      <aside className="nav-rail" onClick={(e) => e.stopPropagation()}>
+      <aside className="nav-rail">
         <div className="brand">
           <h2>RIFTCITY</h2>
           <span className="badge">v2.0</span>
@@ -836,99 +829,92 @@ function App() {
 
       {/* MAIN CONTENT AREA */}
       <div className="main-wrapper">
-        {/* TOP STATUS BAR WITH COMPACT METERS */}
-        <header className="top-status-bar" onClick={(e) => e.stopPropagation()}>
-          <div className="user-level">
-            <span className="level-badge">LV {g.level}</span>
-            <div className="xp-container">
-              <div className="xp-text">XP {levelInfo.currentXp}/100</div>
-              <div className="bar-track compact">
-                <div className="bar-fill xp" style={{ width: `${levelInfo.currentXp}%` }} />
+        {/* TOP STATUS BAR WITH SIDE-BY-SIDE COMPACT METERS */}
+        <header className="top-status-bar" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="user-level" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="level-badge" style={{ whiteSpace: 'nowrap' }}>LV {g.level}</span>
+              <div className="xp-container" style={{ minWidth: '80px' }}>
+                <div className="xp-text" style={{ fontSize: '10px' }}>XP {levelInfo.currentXp}/100</div>
+                <div className="bar-track compact" style={{ height: '4px', background: '#222' }}>
+                  <div className="bar-fill xp" style={{ width: `${levelInfo.currentXp}%`, height: '100%', background: '#3b82f6' }} />
+                </div>
               </div>
+            </div>
+
+            {/* SIDE-BY-SIDE COMPACT STAT ICONS */}
+            <div className="compact-vitals" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '12px' }}>
+              <button onClick={() => setActiveModal("energy")} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px' }}>
+                <span style={{ fontSize: '16px' }}>⚡</span>
+                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{g.gameState.energy}</span>
+              </button>
+
+              <button onClick={() => setActiveModal("nerve")} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px' }}>
+                <span style={{ fontSize: '16px' }}>🔥</span>
+                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{g.gameState.nerve}</span>
+              </button>
+
+              <button onClick={() => setActiveModal("happy")} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px' }}>
+                <span style={{ fontSize: '16px' }}>😊</span>
+                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{Math.floor(g.gameState.happiness)}</span>
+              </button>
+
+              <button onClick={() => setActiveModal("health")} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px', padding: '2px' }}>
+                <span style={{ fontSize: '16px' }}>❤️</span>
+                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{Math.floor(g.gameState.health)}</span>
+              </button>
             </div>
           </div>
 
-          {/* COMPACT RESOURCE METER STRIP */}
-          <div className="compact-vitals">
-            {/* ENERGY */}
-            <div className="compact-vital-item" onClick={() => toggleTooltip("energy")}>
-              <span className="vital-icon">⚡</span>
-              <div className="vital-bar-wrap">
-                <div className="bar-track compact">
-                  <div className="bar-fill energy" style={{ width: `${energyPct}%` }} />
-                </div>
-              </div>
-              <span className="vital-num">{g.gameState.energy}</span>
-              {activeTooltip === "energy" && (
-                <div className="resource-popover">
-                  <strong>⚡ Energy</strong>
-                  <div className="popover-val">{g.gameState.energy} / {MAX_ENERGY}</div>
-                  <small>{g.gameState.energy >= MAX_ENERGY ? "Fully charged" : `Next +1 in: ${formatTime(energyNextTick)}`}</small>
-                </div>
-              )}
-            </div>
-
-            {/* NERVE */}
-            <div className="compact-vital-item" onClick={() => toggleTooltip("nerve")}>
-              <span className="vital-icon">🔥</span>
-              <div className="vital-bar-wrap">
-                <div className="bar-track compact">
-                  <div className="bar-fill nerve" style={{ width: `${nervePct}%` }} />
-                </div>
-              </div>
-              <span className="vital-num">{g.gameState.nerve}</span>
-              {activeTooltip === "nerve" && (
-                <div className="resource-popover">
-                  <strong>🔥 Nerve</strong>
-                  <div className="popover-val">{g.gameState.nerve} / {g.maxNerve}</div>
-                  <small>{g.gameState.nerve >= g.maxNerve ? "At capacity" : `Next +1 in: ${formatTime(nerveNextTick)}`}</small>
-                </div>
-              )}
-            </div>
-
-            {/* HAPPINESS */}
-            <div className="compact-vital-item" onClick={() => toggleTooltip("happy")}>
-              <span className="vital-icon">😊</span>
-              <div className="vital-bar-wrap">
-                <div className="bar-track compact">
-                  <div className="bar-fill happy" style={{ width: `${happyPct}%` }} />
-                </div>
-              </div>
-              <span className="vital-num">{Math.floor(g.gameState.happiness)}</span>
-              {activeTooltip === "happy" && (
-                <div className="resource-popover">
-                  <strong>😊 Happiness</strong>
-                  <div className="popover-val">{Math.floor(g.gameState.happiness)} / {maxHappy}</div>
-                  <small>{g.gameState.happiness >= maxHappy ? "Max happiness" : `Next +5 in: ${formatTime(happyNextTick)}`}</small>
-                </div>
-              )}
-            </div>
-
-            {/* HEALTH */}
-            <div className="compact-vital-item" onClick={() => toggleTooltip("health")}>
-              <span className="vital-icon">❤️</span>
-              <div className="vital-bar-wrap">
-                <div className="bar-track compact">
-                  <div className="bar-fill life" style={{ width: `${lifePct}%` }} />
-                </div>
-              </div>
-              <span className="vital-num">{Math.floor(g.gameState.health)}</span>
-              {activeTooltip === "health" && (
-                <div className="resource-popover">
-                  <strong>❤️ Health</strong>
-                  <div className="popover-val">{Math.floor(g.gameState.health)} / {g.maxHealth}</div>
-                  <small>{g.gameState.health >= g.maxHealth ? "Full health" : `Next +1 in: ${formatTime(healthNextTick)}`}</small>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="currency-bar">
-            <div className="currency-item">💵 {money(g.gameState.cash)}</div>
-            <div className="currency-item">🏦 {money(g.gameState.bank)}</div>
-            <div className="currency-item">💎 {g.gameState.points} Pts</div>
+          <div className="currency-bar" style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
+            <div>💵 {money(g.gameState.cash)}</div>
+            <div>🏦 {money(g.gameState.bank)}</div>
+            <div>💎 {g.gameState.points} Pts</div>
           </div>
         </header>
+
+        {/* STAT OVERLAY POPUP MODAL */}
+        {activeModal && (
+          <div className="modal-overlay" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setActiveModal(null)}>
+            <div className="modal-card" style={{ background: '#18181b', padding: '20px', borderRadius: '8px', minWidth: '240px', border: '1px solid #3f3f46', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+              {activeModal === "energy" && (
+                <>
+                  <h2>⚡ Energy</h2>
+                  <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '12px 0' }}>{g.gameState.energy} / {MAX_ENERGY}</p>
+                  <p style={{ color: '#a1a1aa' }}>{g.gameState.energy >= MAX_ENERGY ? "Fully charged" : `Next +1 tick in: ${formatTime(energyNextTick)}`}</p>
+                </>
+              )}
+
+              {activeModal === "nerve" && (
+                <>
+                  <h2>🔥 Nerve</h2>
+                  <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '12px 0' }}>{g.gameState.nerve} / {g.maxNerve}</p>
+                  <p style={{ color: '#a1a1aa' }}>{g.gameState.nerve >= g.maxNerve ? "At capacity" : `Next +1 tick in: ${formatTime(nerveNextTick)}`}</p>
+                </>
+              )}
+
+              {activeModal === "happy" && (
+                <>
+                  <h2>😊 Happiness</h2>
+                  <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '12px 0' }}>{Math.floor(g.gameState.happiness)} / {maxHappy}</p>
+                  <p style={{ color: '#a1a1aa' }}>{g.gameState.happiness >= maxHappy ? "Max happiness" : `Next +5 tick in: ${formatTime(happyNextTick)}`}</p>
+                </>
+              )}
+
+              {activeModal === "health" && (
+                <>
+                  <h2>❤️ Health</h2>
+                  <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '12px 0' }}>{Math.floor(g.gameState.health)} / {g.maxHealth}</p>
+                  <p style={{ color: '#a1a1aa' }}>{g.gameState.health >= g.maxHealth ? "Full health" : `Next +1 tick in: ${formatTime(healthNextTick)}`}</p>
+                </>
+              )}
+
+              <button className="btn-primary" style={{ marginTop: '16px', width: '100%' }} onClick={() => setActiveModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* SCREEN CONTAINER */}
         <main className="screen-container">
