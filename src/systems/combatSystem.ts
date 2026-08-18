@@ -43,21 +43,23 @@ export interface PlayerProfile {
   stats: CombatStats;
 
   /*
-   * weapons = weapons the player owns.
+   * Weapons the fighter actually owns.
    *
    * IMPORTANT:
-   * Having a weapon here does NOT mean it is equipped.
+   * Owning a weapon does NOT automatically equip it.
    */
   weapons?: WeaponOption[];
 
   /*
-   * Only this determines the currently equipped weapon
-   * when no explicit weapon is supplied to executeCombatTurn().
+   * The ID of the weapon currently equipped.
+   *
+   * If undefined/null, the fighter is UNARMED.
    */
   equippedWeaponId?: string;
 
   cashReward?: number;
   xpReward?: number;
+
   zone?: DistanceZone;
   inCover?: boolean;
 }
@@ -76,63 +78,38 @@ export interface TurnLog {
 }
 
 /*
- * These are weapon definitions available to the combat system.
+ * ============================================================
+ * UNARMED COMBAT
+ * ============================================================
  *
- * IMPORTANT:
- * They are NOT automatically equipped.
+ * Unarmed is NOT an inventory item.
  *
- * A player must explicitly have the corresponding weapon
- * equipped or have it explicitly passed into executeCombatTurn().
+ * It is always available to every player.
+ *
+ * There are intentionally NO DEFAULT WEAPONS here.
+ *
+ * The player does NOT automatically receive:
+ *
+ * - AK-47
+ * - Pistol
+ * - Knife
+ * - Bat
+ * - Pepper Spray
+ *
+ * A weapon must actually exist in the fighter's inventory
+ * and be equipped before combat can use it.
  */
-export const DEFAULT_WEAPONS: WeaponOption[] = [
-  {
-    id: "primary",
-    name: "AK-47",
-    type: "primary",
-    baseDamage: 32,
-    accuracy: 75,
-    critChance: 18,
-    icon: "🔫",
-    optimalZone: "Mid",
-    coverPenetration: 0.4,
-  },
 
-  {
-    id: "secondary",
-    name: "9mm Pistol",
-    type: "secondary",
-    baseDamage: 22,
-    accuracy: 85,
-    critChance: 12,
-    icon: "🔫",
-    optimalZone: "Mid",
-    coverPenetration: 0.2,
-  },
-
-  {
-    id: "melee",
-    name: "Combat Knife",
-    type: "melee",
-    baseDamage: 18,
-    accuracy: 92,
-    critChance: 25,
-    icon: "🔪",
-    optimalZone: "Close",
-    coverPenetration: 0.1,
-  },
-
-  {
-    id: "temporary",
-    name: "Pepper Spray",
-    type: "temporary",
-    baseDamage: 10,
-    accuracy: 98,
-    critChance: 5,
-    icon: "🌶️",
-    optimalZone: "Close",
-    coverPenetration: 0.0,
-  },
-];
+const UNARMED_WEAPON: WeaponOption = {
+  id: "unarmed",
+  name: "Unarmed",
+  type: "melee",
+  baseDamage: 8,
+  accuracy: 65,
+  critChance: 8,
+  optimalZone: "Close",
+  coverPenetration: 0,
+};
 
 const BODY_PARTS: {
   part: BodyPart;
@@ -177,14 +154,10 @@ const ZONE_DISTANCE_MAP: Record<
 
 /*
  * ============================================================
- * HELPERS
+ * ITEM → COMBAT WEAPON
  * ============================================================
  */
 
-/**
- * Converts an Item from gameData into the combat system's
- * WeaponOption format.
- */
 function itemToWeapon(
   item: Item
 ): WeaponOption | null {
@@ -199,20 +172,37 @@ function itemToWeapon(
     baseDamage: item.effect ?? 1,
     accuracy: item.accuracy ?? 70,
     critChance: 10,
-    optimalZone: item.optimalRange,
+    optimalZone:
+      item.optimalRange,
     coverPenetration:
       item.coverPenetration ?? 0,
   };
 }
 
-/**
- * Resolves ONLY an explicitly equipped weapon.
+/*
+ * ============================================================
+ * RESOLVE EQUIPPED WEAPON
+ * ============================================================
  *
- * No equipped weapon means null.
+ * This function is deliberately strict.
  *
- * This is intentionally separate from the player's owned
- * weapons list. Owning a weapon does not automatically equip it.
+ * A fighter gets a weapon ONLY if:
+ *
+ * 1. They have equippedWeaponId
+ * 2. They actually own that weapon
+ *
+ * Otherwise:
+ *
+ * UNARMED.
+ *
+ * We do NOT fall back to:
+ *
+ * - DEFAULT_WEAPONS
+ * - random weapons
+ * - the first weapon in inventory
+ * - a global weapon catalog
  */
+
 function resolveEquippedWeapon(
   fighter: DynamicFighter
 ): WeaponOption | null {
@@ -221,15 +211,12 @@ function resolveEquippedWeapon(
   }
 
   /*
-   * First check the fighter's owned weapons.
-   *
-   * This ensures the player actually owns the weapon
-   * they claim to have equipped.
+   * The weapon must exist in the fighter's inventory.
    */
   const ownedWeapon =
     fighter.weapons?.find(
-      (owned) =>
-        owned.id ===
+      (weapon) =>
+        weapon.id ===
         fighter.equippedWeaponId
     );
 
@@ -238,41 +225,39 @@ function resolveEquippedWeapon(
   }
 
   /*
-   * Then check the global item catalog.
+   * If the inventory stores only IDs rather than full
+   * WeaponOption objects, we can resolve the item from
+   * gameData.
    *
-   * This supports the current RiftCity player profile
-   * structure where equippedWeaponId can point directly
-   * to an ITEM such as "knife", "bat", or "pistol".
+   * BUT we still require that the ID was present in
+   * fighter.weapons.
+   *
+   * Therefore this catalog lookup does NOT grant ownership.
    */
-  const item = getItem(
-    fighter.equippedWeaponId
-  );
+
+  const item =
+    getItem(
+      fighter.equippedWeaponId
+    );
 
   if (!item) {
     return null;
   }
 
-  return itemToWeapon(item);
+  /*
+   * The fighter claimed an equipped ID but does not have
+   * a matching owned weapon object.
+   *
+   * Do NOT grant it.
+   */
+  return null;
 }
 
-/**
- * Creates an unarmed combat weapon.
- *
- * This is NOT an inventory item.
- * It represents the player's natural physical attack.
+/*
+ * ============================================================
+ * WIN CHANCE
+ * ============================================================
  */
-function createUnarmedWeapon(): WeaponOption {
-  return {
-    id: "unarmed",
-    name: "Unarmed",
-    type: "melee",
-    baseDamage: 8,
-    accuracy: 65,
-    critChance: 8,
-    optimalZone: "Close",
-    coverPenetration: 0,
-  };
-}
 
 export function calculateWinChance(
   playerStats: CombatStats,
@@ -290,22 +275,29 @@ export function calculateWinChance(
     opponentStats.speed +
     opponentStats.dexterity;
 
-  /*
-   * Prevent division by zero if a malformed profile
-   * somehow reaches combat.
-   */
   if (pSum + oSum <= 0) {
     return 50;
   }
 
   const chance =
-    (pSum / (pSum + oSum)) * 100;
+    (pSum /
+      (pSum + oSum)) *
+    100;
 
   return Math.min(
     95,
-    Math.max(5, Math.round(chance))
+    Math.max(
+      5,
+      Math.round(chance)
+    )
   );
 }
+
+/*
+ * ============================================================
+ * EXECUTE COMBAT TURN
+ * ============================================================
+ */
 
 export function executeCombatTurn(
   attacker: DynamicFighter,
@@ -316,45 +308,81 @@ export function executeCombatTurn(
   log: TurnLog;
 } {
   /*
-   * ============================================================
-   * WEAPON RESOLUTION
-   * ============================================================
+   * ==========================================================
+   * WEAPON SELECTION
+   * ==========================================================
    *
    * Priority:
    *
-   * 1. Explicit weapon passed to this turn.
-   * 2. Attacker's equippedWeaponId.
-   * 3. Unarmed.
+   * 1. Explicit weapon passed by the combat UI
+   * 2. Currently equipped weapon
+   * 3. UNARMED
    *
-   * NEVER:
-   *
-   * - randomly select from weapons[]
-   * - automatically give DEFAULT_WEAPONS
-   * - give the player a weapon they don't have equipped
+   * There is NO DEFAULT WEAPON.
    */
 
-  const activeWeapon =
-    weapon ??
-    resolveEquippedWeapon(attacker) ??
-    createUnarmedWeapon();
+  let activeWeapon: WeaponOption;
+
+  if (weapon) {
+    /*
+     * If a weapon is explicitly supplied, make sure the
+     * attacker actually owns it unless it is Unarmed.
+     */
+
+    if (weapon.id === "unarmed") {
+      activeWeapon =
+        UNARMED_WEAPON;
+    } else {
+      const ownsWeapon =
+        attacker.weapons?.some(
+          (owned) =>
+            owned.id === weapon.id
+        );
+
+      if (ownsWeapon) {
+        activeWeapon =
+          weapon;
+      } else {
+        /*
+         * Security/integrity fallback:
+         *
+         * Player attempted to attack with a weapon they
+         * don't own.
+         *
+         * They fight unarmed instead.
+         */
+        activeWeapon =
+          UNARMED_WEAPON;
+      }
+    }
+  } else {
+    activeWeapon =
+      resolveEquippedWeapon(
+        attacker
+      ) ??
+      UNARMED_WEAPON;
+  }
 
   const isUnarmed =
-    activeWeapon.id === "unarmed";
+    activeWeapon.id ===
+    "unarmed";
 
   const defenderZone: DistanceZone =
-    defender.zone || "Mid";
+    defender.zone ??
+    "Mid";
 
   const optimalZone: DistanceZone =
-    activeWeapon.optimalZone ||
+    activeWeapon.optimalZone ??
     "Close";
 
   const coverPenetration =
-    activeWeapon.coverPenetration ?? 0;
+    activeWeapon.coverPenetration ??
+    0;
 
   /*
-   * ============================================================
+   * ==========================================================
    * ACCURACY
-   * ============================================================
+   * ==========================================================
    */
 
   let accuracy =
@@ -366,8 +394,9 @@ export function executeCombatTurn(
       2;
 
   /*
-   * Spatial penalty.
+   * Range penalty.
    */
+
   if (
     optimalZone !==
     defenderZone
@@ -389,19 +418,23 @@ export function executeCombatTurn(
   /*
    * Cover penalty.
    */
-  if (defender.inCover) {
+
+  if (
+    defender.inCover
+  ) {
     const coverPenalty =
       20 *
-      (1 - coverPenetration);
+      (1 -
+        coverPenetration);
 
-    accuracy -= coverPenalty;
+    accuracy -=
+      coverPenalty;
   }
 
   /*
-   * Unarmed combat gets a slightly different accuracy
-   * baseline because its weapon definition is deliberately
-   * generic.
+   * Unarmed-specific range handling.
    */
+
   if (isUnarmed) {
     accuracy =
       65 +
@@ -411,11 +444,9 @@ export function executeCombatTurn(
       ) *
         2;
 
-    /*
-     * Unarmed attacks are primarily close-range.
-     */
     if (
-      defenderZone !== "Close"
+      defenderZone !==
+      "Close"
     ) {
       const zoneDelta =
         Math.abs(
@@ -431,23 +462,27 @@ export function executeCombatTurn(
         zoneDelta * 20;
     }
 
-    /*
-     * Cover makes unarmed attacks harder.
-     */
-    if (defender.inCover) {
-      accuracy -= 15;
+    if (
+      defender.inCover
+    ) {
+      accuracy -=
+        15;
     }
   }
 
-  const hitChance = Math.min(
-    95,
-    Math.max(15, accuracy)
-  );
+  const hitChance =
+    Math.min(
+      95,
+      Math.max(
+        15,
+        accuracy
+      )
+    );
 
   /*
-   * ============================================================
+   * ==========================================================
    * MISS
-   * ============================================================
+   * ==========================================================
    */
 
   if (
@@ -455,10 +490,12 @@ export function executeCombatTurn(
     hitChance
   ) {
     return {
-      updatedDefender: defender,
+      updatedDefender:
+        defender,
 
       log: {
-        id: Math.random().toString(),
+        id:
+          Math.random().toString(),
 
         attacker:
           attacker.name,
@@ -466,9 +503,10 @@ export function executeCombatTurn(
         defender:
           defender.name,
 
-        actionText: isUnarmed
-          ? `${attacker.name} attacked ${defender.name} unarmed but MISSED!`
-          : `${attacker.name} attacked with ${activeWeapon.name} but MISSED!`,
+        actionText:
+          isUnarmed
+            ? `${attacker.name} attacked ${defender.name} unarmed but MISSED!`
+            : `${attacker.name} attacked with ${activeWeapon.name} but MISSED!`,
 
         damage: 0,
 
@@ -480,9 +518,9 @@ export function executeCombatTurn(
   }
 
   /*
-   * ============================================================
+   * ==========================================================
    * HIT
-   * ============================================================
+   * ==========================================================
    */
 
   const target =
@@ -498,22 +536,26 @@ export function executeCombatTurn(
     activeWeapon.critChance;
 
   const critMultiplier =
-    isCrit ? 1.75 : 1.0;
+    isCrit
+      ? 1.75
+      : 1.0;
 
   /*
-   * ============================================================
+   * ==========================================================
    * DAMAGE
-   * ============================================================
+   * ==========================================================
    */
 
   let rawDamage: number;
 
   if (isUnarmed) {
     /*
-     * Unarmed damage scales primarily from strength.
+     * Unarmed attack:
      *
-     * Defense still mitigates damage.
+     * Strength is the main offensive stat.
+     * Defense reduces incoming damage.
      */
+
     rawDamage =
       (
         activeWeapon.baseDamage +
@@ -526,8 +568,11 @@ export function executeCombatTurn(
       critMultiplier;
   } else {
     /*
-     * Armed damage.
+     * Armed attack:
+     *
+     * Weapon damage + strength.
      */
+
     rawDamage =
       (
         activeWeapon.baseDamage +
@@ -541,10 +586,9 @@ export function executeCombatTurn(
   }
 
   /*
-   * Optimal zone modifier.
-   *
-   * Unarmed attacks are naturally strongest at Close range.
+   * Optimal range modifier.
    */
+
   rawDamage *=
     optimalZone ===
     defenderZone
@@ -552,54 +596,62 @@ export function executeCombatTurn(
       : 0.8;
 
   /*
-   * Cover damage absorption.
+   * Cover damage reduction.
    */
-  if (defender.inCover) {
+
+  if (
+    defender.inCover
+  ) {
     rawDamage *=
       0.5 +
-      coverPenetration * 0.3;
+      coverPenetration *
+        0.3;
   }
 
   /*
-   * Never allow negative or zero damage.
+   * Final damage.
    */
-  const finalDamage = Math.max(
-    isUnarmed ? 2 : 4,
-    Math.floor(
-      rawDamage +
-        (Math.random() * 6 - 3)
-    )
-  );
 
-  const newHealth = Math.max(
-    0,
-    defender.health -
-      finalDamage
-  );
+  const finalDamage =
+    Math.max(
+      isUnarmed
+        ? 2
+        : 4,
+      Math.floor(
+        rawDamage +
+          (
+            Math.random() *
+              6 -
+            3
+          )
+      )
+    );
+
+  const newHealth =
+    Math.max(
+      0,
+      defender.health -
+        finalDamage
+    );
 
   /*
-   * ============================================================
-   * COMBAT LOG
-   * ============================================================
+   * ==========================================================
+   * COMBAT TEXT
+   * ==========================================================
    */
 
-  let actionText: string;
-
-  if (isUnarmed) {
-    actionText =
-      `${attacker.name} hit ${defender.name} in the ${target.label} unarmed for ${finalDamage} damage!${
-        isCrit
-          ? " 👊 CRITICAL HIT!"
-          : ""
-      }`;
-  } else {
-    actionText =
-      `${attacker.name} hit ${defender.name} in the ${target.label} with ${activeWeapon.name} for ${finalDamage} damage!${
-        isCrit
-          ? " 🎯 CRITICAL HIT!"
-          : ""
-      }`;
-  }
+  const actionText =
+    isUnarmed
+      ? `${attacker.name} hit ${defender.name} in the ${target.label} unarmed for ${finalDamage} damage!${
+          isCrit
+            ? " 👊 CRITICAL HIT!"
+            : ""
+        }`
+      : `${attacker.name} hit ${defender.name} in the ${target.label} with ${activeWeapon.name} for ${finalDamage} damage!${
+          isCrit
+            ? " 🎯 CRITICAL HIT!"
+            : ""
+        }`;
 
   return {
     updatedDefender: {
@@ -608,7 +660,8 @@ export function executeCombatTurn(
     },
 
     log: {
-      id: Math.random().toString(),
+      id:
+        Math.random().toString(),
 
       attacker:
         attacker.name,
@@ -631,6 +684,12 @@ export function executeCombatTurn(
   };
 }
 
+/*
+ * ============================================================
+ * SIMULATE COMBAT
+ * ============================================================
+ */
+
 export function simulateCombat(
   attacker: PlayerProfile,
   defender: PlayerProfile
@@ -641,41 +700,48 @@ export function simulateCombat(
       defender.stats
     );
 
-  /*
-   * This determines the final combat outcome for
-   * the simulation while the actual turn-by-turn
-   * combat generates the logs.
-   */
-  const isWin =
-    Math.random() * 100 <
-    winChance;
+  let currentAttacker: DynamicFighter =
+    {
+      ...attacker,
+      zone:
+        attacker.zone ??
+        "Mid",
+    };
 
-  let currentAttacker = {
-    ...attacker,
-    zone:
-      attacker.zone || "Mid",
-  };
-
-  let currentDefender = {
-    ...defender,
-    zone:
-      defender.zone || "Mid",
-  };
+  let currentDefender: DynamicFighter =
+    {
+      ...defender,
+      zone:
+        defender.zone ??
+        "Mid",
+    };
 
   const logs: TurnLog[] = [];
 
   let rounds = 0;
 
+  /*
+   * Actual combat simulation.
+   *
+   * We do NOT use a pre-rolled win result.
+   */
+
   while (
-    currentAttacker.health > 0 &&
-    currentDefender.health > 0 &&
+    currentAttacker.health >
+      0 &&
+    currentDefender.health >
+      0 &&
     rounds < 20
   ) {
     rounds++;
 
     /*
-     * Attacker's equipped weapon is resolved automatically.
+     * Attacker uses:
+     *
+     * equipped weapon
+     * OR unarmed
      */
+
     const turnResult =
       executeCombatTurn(
         currentAttacker,
@@ -690,17 +756,19 @@ export function simulateCombat(
     );
 
     if (
-      currentDefender.health <= 0
+      currentDefender.health <=
+      0
     ) {
       break;
     }
 
     /*
-     * Defender counter-attacks using THEIR OWN
-     * equipped weapon.
+     * Defender uses THEIR OWN equipment.
      *
-     * If they have no weapon, they fight unarmed.
+     * If they have no weapon:
+     * UNARMED.
      */
+
     const counterResult =
       executeCombatTurn(
         currentDefender,
@@ -716,11 +784,9 @@ export function simulateCombat(
   }
 
   /*
-   * Determine the actual winner from health.
-   *
-   * This is more trustworthy than the initial winChance,
-   * because the combat log represents what actually happened.
+   * Determine winner from actual combat state.
    */
+
   const actualWin =
     currentAttacker.health >
     0;
@@ -728,19 +794,18 @@ export function simulateCombat(
   return {
     isWin: actualWin,
 
-    /*
-     * Keep the calculated chance available for UI/debugging.
-     */
     winChance,
 
     logs,
 
-    winner: actualWin
-      ? currentAttacker
-      : currentDefender,
+    winner:
+      actualWin
+        ? currentAttacker
+        : currentDefender,
 
-    loser: actualWin
-      ? currentDefender
-      : currentAttacker,
+    loser:
+      actualWin
+        ? currentDefender
+        : currentAttacker,
   };
 }
