@@ -23,9 +23,6 @@ export type Item = {
   price: number;
   effect?: number;
 
-  /*
-   * Spatial Combat System extensions
-   */
   optimalRange?: DistanceZone;
   accuracy?: number;
   moveCost?: number;
@@ -67,19 +64,8 @@ export type Property = {
   name: string;
   description: string;
   price: number;
-
-  /*
-   * Kept for compatibility with the existing
-   * property system.
-   */
   maxHealthBonus: number;
-
-  /*
-   * Deprecated for gym calculation.
-   * Gym gains now come from gym + happiness.
-   */
   gymBonus: number;
-
   nerveBonus: number;
   maxHappiness: number;
 };
@@ -89,22 +75,49 @@ export type Property = {
  * PLAYER PROFILES
  * ============================================================
  *
- * These profiles are used by the combat system as selectable
- * opponents.
+ * These are selectable combat opponents.
  *
- * The shape intentionally matches combatSystem.PlayerProfile:
+ * IMPORTANT:
  *
- * id
- * name
- * level
- * health
- * maxHealth
- * stats
+ * equippedWeaponId is OPTIONAL.
  *
- * Optional combat fields are included where useful.
+ * If it exists:
+ *   The player has that weapon equipped.
+ *
+ * If it does not exist:
+ *   The player is UNARMED.
+ *
+ * We do not give opponents automatic weapons.
  */
 
-export const PLAYER_PROFILES = [
+export type PlayerCombatStats = {
+  strength: number;
+  defense: number;
+  speed: number;
+  dexterity: number;
+};
+
+export type PlayerProfile = {
+  id: string;
+  name: string;
+  level: number;
+  health: number;
+  maxHealth: number;
+  stats: PlayerCombatStats;
+
+  equippedWeaponId?: string;
+
+  zone?: DistanceZone;
+  inCover?: boolean;
+
+  cashReward?: number;
+  xpReward?: number;
+};
+
+export const PLAYER_PROFILES: PlayerProfile[] = [
+  /*
+   * UNARMED
+   */
   {
     id: "street-rat",
     name: "StreetRat",
@@ -117,13 +130,15 @@ export const PLAYER_PROFILES = [
       speed: 5,
       dexterity: 5,
     },
-    zone: "Close" as DistanceZone,
+    zone: "Close",
     inCover: false,
     cashReward: 100,
     xpReward: 20,
-    equippedWeaponId: "knife",
   },
 
+  /*
+   * KNIFE EQUIPPED
+   */
   {
     id: "dock-runner",
     name: "DockRunner",
@@ -136,13 +151,16 @@ export const PLAYER_PROFILES = [
       speed: 7,
       dexterity: 8,
     },
-    zone: "Mid" as DistanceZone,
+    equippedWeaponId: "knife",
+    zone: "Close",
     inCover: false,
     cashReward: 175,
     xpReward: 35,
-    equippedWeaponId: "pistol",
   },
 
+  /*
+   * PISTOL EQUIPPED
+   */
   {
     id: "night-shift",
     name: "NightShift",
@@ -155,13 +173,16 @@ export const PLAYER_PROFILES = [
       speed: 9,
       dexterity: 10,
     },
-    zone: "Mid" as DistanceZone,
+    equippedWeaponId: "pistol",
+    zone: "Mid",
     inCover: true,
     cashReward: 300,
     xpReward: 50,
-    equippedWeaponId: "pistol",
   },
 
+  /*
+   * BAT EQUIPPED
+   */
   {
     id: "iron-jack",
     name: "IronJack",
@@ -174,13 +195,16 @@ export const PLAYER_PROFILES = [
       speed: 11,
       dexterity: 10,
     },
-    zone: "Close" as DistanceZone,
+    equippedWeaponId: "bat",
+    zone: "Close",
     inCover: false,
     cashReward: 500,
     xpReward: 75,
-    equippedWeaponId: "bat",
   },
 
+  /*
+   * PISTOL EQUIPPED
+   */
   {
     id: "blackout",
     name: "Blackout",
@@ -193,13 +217,16 @@ export const PLAYER_PROFILES = [
       speed: 16,
       dexterity: 17,
     },
-    zone: "Mid" as DistanceZone,
+    equippedWeaponId: "pistol",
+    zone: "Mid",
     inCover: true,
     cashReward: 800,
     xpReward: 110,
-    equippedWeaponId: "pistol",
   },
 
+  /*
+   * PISTOL EQUIPPED
+   */
   {
     id: "viper",
     name: "Viper",
@@ -212,13 +239,16 @@ export const PLAYER_PROFILES = [
       speed: 23,
       dexterity: 25,
     },
-    zone: "Long" as DistanceZone,
+    equippedWeaponId: "pistol",
+    zone: "Long",
     inCover: true,
     cashReward: 1200,
     xpReward: 150,
-    equippedWeaponId: "pistol",
   },
 
+  /*
+   * UNARMED
+   */
   {
     id: "ghost",
     name: "Ghost",
@@ -231,13 +261,15 @@ export const PLAYER_PROFILES = [
       speed: 31,
       dexterity: 34,
     },
-    zone: "Long" as DistanceZone,
+    zone: "Long",
     inCover: true,
     cashReward: 2000,
     xpReward: 225,
-    equippedWeaponId: "pistol",
   },
 
+  /*
+   * PISTOL EQUIPPED
+   */
   {
     id: "kingpin",
     name: "Kingpin",
@@ -250,11 +282,11 @@ export const PLAYER_PROFILES = [
       speed: 36,
       dexterity: 38,
     },
-    zone: "Mid" as DistanceZone,
+    equippedWeaponId: "pistol",
+    zone: "Mid",
     inCover: true,
     cashReward: 3500,
     xpReward: 350,
-    equippedWeaponId: "pistol",
   },
 ];
 
@@ -630,8 +662,7 @@ export function getJob(
 
   return (
     JOBS.find(
-      (job) =>
-        job.id === id
+      (job) => job.id === id
     ) || null
   );
 }
@@ -641,8 +672,7 @@ export function getItem(
 ): Item | null {
   return (
     ITEMS.find(
-      (item) =>
-        item.id === id
+      (item) => item.id === id
     ) || null
   );
 }
@@ -656,8 +686,7 @@ export function getProperty(
 
   return (
     PROPERTIES.find(
-      (property) =>
-        property.id === id
+      (property) => property.id === id
     ) || null
   );
 }
