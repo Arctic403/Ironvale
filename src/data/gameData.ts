@@ -7,7 +7,7 @@ export type Job = {
   levelRequired: number;
 };
 
-export type DistanceZone = 'Close' | 'Mid' | 'Long';
+export type DistanceZone = "Close" | "Mid" | "Long";
 
 export type Item = {
   id: string;
@@ -22,7 +22,7 @@ export type Item = {
     | "misc";
   price: number;
   effect?: number;
-  
+
   /*
    * Spatial Combat System extensions
    */
@@ -69,8 +69,8 @@ export type Property = {
   price: number;
 
   /*
-   * Kept for compatibility with your
-   * existing property system.
+   * Kept for compatibility with the existing
+   * property system.
    */
   maxHealthBonus: number;
 
@@ -83,6 +83,186 @@ export type Property = {
   nerveBonus: number;
   maxHappiness: number;
 };
+
+/*
+ * ============================================================
+ * PLAYER PROFILES
+ * ============================================================
+ *
+ * These profiles are used by the combat system as selectable
+ * opponents.
+ *
+ * The shape intentionally matches combatSystem.PlayerProfile:
+ *
+ * id
+ * name
+ * level
+ * health
+ * maxHealth
+ * stats
+ *
+ * Optional combat fields are included where useful.
+ */
+
+export const PLAYER_PROFILES = [
+  {
+    id: "street-rat",
+    name: "StreetRat",
+    level: 1,
+    health: 100,
+    maxHealth: 100,
+    stats: {
+      strength: 5,
+      defense: 4,
+      speed: 5,
+      dexterity: 5,
+    },
+    zone: "Close" as DistanceZone,
+    inCover: false,
+    cashReward: 100,
+    xpReward: 20,
+    equippedWeaponId: "knife",
+  },
+
+  {
+    id: "dock-runner",
+    name: "DockRunner",
+    level: 3,
+    health: 115,
+    maxHealth: 115,
+    stats: {
+      strength: 8,
+      defense: 7,
+      speed: 7,
+      dexterity: 8,
+    },
+    zone: "Mid" as DistanceZone,
+    inCover: false,
+    cashReward: 175,
+    xpReward: 35,
+    equippedWeaponId: "pistol",
+  },
+
+  {
+    id: "night-shift",
+    name: "NightShift",
+    level: 5,
+    health: 130,
+    maxHealth: 130,
+    stats: {
+      strength: 11,
+      defense: 10,
+      speed: 9,
+      dexterity: 10,
+    },
+    zone: "Mid" as DistanceZone,
+    inCover: true,
+    cashReward: 300,
+    xpReward: 50,
+    equippedWeaponId: "pistol",
+  },
+
+  {
+    id: "iron-jack",
+    name: "IronJack",
+    level: 8,
+    health: 150,
+    maxHealth: 150,
+    stats: {
+      strength: 15,
+      defense: 16,
+      speed: 11,
+      dexterity: 10,
+    },
+    zone: "Close" as DistanceZone,
+    inCover: false,
+    cashReward: 500,
+    xpReward: 75,
+    equippedWeaponId: "bat",
+  },
+
+  {
+    id: "blackout",
+    name: "Blackout",
+    level: 12,
+    health: 175,
+    maxHealth: 175,
+    stats: {
+      strength: 21,
+      defense: 18,
+      speed: 16,
+      dexterity: 17,
+    },
+    zone: "Mid" as DistanceZone,
+    inCover: true,
+    cashReward: 800,
+    xpReward: 110,
+    equippedWeaponId: "pistol",
+  },
+
+  {
+    id: "viper",
+    name: "Viper",
+    level: 16,
+    health: 200,
+    maxHealth: 200,
+    stats: {
+      strength: 26,
+      defense: 22,
+      speed: 23,
+      dexterity: 25,
+    },
+    zone: "Long" as DistanceZone,
+    inCover: true,
+    cashReward: 1200,
+    xpReward: 150,
+    equippedWeaponId: "pistol",
+  },
+
+  {
+    id: "ghost",
+    name: "Ghost",
+    level: 22,
+    health: 235,
+    maxHealth: 235,
+    stats: {
+      strength: 32,
+      defense: 30,
+      speed: 31,
+      dexterity: 34,
+    },
+    zone: "Long" as DistanceZone,
+    inCover: true,
+    cashReward: 2000,
+    xpReward: 225,
+    equippedWeaponId: "pistol",
+  },
+
+  {
+    id: "kingpin",
+    name: "Kingpin",
+    level: 30,
+    health: 280,
+    maxHealth: 280,
+    stats: {
+      strength: 42,
+      defense: 40,
+      speed: 36,
+      dexterity: 38,
+    },
+    zone: "Mid" as DistanceZone,
+    inCover: true,
+    cashReward: 3500,
+    xpReward: 350,
+    equippedWeaponId: "pistol",
+  },
+];
+
+/*
+ * ============================================================
+ * JOBS
+ * ============================================================
+ */
 
 export const JOBS: Job[] = [
   {
@@ -135,6 +315,12 @@ export const JOBS: Job[] = [
     levelRequired: 25,
   },
 ];
+
+/*
+ * ============================================================
+ * ITEMS
+ * ============================================================
+ */
 
 export const ITEMS: Item[] = [
   {
@@ -230,6 +416,12 @@ export const ITEMS: Item[] = [
   },
 ];
 
+/*
+ * ============================================================
+ * MISSIONS
+ * ============================================================
+ */
+
 export const MISSIONS: Mission[] = [
   {
     id: "first-crime",
@@ -286,6 +478,12 @@ export const MISSIONS: Mission[] = [
     rewardXp: 100,
   },
 ];
+
+/*
+ * ============================================================
+ * EDUCATION
+ * ============================================================
+ */
 
 export const EDUCATION: EducationCourse[] = [
   {
@@ -349,6 +547,12 @@ export const EDUCATION: EducationCourse[] = [
   },
 ];
 
+/*
+ * ============================================================
+ * PROPERTIES
+ * ============================================================
+ */
+
 export const PROPERTIES: Property[] = [
   {
     id: "shack",
@@ -410,6 +614,12 @@ export const PROPERTIES: Property[] = [
     maxHappiness: 150,
   },
 ];
+
+/*
+ * ============================================================
+ * HELPERS
+ * ============================================================
+ */
 
 export function getJob(
   id: string | null
