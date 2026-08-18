@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+
 import {
   DynamicFighter,
   TurnLog,
@@ -6,24 +7,58 @@ import {
   DEFAULT_WEAPONS,
   executeCombatTurn,
   calculateWinChance,
-  resolveEquippedWeapon,
 } from "../systems/combatSystem";
 
+/*
+ * ============================================================
+ * RiftCity Combat Hook
+ * ============================================================
+ *
+ * This hook owns the ACTIVE combat session.
+ *
+ * App.tsx should eventually become responsible for:
+ *   - navigation
+ *   - layout
+ *   - screen rendering
+ *
+ * This hook is responsible for:
+ *   - starting fights
+ *   - tracking fighters
+ *   - executing turns
+ *   - combat logs
+ *   - victory / defeat state
+ *   - fleeing
+ *
+ * IMPORTANT:
+ * SaveData / Screen / ActivityType / game helpers currently
+ * live elsewhere in the existing RiftCity codebase.
+ *
+ * We are deliberately not duplicating those definitions here
+ * until App.tsx has been fully extracted.
+ * ============================================================
+ */
+
 export function useRiftCity() {
-  const [gameState, setGameState] = useState<SaveData>(() => loadSave());
+  /*
+   * ------------------------------------------------------------
+   * EXISTING GAME STATE
+   * ------------------------------------------------------------
+   *
+   * These values are intentionally retained from the current
+   * RiftCity architecture.
+   */
+
+  const [gameState, setGameState] = useState<SaveData>(() =>
+    loadSave()
+  );
+
   const [currentScreen, setCurrentScreen] =
     useState<Screen>("character");
 
   /*
-   * ============================================================
+   * ------------------------------------------------------------
    * COMBAT STATE
-   * ============================================================
-   *
-   * The hook owns the persistent/game-level combat state.
-   *
-   * The actual turn calculation remains inside combatSystem.ts.
-   * This prevents App.tsx from becoming another 5,000-line
-   * archaeological excavation.
+   * ------------------------------------------------------------
    */
 
   const [playerFighter, setPlayerFighter] =
@@ -36,12 +71,17 @@ export function useRiftCity() {
     useState<TurnLog[]>([]);
 
   const [combatStatus, setCombatStatus] =
-    useState<"idle" | "fighting" | "won" | "lost">("idle");
+    useState<
+      "idle" |
+      "fighting" |
+      "won" |
+      "lost"
+    >("idle");
 
   /*
-   * ============================================================
-   * DERIVED GAME STATE
-   * ============================================================
+   * ------------------------------------------------------------
+   * DERIVED PLAYER DATA
+   * ------------------------------------------------------------
    */
 
   const level = getLevel(gameState.xp).level;
@@ -58,9 +98,7 @@ export function useRiftCity() {
     10 +
     Math.min(
       50,
-      Math.floor(
-        gameState.crimeExperience / 100
-      ) * 5
+      Math.floor(gameState.crimeExperience / 100) * 5
     ) +
     (property?.nerveBonus ?? 0);
 
@@ -74,9 +112,9 @@ export function useRiftCity() {
   );
 
   /*
-   * ============================================================
+   * ------------------------------------------------------------
    * ACTIVITY LOG
-   * ============================================================
+   * ------------------------------------------------------------
    */
 
   const log = (
@@ -85,24 +123,29 @@ export function useRiftCity() {
   ) => {
     setGameState((state) => ({
       ...state,
+
       activities: [
         {
           id:
             Date.now() +
             Math.random(),
+
           text,
+
           type,
+
           time: Date.now(),
         },
+
         ...state.activities,
       ].slice(0, 60),
     }));
   };
 
   /*
-   * ============================================================
+   * ------------------------------------------------------------
    * SAVE GAME
-   * ============================================================
+   * ------------------------------------------------------------
    */
 
   useEffect(() => {
@@ -113,132 +156,120 @@ export function useRiftCity() {
   }, [gameState]);
 
   /*
-   * ============================================================
+   * ------------------------------------------------------------
    * MAIN GAME TICK
-   * ============================================================
+   * ------------------------------------------------------------
    *
    * Handles:
    *
-   * - Energy regeneration
-   * - Health regeneration
-   * - Hospital expiration
+   *   Energy regeneration
+   *   Health regeneration
+   *   Hospital expiration
    *
-   * Uses elapsed time rather than assuming the browser remained
-   * open the entire time.
+   * This will eventually move into a dedicated
+   * progression/tick system.
+   * ------------------------------------------------------------
    */
 
   useEffect(() => {
-    const intervalId =
-      window.setInterval(() => {
-        const now = Date.now();
+    const interval = window.setInterval(() => {
+      const now = Date.now();
 
-        setGameState((previous) => {
-          let changed = false;
+      setGameState((previous) => {
+        let changed = false;
 
-          const updates: Partial<SaveData> =
-            {};
+        const updates: Partial<SaveData> = {};
 
-          /*
-           * ------------------------------------------------------
-           * ENERGY
-           * ------------------------------------------------------
-           */
+        /*
+         * ENERGY
+         */
 
-          if (
-            previous.energy <
-            MAX_ENERGY
-          ) {
-            const ticks = Math.floor(
-              (
-                now -
-                previous.lastEnergyUpdate
-              ) /
-                ENERGY_REGEN_INTERVAL
+        if (
+          previous.energy <
+          MAX_ENERGY
+        ) {
+          const ticks = Math.floor(
+            (
+              now -
+              previous.lastEnergyUpdate
+            ) /
+              ENERGY_REGEN_INTERVAL
+          );
+
+          if (ticks > 0) {
+            updates.energy = Math.min(
+              MAX_ENERGY,
+              previous.energy + ticks
             );
 
-            if (ticks > 0) {
-              updates.energy =
-                Math.min(
-                  MAX_ENERGY,
-                  previous.energy +
-                    ticks
-                );
-
-              updates.lastEnergyUpdate =
-                previous.lastEnergyUpdate +
-                ticks *
-                  ENERGY_REGEN_INTERVAL;
-
-              changed = true;
-            }
-          }
-
-          /*
-           * ------------------------------------------------------
-           * HEALTH
-           * ------------------------------------------------------
-           */
-
-          if (
-            previous.health <
-              maxHealth &&
-            !previous.hospitalUntil &&
-            !previous.jailUntil
-          ) {
-            updates.health =
-              Math.min(
-                maxHealth,
-                previous.health + 1
-              );
+            updates.lastEnergyUpdate =
+              previous.lastEnergyUpdate +
+              ticks *
+                ENERGY_REGEN_INTERVAL;
 
             changed = true;
           }
+        }
 
-          /*
-           * ------------------------------------------------------
-           * HOSPITAL EXPIRATION
-           * ------------------------------------------------------
-           */
+        /*
+         * HEALTH
+         */
 
-          if (
-            previous.hospitalUntil &&
-            now >=
-              previous.hospitalUntil
-          ) {
-            updates.hospitalUntil =
-              null;
+        if (
+          previous.health <
+            maxHealth &&
+          !previous.hospitalUntil &&
+          !previous.jailUntil
+        ) {
+          updates.health = Math.min(
+            maxHealth,
+            previous.health + 1
+          );
 
-            updates.health =
-              maxHealth;
+          changed = true;
+        }
 
-            changed = true;
-          }
+        /*
+         * HOSPITAL
+         */
 
-          return changed
-            ? {
-                ...previous,
-                ...updates,
-              }
-            : previous;
-        });
-      }, 1000);
+        if (
+          previous.hospitalUntil &&
+          now >= previous.hospitalUntil
+        ) {
+          updates.hospitalUntil = null;
+
+          updates.health =
+            maxHealth;
+
+          changed = true;
+        }
+
+        if (!changed) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          ...updates,
+        };
+      });
+    }, 1000);
 
     return () =>
-      window.clearInterval(
-        intervalId
-      );
+      window.clearInterval(interval);
   }, [maxHealth]);
 
   /*
-   * ============================================================
+   * ------------------------------------------------------------
    * BLOCKED STATE
-   * ============================================================
+   * ------------------------------------------------------------
    */
 
   const blocked = () =>
     Boolean(
       gameState.jailUntil ||
-        gameState.hospitalUntil
+      gameState.hospitalUntil
     );
 
   /*
@@ -247,55 +278,47 @@ export function useRiftCity() {
    * ============================================================
    */
 
-  const startCombat = (opponent: {
-    id: string;
-    name: string;
-    level: number;
-    stats: any;
-  }) => {
+  const startCombat = (
+    opponent: {
+      id: string;
+      name: string;
+      level: number;
+      stats: any;
+    }
+  ) => {
     /*
      * Cannot fight while jailed/hospitalized.
      */
 
     if (blocked()) {
       log(
-        "Cannot fight while in hospital or jail."
+        "Cannot fight while in hospital/jail."
       );
+
       return;
     }
 
     /*
-     * Combat entry cost.
+     * Combat costs 10 energy.
      */
 
     if (gameState.energy < 10) {
       log(
         "Requires 10 Energy to start a fight."
       );
+
       return;
     }
 
     /*
-     * ----------------------------------------------------------
-     * PLAYER EQUIPMENT
-     * ----------------------------------------------------------
-     *
-     * IMPORTANT:
-     *
-     * DEFAULT_WEAPONS represents weapons available to the
-     * current prototype player.
-     *
-     * equippedWeaponId explicitly determines what is used.
-     *
-     * If no equipped weapon exists, combatSystem correctly
-     * falls back to Unarmed.
+     * Consume combat energy.
      */
 
-    const playerWeapons =
-      DEFAULT_WEAPONS;
-
-    const playerEquippedWeapon =
-      playerWeapons[0];
+    setGameState((previous) => ({
+      ...previous,
+      energy:
+        previous.energy - 10,
+    }));
 
     /*
      * ----------------------------------------------------------
@@ -303,69 +326,22 @@ export function useRiftCity() {
      * ----------------------------------------------------------
      */
 
-    const pFighter: DynamicFighter = {
+    const player: DynamicFighter = {
       id: "player",
 
-      name:
-        gameState.name ??
-        "You",
+      name: gameState.name ?? "You",
 
       level,
 
-      health:
-        Math.max(
-          0,
-          Math.min(
-            gameState.health,
-            maxHealth
-          )
-        ),
+      health: gameState.health,
 
       maxHealth,
 
       stats: gameState.stats,
 
       weapons:
-        playerWeapons,
-
-      /*
-       * Explicitly equip the prototype's first weapon.
-       *
-       * If the player's actual persistent inventory/equipment
-       * system later supplies a different ID, this is the field
-       * we replace rather than rewriting combatSystem.
-       */
-
-      equippedWeaponId:
-        playerEquippedWeapon?.id ??
-        null,
+        DEFAULT_WEAPONS,
     };
-
-    /*
-     * ----------------------------------------------------------
-     * ENEMY EQUIPMENT
-     * ----------------------------------------------------------
-     */
-
-    const enemyWeapons =
-      DEFAULT_WEAPONS.slice(
-        1,
-        3
-      );
-
-    const enemyEquippedWeapon =
-      enemyWeapons[0] ??
-      null;
-
-    /*
-     * ----------------------------------------------------------
-     * ENEMY HEALTH
-     * ----------------------------------------------------------
-     */
-
-    const enemyMaxHealth =
-      100 +
-      opponent.level * 15;
 
     /*
      * ----------------------------------------------------------
@@ -373,31 +349,28 @@ export function useRiftCity() {
      * ----------------------------------------------------------
      */
 
-    const eFighter: DynamicFighter = {
-      id:
-        opponent.id,
+    const enemyMaxHealth =
+      100 +
+      opponent.level * 15;
 
-      name:
-        opponent.name,
+    const enemy: DynamicFighter = {
+      id: opponent.id,
 
-      level:
-        opponent.level,
+      name: opponent.name,
 
-      health:
-        enemyMaxHealth,
+      level: opponent.level,
+
+      health: enemyMaxHealth,
 
       maxHealth:
         enemyMaxHealth,
 
-      stats:
-        opponent.stats,
+      stats: opponent.stats,
 
-      weapons:
-        enemyWeapons,
-
-      equippedWeaponId:
-        enemyEquippedWeapon?.id ??
-        null,
+      weapons: [
+        DEFAULT_WEAPONS[1],
+        DEFAULT_WEAPONS[2],
+      ],
 
       cashReward:
         opponent.level * 45,
@@ -408,26 +381,13 @@ export function useRiftCity() {
 
     /*
      * ----------------------------------------------------------
-     * COMMIT COMBAT
+     * INITIALIZE COMBAT
      * ----------------------------------------------------------
      */
 
-    setGameState((previous) => ({
-      ...previous,
-      energy:
-        Math.max(
-          0,
-          previous.energy - 10
-        ),
-    }));
+    setPlayerFighter(player);
 
-    setPlayerFighter(
-      pFighter
-    );
-
-    setEnemyFighter(
-      eFighter
-    );
+    setEnemyFighter(enemy);
 
     setCombatLogs([]);
 
@@ -444,16 +404,15 @@ export function useRiftCity() {
    * ============================================================
    * PLAYER TURN
    * ============================================================
-   *
-   * This function remains available for older combat UI.
-   *
-   * InteractiveCombatView can also own the live turn state
-   * directly using executeCombatTurn().
    */
 
   const executePlayerTurn = (
     selectedWeapon?: WeaponOption
   ) => {
+    /*
+     * Validate active combat.
+     */
+
     if (
       !playerFighter ||
       !enemyFighter ||
@@ -465,7 +424,7 @@ export function useRiftCity() {
 
     /*
      * ----------------------------------------------------------
-     * PLAYER ATTACK
+     * PLAYER ATTACKS
      * ----------------------------------------------------------
      */
 
@@ -480,19 +439,19 @@ export function useRiftCity() {
       playerTurn.updatedDefender;
 
     /*
-     * Add player log immediately.
+     * Record player's action.
      */
 
     setCombatLogs(
       (previous) => [
         playerTurn.log,
         ...previous,
-      ]
+      ].slice(0, 100)
     );
 
     /*
      * ----------------------------------------------------------
-     * PLAYER WINS
+     * VICTORY
      * ----------------------------------------------------------
      */
 
@@ -533,6 +492,10 @@ export function useRiftCity() {
           xp:
             previous.xp +
             xpGained,
+
+          fightsWon:
+            (previous.fightsWon ?? 0) +
+            1,
         })
       );
 
@@ -541,12 +504,8 @@ export function useRiftCity() {
 
     /*
      * ----------------------------------------------------------
-     * ENEMY COUNTERATTACK
+     * ENEMY COUNTER ATTACK
      * ----------------------------------------------------------
-     *
-     * No weapon is passed intentionally.
-     *
-     * combatSystem resolves the enemy's actual equipped weapon.
      */
 
     const enemyTurn =
@@ -559,9 +518,7 @@ export function useRiftCity() {
       enemyTurn.updatedDefender;
 
     /*
-     * Enemy state does not change from attacking.
-     *
-     * Player health does.
+     * Update combat state.
      */
 
     setEnemyFighter(
@@ -572,42 +529,50 @@ export function useRiftCity() {
       updatedPlayer
     );
 
+    /*
+     * Put enemy action above
+     * previous combat entries.
+     */
+
     setCombatLogs(
       (previous) => [
         enemyTurn.log,
         playerTurn.log,
         ...previous,
-      ]
+      ].slice(0, 100)
     );
 
     /*
-     * Keep global player health synchronized.
+     * Keep global health synchronized
+     * with combat health.
      */
 
     setGameState(
       (previous) => ({
         ...previous,
         health:
-          updatedPlayer.health,
+          Math.max(
+            0,
+            updatedPlayer.health
+          ),
       })
     );
 
     /*
      * ----------------------------------------------------------
-     * PLAYER DEFEATED
+     * DEFEAT
      * ----------------------------------------------------------
      */
 
     if (
       updatedPlayer.health <= 0
     ) {
-      const hospitalUntil =
-        Date.now() +
-        15 * 60 * 1000;
-
       setCombatStatus(
         "lost"
       );
+
+      const hospitalTime =
+        15 * 60 * 1000;
 
       log(
         `Defeated by ${enemyFighter.name}! Sent to hospital.`,
@@ -620,7 +585,13 @@ export function useRiftCity() {
 
           health: 0,
 
-          hospitalUntil,
+          hospitalUntil:
+            Date.now() +
+            hospitalTime,
+
+          fightsLost:
+            (previous.fightsLost ?? 0) +
+            1,
         })
       );
     }
@@ -649,9 +620,7 @@ export function useRiftCity() {
       );
 
     /*
-     * Flee receives a modest bonus.
-     *
-     * Hard-cap at 95% so escape isn't guaranteed.
+     * Flee receives a +20% modifier.
      */
 
     const fleeChance =
@@ -668,7 +637,8 @@ export function useRiftCity() {
       fleeChance
     ) {
       log(
-        `Successfully fled from ${enemyFighter.name}.`
+        `Successfully fled from ${enemyFighter.name}.`,
+        "success"
       );
 
       setCombatStatus(
@@ -695,11 +665,12 @@ export function useRiftCity() {
     /*
      * Failed escape.
      *
-     * Enemy gets the counterattack.
+     * Enemy gets a free attack.
      */
 
     log(
-      `Failed to escape! ${enemyFighter.name} hit you as you ran.`
+      `Failed to escape! ${enemyFighter.name} hit you as you ran.`,
+      "failure"
     );
 
     executePlayerTurn();
@@ -707,11 +678,37 @@ export function useRiftCity() {
 
   /*
    * ============================================================
-   * RETURN API
+   * EXIT / RESET COMBAT
+   * ============================================================
+   */
+
+  const clearCombat = () => {
+    setPlayerFighter(
+      null
+    );
+
+    setEnemyFighter(
+      null
+    );
+
+    setCombatLogs([]);
+
+    setCombatStatus(
+      "idle"
+    );
+  };
+
+  /*
+   * ============================================================
+   * PUBLIC API
    * ============================================================
    */
 
   return {
+    /*
+     * Core state
+     */
+
     gameState,
 
     setGameState,
@@ -722,17 +719,17 @@ export function useRiftCity() {
 
     level,
 
-    property,
+    maxHealth,
+
+    maxNerve,
 
     gym,
 
     job,
 
-    maxHealth,
-
-    maxNerve,
-
-    blocked,
+    /*
+     * Combat state
+     */
 
     playerFighter,
 
@@ -742,10 +739,22 @@ export function useRiftCity() {
 
     combatStatus,
 
+    /*
+     * Combat actions
+     */
+
     startCombat,
 
     executePlayerTurn,
 
     fleeCombat,
+
+    clearCombat,
+
+    /*
+     * Activity
+     */
+
+    log,
   };
 }
