@@ -1,10 +1,18 @@
 export const MAX_ENERGY = 100;
 
-export const ENERGY_REGEN_INTERVAL = 60 * 1000;
+/*
+ * +1 Energy every minute.
+ */
+export const ENERGY_REGEN_INTERVAL =
+  60 * 1000;
+
+/*
+ * +1 Nerve every 5 minutes.
+ */
+export const NERVE_REGEN_INTERVAL =
+  5 * 60 * 1000;
 
 export const BASE_NERVE_MAX = 10;
-
-export const NERVE_REGEN_INTERVAL = 5 * 60 * 1000;
 
 export type ResourceState = {
   energy: number;
@@ -24,90 +32,238 @@ export function getNerveMax(
 ): number {
   return Math.max(
     BASE_NERVE_MAX,
-    naturalNerveMax + propertyNerveBonus
+    naturalNerveMax +
+      propertyNerveBonus
   );
 }
 
+function validTimestamp(
+  value: unknown,
+  fallback: number
+): number {
+  return typeof value ===
+    "number" &&
+    Number.isFinite(value) &&
+    value > 0
+    ? value
+    : fallback;
+}
+
+function clamp(
+  value: number,
+  min: number,
+  max: number
+): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(
+    max,
+    Math.max(
+      min,
+      value
+    )
+  );
+}
+
+/*
+ * Normalize resource values before doing
+ * any regeneration calculation.
+ *
+ * This is important for old saves.
+ */
+export function normalizeResourceState(
+  state: Partial<ResourceState>,
+  now: number,
+  maxNerve: number
+): ResourceState {
+  return {
+    energy: clamp(
+      typeof state.energy ===
+        "number"
+        ? state.energy
+        : MAX_ENERGY,
+      0,
+      MAX_ENERGY
+    ),
+
+    nerve: clamp(
+      typeof state.nerve ===
+        "number"
+        ? state.nerve
+        : BASE_NERVE_MAX,
+      0,
+      maxNerve
+    ),
+
+    lastEnergyUpdate:
+      validTimestamp(
+        state.lastEnergyUpdate,
+        now
+      ),
+
+    lastNerveUpdate:
+      validTimestamp(
+        state.lastNerveUpdate,
+        now
+      ),
+  };
+}
+
+/*
+ * Deterministic passive regeneration.
+ *
+ * Important:
+ *
+ * We only advance the clock by completed ticks.
+ *
+ * This means:
+ *
+ * 100 Energy -> spend 40 -> 60 Energy
+ *
+ * keeps the correct regeneration clock.
+ *
+ * It also means coming back after an hour
+ * correctly gives the elapsed regeneration.
+ */
 export function regenerateResources(
   state: ResourceState,
   now: number,
   maxNerve: number
 ): ResourceState {
-  let updated = {
-    ...state,
-  };
+  const normalized =
+    normalizeResourceState(
+      state,
+      now,
+      maxNerve
+    );
+
+  let energy =
+    normalized.energy;
+
+  let nerve =
+    normalized.nerve;
+
+  let lastEnergyUpdate =
+    normalized.lastEnergyUpdate;
+
+  let lastNerveUpdate =
+    normalized.lastNerveUpdate;
 
   /*
    * ENERGY
-   *
-   * Energy regenerates independently
-   * from Nerve.
    */
   if (
-    state.energy < MAX_ENERGY &&
-    now > state.lastEnergyUpdate
+    energy >= MAX_ENERGY
   ) {
-    const ticks = Math.floor(
-      (now - state.lastEnergyUpdate) /
-        ENERGY_REGEN_INTERVAL
-    );
+    energy = MAX_ENERGY;
 
-    if (ticks > 0) {
-      updated.energy = Math.min(
-        MAX_ENERGY,
-        state.energy + ticks
+    /*
+     * When full, there is no reason to
+     * accumulate an old backlog.
+     */
+    lastEnergyUpdate =
+      now;
+  } else if (
+    now >
+    lastEnergyUpdate
+  ) {
+    const ticks =
+      Math.floor(
+        (
+          now -
+          lastEnergyUpdate
+        ) /
+          ENERGY_REGEN_INTERVAL
       );
 
-      updated.lastEnergyUpdate =
-        state.lastEnergyUpdate +
-        ticks * ENERGY_REGEN_INTERVAL;
+    if (
+      ticks > 0
+    ) {
+      energy =
+        Math.min(
+          MAX_ENERGY,
+          energy + ticks
+        );
+
+      lastEnergyUpdate +=
+        ticks *
+        ENERGY_REGEN_INTERVAL;
+
+      /*
+       * If the regeneration filled the
+       * resource, reset the clock.
+       */
+      if (
+        energy >=
+        MAX_ENERGY
+      ) {
+        energy =
+          MAX_ENERGY;
+
+        lastEnergyUpdate =
+          now;
+      }
     }
-  } else if (
-    state.energy >= MAX_ENERGY
-  ) {
-    /*
-     * Once full, keep the timestamp
-     * current enough that coming back
-     * later does not create a giant
-     * backlog.
-     */
-    updated.energy = MAX_ENERGY;
-    updated.lastEnergyUpdate = now;
   }
 
   /*
    * NERVE
-   *
-   * Nerve has its own completely
-   * independent regeneration clock.
    */
   if (
-    state.nerve < maxNerve &&
-    now > state.lastNerveUpdate
+    nerve >= maxNerve
   ) {
-    const ticks = Math.floor(
-      (now - state.lastNerveUpdate) /
-        NERVE_REGEN_INTERVAL
-    );
+    nerve =
+      maxNerve;
 
-    if (ticks > 0) {
-      updated.nerve = Math.min(
-        maxNerve,
-        state.nerve + ticks
+    lastNerveUpdate =
+      now;
+  } else if (
+    now >
+    lastNerveUpdate
+  ) {
+    const ticks =
+      Math.floor(
+        (
+          now -
+          lastNerveUpdate
+        ) /
+          NERVE_REGEN_INTERVAL
       );
 
-      updated.lastNerveUpdate =
-        state.lastNerveUpdate +
-        ticks * NERVE_REGEN_INTERVAL;
+    if (
+      ticks > 0
+    ) {
+      nerve =
+        Math.min(
+          maxNerve,
+          nerve + ticks
+        );
+
+      lastNerveUpdate +=
+        ticks *
+        NERVE_REGEN_INTERVAL;
+
+      if (
+        nerve >=
+        maxNerve
+      ) {
+        nerve =
+          maxNerve;
+
+        lastNerveUpdate =
+          now;
+      }
     }
-  } else if (
-    state.nerve >= maxNerve
-  ) {
-    updated.nerve = maxNerve;
-    updated.lastNerveUpdate = now;
   }
 
-  return updated;
+  return {
+    energy,
+    nerve,
+    lastEnergyUpdate,
+    lastNerveUpdate,
+  };
 }
 
 export function getResourceTimeRemaining(
@@ -117,19 +273,33 @@ export function getResourceTimeRemaining(
   interval: number,
   now: number
 ): number {
-  if (current >= max) {
+  if (
+    current >= max
+  ) {
     return 0;
   }
 
+  const safeLastUpdate =
+    validTimestamp(
+      lastUpdate,
+      now
+    );
+
   const elapsed =
-    now - lastUpdate;
+    Math.max(
+      0,
+      now -
+        safeLastUpdate
+    );
 
   const remainder =
-    elapsed % interval;
+    elapsed %
+    interval;
 
   return Math.max(
     0,
-    interval - remainder
+    interval -
+      remainder
   );
 }
 
@@ -166,9 +336,10 @@ export function addEnergy(
   current: number,
   amount: number
 ): number {
-  return Math.min(
-    MAX_ENERGY,
-    Math.max(0, current + amount)
+  return clamp(
+    current + amount,
+    0,
+    MAX_ENERGY
   );
 }
 
@@ -177,9 +348,10 @@ export function addNerve(
   amount: number,
   maxNerve: number
 ): number {
-  return Math.min(
-    maxNerve,
-    Math.max(0, current + amount)
+  return clamp(
+    current + amount,
+    0,
+    maxNerve
   );
 }
 
@@ -187,11 +359,15 @@ export function spendEnergy(
   current: number,
   amount: number
 ): number | null {
-  if (amount < 0) {
+  if (
+    amount < 0
+  ) {
     return current;
   }
 
-  if (current < amount) {
+  if (
+    current < amount
+  ) {
     return null;
   }
 
@@ -202,11 +378,15 @@ export function spendNerve(
   current: number,
   amount: number
 ): number | null {
-  if (amount < 0) {
+  if (
+    amount < 0
+  ) {
     return current;
   }
 
-  if (current < amount) {
+  if (
+    current < amount
+  ) {
     return null;
   }
 
