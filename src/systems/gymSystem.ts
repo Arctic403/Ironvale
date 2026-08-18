@@ -311,46 +311,11 @@ export function applyTraining(
   stats: CombatStats,
   gym: Gym,
   stat: TrainingStat,
-  happiness: number = 100,
-  educationMultiplier: number = 1
+  happiness = 100,
+  educationMultiplier = 1
 ): TrainingResult {
-  const baseGain =
-    gym.gains[stat];
-
-  if (
-    baseGain === null ||
-    baseGain === undefined
-  ) {
-    return {
-      stats: {
-        ...stats,
-      },
-      gain: 0,
-    };
-  }
-
-  const happinessMultiplier =
-    getHappinessMultiplier(
-      happiness
-    );
-
-  const gain =
-    baseGain *
-    happinessMultiplier *
-    Math.max(
-      0,
-      educationMultiplier
-    );
-
-  return {
-    stats: {
-      ...stats,
-
-      [stat]:
-        stats[stat] +
-        gain,
-    },
-
-    gain,
-  };
+  const baseGain = gym.gains[stat];
+  if (baseGain === null || baseGain === undefined) return { stats: { ...stats }, gain: 0 };
+  const gain = baseGain * getHappinessMultiplier(happiness) * Math.max(0, educationMultiplier);
+  return { stats: { ...stats, [stat]: stats[stat] + gain }, gain };
 }
