@@ -37,6 +37,7 @@ import {
   EDUCATION,
   ITEMS,
   JOBS,
+  PLAYER_PROFILES,
   MISSIONS,
   PROPERTIES,
   getItem,
