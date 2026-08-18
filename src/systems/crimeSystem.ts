@@ -9,6 +9,10 @@ export const CRIMES:Crime[]=[
 {id:"robbery",name:"Armed Robbery",description:"Hit a high-value target under serious risk.",levelRequired:6,nerve:8,difficulty:54,minReward:500,maxReward:1200,xp:42,crimeExperience:28,risk:28,successText:"You leave with the score."},
 {id:"bank-job",name:"Bank Job",description:"Plan a major financial robbery.",levelRequired:9,nerve:10,difficulty:64,minReward:1000,maxReward:3000,xp:60,crimeExperience:40,risk:36,successText:"The vault gives up a portion of its money."},
 {id:"major-heist",name:"Major Heist",description:"Attempt a city-scale score.",levelRequired:13,nerve:12,difficulty:76,minReward:2500,maxReward:7500,xp:85,crimeExperience:55,risk:45,successText:"Against several sensible expectations, it worked."},
+{id:"counterfeit",name:"Counterfeit Operation",description:"Move a risky batch of forged goods.",levelRequired:16,nerve:13,difficulty:80,minReward:4000,maxReward:10000,xp:100,crimeExperience:65,risk:48,successText:"The operation clears the city without drawing attention."},
+{id:"warehouse-raid",name:"Warehouse Raid",description:"Hit a guarded industrial warehouse.",levelRequired:20,nerve:15,difficulty:84,minReward:6000,maxReward:15000,xp:120,crimeExperience:80,risk:52,successText:"You escape with valuable contraband."},
+{id:"corporate-swindle",name:"Corporate Swindle",description:"Exploit a wealthy target's weak controls.",levelRequired:25,nerve:18,difficulty:88,minReward:10000,maxReward:25000,xp:150,crimeExperience:100,risk:56,successText:"The score lands before anyone notices."},
+{id:"city-heist",name:"City Heist",description:"Coordinate an ambitious city-wide operation.",levelRequired:30,nerve:20,difficulty:92,minReward:20000,maxReward:50000,xp:200,crimeExperience:140,risk:62,successText:"A legendary score becomes your newest record."},
 ];
 export function crimeUnlocked(c:Crime,lvl:number){return lvl>=c.levelRequired}
 export function getCrimeStatBonus(s:CombatStats){const avg=(s.strength+s.speed+s.dexterity)/3;return Math.min(20,Math.max(0,avg-1)*1.5)}

@@ -8,6 +8,9 @@ export const OPPONENTS:Opponent[]=[
 {id:"enforcer",name:"Local Enforcer",description:"A professional problem for an amateur fighter.",health:125,stats:{strength:19,defense:17,speed:15,dexterity:17},rewardCash:400,rewardXp:38},
 {id:"veteran",name:"Street Veteran",description:"A seasoned fighter who has seen almost every trick.",health:145,stats:{strength:27,defense:24,speed:23,dexterity:25},rewardCash:650,rewardXp:50},
 {id:"champion",name:"District Champion",description:"The kind of opponent you should not challenge casually.",health:180,stats:{strength:38,defense:34,speed:31,dexterity:36},rewardCash:1200,rewardXp:75},
+{id:"elite-enforcer",name:"Elite Enforcer",description:"A highly trained city operator.",health:220,stats:{strength:50,defense:48,speed:45,dexterity:47},rewardCash:2500,rewardXp:110},
+{id:"arena-champion",name:"Arena Champion",description:"A top-tier fictional combatant.",health:280,stats:{strength:68,defense:62,speed:60,dexterity:65},rewardCash:5000,rewardXp:180},
+{id:"district-boss",name:"District Boss",description:"A dangerous endgame opponent controlling a major district.",health:350,stats:{strength:90,defense:82,speed:75,dexterity:86},rewardCash:10000,rewardXp:300},
 ];
 function power(s:CombatStats){return s.strength*1.2+s.defense+s.speed*1.05+s.dexterity*1.1}
 export function calculateAttackPower(s:CombatStats){return s.strength*1.2+s.speed*.25}
