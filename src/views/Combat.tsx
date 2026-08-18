@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   DynamicFighter,
   TurnLog,
@@ -8,14 +8,18 @@ import {
   executeCombatTurn,
 } from "../systems/combatSystem";
 
+type FinishOutcome = "leave" | "hospitalize" | "mug";
+
 interface InteractiveCombatViewProps {
   player: DynamicFighter;
   enemy: DynamicFighter;
+
   onFinish: (
-    outcome: "leave" | "hospitalize" | "mug",
+    outcome: FinishOutcome,
     enemy: DynamicFighter,
     finalPlayerHealth: number
   ) => void;
+
   onDefeat: (finalPlayerHealth: number) => void;
 }
 
@@ -25,239 +29,242 @@ export function InteractiveCombatView({
   onFinish,
   onDefeat,
 }: InteractiveCombatViewProps) {
-  const [pState, setPState] =
-    useState<DynamicFighter>(player);
+  const [pState, setPState] = useState<DynamicFighter>(player);
+  const [eState, setEState] = useState<DynamicFighter>(enemy);
 
-  const [eState, setEState] =
-    useState<DynamicFighter>(enemy);
+  const [combatLogs, setCombatLogs] = useState<TurnLog[]>([]);
+  const [turn, setTurn] = useState<"player" | "enemy">("player");
 
-  const [combatLogs, setCombatLogs] =
-    useState<TurnLog[]>([]);
+  const [winner, setWinner] = useState<"player" | "enemy" | null>(null);
 
-  const [turn, setTurn] =
-    useState<"player" | "enemy">("player");
+  const [processing, setProcessing] = useState(false);
+  const [finishSelected, setFinishSelected] = useState(false);
 
-  const [winner, setWinner] =
-    useState<"player" | "enemy" | null>(null);
+  const enemyTimerRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
 
   /*
-   * ==========================================================
+   * ------------------------------------------------------------
+   * LIFECYCLE SAFETY
+   * ------------------------------------------------------------
+   */
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+
+      if (enemyTimerRef.current !== null) {
+        window.clearTimeout(enemyTimerRef.current);
+        enemyTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  /*
+   * ------------------------------------------------------------
    * PLAYER EQUIPMENT
-   * ==========================================================
+   * ------------------------------------------------------------
    *
-   * The combat UI does NOT invent weapons.
+   * Combat only exposes:
    *
-   * If the player has no equipped weapon:
+   *   1. Unarmed
+   *   2. The weapon actually equipped
    *
-   *     👊 Unarmed
-   *
-   * If they have an equipped weapon:
-   *
-   *     🔫 Equipped Weapon
-   *
-   * Weapons sitting in inventory but NOT equipped are
-   * intentionally NOT displayed as attack options.
+   * Inventory ownership alone does not create attack buttons.
    */
 
-  const equippedWeapon =
-    resolveEquippedWeapon(pState);
+  const equippedWeapon = useMemo(
+    () => resolveEquippedWeapon(pState),
+    [pState]
+  );
 
-  const playerAttackOptions: WeaponOption[] = [
-    UNARMED_WEAPON,
-  ];
+  const attackOptions = useMemo<WeaponOption[]>(() => {
+    const options: WeaponOption[] = [UNARMED_WEAPON];
 
-  /*
-   * Only add the equipped weapon.
-   *
-   * Do not add the entire weapons[] inventory.
-   */
-  if (
-    equippedWeapon.id !==
-    UNARMED_WEAPON.id
-  ) {
-    playerAttackOptions.push(
-      equippedWeapon
+    if (equippedWeapon.id !== UNARMED_WEAPON.id) {
+      options.push(equippedWeapon);
+    }
+
+    return options.filter(
+      (weapon, index, array) =>
+        array.findIndex((other) => other.id === weapon.id) === index
     );
-  }
+  }, [equippedWeapon]);
 
   /*
-   * Prevent duplicate Unarmed buttons.
+   * ------------------------------------------------------------
+   * HEALTH HELPERS
+   * ------------------------------------------------------------
    */
-  const uniqueAttackOptions =
-    playerAttackOptions.filter(
-      (
-        weapon,
-        index,
-        array
-      ) =>
-        array.findIndex(
-          (other) =>
-            other.id ===
-            weapon.id
-        ) === index
-    );
+
+  const playerHealthPercent =
+    pState.maxHealth > 0
+      ? Math.max(
+          0,
+          Math.min(100, (pState.health / pState.maxHealth) * 100)
+        )
+      : 0;
+
+  const enemyHealthPercent =
+    eState.maxHealth > 0
+      ? Math.max(
+          0,
+          Math.min(100, (eState.health / eState.maxHealth) * 100)
+        )
+      : 0;
 
   /*
-   * ==========================================================
+   * ------------------------------------------------------------
+   * LOGGING
+   * ------------------------------------------------------------
+   */
+
+  const appendLog = (log: TurnLog) => {
+    setCombatLogs((prev) => [log, ...prev].slice(0, 50));
+  };
+
+  /*
+   * ------------------------------------------------------------
    * PLAYER ATTACK
-   * ==========================================================
+   * ------------------------------------------------------------
    */
 
-  const handlePlayerAttack = (
-    weapon: WeaponOption
-  ) => {
-    /*
-     * Ignore input while it isn't the player's turn.
-     */
-    if (
-      turn !== "player" ||
-      winner
-    ) {
+  const handlePlayerAttack = (requestedWeapon: WeaponOption) => {
+    if (turn !== "player") {
+      return;
+    }
+
+    if (winner) {
+      return;
+    }
+
+    if (processing) {
       return;
     }
 
     /*
-     * ========================================================
-     * WEAPON VALIDATION
-     * ========================================================
+     * Validate the requested weapon against actual equipment.
      *
-     * Unarmed is always allowed.
-     *
-     * Any real weapon must be the weapon currently equipped
-     * by the player.
+     * The combat system performs its own validation too, so this
+     * UI layer cannot accidentally create/use an arbitrary weapon.
      */
 
-    let selectedWeapon: WeaponOption;
+    let selectedWeapon = UNARMED_WEAPON;
 
-    if (
-      weapon.id ===
-      UNARMED_WEAPON.id
-    ) {
-      selectedWeapon =
-        UNARMED_WEAPON;
+    if (requestedWeapon.id === UNARMED_WEAPON.id) {
+      selectedWeapon = UNARMED_WEAPON;
     } else {
-      /*
-       * Verify that the requested weapon is actually the
-       * currently equipped weapon.
-       */
-      const currentEquipped =
-        resolveEquippedWeapon(
-          pState
-        );
+      const currentEquipped = resolveEquippedWeapon(pState);
 
-      if (
-        currentEquipped.id !==
-        weapon.id
-      ) {
-        /*
-         * Stale UI / invalid request.
-         *
-         * Safely fall back to Unarmed.
-         */
-        selectedWeapon =
-          UNARMED_WEAPON;
-      } else {
-        selectedWeapon =
-          currentEquipped;
+      if (currentEquipped.id === requestedWeapon.id) {
+        selectedWeapon = currentEquipped;
       }
     }
 
+    setProcessing(true);
+
     /*
-     * ========================================================
      * PLAYER TURN
-     * ========================================================
      */
 
-    const playerResult =
-      executeCombatTurn(
-        pState,
-        eState,
-        selectedWeapon
-      );
-
-    setEState(
-      playerResult.updatedDefender
+    const playerResult = executeCombatTurn(
+      pState,
+      eState,
+      selectedWeapon
     );
 
-    setCombatLogs(
-      (prev) => [
-        playerResult.log,
-        ...prev,
-      ]
-    );
+    const updatedEnemy = playerResult.updatedDefender;
+
+    setEState(updatedEnemy);
+    appendLog(playerResult.log);
 
     /*
      * Enemy defeated.
      */
-    if (
-      playerResult
-        .updatedDefender
-        .health <= 0
-    ) {
+
+    if (updatedEnemy.health <= 0) {
       setWinner("player");
+      setTurn("player");
+      setProcessing(false);
       return;
     }
 
     /*
-     * ========================================================
+     * ----------------------------------------------------------
      * ENEMY TURN
-     * ========================================================
+     * ----------------------------------------------------------
      */
 
     setTurn("enemy");
 
-    setTimeout(() => {
-      /*
-       * The combat system independently resolves the enemy's
-       * equipped weapon.
-       *
-       * No weapon is passed from the UI.
-       *
-       * Therefore:
-       *
-       * enemy equipped weapon -> weapon
-       * no equipped weapon     -> unarmed
-       */
-      const aiResult =
-        executeCombatTurn(
-          playerResult.updatedDefender,
-          pState
-        );
-
-      setPState(
-        aiResult.updatedDefender
-      );
-
-      setCombatLogs(
-        (prev) => [
-          aiResult.log,
-          ...prev,
-        ]
-      );
-
-      /*
-       * Player defeated.
-       */
-      if (
-        aiResult
-          .updatedDefender
-          .health <= 0
-      ) {
-        setWinner("enemy");
-
-        onDefeat(
-          aiResult
-            .updatedDefender
-            .health
-        );
-      } else {
-        /*
-         * Back to player's turn.
-         */
-        setTurn("player");
+    enemyTimerRef.current = window.setTimeout(() => {
+      if (!mountedRef.current) {
+        return;
       }
-    }, 600);
+
+      /*
+       * Enemy does not receive a weapon from the UI.
+       *
+       * executeCombatTurn resolves the enemy's own equipped
+       * weapon or falls back to Unarmed.
+       */
+
+      const enemyResult = executeCombatTurn(
+        updatedEnemy,
+        pState
+      );
+
+      const updatedPlayer = enemyResult.updatedDefender;
+
+      setPState(updatedPlayer);
+      appendLog(enemyResult.log);
+
+      if (updatedPlayer.health <= 0) {
+        setWinner("enemy");
+        setTurn("enemy");
+        setProcessing(false);
+
+        onDefeat(updatedPlayer.health);
+        return;
+      }
+
+      setTurn("player");
+      setProcessing(false);
+      enemyTimerRef.current = null;
+    }, 700);
   };
+
+  /*
+   * ------------------------------------------------------------
+   * FINISHING OUTCOME
+   * ------------------------------------------------------------
+   */
+
+  const handleFinish = (outcome: FinishOutcome) => {
+    if (winner !== "player") {
+      return;
+    }
+
+    if (finishSelected) {
+      return;
+    }
+
+    setFinishSelected(true);
+
+    onFinish(
+      outcome,
+      eState,
+      Math.max(1, pState.health)
+    );
+  };
+
+  /*
+   * ------------------------------------------------------------
+   * RENDER
+   * ------------------------------------------------------------
+   */
 
   return (
     <div
@@ -269,324 +276,474 @@ export function InteractiveCombatView({
       }}
     >
       {/* ======================================================
-          VITALS DISPLAY
+          COMBAT HEADER
           ====================================================== */}
 
       <div
+        className="card"
         style={{
-          display: "grid",
-          gridTemplateColumns:
-            "1fr 1fr",
-          gap: "12px",
+          padding: "14px 16px",
         }}
       >
-        {/* PLAYER */}
         <div
-          className="card"
           style={{
-            padding: "12px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
           }}
         >
-          <h3>
-            {pState.name} (LV{" "}
-            {pState.level})
-          </h3>
-
-          <p>
-            Health:{" "}
-            {pState.health} /{" "}
-            {pState.maxHealth}
-          </p>
-
-          <div
-            style={{
-              height: "8px",
-              background: "#333",
-              borderRadius:
-                "4px",
-              overflow: "hidden",
-            }}
-          >
-            <div
+          <div>
+            <span
+              className="card-tag"
               style={{
-                width: `${Math.max(
-                  0,
-                  Math.min(
-                    100,
-                    (pState.health /
-                      pState.maxHealth) *
-                      100
-                  )
-                )}%`,
-                height: "100%",
-                background:
-                  "#22c55e",
-                transition:
-                  "width 0.3s",
+                display: "inline-block",
+                marginBottom: "5px",
               }}
-            />
+            >
+              LIVE COMBAT
+            </span>
+
+            <h2 style={{ margin: 0 }}>
+              {pState.name} vs {eState.name}
+            </h2>
           </div>
-        </div>
-
-        {/* ENEMY */}
-        <div
-          className="card"
-          style={{
-            padding: "12px",
-          }}
-        >
-          <h3>
-            {eState.name} (LV{" "}
-            {eState.level})
-          </h3>
-
-          <p>
-            Health:{" "}
-            {eState.health} /{" "}
-            {eState.maxHealth}
-          </p>
 
           <div
             style={{
-              height: "8px",
-              background: "#333",
-              borderRadius:
-                "4px",
-              overflow: "hidden",
+              fontSize: "12px",
+              color: "#a1a1aa",
+              textAlign: "right",
             }}
           >
-            <div
-              style={{
-                width: `${Math.max(
-                  0,
-                  Math.min(
-                    100,
-                    (eState.health /
-                      eState.maxHealth) *
-                      100
-                  )
-                )}%`,
-                height: "100%",
-                background:
-                  "#ef4444",
-                transition:
-                  "width 0.3s",
-              }}
-            />
+            {winner
+              ? winner === "player"
+                ? "COMBAT WON"
+                : "COMBAT LOST"
+              : turn === "player"
+              ? "YOUR TURN"
+              : "ENEMY TURN"}
           </div>
         </div>
       </div>
 
       {/* ======================================================
-          PLAYER ACTION CONTROLS
+          FIGHTER VITALS
           ====================================================== */}
 
-      {!winner &&
-        turn ===
-          "player" && (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "12px",
+        }}
+      >
+        {/* PLAYER */}
+
+        <div
+          className="card"
+          style={{
+            padding: "14px",
+          }}
+        >
           <div
-            className="card"
             style={{
-              padding: "12px",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "8px",
+              alignItems: "center",
             }}
           >
-            <p
-              style={{
-                marginBottom:
-                  "8px",
-                fontWeight:
-                  "bold",
-              }}
-            >
-              Select Attack:
-            </p>
+            <h3 style={{ margin: 0 }}>
+              {pState.name}
+            </h3>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "8px",
-                flexWrap:
-                  "wrap",
-              }}
-            >
-              {uniqueAttackOptions.map(
-                (weapon) => {
-                  const isUnarmed =
-                    weapon.id ===
-                    UNARMED_WEAPON.id;
-
-                  return (
-                    <button
-                      key={
-                        weapon.id
-                      }
-                      className="btn-primary"
-                      onClick={() =>
-                        handlePlayerAttack(
-                          weapon
-                        )
-                      }
-                    >
-                      {weapon.icon ||
-                        (isUnarmed
-                          ? "👊"
-                          : "⚔️")}{" "}
-                      {weapon.name}{" "}
-                      (
-                      {
-                        weapon.baseDamage
-                      }{" "}
-                      Dmg)
-                    </button>
-                  );
-                }
-              )}
-            </div>
-
-            {/* Current equipment indicator */}
-            <div
-              style={{
-                marginTop:
-                  "10px",
-                fontSize:
-                  "12px",
-                color:
-                  "#a1a1aa",
-              }}
-            >
-              Equipped:{" "}
-              <strong
-                style={{
-                  color:
-                    "#f4f4f5",
-                }}
-              >
-                {equippedWeapon.name}
-              </strong>
-            </div>
+            <span className="card-tag">
+              LV {pState.level}
+            </span>
           </div>
-        )}
+
+          <p
+            style={{
+              margin: "10px 0 6px",
+              fontSize: "13px",
+            }}
+          >
+            ❤️ Health{" "}
+            <strong>
+              {Math.max(0, Math.floor(pState.health))} /{" "}
+              {pState.maxHealth}
+            </strong>
+          </p>
+
+          <div
+            style={{
+              height: "9px",
+              background: "#27272a",
+              borderRadius: "5px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${playerHealthPercent}%`,
+                height: "100%",
+                background: "#22c55e",
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: "10px",
+              fontSize: "12px",
+              color: "#a1a1aa",
+            }}
+          >
+            Equipped:{" "}
+            <strong style={{ color: "#f4f4f5" }}>
+              {equippedWeapon.name}
+            </strong>
+          </div>
+        </div>
+
+        {/* ENEMY */}
+
+        <div
+          className="card"
+          style={{
+            padding: "14px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "8px",
+              alignItems: "center",
+            }}
+          >
+            <h3 style={{ margin: 0 }}>
+              {eState.name}
+            </h3>
+
+            <span className="card-tag">
+              LV {eState.level}
+            </span>
+          </div>
+
+          <p
+            style={{
+              margin: "10px 0 6px",
+              fontSize: "13px",
+            }}
+          >
+            ❤️ Health{" "}
+            <strong>
+              {Math.max(0, Math.floor(eState.health))} /{" "}
+              {eState.maxHealth}
+            </strong>
+          </p>
+
+          <div
+            style={{
+              height: "9px",
+              background: "#27272a",
+              borderRadius: "5px",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${enemyHealthPercent}%`,
+                height: "100%",
+                background: "#ef4444",
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: "10px",
+              fontSize: "12px",
+              color: "#a1a1aa",
+            }}
+          >
+            Status:{" "}
+            <strong style={{ color: "#f4f4f5" }}>
+              {eState.health <= 0
+                ? "Defeated"
+                : eState.inCover
+                ? "In Cover"
+                : "Exposed"}
+            </strong>
+          </div>
+        </div>
+      </div>
 
       {/* ======================================================
-          ENEMY TURN
+          TURN STATUS
           ====================================================== */}
 
-      {turn ===
-        "enemy" &&
-        !winner && (
+      {!winner && (
+        <div
+          className="card"
+          style={{
+            padding: "12px 14px",
+            textAlign: "center",
+          }}
+        >
+          {turn === "player" ? (
+            <strong>
+              ⚔️ Your turn. Choose your attack.
+            </strong>
+          ) : (
+            <span style={{ color: "#a1a1aa" }}>
+              {eState.name} is deciding what to do...
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================
+          PLAYER ACTIONS
+          ====================================================== */}
+
+      {!winner && turn === "player" && (
+        <div
+          className="card"
+          style={{
+            padding: "14px",
+          }}
+        >
           <div
-            className="card"
             style={{
-              padding: "12px",
-              textAlign:
-                "center",
-              color:
-                "#a1a1aa",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "10px",
+              gap: "10px",
             }}
           >
-            {eState.name} is
-            making a move...
+            <h3 style={{ margin: 0 }}>
+              Attack
+            </h3>
+
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#a1a1aa",
+              }}
+            >
+              Select weapon
+            </span>
           </div>
-        )}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: "8px",
+            }}
+          >
+            {attackOptions.map((weapon) => {
+              const isUnarmed =
+                weapon.id === UNARMED_WEAPON.id;
+
+              return (
+                <button
+                  key={weapon.id}
+                  className="btn-primary"
+                  disabled={processing}
+                  onClick={() =>
+                    handlePlayerAttack(weapon)
+                  }
+                  style={{
+                    minHeight: "52px",
+                    opacity: processing ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "block",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {weapon.icon ||
+                      (isUnarmed ? "👊" : "⚔️")}{" "}
+                    {weapon.name}
+                  </span>
+
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      marginTop: "3px",
+                      opacity: 0.8,
+                    }}
+                  >
+                    {weapon.baseDamage} base damage
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            style={{
+              marginTop: "12px",
+              paddingTop: "10px",
+              borderTop: "1px solid #27272a",
+              fontSize: "12px",
+              color: "#a1a1aa",
+            }}
+          >
+            Equipped weapon:{" "}
+            <strong style={{ color: "#f4f4f5" }}>
+              {equippedWeapon.name}
+            </strong>
+          </div>
+        </div>
+      )}
 
       {/* ======================================================
           VICTORY
           ====================================================== */}
 
-      {winner ===
-        "player" && (
+      {winner === "player" && (
         <div
           className="card"
           style={{
-            padding: "16px",
-            border:
-              "1px solid #22c55e",
-            textAlign:
-              "center",
+            padding: "18px",
+            border: "1px solid #22c55e",
+            textAlign: "center",
           }}
         >
-          <h2
+          <div
             style={{
-              color:
-                "#22c55e",
+              fontSize: "34px",
+              marginBottom: "4px",
             }}
           >
-            VICTORY!
+            🏆
+          </div>
+
+          <h2
+            style={{
+              margin: "0 0 6px",
+              color: "#22c55e",
+            }}
+          >
+            VICTORY
           </h2>
 
           <p
             style={{
-              margin:
-                "8px 0 16px",
+              margin: "0 0 16px",
+              color: "#a1a1aa",
             }}
           >
-            Select Finishing
-            Outcome:
+            {eState.name} has been defeated.
           </p>
 
-          <div
-            style={{
-              display:
-                "flex",
-              gap: "8px",
-              justifyContent:
-                "center",
-              flexWrap:
-                "wrap",
-            }}
-          >
-            <button
-              className="btn-primary"
-              onClick={() =>
-                onFinish(
-                  "leave",
-                  eState,
-                  pState.health
-                )
-              }
-            >
-              🚶 Leave ( Max
-              EXP Bonus )
-            </button>
+          {!finishSelected ? (
+            <>
+              <p
+                style={{
+                  fontSize: "13px",
+                  marginBottom: "10px",
+                }}
+              >
+                Choose what happens next:
+              </p>
 
-            <button
-              className="btn-primary"
-              style={{
-                background:
-                  "#dc2626",
-              }}
-              onClick={() =>
-                onFinish(
-                  "hospitalize",
-                  eState,
-                  pState.health
-                )
-              }
-            >
-              🏥 Hospitalize (
-              Extended Hospital
-              Time )
-            </button>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap: "8px",
+                }}
+              >
+                <button
+                  className="btn-primary"
+                  onClick={() =>
+                    handleFinish("leave")
+                  }
+                >
+                  🚶 Leave
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      marginTop: "3px",
+                      opacity: 0.8,
+                    }}
+                  >
+                    Maximum XP bonus
+                  </span>
+                </button>
 
-            <button
-              className="btn-primary"
+                <button
+                  className="btn-primary"
+                  onClick={() =>
+                    handleFinish("mug")
+                  }
+                  style={{
+                    background: "#eab308",
+                    color: "#000",
+                  }}
+                >
+                  💵 Mug
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      marginTop: "3px",
+                      opacity: 0.75,
+                    }}
+                  >
+                    Steal some cash
+                  </span>
+                </button>
+
+                <button
+                  className="btn-primary"
+                  onClick={() =>
+                    handleFinish("hospitalize")
+                  }
+                  style={{
+                    background: "#dc2626",
+                  }}
+                >
+                  🏥 Hospitalize
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      marginTop: "3px",
+                      opacity: 0.8,
+                    }}
+                  >
+                    Longer hospital time
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <p
               style={{
-                background:
-                  "#eab308",
-                color: "#000",
+                margin: 0,
+                color: "#a1a1aa",
               }}
-              onClick={() =>
-                onFinish(
-                  "mug",
-                  eState,
-                  pState.health
-                )
-              }
             >
-              💵 Mug ( Steal
-              Cash )
-            </button>
-          </div>
+              Resolving combat rewards...
+            </p>
+          )}
         </div>
       )}
 
@@ -594,31 +751,40 @@ export function InteractiveCombatView({
           DEFEAT
           ====================================================== */}
 
-      {winner ===
-        "enemy" && (
+      {winner === "enemy" && (
         <div
           className="card"
           style={{
-            padding: "16px",
-            border:
-              "1px solid #ef4444",
-            textAlign:
-              "center",
+            padding: "18px",
+            border: "1px solid #ef4444",
+            textAlign: "center",
           }}
         >
+          <div
+            style={{
+              fontSize: "34px",
+              marginBottom: "4px",
+            }}
+          >
+            🏥
+          </div>
+
           <h2
             style={{
-              color:
-                "#ef4444",
+              margin: "0 0 6px",
+              color: "#ef4444",
             }}
           >
             DEFEATED
           </h2>
 
-          <p>
-            You were knocked
-            out and admitted
-            to the hospital.
+          <p
+            style={{
+              margin: 0,
+              color: "#a1a1aa",
+            }}
+          >
+            You were knocked out and sent to the hospital.
           </p>
         </div>
       )}
@@ -630,50 +796,80 @@ export function InteractiveCombatView({
       <div
         className="card"
         style={{
-          padding: "12px",
-          maxHeight:
-            "200px",
-          overflowY:
-            "auto",
-          background:
-            "#09090b",
+          padding: "14px",
+          maxHeight: "260px",
+          overflowY: "auto",
+          background: "#09090b",
         }}
       >
-        <p
+        <div
           style={{
-            fontSize:
-              "12px",
-            color:
-              "#a1a1aa",
-            marginBottom:
-              "8px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "10px",
           }}
         >
-          COMBAT LOG
-        </p>
+          <h3 style={{ margin: 0 }}>
+            Combat Log
+          </h3>
 
-        {combatLogs.map(
-          (log) => (
+          <span
+            style={{
+              fontSize: "11px",
+              color: "#71717a",
+            }}
+          >
+            {combatLogs.length} events
+          </span>
+        </div>
+
+        {combatLogs.length === 0 ? (
+          <div
+            style={{
+              color: "#71717a",
+              fontSize: "13px",
+              padding: "8px 0",
+            }}
+          >
+            Combat has not started yet.
+          </div>
+        ) : (
+          combatLogs.map((log) => (
             <div
               key={log.id}
               style={{
-                fontSize:
-                  "13px",
-                marginBottom:
-                  "4px",
-                color:
-                  log.isCrit
-                    ? "#f59e0b"
-                    : log.isMiss
-                    ? "#71717a"
-                    : "#f4f4f5",
+                padding: "8px 0",
+                borderBottom:
+                  "1px solid #18181b",
+                fontSize: "13px",
+                color: log.isCrit
+                  ? "#f59e0b"
+                  : log.isMiss
+                  ? "#71717a"
+                  : "#f4f4f5",
               }}
             >
-              {
-                log.actionText
-              }
+              <div>
+                {log.actionText}
+              </div>
+
+              {log.damage > 0 && (
+                <div
+                  style={{
+                    marginTop: "2px",
+                    fontSize: "11px",
+                    color: "#71717a",
+                  }}
+                >
+                  {log.damage} damage
+                  {log.hitPart
+                    ? ` · ${log.hitPart}`
+                    : ""}
+                </div>
+              )}
             </div>
-          )
+          ))
         )}
       </div>
     </div>
