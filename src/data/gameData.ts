@@ -124,22 +124,6 @@ export const JOBS: Job[] = [
     salary: 800,
     levelRequired: 25,
   },
-  {
-    id: "executive",
-    company: "Rift Holdings",
-    title: "Operations Executive",
-    description: "Manage high-value city operations and earn a premium salary.",
-    salary: 1400,
-    levelRequired: 35,
-  },
-  {
-    id: "director",
-    company: "Rift Industries",
-    title: "Regional Director",
-    description: "A senior position for established citizens.",
-    salary: 2400,
-    levelRequired: 50,
-  },
 ];
 
 export const ITEMS: Item[] = [
@@ -222,46 +206,6 @@ export const ITEMS: Item[] = [
     price: 700,
     effect: 3,
   },
-  {
-    id: "field-medkit",
-    name: "Field Medkit",
-    description: "Restore 60 health.",
-    type: "medical",
-    price: 1400,
-    effect: 60,
-  },
-  {
-    id: "energy-pack",
-    name: "Energy Pack",
-    description: "Restore 60 energy.",
-    type: "energy",
-    price: 1600,
-    effect: 60,
-  },
-  {
-    id: "trauma-armor",
-    name: "Trauma Armor",
-    description: "Heavy protective equipment.",
-    type: "armor",
-    price: 12000,
-    effect: 30,
-  },
-  {
-    id: "crowbar",
-    name: "Heavy Crowbar",
-    description: "A durable close-combat weapon.",
-    type: "weapon",
-    price: 2200,
-    effect: 14,
-  },
-  {
-    id: "rifle",
-    name: "Ranger Rifle",
-    description: "A high-tier fictional combat weapon.",
-    type: "weapon",
-    price: 15000,
-    effect: 35,
-  },
 ];
 
 export const MISSIONS: Mission[] = [
@@ -318,42 +262,6 @@ export const MISSIONS: Mission[] = [
     target: 10000,
     rewardCash: 1000,
     rewardXp: 100,
-  },
-  {
-    id: "crime-master",
-    name: "Crime Master",
-    description: "Successfully complete 50 crimes.",
-    requirement: "crime",
-    target: 50,
-    rewardCash: 15000,
-    rewardXp: 500,
-  },
-  {
-    id: "combat-veteran",
-    name: "Combat Veteran",
-    description: "Win 25 fights.",
-    requirement: "combat",
-    target: 25,
-    rewardCash: 12000,
-    rewardXp: 400,
-  },
-  {
-    id: "gym-veteran",
-    name: "Gym Veteran",
-    description: "Complete 100 training sessions.",
-    requirement: "gym",
-    target: 100,
-    rewardCash: 10000,
-    rewardXp: 300,
-  },
-  {
-    id: "millionaire",
-    name: "Millionaire",
-    description: "Reach $1,000,000 cash.",
-    requirement: "cash",
-    target: 1000000,
-    rewardCash: 50000,
-    rewardXp: 1000,
   },
 ];
 
