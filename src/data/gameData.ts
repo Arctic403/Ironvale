@@ -11,7 +11,13 @@ export type Item = {
   id: string;
   name: string;
   description: string;
-  type: "weapon" | "armor" | "medical" | "energy" | "nerve" | "misc";
+  type:
+    | "weapon"
+    | "armor"
+    | "medical"
+    | "energy"
+    | "nerve"
+    | "misc";
   price: number;
   effect?: number;
 };
@@ -51,8 +57,19 @@ export type Property = {
   name: string;
   description: string;
   price: number;
+
+  /*
+   * Kept for compatibility with your
+   * existing property system.
+   */
   maxHealthBonus: number;
+
+  /*
+   * Deprecated for gym calculation.
+   * Gym gains now come from gym + happiness.
+   */
   gymBonus: number;
+
   nerveBonus: number;
 };
 
@@ -66,6 +83,7 @@ export const JOBS: Job[] = [
     salary: 100,
     levelRequired: 1,
   },
+
   {
     id: "security",
     company: "RiftShield",
@@ -75,6 +93,7 @@ export const JOBS: Job[] = [
     salary: 180,
     levelRequired: 5,
   },
+
   {
     id: "construction",
     company: "Ironworks",
@@ -84,6 +103,7 @@ export const JOBS: Job[] = [
     salary: 300,
     levelRequired: 10,
   },
+
   {
     id: "technician",
     company: "RiftTech",
@@ -93,6 +113,7 @@ export const JOBS: Job[] = [
     salary: 500,
     levelRequired: 15,
   },
+
   {
     id: "finance",
     company: "Rift Capital",
@@ -114,6 +135,7 @@ export const ITEMS: Item[] = [
     price: 250,
     effect: 5,
   },
+
   {
     id: "bat",
     name: "Baseball Bat",
@@ -123,6 +145,7 @@ export const ITEMS: Item[] = [
     price: 600,
     effect: 10,
   },
+
   {
     id: "pistol",
     name: "9mm Pistol",
@@ -132,6 +155,7 @@ export const ITEMS: Item[] = [
     price: 2500,
     effect: 20,
   },
+
   {
     id: "jacket",
     name: "Reinforced Jacket",
@@ -141,6 +165,7 @@ export const ITEMS: Item[] = [
     price: 500,
     effect: 5,
   },
+
   {
     id: "vest",
     name: "Tactical Vest",
@@ -150,6 +175,7 @@ export const ITEMS: Item[] = [
     price: 3000,
     effect: 15,
   },
+
   {
     id: "medkit",
     name: "Small Medkit",
@@ -159,6 +185,7 @@ export const ITEMS: Item[] = [
     price: 300,
     effect: 25,
   },
+
   {
     id: "energy-drink",
     name: "Energy Drink",
@@ -168,6 +195,7 @@ export const ITEMS: Item[] = [
     price: 400,
     effect: 25,
   },
+
   {
     id: "nerve-tonic",
     name: "Nerve Tonic",
@@ -190,6 +218,7 @@ export const MISSIONS: Mission[] = [
     rewardCash: 500,
     rewardXp: 50,
   },
+
   {
     id: "street-criminal",
     name: "Street Criminal",
@@ -200,6 +229,7 @@ export const MISSIONS: Mission[] = [
     rewardCash: 2500,
     rewardXp: 150,
   },
+
   {
     id: "fighter",
     name: "First Blood",
@@ -210,6 +240,7 @@ export const MISSIONS: Mission[] = [
     rewardCash: 750,
     rewardXp: 75,
   },
+
   {
     id: "gym-rat",
     name: "Gym Rat",
@@ -220,6 +251,7 @@ export const MISSIONS: Mission[] = [
     rewardCash: 1500,
     rewardXp: 100,
   },
+
   {
     id: "money-maker",
     name: "Making Money",
@@ -244,6 +276,7 @@ export const EDUCATION: EducationCourse[] = [
     bonus: "crime",
     bonusAmount: 3,
   },
+
   {
     id: "fitness-basics",
     name: "Fitness Fundamentals",
@@ -255,6 +288,7 @@ export const EDUCATION: EducationCourse[] = [
     bonus: "gym",
     bonusAmount: 5,
   },
+
   {
     id: "self-defense",
     name: "Self Defense",
@@ -266,6 +300,7 @@ export const EDUCATION: EducationCourse[] = [
     bonus: "combat",
     bonusAmount: 5,
   },
+
   {
     id: "criminal-psychology",
     name: "Criminal Psychology",
@@ -277,6 +312,7 @@ export const EDUCATION: EducationCourse[] = [
     bonus: "crime",
     bonusAmount: 7,
   },
+
   {
     id: "advanced-fitness",
     name: "Sports Science",
@@ -292,6 +328,17 @@ export const EDUCATION: EducationCourse[] = [
 
 export const PROPERTIES: Property[] = [
   {
+    id: "shack",
+    name: "Shack",
+    description:
+      "A tiny place to start your life in RiftCity.",
+    price: 0,
+    maxHealthBonus: 0,
+    gymBonus: 0,
+    nerveBonus: 0,
+  },
+
+  {
     id: "apartment",
     name: "Small Apartment",
     description:
@@ -301,6 +348,7 @@ export const PROPERTIES: Property[] = [
     gymBonus: 0,
     nerveBonus: 0,
   },
+
   {
     id: "house",
     name: "Suburban House",
@@ -308,9 +356,10 @@ export const PROPERTIES: Property[] = [
       "More space and a better environment.",
     price: 25000,
     maxHealthBonus: 10,
-    gymBonus: 2,
+    gymBonus: 0,
     nerveBonus: 0,
   },
+
   {
     id: "townhouse",
     name: "Luxury Townhouse",
@@ -318,9 +367,10 @@ export const PROPERTIES: Property[] = [
       "A comfortable home for someone climbing the ladder.",
     price: 100000,
     maxHealthBonus: 20,
-    gymBonus: 4,
+    gymBonus: 0,
     nerveBonus: 1,
   },
+
   {
     id: "mansion",
     name: "City Mansion",
@@ -328,7 +378,7 @@ export const PROPERTIES: Property[] = [
       "A serious statement of success.",
     price: 500000,
     maxHealthBonus: 40,
-    gymBonus: 7,
+    gymBonus: 0,
     nerveBonus: 2,
   },
 ];
@@ -342,7 +392,8 @@ export function getJob(
 
   return (
     JOBS.find(
-      (job) => job.id === id
+      (job) =>
+        job.id === id
     ) || null
   );
 }
@@ -352,7 +403,8 @@ export function getItem(
 ): Item | null {
   return (
     ITEMS.find(
-      (item) => item.id === id
+      (item) =>
+        item.id === id
     ) || null
   );
 }
