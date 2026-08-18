@@ -36,6 +36,11 @@ import {
   TrainingStat,
   TRAINING_STATS,
   applyTraining,
+  canTrainStat,
+  getGymExperienceGain,
+  getNextGym,
+  gymUnlocked,
+  isJailGym,
 } from "./systems/gymSystem";
 
 import {
@@ -104,6 +109,19 @@ type SaveData = {
 
   stats: CombatStats;
 
+  /*
+   * NEW — Torn-style gym progression.
+   */
+  gymExperience: number;
+  gymMemberships: string[];
+  activeGym: string;
+
+  /*
+   * NEW — Happiness.
+   */
+  happiness: number;
+  lastHappinessUpdate: number;
+
   currentJob: string | null;
   jobStartedAt: number;
   lastJobPayment: number;
@@ -137,12 +155,41 @@ type SaveData = {
 };
 
 const SAVE_KEY =
-  "riftcity-core-v2";
+  "riftcity-core-v3";
 
 const JOB_PAY_INTERVAL =
   60 * 60 * 1000;
 
 const JAIL_BASE_MINUTES = 2;
+
+/*
+ * Torn-style happiness is much more meaningful
+ * than a tiny RPG modifier, so RiftCity starts
+ * players at 100.
+ */
+const BASE_HAPPINESS = 100;
+
+/*
+ * Happiness naturally falls when training.
+ * Torn's actual happy-loss system is tied to
+ * energy used and generally loses roughly
+ * 40–60% of the energy spent.
+ */
+function getTrainingHappinessLoss(
+  energyCost: number
+): number {
+  const low =
+    energyCost * 0.4;
+
+  const high =
+    energyCost * 0.6;
+
+  return (
+    low +
+    Math.random() *
+      (high - low)
+  );
+}
 
 function freshSave(): SaveData {
   const now =
@@ -171,6 +218,25 @@ function freshSave(): SaveData {
       speed: 1,
       dexterity: 1,
     },
+
+    /*
+     * Premier Fitness is automatically
+     * available to a new player.
+     */
+    gymExperience: 0,
+
+    gymMemberships: [
+      "premier-fitness",
+    ],
+
+    activeGym:
+      "premier-fitness",
+
+    happiness:
+      BASE_HAPPINESS,
+
+    lastHappinessUpdate:
+      now,
 
     currentJob: null,
 
@@ -261,17 +327,173 @@ function loadSave(): SaveData {
         completedMissions:
           parsed.completedMissions ||
           [],
+
+        gymExperience:
+          typeof parsed.gymExperience ===
+          "number"
+            ? parsed.gymExperience
+            : 0,
+
+        gymMemberships:
+          Array.isArray(
+            parsed.gymMemberships
+          )
+            ? parsed.gymMemberships
+            : [
+                "premier-fitness",
+              ],
+
+        activeGym:
+          parsed.activeGym ||
+          "premier-fitness",
+
+        happiness:
+          typeof parsed.happiness ===
+          "number"
+            ? parsed.happiness
+            : BASE_HAPPINESS,
+
+        lastHappinessUpdate:
+          typeof parsed.lastHappinessUpdate ===
+          "number"
+            ? parsed.lastHappinessUpdate
+            : Date.now(),
       };
     }
 
+    /*
+     * Legacy V2 migration.
+     */
     const old =
       localStorage.getItem(
-        "riftcity-unified-v1"
+        "riftcity-core-v2"
       );
 
     if (old) {
       const oldSave =
         JSON.parse(old);
+
+      const fresh =
+        freshSave();
+
+      return {
+        ...fresh,
+
+        cash:
+          typeof oldSave.cash ===
+          "number"
+            ? oldSave.cash
+            : fresh.cash,
+
+        xp:
+          typeof oldSave.xp ===
+          "number"
+            ? oldSave.xp
+            : fresh.xp,
+
+        energy:
+          typeof oldSave.energy ===
+          "number"
+            ? oldSave.energy
+            : fresh.energy,
+
+        nerve:
+          typeof oldSave.nerve ===
+          "number"
+            ? oldSave.nerve
+            : fresh.nerve,
+
+        health:
+          typeof oldSave.health ===
+          "number"
+            ? oldSave.health
+            : fresh.health,
+
+        crimeExperience:
+          typeof oldSave.crimeExperience ===
+          "number"
+            ? oldSave.crimeExperience
+            : 0,
+
+        stats: {
+          ...fresh.stats,
+          ...(oldSave.stats ||
+            {}),
+        },
+
+        currentJob:
+          oldSave.currentJob ||
+          null,
+
+        inventory:
+          oldSave.inventory ||
+          {},
+
+        equippedWeapon:
+          oldSave.equippedWeapon ||
+          null,
+
+        equippedArmor:
+          oldSave.equippedArmor ||
+          null,
+
+        ownedProperty:
+          oldSave.ownedProperty ||
+          "shack",
+
+        educationCompleted:
+          oldSave.educationCompleted ||
+          [],
+
+        completedMissions:
+          oldSave.completedMissions ||
+          [],
+
+        crimesCompleted:
+          oldSave.crimesCompleted ||
+          0,
+
+        crimesFailed:
+          oldSave.crimesFailed ||
+          0,
+
+        crimesSpooked:
+          oldSave.crimesSpooked ||
+          0,
+
+        timesJailed:
+          oldSave.timesJailed ||
+          0,
+
+        fightsWon:
+          oldSave.fightsWon ||
+          0,
+
+        fightsLost:
+          oldSave.fightsLost ||
+          0,
+
+        gymSessions:
+          oldSave.gymSessions ||
+          0,
+
+        activities:
+          oldSave.activities ||
+          fresh.activities,
+      };
+    }
+
+    /*
+     * Legacy V1 migration.
+     */
+    const oldV1 =
+      localStorage.getItem(
+        "riftcity-unified-v1"
+      );
+
+    if (oldV1) {
+      const oldSave =
+        JSON.parse(oldV1);
 
       return {
         ...freshSave(),
@@ -446,10 +668,6 @@ function App() {
     property?.maxHealthBonus ||
     0;
 
-  const propertyGym =
-    property?.gymBonus ||
-    0;
-
   const propertyNerve =
     property?.nerveBonus ||
     0;
@@ -486,6 +704,14 @@ function App() {
         save.educationActive
     ) || null;
 
+  const activeGym =
+    GYMS.find(
+      (gym) =>
+        gym.id ===
+        save.activeGym
+    ) ||
+    GYMS[0];
+
   useEffect(() => {
     const timer =
       window.setInterval(
@@ -504,8 +730,8 @@ function App() {
   }, []);
 
   /*
-   * Passive regeneration,
-   * jobs, jail and education.
+   * Passive regeneration and
+   * timed activities.
    */
   useEffect(() => {
     setSave(
@@ -540,11 +766,6 @@ function App() {
               ENERGY_REGEN_INTERVAL;
         }
 
-        /*
-         * Keep full energy timestamp
-         * fresh so we don't build up
-         * an unnecessary backlog.
-         */
         if (
           updated.energy >=
           MAX_ENERGY
@@ -908,24 +1129,202 @@ function App() {
     );
   }
 
-  function train(
-    gym: Gym,
-    stat: TrainingStat
+  /*
+   * NEW:
+   * Join a Torn-style gym.
+   */
+  function joinGym(
+    gym: Gym
   ) {
     if (
-      jailed
+      isJailGym(gym)
     ) {
       setMessage(
-        "You can't train while jailed."
+        "Crims Gym is only available while jailed."
       );
 
       return;
     }
 
     if (
-      levelInfo.level <
-      gym.levelRequired
+      !gymUnlocked(
+        gym,
+        save.gymExperience
+      )
     ) {
+      setMessage(
+        "You haven't earned enough Gym EXP."
+      );
+
+      return;
+    }
+
+    if (
+      save.gymMemberships.includes(
+        gym.id
+      )
+    ) {
+      update(
+        (current) => ({
+          ...current,
+          activeGym:
+            gym.id,
+        })
+      );
+
+      setMessage(
+        `You activated your ${gym.name} membership.`
+      );
+
+      return;
+    }
+
+    if (
+      save.cash <
+      gym.membershipCost
+    ) {
+      setMessage(
+        "You can't afford this gym membership."
+      );
+
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+
+        cash:
+          current.cash -
+          gym.membershipCost,
+
+        gymMemberships:
+          Array.from(
+            new Set([
+              ...current.gymMemberships,
+              gym.id,
+            ])
+          ),
+
+        activeGym:
+          gym.id,
+      })
+    );
+
+    setMessage(
+      `Membership purchased: ${gym.name}.`
+    );
+  }
+
+  /*
+   * Jail gym automatically becomes available
+   * while jailed.
+   */
+  function selectGym(
+    gym: Gym
+  ) {
+    if (
+      isJailGym(gym)
+    ) {
+      if (!jailed) {
+        setMessage(
+          "Crims Gym is only available in jail."
+        );
+
+        return;
+      }
+
+      update(
+        (current) => ({
+          ...current,
+          activeGym:
+            gym.id,
+        })
+      );
+
+      return;
+    }
+
+    if (
+      !save.gymMemberships.includes(
+        gym.id
+      )
+    ) {
+      setMessage(
+        "You need a membership first."
+      );
+
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+        activeGym:
+          gym.id,
+      })
+    );
+  }
+
+  function train(
+    gym: Gym,
+    stat: TrainingStat
+  ) {
+    if (
+      !gym
+    ) {
+      return;
+    }
+
+    /*
+     * Jail behavior:
+     * jailed players can only use Crims Gym.
+     */
+    if (
+      jailed &&
+      !isJailGym(gym)
+    ) {
+      setMessage(
+        "While jailed, you can only use Crims Gym."
+      );
+
+      return;
+    }
+
+    if (
+      !jailed &&
+      isJailGym(gym)
+    ) {
+      setMessage(
+        "Crims Gym is only available in jail."
+      );
+
+      return;
+    }
+
+    if (
+      !isJailGym(gym) &&
+      !save.gymMemberships.includes(
+        gym.id
+      )
+    ) {
+      setMessage(
+        "You don't have a membership for this gym."
+      );
+
+      return;
+    }
+
+    if (
+      !canTrainStat(
+        gym,
+        stat
+      )
+    ) {
+      setMessage(
+        `${gym.name} doesn't train ${stat}.`
+      );
+
       return;
     }
 
@@ -934,92 +1333,176 @@ function App() {
       gym.energyCost
     ) {
       setMessage(
-        "You don't have enough Energy."
+        `You need ${gym.energyCost} Energy to train here.`
       );
 
       return;
     }
 
+    /*
+     * Education modifier.
+     *
+     * This fixes another existing bug where
+     * education was completed but had no effect.
+     */
+    let educationMultiplier =
+      1;
+
+    const completedEducation =
+      EDUCATION.filter(
+        (course) =>
+          save.educationCompleted.includes(
+            course.id
+          )
+      );
+
+    for (
+      const course of completedEducation
+    ) {
+      if (
+        course.bonus ===
+        "gym"
+      ) {
+        educationMultiplier +=
+          course.bonusAmount /
+          100;
+      }
+    }
+
     update(
       (current) => {
-        const trainedStats =
+        const result =
           applyTraining(
             current.stats,
             gym,
-            stat
+            stat,
+            current.happiness,
+            educationMultiplier
           );
 
-        const statInfo =
-          TRAINING_STATS.find(
-            (item) =>
-              item.id ===
-              stat
+        /*
+         * IMPORTANT:
+         *
+         * The old version called applyTraining()
+         * and then added the gain again.
+         *
+         * That was the double-training bug.
+         *
+         * Now result.stats already contains
+         * the gain exactly once.
+         */
+        const gymExperienceGain =
+          getGymExperienceGain(
+            gym.energyCost
           );
 
-        const propertyMultiplier =
-          1 +
-          propertyGym /
-            100;
+        const happinessLoss =
+          getTrainingHappinessLoss(
+            gym.energyCost
+          );
 
-        const actualGain =
-          gym.gain *
-          propertyMultiplier;
+        const nextGymExp =
+          current.gymExperience +
+          gymExperienceGain;
 
-        const finalStats = {
-          ...trainedStats,
+        const oldNextGym =
+          getNextGym(
+            current.gymExperience
+          );
 
-          [stat]:
-            current.stats[
-              stat
-            ] +
-            actualGain,
+        const newNextGym =
+          getNextGym(
+            nextGymExp
+          );
+
+        let updated: SaveData = {
+          ...current,
+
+          energy:
+            current.energy -
+            gym.energyCost,
+
+          happiness:
+            Math.max(
+              0,
+              current.happiness -
+                happinessLoss
+            ),
+
+          gymExperience:
+            nextGymExp,
+
+          gymSessions:
+            current.gymSessions +
+            1,
+
+          stats:
+            result.stats,
+
+          xp:
+            current.xp +
+            5,
         };
 
+        /*
+         * Log newly unlocked gyms.
+         */
+        if (
+          oldNextGym &&
+          newNextGym &&
+          oldNextGym.id !==
+            newNextGym.id
+        ) {
+          updated =
+            addActivity(
+              updated,
+              `New gym unlocked: ${oldNextGym.name}.`,
+              "system"
+            );
+        }
+
         return addActivity(
-          {
-            ...current,
-
-            energy:
-              current.energy -
-              gym.energyCost,
-
-            gymSessions:
-              current.gymSessions +
-              1,
-
-            stats:
-              finalStats,
-
-            xp:
-              current.xp +
-              5,
-          },
-
-          `${gym.name}: ${statInfo?.name || stat} +${actualGain.toFixed(
+          updated,
+          `${gym.name}: ${statInfoName(
+            stat
+          )} +${result.gain.toFixed(
             2
-          )}.`,
+          )}. -${happinessLoss.toFixed(
+            0
+          )} Happy.`,
           "gym"
         );
       }
     );
 
-    const statInfo =
-      TRAINING_STATS.find(
-        (item) =>
-          item.id ===
-          stat
+    /*
+     * We calculate the expected message using
+     * the same formula without mutating state.
+     */
+    const preview =
+      applyTraining(
+        save.stats,
+        gym,
+        stat,
+        save.happiness,
+        educationMultiplier
       );
 
-    const actualGain =
-      gym.gain *
-      (1 +
-        propertyGym /
-          100);
+    const happinessLoss =
+      getTrainingHappinessLoss(
+        gym.energyCost
+      );
 
     setMessage(
-      `${statInfo?.icon || ""} ${statInfo?.name || stat} +${actualGain.toFixed(
+      `${statInfoIcon(
+        stat
+      )} ${statInfoName(
+        stat
+      )} +${preview.gain.toFixed(
         2
-      )}.`
+      )} • -${happinessLoss.toFixed(
+        0
+      )} Happy`
     );
   }
 
@@ -1524,7 +2007,7 @@ function App() {
 
           <div className="status">
             <span className="status-dot" />
-            V2 FOUNDATION
+            V3 FOUNDATION
           </div>
         </header>
 
@@ -1604,6 +2087,16 @@ function App() {
       (save.energy /
         MAX_ENERGY) *
         100
+    );
+
+  const happinessPercent =
+    Math.min(
+      100,
+      Math.round(
+        (save.happiness /
+          1000) *
+          100
+      )
     );
 
   const nextNerveAt =
@@ -1717,6 +2210,27 @@ function App() {
               className="nerve-fill"
               style={{
                 width: `${nervePercent}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        <div>
+          <span>
+            HAPPY
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.happiness
+            )}
+          </strong>
+
+          <div className="resource-bar">
+            <div
+              className="health-fill"
+              style={{
+                width: `${happinessPercent}%`,
               }}
             />
           </div>
@@ -1931,14 +2445,17 @@ function App() {
             "gym" && (
             <GymScreen
               save={save}
-              level={
-                levelInfo.level
-              }
               jailed={
                 jailed
               }
               onTrain={
                 train
+              }
+              onJoinGym={
+                joinGym
+              }
+              onSelectGym={
+                selectGym
               }
             />
           )}
@@ -2100,6 +2617,31 @@ function CityScreen({
 
         <div>
           <span>
+            ENERGY
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.energy
+            )}
+            /100
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            HAPPY
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.happiness
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
             HEALTH
           </span>
 
@@ -2139,7 +2681,7 @@ function CityScreen({
         <ActionCard
           icon="🏋️"
           title="Train"
-          description="Spend Energy and choose exactly what to train."
+          description="Use Energy and Happiness to build your battle stats."
           onClick={() =>
             setScreen("gym")
           }
@@ -2434,7 +2976,7 @@ function CrimeScreen({
 }
 
 /* =========================
-   COMBAT / PLAYERS
+   COMBAT
 ========================= */
 
 function CombatScreen({
@@ -2498,12 +3040,6 @@ function CombatScreen({
             }
           />
         </div>
-
-        <p>
-          Choose your opponent based on
-          their actual stats. There are no
-          artificial combat level gates.
-        </p>
       </div>
 
       {OPPONENTS.map(
@@ -2636,117 +3172,297 @@ function CombatScreen({
 }
 
 /* =========================
-   GYM
+   TORN-STYLE GYM
 ========================= */
 
 function GymScreen({
   save,
-  level,
   jailed,
   onTrain,
+  onJoinGym,
+  onSelectGym,
 }: {
   save: SaveData;
-  level: number;
   jailed: boolean;
   onTrain: (
     gym: Gym,
     stat: TrainingStat
   ) => void;
+  onJoinGym: (
+    gym: Gym
+  ) => void;
+  onSelectGym: (
+    gym: Gym
+  ) => void;
 }) {
-  const [
-    selectedGym,
-    setSelectedGym,
-  ] = useState<string>(
-    GYMS[0]?.id ||
-      ""
-  );
+  const standardGyms =
+    GYMS.filter(
+      (gym) =>
+        !isJailGym(gym)
+    );
 
-  const gym =
+  const jailGym =
     GYMS.find(
-      (item) =>
-        item.id ===
-        selectedGym
+      (gym) =>
+        isJailGym(gym)
+    );
+
+  const activeGym =
+    GYMS.find(
+      (gym) =>
+        gym.id ===
+        save.activeGym
     ) ||
-    GYMS[0];
+    standardGyms[0];
+
+  const nextGym =
+    getNextGym(
+      save.gymExperience
+    );
 
   return (
     <div className="list">
       <div className="panel">
         <p className="eyebrow">
-          TRAINING
+          BATTLE STATS TRAINING
         </p>
 
         <h3>
-          Energy:{" "}
-          {Math.floor(
-            save.energy
-          )}
-          /{MAX_ENERGY}
+          Gym EXP:{" "}
+          {
+            save.gymExperience
+          }
         </h3>
 
         <p>
-          Pick a gym, then choose exactly
-          which combat stat you want to
-          improve.
+          Train to earn Gym EXP and unlock
+          better facilities. Your active gym
+          determines your gain rate.
         </p>
+
+        {nextGym && (
+          <small>
+            Next gym:{" "}
+            <strong>
+              {nextGym.name}
+            </strong>
+            {" • "}
+            {
+              Math.max(
+                0,
+                nextGym.gymExpRequired -
+                  save.gymExperience
+              )
+            }{" "}
+            Gym EXP needed
+          </small>
+        )}
       </div>
 
       <div className="panel">
         <p className="eyebrow">
-          CHOOSE YOUR GYM
+          HAPPINESS
+        </p>
+
+        <div className="gym-happiness">
+          <strong>
+            {Math.floor(
+              save.happiness
+            )}
+          </strong>
+
+          <span>
+            Higher Happiness produces better
+            training gains.
+          </span>
+        </div>
+      </div>
+
+      {jailed &&
+        jailGym && (
+          <div className="panel">
+            <p className="eyebrow">
+              JAIL GYM
+            </p>
+
+            <div
+              className={`list-card ${
+                activeGym.id ===
+                jailGym.id
+                  ? "owned"
+                  : ""
+              }`}
+            >
+              <div>
+                <span className="job-tag">
+                  JAILED
+                </span>
+
+                <h3>
+                  {jailGym.name}
+                </h3>
+
+                <p>
+                  {
+                    jailGym.description
+                  }
+                </p>
+
+                <small>
+                  {
+                    jailGym.energyCost
+                  } Energy/train
+                  {" • "}
+                  Defense{" "}
+                  {
+                    jailGym.gains
+                      .defense
+                  }
+                  gain
+                </small>
+              </div>
+
+              <button
+                className="job-button"
+                onClick={() =>
+                  onSelectGym(
+                    jailGym
+                  )
+                }
+              >
+                {activeGym.id ===
+                jailGym.id
+                  ? "ACTIVE"
+                  : "USE GYM"}
+              </button>
+            </div>
+          </div>
+        )}
+
+      <div className="panel">
+        <p className="eyebrow">
+          GYMS
         </p>
 
         <div className="gym-selector">
-          {GYMS.map(
-            (item) => {
-              const locked =
-                level <
-                item.levelRequired;
+          {standardGyms.map(
+            (gym) => {
+              const unlocked =
+                gymUnlocked(
+                  gym,
+                  save.gymExperience
+                );
+
+              const member =
+                save.gymMemberships.includes(
+                  gym.id
+                );
+
+              const active =
+                save.activeGym ===
+                gym.id;
 
               return (
-                <button
-                  key={
-                    item.id
-                  }
+                <div
                   className={`gym-option ${
-                    selectedGym ===
-                    item.id
+                    active
                       ? "active"
                       : ""
+                  } ${
+                    !unlocked
+                      ? "locked"
+                      : ""
                   }`}
-                  disabled={
-                    locked
-                  }
-                  onClick={() =>
-                    setSelectedGym(
-                      item.id
-                    )
+                  key={
+                    gym.id
                   }
                 >
                   <strong>
-                    {
-                      item.name
-                    }
+                    {gym.name}
                   </strong>
 
                   <small>
-                    {locked
-                      ? `LEVEL ${item.levelRequired}`
-                      : `+${item.gain.toFixed(
-                          2
-                        )} stat`}
+                    {unlocked
+                      ? member
+                        ? `Member • ${gym.energyCost} Energy`
+                        : `Membership ${money(
+                            gym.membershipCost
+                          )}`
+                      : `${gym.gymExpRequired} Gym EXP`}
                   </small>
-                </button>
+
+                  <div className="gym-dot-row">
+                    {TRAINING_STATS.map(
+                      (stat) => {
+                        const value =
+                          gym.gains[
+                            stat.id
+                          ];
+
+                        return (
+                          <span
+                            key={
+                              stat.id
+                            }
+                            title={
+                              stat.name
+                            }
+                          >
+                            {value ===
+                            null
+                              ? "—"
+                              : value.toFixed(
+                                  1
+                                )}
+                          </span>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  {!unlocked ? (
+                    <button
+                      className="small-button"
+                      disabled
+                    >
+                      LOCKED
+                    </button>
+                  ) : !member ? (
+                    <button
+                      className="small-button"
+                      onClick={() =>
+                        onJoinGym(
+                          gym
+                        )
+                      }
+                    >
+                      JOIN
+                    </button>
+                  ) : (
+                    <button
+                      className="small-button"
+                      onClick={() =>
+                        onSelectGym(
+                          gym
+                        )
+                      }
+                    >
+                      {active
+                        ? "ACTIVE"
+                        : "SELECT"}
+                    </button>
+                  )}
+                </div>
               );
             }
           )}
         </div>
       </div>
 
-      {gym && (
+      {activeGym && (
         <div className="panel">
           <p className="eyebrow">
-            {gym.name}
+            {activeGym.name}
           </p>
 
           <h3>
@@ -2754,37 +3470,44 @@ function GymScreen({
           </h3>
 
           <p>
-            {gym.description}
+            {activeGym.description}
           </p>
 
           <div className="training-grid">
             {TRAINING_STATS.map(
               (stat) => {
-                const locked =
-                  level <
-                  gym.levelRequired;
+                const gymGain =
+                  activeGym.gains[
+                    stat.id
+                  ];
+
+                const unavailable =
+                  gymGain ===
+                    null ||
+                  gymGain ===
+                    undefined;
 
                 const insufficient =
                   save.energy <
-                  gym.energyCost;
-
-                const gain =
-                  gym.gain;
+                  activeGym.energyCost;
 
                 return (
                   <button
                     key={
                       stat.id
                     }
-                    className="training-card"
+                    className={`training-card ${
+                      unavailable
+                        ? "locked"
+                        : ""
+                    }`}
                     disabled={
-                      locked ||
-                      jailed ||
+                      unavailable ||
                       insufficient
                     }
                     onClick={() =>
                       onTrain(
-                        gym,
+                        activeGym,
                         stat.id
                       )
                     }
@@ -2802,18 +3525,22 @@ function GymScreen({
                     </strong>
 
                     <small>
-                      {stat.description}
+                      {
+                        stat.description
+                      }
                     </small>
 
                     <div>
-                      +{gain.toFixed(
-                        2
-                      )}
+                      {unavailable
+                        ? "NOT AVAILABLE"
+                        : `+${gymGain.toFixed(
+                            2
+                          )} / 5E`}
                     </div>
 
                     <em>
                       -{
-                        gym.energyCost
+                        activeGym.energyCost
                       } Energy
                     </em>
                   </button>
@@ -2822,28 +3549,31 @@ function GymScreen({
             )}
           </div>
 
-          {jailed && (
-            <p>
-              You cannot train while
-              jailed.
-            </p>
-          )}
-
           {save.energy <
-            gym.energyCost && (
+            activeGym.energyCost && (
             <p>
               You need{" "}
               {
-                gym.energyCost
+                activeGym.energyCost
               } Energy to train here.
             </p>
           )}
+
+          {jailed &&
+            !isJailGym(
+              activeGym
+            ) && (
+              <p>
+                While jailed, switch to
+                Crims Gym.
+              </p>
+            )}
         </div>
       )}
 
       <div className="panel">
         <p className="eyebrow">
-          YOUR BUILD
+          YOUR BATTLE STATS
         </p>
 
         <div className="stats-grid">
@@ -2856,17 +3586,17 @@ function GymScreen({
           />
 
           <Stat
-            label="Defense"
+            label="Speed"
             value={
-              save.stats
-                .defense
+              save.stats.speed
             }
           />
 
           <Stat
-            label="Speed"
+            label="Defense"
             value={
-              save.stats.speed
+              save.stats
+                .defense
             }
           />
 
@@ -3538,6 +4268,30 @@ function CharacterScreen({
 
         <div>
           <span>
+            GYM EXP
+          </span>
+
+          <strong>
+            {
+              save.gymExperience
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            HAPPINESS
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.happiness
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
             CRIME EXPERIENCE
           </span>
 
@@ -3550,7 +4304,7 @@ function CharacterScreen({
 
         <div>
           <span>
-            NERVE BAR
+            NERVE
           </span>
 
           <strong>
@@ -3589,17 +4343,17 @@ function CharacterScreen({
           />
 
           <Stat
-            label="Defense"
+            label="Speed"
             value={
-              save.stats
-                .defense
+              save.stats.speed
             }
           />
 
           <Stat
-            label="Speed"
+            label="Defense"
             value={
-              save.stats.speed
+              save.stats
+                .defense
             }
           />
 
@@ -3675,6 +4429,28 @@ function CharacterScreen({
 /* =========================
    COMPONENTS
 ========================= */
+
+function statInfoName(
+  stat: TrainingStat
+): string {
+  return (
+    TRAINING_STATS.find(
+      (item) =>
+        item.id === stat
+    )?.name || stat
+  );
+}
+
+function statInfoIcon(
+  stat: TrainingStat
+): string {
+  return (
+    TRAINING_STATS.find(
+      (item) =>
+        item.id === stat
+    )?.icon || ""
+  );
+}
 
 function ActionCard({
   icon,
