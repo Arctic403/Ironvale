@@ -2,24 +2,27 @@
 
 :root {
   font-family: Inter, system-ui, sans-serif;
+
   color: #eef1ff;
   background: #05050b;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
 
   --bg: #05050b;
-  --panel: rgba(14, 13, 27, .82);
-  --panel-2: rgba(22, 19, 42, .9);
+  --panel: rgba(14, 13, 27, .86);
+  --panel2: rgba(22, 19, 42, .92);
 
   --purple: #8b5cff;
   --purple2: #b16cff;
   --cyan: #42d9ff;
-  --pink: #ff4fd8;
   --green: #54e6a8;
+  --red: #ff5c70;
+  --yellow: #ffc857;
+  --orange: #ff925c;
 
   --muted: #858aa6;
   --line: rgba(157, 126, 255, .18);
-  --glow: 0 0 32px rgba(139, 92, 255, .18);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -53,54 +56,24 @@ body {
       rgba(255, 43, 194, .08),
       transparent 35%
     ),
-    #05050b;
+    var(--bg);
 }
 
 button {
   font: inherit;
 }
 
+button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
 .app {
   min-height: 100vh;
-  position: relative;
-  overflow: hidden;
 }
 
-.app::before {
-  content: "";
-  position: fixed;
-  inset: 0;
+/* HEADER */
 
-  pointer-events: none;
-
-  opacity: .22;
-
-  background-image:
-    linear-gradient(
-      rgba(255,255,255,.025) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      rgba(255,255,255,.025) 1px,
-      transparent 1px
-    );
-
-  background-size: 48px 48px;
-
-  mask-image:
-    linear-gradient(
-      to bottom,
-      black,
-      transparent 85%
-    );
-}
-
-/* =========================
-   HEADER
-========================= */
-
-.topbar,
 .game-header {
   height: 72px;
 
@@ -108,18 +81,21 @@ button {
 
   display: flex;
   align-items: center;
-  justify-content: space-between;
+
+  gap: 18px;
 
   border-bottom:
     1px solid rgba(255,255,255,.07);
 
   background:
-    rgba(5,5,11,.72);
+    rgba(5,5,11,.82);
 
   backdrop-filter: blur(18px);
 
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: 0;
+
+  z-index: 10;
 }
 
 .logo {
@@ -131,13 +107,6 @@ button {
   font-weight: 900;
   letter-spacing: -1px;
   font-size: 20px;
-}
-
-.logo > span:last-child span {
-  color: var(--purple2);
-
-  text-shadow:
-    0 0 20px rgba(177,108,255,.45);
 }
 
 .logo-mark {
@@ -159,305 +128,57 @@ button {
       rgba(66,217,255,.12)
     );
 
-  box-shadow:
-    0 0 25px rgba(139,92,255,.18);
-
   color: #fff;
 }
 
-.status {
-  color: #9b9eb5;
-
-  font-size: 10px;
-  font-weight: 800;
-
-  letter-spacing: 1.6px;
-}
-
-.status-dot {
-  display: inline-block;
-
-  width: 7px;
-  height: 7px;
-
-  border-radius: 50%;
-
-  background: var(--green);
-
-  box-shadow:
-    0 0 12px var(--green);
-
-  margin-right: 8px;
-}
-
-/* =========================
-   LANDING PAGE
-========================= */
-
-.landing .hero {
-  max-width: 1200px;
-
-  margin: 0 auto;
-
-  min-height:
-    calc(100vh - 72px);
-
-  display: grid;
-
-  grid-template-columns:
-    1fr .85fr;
-
-  gap: 60px;
-
-  align-items: center;
-
-  padding: 60px 28px;
-}
-
-.hero-content {
-  position: relative;
-  z-index: 1;
-}
-
-.eyebrow {
-  margin: 0 0 12px;
-
-  color: var(--cyan);
-
-  font-size: 10px;
-  font-weight: 900;
-
-  letter-spacing: 2.5px;
-}
-
-h1 {
-  margin: 0;
-
-  font-size:
-    clamp(48px, 8vw, 88px);
-
-  line-height: .92;
-
-  letter-spacing: -5px;
+.logo span span {
+  color: var(--purple2);
 
   text-shadow:
-    0 0 45px rgba(139,92,255,.15);
-}
-
-h1 span {
-  background:
-    linear-gradient(
-      90deg,
-      #fff,
-      var(--purple2),
-      var(--cyan)
-    );
-
-  -webkit-background-clip: text;
-  background-clip: text;
-
-  color: transparent;
-}
-
-.intro {
-  max-width: 520px;
-
-  color: #999eb9;
-
-  line-height: 1.7;
-
-  font-size: 16px;
-
-  margin: 26px 0 32px;
-}
-
-.play-button {
-  border:
-    1px solid rgba(177,108,255,.5);
-
-  background:
-    linear-gradient(
-      135deg,
-      #7d4dff,
-      #a45bff 55%,
-      #4931a5
-    );
-
-  color: #fff;
-
-  padding: 15px 22px;
-
-  border-radius: 12px;
-
-  font-weight: 900;
-
-  letter-spacing: .8px;
-
-  box-shadow:
-    0 0 30px rgba(139,92,255,.25),
-    inset 0 1px rgba(255,255,255,.2);
-
-  cursor: pointer;
-
-  transition: .2s;
-}
-
-.play-button:hover {
-  transform: translateY(-2px);
-
-  box-shadow:
-    0 0 42px rgba(139,92,255,.4);
-}
-
-.play-button span {
-  margin-left: 14px;
-}
-
-.city-card {
-  min-height: 430px;
-
-  border:
-    1px solid var(--line);
-
-  border-radius: 26px;
-
-  overflow: hidden;
-
-  position: relative;
-
-  background:
-    radial-gradient(
-      circle at 50% 45%,
-      rgba(139,92,255,.25),
-      transparent 35%
-    ),
-    linear-gradient(
-      145deg,
-      rgba(25,20,48,.92),
-      rgba(7,8,18,.95)
-    );
-
-  box-shadow:
-    var(--glow);
-}
-
-.city-card::after {
-  content: "";
-
-  position: absolute;
-
-  inset: 22% -20% 0;
-
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 38px,
-      rgba(139,92,255,.12) 39px 40px
-    ),
-    linear-gradient(
-      155deg,
-      transparent 45%,
-      rgba(66,217,255,.12) 45.5%,
-      transparent 46%
-    );
-
-  transform:
-    perspective(300px)
-    rotateX(55deg);
-
-  transform-origin: bottom;
-}
-
-.city-glow {
-  position: absolute;
-
-  width: 220px;
-  height: 220px;
-
-  border-radius: 50%;
-
-  background:
-    rgba(139,92,255,.22);
-
-  filter: blur(55px);
-
-  left: 50%;
-  top: 35%;
-
-  transform:
-    translate(-50%,-50%);
-}
-
-.city-info {
-  position: absolute;
-
-  left: 24px;
-  bottom: 22px;
-
-  z-index: 2;
-}
-
-.city-info span,
-.city-info strong {
-  display: block;
-}
-
-.city-info span {
-  font-size: 9px;
-
-  color: #767c99;
-
-  letter-spacing: 1.8px;
-
-  font-weight: 800;
-}
-
-.city-info strong {
-  margin-top: 6px;
-
-  font-size: 13px;
-
-  color: #c5c8dc;
-}
-
-/* =========================
-   GAME HEADER
-========================= */
-
-.game-shell {
-  padding-bottom: 40px;
-}
-
-.game-header {
-  position: sticky;
-  top: 0;
-
-  z-index: 5;
+    0 0 20px rgba(177,108,255,.45);
 }
 
 .wallet {
   text-align: right;
 
   margin-left: auto;
-  margin-right: 18px;
 }
 
-.wallet span {
+.wallet span,
+.player-bar span,
+.city-dashboard span,
+.crime-summary span,
+.crime-stats span,
+.job-rewards span,
+.record-grid span,
+.stat-card span {
   display: block;
 
-  color: #727791;
+  color: #6e748c;
 
   font-size: 8px;
 
-  letter-spacing: 1.5px;
-
   font-weight: 900;
+
+  letter-spacing: 1.5px;
 }
 
 .wallet strong {
+  display: block;
+
   color: #d9d4ff;
 
   font-size: 17px;
+
+  margin-top: 2px;
+}
+
+.small-button,
+.nav-button,
+.job-button,
+.crime-button,
+.quit-button {
+  cursor: pointer;
 }
 
 .small-button {
@@ -472,13 +193,9 @@ h1 span {
   padding: 9px 12px;
 
   border-radius: 9px;
-
-  cursor: pointer;
 }
 
-/* =========================
-   PLAYER BAR
-========================= */
+/* PLAYER BAR */
 
 .player-bar {
   max-width: 1250px;
@@ -490,7 +207,7 @@ h1 span {
   display: grid;
 
   grid-template-columns:
-    1.5fr repeat(4,1fr);
+    1.5fr repeat(4, 1fr);
 
   gap: 14px;
 
@@ -501,21 +218,6 @@ h1 span {
 
   background:
     rgba(12,11,23,.72);
-
-  box-shadow:
-    var(--glow);
-}
-
-.player-bar span {
-  display: block;
-
-  color: #666c86;
-
-  font-size: 8px;
-
-  letter-spacing: 1.5px;
-
-  font-weight: 900;
 }
 
 .player-bar strong {
@@ -528,14 +230,12 @@ h1 span {
   font-size: 13px;
 }
 
-/* =========================
-   GAME LAYOUT
-========================= */
+/* LAYOUT */
 
 .game-layout {
   max-width: 1250px;
 
-  margin: 18px auto 0;
+  margin: 18px auto 50px;
 
   padding: 0 16px;
 
@@ -555,12 +255,12 @@ h1 span {
   background:
     linear-gradient(
       145deg,
-      rgba(17,15,31,.9),
-      rgba(8,8,16,.88)
+      rgba(17,15,31,.92),
+      rgba(8,8,16,.90)
     );
 
   box-shadow:
-    var(--glow);
+    0 0 32px rgba(139,92,255,.08);
 }
 
 .nav-card {
@@ -571,15 +271,26 @@ h1 span {
   border-radius: 16px;
 
   position: sticky;
-
   top: 90px;
 }
 
+.eyebrow {
+  color: var(--cyan);
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  margin-bottom: 7px;
+}
+
 .nav-card .eyebrow {
+  color: #6f748d;
+
   margin:
     5px 10px 12px;
-
-  color: #6f748d;
 }
 
 .nav-button {
@@ -597,8 +308,6 @@ h1 span {
   padding: 12px 11px;
 
   border-radius: 10px;
-
-  cursor: pointer;
 
   margin-bottom: 4px;
 
@@ -632,12 +341,12 @@ h1 span {
 }
 
 .reset-button {
-  margin-top: 20px;
+  margin-top: 25px;
 
   color: #666b80;
-
-  font-size: 11px;
 }
+
+/* CONTENT */
 
 .content-card {
   min-width: 0;
@@ -654,6 +363,8 @@ h1 span {
 
   justify-content: space-between;
 
+  gap: 20px;
+
   margin-bottom: 20px;
 }
 
@@ -663,6 +374,24 @@ h1 span {
   font-size: 30px;
 
   letter-spacing: -1.2px;
+}
+
+.section-heading h3 {
+  margin: 4px 0 0;
+
+  font-size: 18px;
+}
+
+.intro {
+  max-width: 650px;
+
+  color: #7f849b;
+
+  line-height: 1.6;
+
+  font-size: 12px;
+
+  margin: 8px 0 0;
 }
 
 .level {
@@ -683,16 +412,14 @@ h1 span {
   font-weight: 900;
 }
 
-/* =========================
-   CITY DASHBOARD
-========================= */
+/* DASHBOARD */
 
 .city-dashboard,
 .crime-summary {
   display: grid;
 
   grid-template-columns:
-    repeat(3,1fr);
+    repeat(3, 1fr);
 
   gap: 12px;
 
@@ -709,27 +436,7 @@ h1 span {
   border-radius: 13px;
 
   background:
-    linear-gradient(
-      145deg,
-      rgba(255,255,255,.035),
-      rgba(255,255,255,.012)
-    );
-}
-
-.city-dashboard span,
-.crime-summary span,
-.crime-stats-mini span,
-.job-rewards span,
-.progress-stat span {
-  display: block;
-
-  color: #6e748c;
-
-  font-size: 8px;
-
-  font-weight: 900;
-
-  letter-spacing: 1.5px;
+    rgba(255,255,255,.018);
 }
 
 .city-dashboard strong,
@@ -741,17 +448,95 @@ h1 span {
   font-size: 18px;
 }
 
-/* =========================
-   CITY ACTIONS
-========================= */
+/* PANELS */
+
+.panel {
+  padding: 20px;
+
+  border:
+    1px solid rgba(255,255,255,.075);
+
+  border-radius: 15px;
+
+  background:
+    rgba(255,255,255,.018);
+
+  margin-bottom: 16px;
+}
+
+.panel h3 {
+  margin:
+    4px 0 7px;
+
+  font-size: 18px;
+}
+
+.panel p {
+  color: #7f849b;
+
+  line-height: 1.6;
+
+  font-size: 12px;
+}
+
+.jail-panel {
+  border-color:
+    rgba(255,92,112,.35);
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255,92,112,.10),
+      rgba(255,92,112,.025)
+    );
+}
+
+.jail-panel .eyebrow {
+  color: var(--red);
+}
+
+/* XP */
+
+.xp-bar {
+  height: 9px;
+
+  overflow: hidden;
+
+  border-radius: 99px;
+
+  background:
+    rgba(255,255,255,.06);
+
+  margin-top: 14px;
+}
+
+.xp-bar div {
+  height: 100%;
+
+  border-radius: inherit;
+
+  background:
+    linear-gradient(
+      90deg,
+      var(--purple),
+      var(--cyan)
+    );
+
+  transition:
+    width .4s ease;
+}
+
+/* ACTIONS */
 
 .action-grid {
   display: grid;
 
   grid-template-columns:
-    repeat(2,1fr);
+    repeat(2, 1fr);
 
   gap: 12px;
+
+  margin-bottom: 18px;
 }
 
 .action-card {
@@ -781,13 +566,15 @@ h1 span {
 }
 
 .action-card:hover {
-  transform: translateY(-2px);
+  transform:
+    translateY(-2px);
 
   border-color:
     rgba(139,92,255,.4);
 
   box-shadow:
-    0 0 30px rgba(139,92,255,.12);
+    0 0 30px
+    rgba(139,92,255,.12);
 }
 
 .action-card span {
@@ -814,64 +601,15 @@ h1 span {
   line-height: 1.5;
 }
 
-/* =========================
-   PANELS
-========================= */
+/* CRIMES */
 
-.panel {
-  padding: 20px;
-
-  border:
-    1px solid rgba(255,255,255,.075);
-
-  border-radius: 15px;
-
-  background:
-    rgba(255,255,255,.018);
-}
-
-.panel h3,
-.job-card h3 {
-  margin:
-    4px 0 7px;
-
-  font-size: 18px;
-}
-
-.panel p,
-.job-card p {
-  color: #7f849b;
-
-  line-height: 1.6;
-
-  font-size: 12px;
-}
-
-.job-tag {
-  color: var(--cyan) !important;
-
-  font-size: 8px !important;
-
-  font-weight: 900;
-
-  letter-spacing: 1.5px;
-
-  margin: 0 0 5px !important;
-}
-
-/* =========================
-   JOBS
-========================= */
-
-.jobs-list {
+.crime-list {
   display: grid;
 
   gap: 11px;
-
-  margin-top: 16px;
 }
 
-.job-card {
+.crime-card {
   padding: 18px;
 
   border:
@@ -889,24 +627,16 @@ h1 span {
   transition: .18s;
 }
 
-.job-card:hover {
+.crime-card:hover {
   border-color:
     rgba(139,92,255,.25);
 }
 
-.job-card.locked {
+.crime-card.locked {
   opacity: .55;
 }
 
-.job-card.owned {
-  border-color:
-    rgba(139,92,255,.4);
-
-  box-shadow:
-    0 0 28px rgba(139,92,255,.09);
-}
-
-.job-main {
+.crime-main {
   display: flex;
 
   justify-content: space-between;
@@ -916,10 +646,36 @@ h1 span {
   align-items: center;
 }
 
-.job-button,
+.crime-tag,
+.job-tag {
+  color: var(--cyan);
+
+  font-size: 8px;
+
+  font-weight: 900;
+
+  letter-spacing: 1.5px;
+}
+
+.crime-card h3 {
+  margin:
+    5px 0 7px;
+
+  font-size: 18px;
+}
+
+.crime-card p {
+  color: #7f849b;
+
+  font-size: 12px;
+
+  line-height: 1.5;
+
+  margin: 0;
+}
+
 .crime-button,
-.upgrade-button,
-.collect-all-button {
+.job-button {
   border:
     1px solid rgba(139,92,255,.35);
 
@@ -942,23 +698,119 @@ h1 span {
 
   letter-spacing: .7px;
 
-  cursor: pointer;
-
   white-space: nowrap;
 }
 
-.job-button:disabled,
-.crime-button:disabled {
+.crime-button:disabled,
+.job-button:disabled {
   opacity: .4;
 
   cursor: not-allowed;
+}
+
+.crime-stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(6, 1fr);
+
+  gap: 8px;
+
+  margin-top: 15px;
+
+  padding-top: 13px;
+
+  border-top:
+    1px solid rgba(255,255,255,.06);
+}
+
+.crime-stats strong {
+  display: block;
+
+  margin-top: 5px;
+
+  color: #d6d9e8;
+
+  font-size: 11px;
+}
+
+.locked-message {
+  margin-top: 13px;
+
+  color: #777d94;
+
+  font-size: 11px;
+}
+
+/* JOBS */
+
+.jobs-list {
+  display: grid;
+
+  gap: 11px;
+}
+
+.job-card {
+  padding: 18px;
+
+  border:
+    1px solid rgba(255,255,255,.075);
+
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(22,19,40,.72),
+      rgba(10,10,19,.88)
+    );
+}
+
+.job-card.locked {
+  opacity: .55;
+}
+
+.job-card.owned {
+  border-color:
+    rgba(139,92,255,.4);
+
+  box-shadow:
+    0 0 28px
+    rgba(139,92,255,.09);
+}
+
+.job-main {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 15px;
+
+  align-items: center;
+}
+
+.job-card h3 {
+  margin:
+    5px 0 7px;
+
+  font-size: 18px;
+}
+
+.job-card p {
+  color: #7f849b;
+
+  line-height: 1.5;
+
+  font-size: 12px;
+
+  margin: 0;
 }
 
 .job-rewards {
   display: grid;
 
   grid-template-columns:
-    repeat(4,1fr);
+    repeat(2, 1fr);
 
   gap: 8px;
 
@@ -968,10 +820,6 @@ h1 span {
 
   border-top:
     1px solid rgba(255,255,255,.06);
-}
-
-.job-rewards > div {
-  padding: 8px 0;
 }
 
 .job-rewards strong {
@@ -1032,300 +880,204 @@ h1 span {
   color: #777d94;
 }
 
-.collect-all-button {
-  background:
-    linear-gradient(
-      135deg,
-      #7950ff,
-      #9b5cff
-    );
+.quit-button {
+  width: auto;
 
-  color: #fff;
+  background:
+    transparent;
+
+  color: #777d94;
+
+  border:
+    1px solid rgba(255,255,255,.08);
+
+  padding: 9px 12px;
+
+  border-radius: 8px;
 }
 
-.quit-button {
-  width: 100%;
+/* CHARACTER */
 
-  margin-top: 10px;
+.stats-grid {
+  display: grid;
 
-  padding: 9px;
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  gap: 10px;
+}
+
+.stat-card {
+  padding: 16px;
 
   border:
     1px solid rgba(255,255,255,.06);
 
-  border-radius: 8px;
+  border-radius: 12px;
 
-  background: transparent;
-
-  color: #666b80;
-
-  cursor: pointer;
-
-  font-size: 10px;
+  background:
+    rgba(255,255,255,.02);
 }
 
-.quit-button:hover {
-  color: #ff6f9f;
+.stat-card strong {
+  display: block;
 
-  border-color:
-    rgba(255,80,130,.25);
+  font-size: 22px;
+
+  margin-top: 8px;
+
+  color: #ddd8ff;
 }
 
-/* =========================
-   CRIMES
-========================= */
-
-.crime-stats-mini {
+.record-grid {
   display: grid;
 
   grid-template-columns:
-    repeat(4,1fr);
+    repeat(4, 1fr);
 
-  gap: 8px;
-
-  margin-bottom: 15px;
+  gap: 10px;
 }
 
-.crime-stats-mini > div {
-  padding: 12px;
+.record-grid > div {
+  padding: 15px;
 
   border:
-    1px solid rgba(255,79,216,.1);
+    1px solid rgba(255,255,255,.06);
 
-  border-radius: 10px;
-
-  background:
-    rgba(255,79,216,.025);
-}
-
-.crime-stats-mini strong {
-  display: block;
-
-  margin-top: 5px;
-
-  color: #d8baff;
-}
-
-.crime-card {
-  border-left:
-    2px solid rgba(255,79,216,.45);
-}
-
-.crime-button {
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255,63,178,.27),
-      rgba(139,53,177,.22)
-    );
-
-  border-color:
-    rgba(255,79,216,.3);
-}
-
-.crime-button:hover:not(:disabled) {
-  box-shadow:
-    0 0 20px rgba(255,79,216,.16);
-}
-
-/* =========================
-   MISSIONS
-========================= */
-
-.mission-objectives {
-  display: grid;
-
-  gap: 9px;
-
-  margin:
-    18px 0 24px;
-
-  color: #9ea3ba;
-
-  font-size: 12px;
-}
-
-/* =========================
-   CHARACTER
-========================= */
-
-.stats {
-  display: grid;
-
-  grid-template-columns:
-    repeat(4,1fr);
-
-  gap: 11px;
-}
-
-.stat,
-.stat-wide {
-  padding: 18px;
-
-  border:
-    1px solid rgba(255,255,255,.07);
-
-  border-radius: 13px;
+  border-radius: 12px;
 
   background:
-    rgba(255,255,255,.018);
+    rgba(255,255,255,.02);
 }
 
-.stat span {
-  display: block;
-
-  color: #686e87;
-
-  font-size: 8px;
-
-  letter-spacing: 1.5px;
-
-  font-weight: 900;
-}
-
-.stat strong {
+.record-grid strong {
   display: block;
 
   margin-top: 7px;
 
-  font-size: 17px;
+  font-size: 18px;
 }
 
-.stat-wide {
-  grid-column: 1 / -1;
+/* ACTIVITY */
+
+.activity-feed {
+  display: grid;
+
+  gap: 0;
 }
 
-.stat-wide h3 {
-  margin: 0;
+.activity {
+  display: grid;
 
-  font-size: 14px;
+  grid-template-columns:
+    70px 1fr;
+
+  gap: 12px;
+
+  padding: 11px 0;
+
+  border-bottom:
+    1px solid rgba(255,255,255,.05);
 }
 
-.progress-stat {
-  margin-top: 16px;
+.activity:last-child {
+  border-bottom: none;
 }
 
-.progress-stat > strong {
-  float: right;
+.activity > span {
+  color: #5f6479;
 
   font-size: 10px;
 }
 
-.progress-bar {
-  clear: both;
-
-  height: 7px;
-
-  margin-top: 9px;
-
-  overflow: hidden;
-
-  border-radius: 8px;
-
-  background:
-    rgba(255,255,255,.055);
-}
-
-.progress-bar div {
-  height: 100%;
-
-  border-radius: inherit;
-
-  background:
-    linear-gradient(
-      90deg,
-      var(--purple),
-      var(--cyan)
-    );
-
-  box-shadow:
-    0 0 12px rgba(66,217,255,.3);
-}
-
-/* =========================
-   MESSAGE
-========================= */
-
-.message {
-  margin-top: 16px;
-
-  padding: 12px 14px;
-
-  border:
-    1px solid rgba(66,217,255,.1);
-
-  border-radius: 10px;
-
-  background:
-    rgba(66,217,255,.025);
-
-  color: #8d93aa;
+.activity strong {
+  color: #b9bdd0;
 
   font-size: 11px;
+
+  line-height: 1.4;
 }
 
-/* =========================
-   MOBILE
-========================= */
+.activity.success strong {
+  color: var(--green);
+}
 
-@media (max-width: 800px) {
+.activity.failure strong {
+  color: #aaaebe;
+}
 
-  .topbar,
-  .game-header {
-    padding: 0 15px;
-  }
+.activity.spooked strong {
+  color: var(--yellow);
+}
 
-  .landing .hero {
-    grid-template-columns: 1fr;
+.activity.jailed strong {
+  color: var(--red);
+}
 
-    gap: 28px;
+.activity.job strong {
+  color: var(--cyan);
+}
 
-    padding-top: 55px;
-  }
+/* MOBILE */
 
-  .city-card {
-    min-height: 260px;
-  }
-
+@media (
+  max-width: 850px
+) {
   .game-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns:
+      1fr;
   }
 
   .nav-card {
     position: static;
 
-    display: flex;
+    display: grid;
+
+    grid-template-columns:
+      repeat(4, 1fr);
 
     gap: 5px;
-
-    overflow-x: auto;
-
-    padding: 7px;
   }
 
-  .nav-card .eyebrow,
-  .reset-button {
+  .nav-card .eyebrow {
     display: none;
   }
 
-  .nav-button {
-    min-width: max-content;
-
-    margin: 0;
-
-    text-align: center;
+  .reset-button {
+    margin-top: 0;
   }
 
   .player-bar {
-    margin-left: 10px;
-    margin-right: 10px;
-
     grid-template-columns:
-      repeat(2,1fr);
+      repeat(2, 1fr);
   }
 
-  .player-bar > div:first-child {
-    grid-column: 1 / -1;
+  .crime-stats {
+    grid-template-columns:
+      repeat(3, 1fr);
+  }
+
+  .stats-grid,
+  .record-grid {
+    grid-template-columns:
+      repeat(2, 1fr);
+  }
+}
+
+@media (
+  max-width: 600px
+) {
+  .game-header {
+    padding: 0 15px;
+  }
+
+  .player-bar {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .game-layout {
+    padding: 0 10px;
   }
 
   .content-card {
@@ -1333,101 +1085,31 @@ h1 span {
   }
 
   .city-dashboard,
-  .crime-summary {
-    grid-template-columns: 1fr;
-  }
-
+  .crime-summary,
   .action-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .job-rewards {
     grid-template-columns:
-      repeat(2,1fr);
+      1fr;
   }
 
-  .crime-stats-mini {
-    grid-template-columns:
-      repeat(2,1fr);
-  }
-
-  .stats {
-    grid-template-columns:
-      repeat(2,1fr);
-  }
-
-  h1 {
-    letter-spacing: -3px;
-  }
-
+  .crime-main,
   .job-main {
     align-items: flex-start;
-  }
 
-  .job-button,
-  .crime-button {
-    flex-shrink: 0;
-  }
-}
-
-@media (max-width: 480px) {
-
-  .logo {
-    font-size: 17px;
-  }
-
-  .logo-mark {
-    width: 30px;
-    height: 30px;
-  }
-
-  .wallet {
-    margin-right: 8px;
-  }
-
-  .wallet strong {
-    font-size: 14px;
-  }
-
-  .small-button {
-    padding: 8px;
-    font-size: 10px;
-  }
-
-  .content-card {
-    border-radius: 14px;
-  }
-
-  .section-heading h2 {
-    font-size: 25px;
-  }
-
-  .job-main {
     flex-direction: column;
   }
 
-  .job-button,
-  .crime-button {
+  .crime-button,
+  .job-button {
     width: 100%;
   }
 
-  .income-summary {
-    flex-direction: column;
-
-    align-items: flex-start;
-
-    gap: 14px;
+  .crime-stats {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 
-  .collect-all-button {
-    width: 100%;
-  }
-
-  .stats {
-    grid-template-columns: 1fr;
-  }
-
-  .stat-wide {
-    grid-column: auto;
+  .nav-card {
+    grid-template-columns:
+      repeat(2, 1fr);
   }
 }
