@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { executeCombatTurn, DynamicFighter } from "./CombatSystem";
 import { DistanceZone } from "./gameData";
 
+// --- CUSTOM HOOK ---
 export function useRiftCity() {
   const [gameState, setGameState] = useState<SaveData>(() => loadSave());
   const [currentScreen, setCurrentScreen] = useState<Screen>("character");
@@ -408,7 +409,6 @@ export function useRiftCity() {
     setCombatOpponent(updatedEnemy);
     setCombatMessage(turnResult.log.actionText);
 
-    // Trigger enemy response after player attack
     executeEnemyCounterTurn();
 
     setGameState((prev) => ({
@@ -442,3 +442,27 @@ export function useRiftCity() {
     executeCombatRound,
   };
 }
+
+// --- MAIN APP COMPONENT ---
+export function App() {
+  const rift = useRiftCity();
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4">
+      <header className="border-b border-slate-800 pb-4 mb-4">
+        <h1 className="text-2xl font-bold text-emerald-400">Rift City</h1>
+        <p className="text-sm text-slate-400">
+          Level: {rift.level} | Energy: {rift.gameState.energy} | Nerve: {rift.gameState.nerve}
+        </p>
+      </header>
+
+      <main className="max-w-4xl mx-auto">
+        <p className="text-slate-300 mb-4">{rift.combatMessage}</p>
+        {/* Render your active screen/view logic here */}
+      </main>
+    </div>
+  );
+}
+
+// Default export required for main.tsx import
+export default App;
