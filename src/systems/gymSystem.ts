@@ -22,7 +22,7 @@ export const GYMS: Gym[] = [
     id: "street-gym",
     name: "Street Gym",
     description:
-      "A cheap neighborhood gym with basic equipment.",
+      "A cheap neighborhood gym with basic equipment. Nothing fancy, but everyone has to start somewhere.",
     levelRequired: 1,
     energyCost: 5,
     gain: 0.7,
@@ -32,7 +32,7 @@ export const GYMS: Gym[] = [
     id: "iron-gym",
     name: "Iron Gym",
     description:
-      "Better equipment and heavier weights.",
+      "Better equipment, heavier weights and a serious crowd.",
     levelRequired: 5,
     energyCost: 10,
     gain: 1.2,
@@ -42,7 +42,7 @@ export const GYMS: Gym[] = [
     id: "combat-gym",
     name: "Combat Gym",
     description:
-      "A serious training facility built for fighters.",
+      "A serious training facility built for people who actually plan on fighting.",
     levelRequired: 10,
     energyCost: 15,
     gain: 1.7,
@@ -52,7 +52,7 @@ export const GYMS: Gym[] = [
     id: "elite-gym",
     name: "Elite Performance Center",
     description:
-      "The best training facility currently available in RiftCity.",
+      "RiftCity's premier training facility. Expensive, exclusive and extremely effective.",
     levelRequired: 20,
     energyCost: 25,
     gain: 2.8,
@@ -70,7 +70,7 @@ export const TRAINING_STATS: {
     name: "Strength",
     icon: "💪",
     description:
-      "Increases your offensive power.",
+      "Build offensive power and hit harder.",
   },
 
   {
@@ -78,7 +78,7 @@ export const TRAINING_STATS: {
     name: "Defense",
     icon: "🛡️",
     description:
-      "Improves your ability to withstand attacks.",
+      "Become harder to damage in combat.",
   },
 
   {
@@ -86,7 +86,7 @@ export const TRAINING_STATS: {
     name: "Speed",
     icon: "⚡",
     description:
-      "Makes you faster and improves offensive pressure.",
+      "Improve your speed and offensive pressure.",
   },
 
   {
@@ -94,7 +94,7 @@ export const TRAINING_STATS: {
     name: "Dexterity",
     icon: "🎯",
     description:
-      "Improves your accuracy and defensive ability.",
+      "Improve accuracy, precision and combat effectiveness.",
   },
 ];
 
@@ -105,9 +105,11 @@ export function getTrainingGain(
   /*
    * The player chooses the stat.
    *
-   * Gym quality controls the amount
-   * gained rather than deciding the
-   * stat automatically.
+   * The gym determines how much
+   * that selected stat increases.
+   *
+   * We intentionally do not use
+   * different gains for each stat.
    */
   void stat;
 
