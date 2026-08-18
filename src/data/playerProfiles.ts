@@ -1,6 +1,6 @@
 import { CombatStats } from "../systems/progressionSystem";
 
-export type PlayerProfile = {
+export interface PlayerProfile {
   id: string;
   name: string;
   level: number;
@@ -16,7 +16,7 @@ export type PlayerProfile = {
   cashReward: number;
   xpReward: number;
   faction: string;
-};
+}
 
 export const PLAYER_PROFILES: PlayerProfile[] = [
   {
