@@ -1,5 +1,5 @@
 import { CombatStats } from "./progressionSystem";
-import { PLAYER_PROFILES, PlayerProfile } from "./playerProfiles";
+import { PLAYER_PROFILES, PlayerProfile } from "../data/playerProfiles";
 
 export type CombatDifficulty = "easy" | "fair" | "dangerous" | "very-dangerous";
 export type Opponent = PlayerProfile;
