@@ -17,17 +17,19 @@ export interface CombatStats {
   dexterity: number;
 }
 
-export interface DynamicFighter {
+export interface PlayerProfile {
   id: string;
   name: string;
   level: number;
   health: number;
   maxHealth: number;
   stats: CombatStats;
-  weapons: WeaponOption[];
+  weapons?: WeaponOption[];
   cashReward?: number;
   xpReward?: number;
 }
+
+export type DynamicFighter = PlayerProfile;
 
 export interface TurnLog {
   id: string;
@@ -67,7 +69,6 @@ export function executeCombatTurn(
   defender: DynamicFighter,
   weapon?: WeaponOption
 ): { updatedDefender: DynamicFighter; log: TurnLog } {
-  // Use specified weapon or default to a random weapon from attacker inventory
   const activeWeapon =
     weapon ||
     (attacker.weapons && attacker.weapons.length > 0
@@ -125,5 +126,36 @@ export function executeCombatTurn(
       isMiss: false,
       hitPart: target.part,
     },
+  };
+}
+
+export function simulateCombat(attacker: PlayerProfile, defender: PlayerProfile) {
+  const winChance = calculateWinChance(attacker.stats, defender.stats);
+  const isWin = Math.random() * 100 < winChance;
+
+  let currentAttacker = { ...attacker };
+  let currentDefender = { ...defender };
+  const logs: TurnLog[] = [];
+  let rounds = 0;
+
+  while (currentAttacker.health > 0 && currentDefender.health > 0 && rounds < 20) {
+    rounds++;
+    const turnResult = executeCombatTurn(currentAttacker, currentDefender);
+    currentDefender = turnResult.updatedDefender;
+    logs.push(turnResult.log);
+
+    if (currentDefender.health <= 0) break;
+
+    // Counter turn
+    const counterResult = executeCombatTurn(currentDefender, currentAttacker);
+    currentAttacker = counterResult.updatedDefender;
+    logs.push(counterResult.log);
+  }
+
+  return {
+    isWin,
+    logs,
+    winner: currentAttacker.health > 0 ? currentAttacker : currentDefender,
+    loser: currentAttacker.health > 0 ? currentDefender : currentAttacker,
   };
 }
