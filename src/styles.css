@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
 
 :root {
   font-family: Inter, system-ui, sans-serif;
@@ -7,11 +7,12 @@
   background: #05050b;
 
   --bg: #05050b;
-  --panel: rgba(14, 13, 27, .86);
+  --panel: rgba(14, 13, 27, .88);
 
   --purple: #8b5cff;
   --purple2: #b16cff;
   --cyan: #42d9ff;
+
   --green: #54e6a8;
   --red: #ff5c70;
   --yellow: #ffc857;
@@ -30,6 +31,7 @@ html,
 body,
 #root {
   margin: 0;
+
   min-height: 100%;
   min-width: 100%;
 }
@@ -48,61 +50,34 @@ body {
       rgba(0, 214, 255, .10),
       transparent 28%
     ),
-    radial-gradient(
-      circle at 55% 90%,
-      rgba(255, 43, 194, .08),
-      transparent 35%
-    ),
-    var(--bg);
+    #05050b;
 }
 
 button {
   font: inherit;
 }
 
-button:focus-visible {
-  outline: 2px solid var(--cyan);
-  outline-offset: 2px;
+button:disabled {
+  cursor: not-allowed;
 }
 
 .app {
   min-height: 100vh;
 }
 
-/* HEADER */
-
-.game-header {
-  height: 72px;
-
-  padding: 0 28px;
-
-  display: flex;
-  align-items: center;
-
-  gap: 18px;
-
-  border-bottom:
-    1px solid rgba(255,255,255,.07);
-
-  background:
-    rgba(5,5,11,.82);
-
-  backdrop-filter: blur(18px);
-
-  position: sticky;
-  top: 0;
-
-  z-index: 10;
-}
+/* LOGO */
 
 .logo {
   display: flex;
+
   align-items: center;
 
   gap: 11px;
 
   font-weight: 900;
+
   letter-spacing: -1px;
+
   font-size: 20px;
 }
 
@@ -111,6 +86,7 @@ button:focus-visible {
   height: 34px;
 
   display: grid;
+
   place-items: center;
 
   border:
@@ -130,23 +106,267 @@ button:focus-visible {
   color: var(--purple2);
 }
 
-.wallet {
-  text-align: right;
-  margin-left: auto;
+/* HEADER */
+
+.topbar,
+.game-header {
+  height: 72px;
+
+  padding: 0 28px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 18px;
+
+  border-bottom:
+    1px solid rgba(255,255,255,.07);
+
+  background:
+    rgba(5,5,11,.82);
+
+  backdrop-filter:
+    blur(18px);
+
+  position: relative;
+
+  z-index: 5;
 }
 
-.wallet span,
-.player-bar span,
-.city-dashboard span,
-.crime-summary span,
-.crime-stats span,
-.job-rewards span,
-.record-grid span,
-.stat-card span,
-.nerve-display span {
+.game-header {
+  position: sticky;
+
+  top: 0;
+}
+
+.status {
+  margin-left: auto;
+
+  color: #888da4;
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: 1.5px;
+}
+
+.status-dot {
+  display: inline-block;
+
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background:
+    var(--green);
+
+  box-shadow:
+    0 0 12px
+    var(--green);
+
+  margin-right: 8px;
+}
+
+/* LANDING */
+
+.hero {
+  max-width: 1200px;
+
+  min-height:
+    calc(100vh - 72px);
+
+  margin: 0 auto;
+
+  padding: 60px 28px;
+
+  display: grid;
+
+  grid-template-columns:
+    1fr .85fr;
+
+  gap: 60px;
+
+  align-items: center;
+}
+
+.hero-content {
+  position: relative;
+
+  z-index: 1;
+}
+
+.eyebrow {
+  color: var(--cyan);
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: 2px;
+
+  margin: 0 0 8px;
+}
+
+h1 {
+  margin: 0;
+
+  font-size:
+    clamp(48px, 8vw, 88px);
+
+  line-height: .92;
+
+  letter-spacing: -5px;
+}
+
+h1 span {
+  background:
+    linear-gradient(
+      90deg,
+      #fff,
+      var(--purple2),
+      var(--cyan)
+    );
+
+  -webkit-background-clip: text;
+  background-clip: text;
+
+  color: transparent;
+}
+
+.intro {
+  color: #999eb9;
+
+  line-height: 1.7;
+
+  font-size: 13px;
+
+  max-width: 600px;
+}
+
+.play-button {
+  border:
+    1px solid
+    rgba(177,108,255,.5);
+
+  background:
+    linear-gradient(
+      135deg,
+      #7d4dff,
+      #a45bff,
+      #4931a5
+    );
+
+  color: #fff;
+
+  padding: 15px 22px;
+
+  border-radius: 12px;
+
+  font-weight: 900;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 0 30px
+    rgba(139,92,255,.25);
+}
+
+.play-button span {
+  margin-left: 14px;
+}
+
+.city-card {
+  min-height: 430px;
+
+  border:
+    1px solid
+    rgba(157,126,255,.18);
+
+  border-radius: 26px;
+
+  position: relative;
+
+  overflow: hidden;
+
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(139,92,255,.25),
+      transparent 35%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(25,20,48,.92),
+      rgba(7,8,18,.95)
+    );
+}
+
+.city-glow {
+  position: absolute;
+
+  width: 220px;
+  height: 220px;
+
+  border-radius: 50%;
+
+  background:
+    rgba(139,92,255,.22);
+
+  filter:
+    blur(55px);
+
+  left: 50%;
+  top: 35%;
+
+  transform:
+    translate(-50%,-50%);
+}
+
+.city-info {
+  position: absolute;
+
+  bottom: 22px;
+  left: 24px;
+}
+
+.city-info span,
+.city-info strong {
+  display: block;
+}
+
+.city-info span {
+  color: #767c99;
+
+  font-size: 9px;
+
+  font-weight: 900;
+
+  letter-spacing: 1.5px;
+}
+
+.city-info strong {
+  margin-top: 6px;
+
+  color: #c5c8dc;
+
+  font-size: 13px;
+}
+
+/* WALLET */
+
+.wallet {
+  margin-left: auto;
+
+  text-align: right;
+}
+
+.wallet span {
   display: block;
 
-  color: #6e748c;
+  color: #727791;
 
   font-size: 8px;
 
@@ -156,18 +376,15 @@ button:focus-visible {
 }
 
 .wallet strong {
-  display: block;
-
   color: #d9d4ff;
 
   font-size: 17px;
-
-  margin-top: 2px;
 }
 
 .small-button {
   border:
-    1px solid rgba(255,255,255,.1);
+    1px solid
+    rgba(255,255,255,.1);
 
   background:
     rgba(255,255,255,.04);
@@ -193,12 +410,13 @@ button:focus-visible {
   display: grid;
 
   grid-template-columns:
-    1.3fr repeat(5, 1fr);
+    1.2fr repeat(5,1fr);
 
   gap: 14px;
 
   border:
-    1px solid rgba(255,255,255,.07);
+    1px solid
+    rgba(255,255,255,.07);
 
   border-radius: 14px;
 
@@ -206,50 +424,66 @@ button:focus-visible {
     rgba(12,11,23,.72);
 }
 
+.player-bar span,
+.city-dashboard span,
+.crime-summary span,
+.crime-stats span,
+.stat-card span,
+.record-grid span,
+.list-card small {
+  display: block;
+
+  color: #6e748c;
+
+  font-size: 8px;
+
+  font-weight: 900;
+
+  letter-spacing: 1.4px;
+}
+
 .player-bar strong {
   display: block;
 
   margin-top: 5px;
 
-  color: #e6e8f5;
-
-  font-size: 13px;
+  font-size: 12px;
 }
 
-.regen-text {
-  display: block;
+.resource-bar {
+  height: 4px;
 
-  margin-top: 4px;
-
-  color: #667087;
-
-  font-size: 8px;
-}
-
-.mini-nerve-bar {
-  height: 3px;
-
-  overflow: hidden;
-
-  border-radius: 99px;
-
-  background:
-    rgba(255,255,255,.07);
+  width: 70px;
 
   margin-top: 6px;
 
-  width: 70px;
-}
+  border-radius: 99px;
 
-.mini-nerve-bar div {
-  height: 100%;
+  overflow: hidden;
 
   background:
-    linear-gradient(
-      90deg,
-      var(--purple),
-      var(--cyan)
-    );
+    rgba(255,255,255,.06);
+}
+
+.resource-bar div {
+  height: 100%;
+
+  border-radius: inherit;
+}
+
+.energy-fill {
+  background:
+    var(--cyan);
+}
+
+.nerve-fill {
+  background:
+    var(--purple2);
+}
+
+.health-fill {
+  background:
+    var(--green);
 }
 
 /* LAYOUT */
@@ -272,7 +506,8 @@ button:focus-visible {
 .nav-card,
 .content-card {
   border:
-    1px solid rgba(255,255,255,.075);
+    1px solid
+    rgba(255,255,255,.075);
 
   background:
     linear-gradient(
@@ -282,7 +517,8 @@ button:focus-visible {
     );
 
   box-shadow:
-    0 0 32px rgba(139,92,255,.08);
+    0 0 32px
+    rgba(139,92,255,.08);
 }
 
 .nav-card {
@@ -293,19 +529,8 @@ button:focus-visible {
   border-radius: 16px;
 
   position: sticky;
+
   top: 90px;
-}
-
-.eyebrow {
-  color: var(--cyan);
-
-  font-size: 9px;
-
-  font-weight: 900;
-
-  letter-spacing: 2px;
-
-  margin-bottom: 7px;
 }
 
 .nav-card .eyebrow {
@@ -321,23 +546,25 @@ button:focus-visible {
   border:
     1px solid transparent;
 
-  background: transparent;
+  background:
+    transparent;
 
   color: #858aa2;
 
   text-align: left;
 
-  padding: 12px 11px;
+  padding: 11px;
 
   border-radius: 10px;
 
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 
   font-weight: 700;
 
   cursor: pointer;
 
-  transition: .18s;
+  transition:
+    .18s;
 }
 
 .nav-button:hover {
@@ -361,11 +588,12 @@ button:focus-visible {
     rgba(139,92,255,.18);
 
   box-shadow:
-    inset 3px 0 var(--purple);
+    inset 3px 0
+    var(--purple);
 }
 
 .reset-button {
-  margin-top: 25px;
+  margin-top: 20px;
 
   color: #666b80;
 }
@@ -377,8 +605,6 @@ button:focus-visible {
 
   padding: 24px;
 }
-
-/* HEADINGS */
 
 .section-heading {
   display: flex;
@@ -400,24 +626,6 @@ button:focus-visible {
   letter-spacing: -1.2px;
 }
 
-.section-heading h3 {
-  margin: 4px 0 0;
-
-  font-size: 18px;
-}
-
-.intro {
-  max-width: 650px;
-
-  color: #7f849b;
-
-  line-height: 1.6;
-
-  font-size: 12px;
-
-  margin: 8px 0 0;
-}
-
 .level {
   padding: 8px 10px;
 
@@ -427,7 +635,8 @@ button:focus-visible {
     rgba(139,92,255,.12);
 
   border:
-    1px solid rgba(139,92,255,.22);
+    1px solid
+    rgba(139,92,255,.22);
 
   color: #bba8ff;
 
@@ -436,48 +645,14 @@ button:focus-visible {
   font-weight: 900;
 }
 
-.nerve-display {
-  padding: 11px 14px;
-
-  border-radius: 10px;
-
-  background:
-    rgba(139,92,255,.08);
-
-  border:
-    1px solid rgba(139,92,255,.2);
-
-  min-width: 100px;
-}
-
-.nerve-display strong {
-  display: block;
-
-  margin-top: 4px;
-
-  color: #dcd7ff;
-
-  font-size: 17px;
-}
-
-.nerve-display small {
-  display: block;
-
-  color: #697089;
-
-  margin-top: 4px;
-
-  font-size: 8px;
-}
-
-/* DASHBOARD */
+/* DASHBOARDS */
 
 .city-dashboard,
 .crime-summary {
   display: grid;
 
   grid-template-columns:
-    repeat(3, 1fr);
+    repeat(4,1fr);
 
   gap: 12px;
 
@@ -486,10 +661,11 @@ button:focus-visible {
 
 .city-dashboard > div,
 .crime-summary > div {
-  padding: 18px;
+  padding: 17px;
 
   border:
-    1px solid rgba(255,255,255,.075);
+    1px solid
+    rgba(255,255,255,.075);
 
   border-radius: 13px;
 
@@ -506,110 +682,12 @@ button:focus-visible {
   font-size: 18px;
 }
 
-.nerve-bar {
-  height: 6px;
+.city-dashboard small {
+  display: block;
 
-  margin-top: 10px;
+  color: #737990;
 
-  overflow: hidden;
-
-  border-radius: 99px;
-
-  background:
-    rgba(255,255,255,.06);
-}
-
-.nerve-bar div {
-  height: 100%;
-
-  background:
-    linear-gradient(
-      90deg,
-      var(--purple),
-      var(--cyan)
-    );
-
-  border-radius: inherit;
-
-  transition: width .3s ease;
-}
-
-/* PANELS */
-
-.panel {
-  padding: 20px;
-
-  border:
-    1px solid rgba(255,255,255,.075);
-
-  border-radius: 15px;
-
-  background:
-    rgba(255,255,255,.018);
-
-  margin-bottom: 16px;
-}
-
-.panel h3 {
-  margin:
-    4px 0 7px;
-
-  font-size: 18px;
-}
-
-.panel p {
-  color: #7f849b;
-
-  line-height: 1.6;
-
-  font-size: 12px;
-}
-
-.jail-panel {
-  border-color:
-    rgba(255,92,112,.35);
-
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255,92,112,.10),
-      rgba(255,92,112,.025)
-    );
-}
-
-.jail-panel .eyebrow {
-  color: var(--red);
-}
-
-/* XP */
-
-.xp-bar {
-  height: 9px;
-
-  overflow: hidden;
-
-  border-radius: 99px;
-
-  background:
-    rgba(255,255,255,.06);
-
-  margin-top: 14px;
-}
-
-.xp-bar div {
-  height: 100%;
-
-  border-radius: inherit;
-
-  background:
-    linear-gradient(
-      90deg,
-      var(--purple),
-      var(--cyan)
-    );
-
-  transition:
-    width .4s ease;
+  margin-top: 6px;
 }
 
 /* ACTIONS */
@@ -618,7 +696,7 @@ button:focus-visible {
   display: grid;
 
   grid-template-columns:
-    repeat(2, 1fr);
+    repeat(2,1fr);
 
   gap: 12px;
 
@@ -633,7 +711,8 @@ button:focus-visible {
   text-align: left;
 
   border:
-    1px solid rgba(255,255,255,.075);
+    1px solid
+    rgba(255,255,255,.075);
 
   border-radius: 14px;
 
@@ -648,7 +727,8 @@ button:focus-visible {
 
   cursor: pointer;
 
-  transition: .2s;
+  transition:
+    .2s;
 }
 
 .action-card:hover {
@@ -657,10 +737,6 @@ button:focus-visible {
 
   border-color:
     rgba(139,92,255,.4);
-
-  box-shadow:
-    0 0 30px
-    rgba(139,92,255,.12);
 }
 
 .action-card span {
@@ -687,19 +763,58 @@ button:focus-visible {
   line-height: 1.5;
 }
 
-/* CRIMES */
+/* PANELS */
 
-.crime-list {
+.panel {
+  padding: 20px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.075);
+
+  border-radius: 15px;
+
+  background:
+    rgba(255,255,255,.018);
+
+  margin-bottom: 14px;
+}
+
+.panel h3 {
+  margin:
+    4px 0 7px;
+}
+
+.panel p {
+  color: #7f849b;
+
+  line-height: 1.6;
+
+  font-size: 12px;
+}
+
+/* LISTS */
+
+.list {
   display: grid;
 
   gap: 11px;
 }
 
-.crime-card {
+.list-card {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  gap: 18px;
+
   padding: 18px;
 
   border:
-    1px solid rgba(255,255,255,.075);
+    1px solid
+    rgba(255,255,255,.075);
 
   border-radius: 14px;
 
@@ -709,31 +824,32 @@ button:focus-visible {
       rgba(22,19,40,.72),
       rgba(10,10,19,.88)
     );
-
-  transition: .18s;
 }
 
-.crime-card:hover {
+.list-card.owned {
   border-color:
-    rgba(139,92,255,.25);
+    rgba(139,92,255,.4);
 }
 
-.crime-card.locked {
-  opacity: .55;
+.list-card h3 {
+  margin:
+    5px 0 7px;
+
+  font-size: 17px;
 }
 
-.crime-main {
-  display: flex;
+.list-card p {
+  color: #7f849b;
 
-  justify-content: space-between;
+  font-size: 12px;
 
-  gap: 15px;
+  line-height: 1.5;
 
-  align-items: center;
+  margin: 0 0 8px;
 }
 
-.crime-tag,
-.job-tag {
+.job-tag,
+.crime-tag {
   color: var(--cyan);
 
   font-size: 8px;
@@ -743,27 +859,11 @@ button:focus-visible {
   letter-spacing: 1.5px;
 }
 
-.crime-card h3 {
-  margin:
-    5px 0 7px;
-
-  font-size: 18px;
-}
-
-.crime-card p {
-  color: #7f849b;
-
-  font-size: 12px;
-
-  line-height: 1.5;
-
-  margin: 0;
-}
-
-.crime-button,
-.job-button {
+.job-button,
+.crime-button {
   border:
-    1px solid rgba(139,92,255,.35);
+    1px solid
+    rgba(139,92,255,.35);
 
   border-radius: 9px;
 
@@ -784,65 +884,48 @@ button:focus-visible {
 
   letter-spacing: .7px;
 
-  white-space: nowrap;
-
   cursor: pointer;
+
+  white-space: nowrap;
 }
 
-.crime-button:disabled,
-.job-button:disabled {
+.job-button:disabled,
+.crime-button:disabled {
   opacity: .4;
-
-  cursor: not-allowed;
 }
 
-.crime-stats {
-  display: grid;
+/* CRIMES */
 
-  grid-template-columns:
-    repeat(6, 1fr);
+.resource-heading {
+  display: flex;
 
-  gap: 8px;
+  justify-content: space-between;
 
-  margin-top: 15px;
+  align-items: center;
 
-  padding-top: 13px;
-
-  border-top:
-    1px solid rgba(255,255,255,.06);
+  margin-bottom: 15px;
 }
 
-.crime-stats strong {
-  display: block;
-
-  margin-top: 5px;
-
-  color: #d6d9e8;
-
-  font-size: 11px;
+.resource-heading h3 {
+  margin: 0;
 }
 
-.locked-message {
-  margin-top: 13px;
-
-  color: #777d94;
-
-  font-size: 11px;
+.resource-heading small {
+  color: #70758b;
 }
 
-/* JOBS */
-
-.jobs-list {
+.crime-list {
   display: grid;
 
   gap: 11px;
 }
 
-.job-card {
+.crime-card {
   padding: 18px;
 
   border:
-    1px solid rgba(255,255,255,.075);
+    1px solid
+    rgba(255,255,255,.075);
 
   border-radius: 14px;
 
@@ -854,37 +937,28 @@ button:focus-visible {
     );
 }
 
-.job-card.locked {
-  opacity: .55;
+.crime-card.locked {
+  opacity: .5;
 }
 
-.job-card.owned {
-  border-color:
-    rgba(139,92,255,.4);
-
-  box-shadow:
-    0 0 28px
-    rgba(139,92,255,.09);
-}
-
-.job-main {
+.crime-main {
   display: flex;
 
   justify-content: space-between;
 
-  gap: 15px;
-
   align-items: center;
+
+  gap: 18px;
 }
 
-.job-card h3 {
+.crime-card h3 {
   margin:
     5px 0 7px;
 
   font-size: 18px;
 }
 
-.job-card p {
+.crime-card p {
   color: #7f849b;
 
   line-height: 1.5;
@@ -894,54 +968,116 @@ button:focus-visible {
   margin: 0;
 }
 
-.job-rewards {
+.crime-stats {
   display: grid;
 
   grid-template-columns:
-    repeat(2, 1fr);
+    repeat(5,1fr);
 
-  gap: 8px;
+  gap: 10px;
+
+  padding-top: 14px;
 
   margin-top: 14px;
 
-  padding-top: 13px;
-
   border-top:
-    1px solid rgba(255,255,255,.06);
+    1px solid
+    rgba(255,255,255,.06);
 }
 
-.job-rewards strong {
+.crime-stats strong {
   display: block;
 
   margin-top: 5px;
 
-  color: #d6d9e8;
-
   font-size: 11px;
 }
+
+/* STATS */
+
+.stats-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4,1fr);
+
+  gap: 10px;
+}
+
+.stat-card {
+  padding: 16px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.06);
+
+  border-radius: 12px;
+
+  background:
+    rgba(255,255,255,.02);
+}
+
+.stat-card strong {
+  display: block;
+
+  margin-top: 7px;
+
+  font-size: 22px;
+
+  color: #ddd8ff;
+}
+
+.record-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4,1fr);
+
+  gap: 10px;
+}
+
+.record-grid > div {
+  padding: 15px;
+
+  border:
+    1px solid
+    rgba(255,255,255,.06);
+
+  border-radius: 12px;
+
+  background:
+    rgba(255,255,255,.02);
+}
+
+.record-grid strong {
+  display: block;
+
+  margin-top: 7px;
+
+  font-size: 18px;
+}
+
+/* JOB */
 
 .income-summary {
   display: flex;
 
-  align-items: center;
-
   justify-content: space-between;
+
+  align-items: center;
 
   padding: 18px;
 
   border:
-    1px solid rgba(139,92,255,.22);
+    1px solid
+    rgba(139,92,255,.22);
 
   border-radius: 14px;
 
   margin-bottom: 12px;
 
   background:
-    linear-gradient(
-      90deg,
-      rgba(139,92,255,.1),
-      rgba(66,217,255,.025)
-    );
+    rgba(139,92,255,.06);
 }
 
 .income-summary span {
@@ -949,9 +1085,9 @@ button:focus-visible {
 
   font-size: 8px;
 
-  letter-spacing: 1.5px;
-
   font-weight: 900;
+
+  letter-spacing: 1.5px;
 }
 
 .income-summary strong {
@@ -969,15 +1105,14 @@ button:focus-visible {
 }
 
 .quit-button {
-  width: auto;
+  border:
+    1px solid
+    rgba(255,255,255,.08);
 
   background:
     transparent;
 
   color: #777d94;
-
-  border:
-    1px solid rgba(255,255,255,.08);
 
   padding: 9px 12px;
 
@@ -986,98 +1121,45 @@ button:focus-visible {
   cursor: pointer;
 }
 
-/* CHARACTER */
+/* BUTTONS */
 
-.stats-grid {
-  display: grid;
+.button-row {
+  display: flex;
 
-  grid-template-columns:
-    repeat(4, 1fr);
+  gap: 7px;
 
-  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.stat-card {
-  padding: 16px;
-
-  border:
-    1px solid rgba(255,255,255,.06);
-
-  border-radius: 12px;
-
-  background:
-    rgba(255,255,255,.02);
-}
-
-.stat-card strong {
-  display: block;
-
-  font-size: 22px;
-
-  margin-top: 8px;
-
-  color: #ddd8ff;
-}
-
-.record-grid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(4, 1fr);
-
-  gap: 10px;
-}
-
-.record-grid > div {
-  padding: 15px;
-
-  border:
-    1px solid rgba(255,255,255,.06);
-
-  border-radius: 12px;
-
-  background:
-    rgba(255,255,255,.02);
-}
-
-.record-grid strong {
-  display: block;
-
-  margin-top: 7px;
-
-  font-size: 18px;
-}
-
-/* ACTIVITY */
+/* FEED */
 
 .activity-feed {
   display: grid;
-
-  gap: 0;
 }
 
 .activity {
   display: grid;
 
   grid-template-columns:
-    70px 1fr;
+    65px 1fr;
 
-  gap: 12px;
+  gap: 10px;
 
-  padding: 11px 0;
+  padding: 10px 0;
 
   border-bottom:
-    1px solid rgba(255,255,255,.05);
+    1px solid
+    rgba(255,255,255,.05);
 }
 
 .activity:last-child {
-  border-bottom: none;
+  border-bottom: 0;
 }
 
 .activity > span {
   color: #5f6479;
 
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .activity strong {
@@ -1104,8 +1186,37 @@ button:focus-visible {
   color: var(--red);
 }
 
-.activity.job strong {
+.activity.combat strong {
+  color: #ff8f8f;
+}
+
+.activity.gym strong {
   color: var(--cyan);
+}
+
+.activity.job strong {
+  color: var(--purple2);
+}
+
+/* MESSAGE */
+
+.system-message {
+  margin-top: 16px;
+
+  padding: 12px 14px;
+
+  border:
+    1px solid
+    rgba(66,217,255,.16);
+
+  border-radius: 10px;
+
+  background:
+    rgba(66,217,255,.035);
+
+  color: #8b91a9;
+
+  font-size: 11px;
 }
 
 /* MOBILE */
@@ -1115,7 +1226,12 @@ button:focus-visible {
 ) {
   .player-bar {
     grid-template-columns:
-      repeat(3, 1fr);
+      repeat(3,1fr);
+  }
+
+  .hero {
+    grid-template-columns:
+      1fr;
   }
 }
 
@@ -1133,9 +1249,9 @@ button:focus-visible {
     display: grid;
 
     grid-template-columns:
-      repeat(4, 1fr);
+      repeat(2,1fr);
 
-    gap: 5px;
+    gap: 4px;
   }
 
   .nav-card .eyebrow {
@@ -1148,33 +1264,36 @@ button:focus-visible {
 
   .crime-stats {
     grid-template-columns:
-      repeat(3, 1fr);
+      repeat(3,1fr);
   }
 
   .stats-grid,
   .record-grid {
     grid-template-columns:
-      repeat(2, 1fr);
+      repeat(2,1fr);
   }
 }
 
 @media (
   max-width: 600px
 ) {
-  .game-header {
-    padding: 0 15px;
+  .game-header,
+  .topbar {
+    padding:
+      0 14px;
   }
 
   .player-bar {
-    margin-left: 12px;
-    margin-right: 12px;
+    margin-left: 10px;
+    margin-right: 10px;
 
     grid-template-columns:
-      repeat(2, 1fr);
+      repeat(2,1fr);
   }
 
   .game-layout {
-    padding: 0 10px;
+    padding:
+      0 10px;
   }
 
   .content-card {
@@ -1189,10 +1308,10 @@ button:focus-visible {
   }
 
   .crime-main,
-  .job-main {
-    align-items: flex-start;
-
+  .list-card {
     flex-direction: column;
+
+    align-items: flex-start;
   }
 
   .crime-button,
@@ -1202,15 +1321,19 @@ button:focus-visible {
 
   .crime-stats {
     grid-template-columns:
-      repeat(2, 1fr);
-  }
-
-  .nav-card {
-    grid-template-columns:
-      repeat(2, 1fr);
+      repeat(2,1fr);
   }
 
   .section-heading {
     flex-direction: column;
+  }
+
+  .hero {
+    padding:
+      40px 20px;
+  }
+
+  .city-card {
+    min-height: 300px;
   }
 }
