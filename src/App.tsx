@@ -7,145 +7,140 @@ import React, {
 import {
   CRIMES,
   Crime,
-  calculateSuccessChance,
+  crimeSuccessChance,
   crimeUnlocked,
+  getCrimeStatBonus,
   randomReward,
   rollCrimeOutcome,
-} from "./crimeSystem";
+} from "./systems/crimeSystem";
+
+import {
+  OPPONENTS,
+  Opponent,
+  resolveCombat,
+} from "./systems/combatSystem";
+
+import {
+  GYMS,
+  Gym,
+} from "./systems/gymSystem";
+
+import {
+  CombatStats,
+  getLevel,
+  getMaxHealth,
+  getNaturalNerveMax,
+} from "./systems/progressionSystem";
+
+import {
+  EDUCATION,
+  ITEMS,
+  JOBS,
+  MISSIONS,
+  PROPERTIES,
+  EducationCourse,
+  Item,
+  Job,
+  Mission,
+  Property,
+  getProperty,
+} from "./data/gameData";
 
 type Screen =
   | "city"
   | "crimes"
-  | "job"
+  | "combat"
+  | "gym"
+  | "jobs"
+  | "items"
+  | "missions"
+  | "education"
+  | "property"
   | "character";
+
+type ActivityType =
+  | "success"
+  | "failure"
+  | "spooked"
+  | "jailed"
+  | "combat"
+  | "gym"
+  | "job"
+  | "system";
 
 type Activity = {
   id: number;
   text: string;
-  type:
-    | "success"
-    | "failure"
-    | "spooked"
-    | "jailed"
-    | "job"
-    | "system";
+  type: ActivityType;
   time: number;
-};
-
-type Stats = {
-  strength: number;
-  defense: number;
-  speed: number;
-  intelligence: number;
-};
-
-type Job = {
-  id: string;
-  company: string;
-  title: string;
-  salary: number;
-  levelRequired: number;
-  description: string;
 };
 
 type SaveData = {
   cash: number;
-
   xp: number;
 
   energy: number;
 
   nerve: number;
+  lastNerveUpdate: number;
 
-  stats: Stats;
+  health: number;
+
+  crimeExperience: number;
+
+  stats: CombatStats;
 
   currentJob: string | null;
+  jobStartedAt: number;
+  lastJobPayment: number;
 
   jailUntil: number | null;
 
+  inventory: Record<string, number>;
+
+  equippedWeapon: string | null;
+  equippedArmor: string | null;
+
+  ownedProperty: string | null;
+
+  educationCompleted: string[];
+  educationActive: string | null;
+  educationStartedAt: number | null;
+
+  completedMissions: string[];
+
   crimesCompleted: number;
-
   crimesFailed: number;
-
   crimesSpooked: number;
-
   timesJailed: number;
 
+  fightsWon: number;
+  fightsLost: number;
+
+  gymSessions: number;
+
   activities: Activity[];
-
-  lastEnergyUpdate: number;
-
-  lastNerveUpdate: number;
-
-  lastJobUpdate: number;
 };
 
 const SAVE_KEY =
-  "riftcity-simple-v3";
+  "riftcity-core-v2";
 
 const MAX_ENERGY = 100;
 
-const MAX_NERVE = 20;
-
-const ENERGY_REGEN_MS =
+const ENERGY_REGEN =
   60 * 1000;
 
-const NERVE_REGEN_MS =
+const NERVE_REGEN =
   5 * 60 * 1000;
 
 const JOB_PAY_INTERVAL =
   60 * 60 * 1000;
 
-const JOBS: Job[] = [
-  {
-    id: "delivery",
-    company: "RiftExpress",
-    title: "Courier",
-    salary: 100,
-    levelRequired: 1,
-    description:
-      "Deliver packages across RiftCity.",
-  },
-  {
-    id: "security",
-    company: "RiftShield",
-    title: "Security Guard",
-    salary: 180,
-    levelRequired: 5,
-    description:
-      "Protect businesses around the city.",
-  },
-  {
-    id: "construction",
-    company: "Ironworks",
-    title: "Construction Worker",
-    salary: 300,
-    levelRequired: 10,
-    description:
-      "Build the city while building your wallet.",
-  },
-  {
-    id: "technician",
-    company: "RiftTech",
-    title: "Technician",
-    salary: 500,
-    levelRequired: 15,
-    description:
-      "Keep RiftCity's systems running.",
-  },
-  {
-    id: "finance",
-    company: "Rift Capital",
-    title: "Finance Associate",
-    salary: 800,
-    levelRequired: 25,
-    description:
-      "Move money for people who have too much of it.",
-  },
-];
+const JAIL_BASE_MINUTES = 2;
 
-function newSave(): SaveData {
-  const now = Date.now();
+function freshSave(): SaveData {
+  const now =
+    Date.now();
 
   return {
     cash: 1000,
@@ -154,18 +149,44 @@ function newSave(): SaveData {
 
     energy: 100,
 
-    nerve: 20,
+    nerve: 10,
+
+    lastNerveUpdate: now,
+
+    health: 100,
+
+    crimeExperience: 0,
 
     stats: {
       strength: 1,
       defense: 1,
       speed: 1,
-      intelligence: 1,
+      dexterity: 1,
     },
 
     currentJob: null,
 
+    jobStartedAt: now,
+
+    lastJobPayment: now,
+
     jailUntil: null,
+
+    inventory: {},
+
+    equippedWeapon: null,
+
+    equippedArmor: null,
+
+    ownedProperty: "shack",
+
+    educationCompleted: [],
+
+    educationActive: null,
+
+    educationStartedAt: null,
+
+    completedMissions: [],
 
     crimesCompleted: 0,
 
@@ -175,154 +196,156 @@ function newSave(): SaveData {
 
     timesJailed: 0,
 
+    fightsWon: 0,
+
+    fightsLost: 0,
+
+    gymSessions: 0,
+
     activities: [
       {
         id: 1,
         text:
-          "Welcome to RiftCity. Keep your head down.",
+          "Welcome to RiftCity.",
         type: "system",
         time: now,
       },
     ],
-
-    lastEnergyUpdate: now,
-
-    lastNerveUpdate: now,
-
-    lastJobUpdate: now,
   };
 }
 
 function loadSave(): SaveData {
   try {
-    const raw =
+    const current =
       localStorage.getItem(
         SAVE_KEY
       );
 
-    if (!raw) {
-      return newSave();
+    if (current) {
+      return {
+        ...freshSave(),
+        ...JSON.parse(
+          current
+        ),
+      };
     }
 
-    const parsed =
-      JSON.parse(raw);
+    /*
+     * Migration from the old
+     * RiftCity save.
+     */
+    const old =
+      localStorage.getItem(
+        "riftcity-unified-v1"
+      );
 
-    const fresh =
-      newSave();
+    if (old) {
+      const oldSave =
+        JSON.parse(old);
 
-    return {
-      ...fresh,
-      ...parsed,
+      return {
+        ...freshSave(),
 
-      stats: {
-        ...fresh.stats,
-        ...(parsed.stats || {}),
-      },
+        cash:
+          typeof oldSave.cash ===
+          "number"
+            ? oldSave.cash
+            : 1000,
 
-      activities:
-        parsed.activities || [],
+        xp:
+          typeof oldSave.xp ===
+          "number"
+            ? oldSave.xp
+            : 0,
 
-      /*
-       * This protects players who already
-       * had an older save without nerve.
-       */
-      nerve:
-        typeof parsed.nerve ===
-        "number"
-          ? parsed.nerve
-          : MAX_NERVE,
+        energy:
+          typeof oldSave.energy ===
+          "number"
+            ? oldSave.energy
+            : 100,
 
-      lastNerveUpdate:
-        typeof parsed.lastNerveUpdate ===
-        "number"
-          ? parsed.lastNerveUpdate
-          : Date.now(),
-    };
+        currentJob:
+          oldSave.currentJob ||
+          null,
+
+        stats: {
+          strength:
+            1 +
+            (oldSave.skills?.strength ||
+              0) /
+              10,
+
+          defense:
+            1 +
+            (oldSave.skills?.defense ||
+              0) /
+              10,
+
+          speed:
+            1 +
+            (oldSave.skills?.speed ||
+              0) /
+              10,
+
+          dexterity:
+            1 +
+            (oldSave.skills?.dexterity ||
+              0) /
+              10,
+        },
+      };
+    }
+
+    return freshSave();
   } catch {
-    return newSave();
+    return freshSave();
   }
 }
 
-function formatMoney(
-  amount: number
+function money(
+  value: number
 ) {
   return `$${Math.floor(
-    amount
+    value
   ).toLocaleString()}`;
 }
 
-function formatTime(
-  milliseconds: number
+function duration(
+  ms: number
 ) {
-  const totalSeconds =
+  const seconds =
     Math.max(
       0,
-      Math.ceil(
-        milliseconds / 1000
-      )
-    );
-
-  const hours =
-    Math.floor(
-      totalSeconds / 3600
+      Math.ceil(ms / 1000)
     );
 
   const minutes =
     Math.floor(
-      (totalSeconds % 3600) / 60
+      seconds / 60
     );
 
-  const seconds =
-    totalSeconds % 60;
+  const remaining =
+    seconds % 60;
 
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`;
+  if (minutes > 60) {
+    const hours =
+      Math.floor(
+        minutes / 60
+      );
+
+    return `${hours}h ${
+      minutes % 60
+    }m`;
   }
 
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-
-  return `${seconds}s`;
-}
-
-function getLevel(
-  xp: number
-) {
-  let level = 1;
-
-  let required = 100;
-
-  let remaining = xp;
-
-  while (
-    remaining >= required
-  ) {
-    remaining -= required;
-
-    level++;
-
-    required = Math.floor(
-      100 *
-        Math.pow(
-          1.16,
-          level - 1
-        )
-    );
-  }
-
-  return {
-    level,
-    currentXp: remaining,
-    requiredXp: required,
-  };
+  return `${minutes}m ${remaining}s`;
 }
 
 function addActivity(
   data: SaveData,
   text: string,
-  type: Activity["type"]
-) {
+  type: ActivityType
+): SaveData {
   return {
     ...data,
 
@@ -331,162 +354,24 @@ function addActivity(
         id:
           Date.now() +
           Math.random(),
+
         text,
+
         type,
+
         time: Date.now(),
       },
+
       ...data.activities,
     ].slice(0, 50),
   };
 }
 
-function processOfflineState(
-  data: SaveData
-) {
-  const now = Date.now();
-
-  let updated: SaveData = {
-    ...data,
-  };
-
-  /*
-   * ENERGY REGEN
-   *
-   * Energy is not used by crimes.
-   * It remains available for future
-   * systems such as training/combat.
-   */
-  const elapsedEnergy =
-    now -
-    data.lastEnergyUpdate;
-
-  const energyTicks =
-    Math.floor(
-      elapsedEnergy /
-        ENERGY_REGEN_MS
-    );
-
-  if (energyTicks > 0) {
-    updated.energy =
-      Math.min(
-        MAX_ENERGY,
-        data.energy +
-          energyTicks
-      );
-
-    updated.lastEnergyUpdate =
-      data.lastEnergyUpdate +
-      energyTicks *
-        ENERGY_REGEN_MS;
-  }
-
-  /*
-   * NERVE REGEN
-   *
-   * One nerve every five minutes.
-   */
-  const elapsedNerve =
-    now -
-    data.lastNerveUpdate;
-
-  const nerveTicks =
-    Math.floor(
-      elapsedNerve /
-        NERVE_REGEN_MS
-    );
-
-  if (nerveTicks > 0) {
-    updated.nerve =
-      Math.min(
-        MAX_NERVE,
-        data.nerve +
-          nerveTicks
-      );
-
-    updated.lastNerveUpdate =
-      data.lastNerveUpdate +
-      nerveTicks *
-        NERVE_REGEN_MS;
-  }
-
-  /*
-   * JOB PAY
-   */
-  if (data.currentJob) {
-    const job =
-      JOBS.find(
-        (item) =>
-          item.id ===
-          data.currentJob
-      );
-
-    if (job) {
-      const elapsedJob =
-        now -
-        data.lastJobUpdate;
-
-      const payments =
-        Math.floor(
-          elapsedJob /
-            JOB_PAY_INTERVAL
-        );
-
-      if (payments > 0) {
-        const income =
-          payments *
-          job.salary;
-
-        updated.cash +=
-          income;
-
-        updated.lastJobUpdate =
-          data.lastJobUpdate +
-          payments *
-            JOB_PAY_INTERVAL;
-
-        updated =
-          addActivity(
-            updated,
-            `${job.title} shift complete. +${formatMoney(
-              income
-            )}`,
-            "job"
-          );
-      }
-    }
-  }
-
-  /*
-   * JAIL EXPIRATION
-   */
-  if (
-    updated.jailUntil &&
-    updated.jailUntil <= now
-  ) {
-    updated.jailUntil =
-      null;
-
-    updated =
-      addActivity(
-        updated,
-        "You were released from jail.",
-        "system"
-      );
-  }
-
-  return updated;
-}
-
 function App() {
   const [
-    data,
-    setData,
-  ] = useState<SaveData>(
-    () =>
-      processOfflineState(
-        loadSave()
-      )
-  );
+    entered,
+    setEntered,
+  ] = useState(false);
 
   const [
     screen,
@@ -496,44 +381,84 @@ function App() {
   );
 
   const [
+    save,
+    setSave,
+  ] = useState<SaveData>(
+    loadSave
+  );
+
+  const [
     now,
     setNow,
   ] = useState(
     Date.now()
   );
 
+  const [
+    message,
+    setMessage,
+  ] = useState(
+    "Welcome to RiftCity."
+  );
+
   const levelInfo =
     useMemo(
-      () => getLevel(data.xp),
-      [data.xp]
+      () => getLevel(save.xp),
+      [save.xp]
     );
+
+  const property =
+    getProperty(
+      save.ownedProperty
+    );
+
+  const propertyHealth =
+    property?.maxHealthBonus ||
+    0;
+
+  const propertyGym =
+    property?.gymBonus || 0;
+
+  const propertyNerve =
+    property?.nerveBonus || 0;
+
+  const maxHealth =
+    getMaxHealth(
+      propertyHealth
+    );
+
+  const naturalNerve =
+    getNaturalNerveMax(
+      save.crimeExperience
+    );
+
+  const maxNerve =
+    naturalNerve +
+    propertyNerve;
+
+  const jailed =
+    save.jailUntil !== null &&
+    save.jailUntil > now;
 
   const currentJob =
     JOBS.find(
       (job) =>
         job.id ===
-        data.currentJob
+        save.currentJob
     ) || null;
 
-  const jailed =
-    data.jailUntil !== null &&
-    data.jailUntil > now;
+  const activeEducation =
+    EDUCATION.find(
+      (course) =>
+        course.id ===
+        save.educationActive
+    ) || null;
 
   /*
-   * SAVE
+   * Clock.
    */
   useEffect(() => {
-    localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify(data)
-    );
-  }, [data]);
-
-  /*
-   * CLOCK
-   */
-  useEffect(() => {
-    const interval =
+    const timer =
       window.setInterval(
         () => {
           setNow(
@@ -545,66 +470,248 @@ function App() {
 
     return () =>
       window.clearInterval(
-        interval
+        timer
       );
   }, []);
 
   /*
-   * PASSIVE SYSTEMS
+   * Passive regeneration,
+   * jobs, jail and education.
    */
   useEffect(() => {
-    const interval =
-      window.setInterval(
-        () => {
-          setData(
-            (current) =>
-              processOfflineState(
-                current
-              )
-          );
-        },
-        5000
-      );
+    setSave(
+      (current) => {
+        let updated = {
+          ...current,
+        };
 
-    return () =>
-      window.clearInterval(
-        interval
-      );
-  }, []);
+        /*
+         * ENERGY
+         */
+        const energyTicks =
+          Math.floor(
+            (now -
+              current.lastNerveUpdate) /
+              ENERGY_REGEN
+          );
+
+        if (
+          energyTicks > 0 &&
+          current.energy <
+            MAX_ENERGY
+        ) {
+          updated.energy =
+            Math.min(
+              MAX_ENERGY,
+              current.energy +
+                energyTicks
+            );
+        }
+
+        /*
+         * NERVE
+         */
+        const nerveTicks =
+          Math.floor(
+            (now -
+              current.lastNerveUpdate) /
+              NERVE_REGEN
+          );
+
+        if (
+          nerveTicks > 0
+        ) {
+          updated.nerve =
+            Math.min(
+              maxNerve,
+              current.nerve +
+                nerveTicks
+            );
+
+          updated.lastNerveUpdate =
+            current.lastNerveUpdate +
+            nerveTicks *
+              NERVE_REGEN;
+        }
+
+        /*
+         * JOB PAY
+         */
+        if (
+          current.currentJob
+        ) {
+          const job =
+            JOBS.find(
+              (item) =>
+                item.id ===
+                current.currentJob
+            );
+
+          if (job) {
+            const payments =
+              Math.floor(
+                (now -
+                  current.lastJobPayment) /
+                  JOB_PAY_INTERVAL
+              );
+
+            if (
+              payments > 0
+            ) {
+              updated.cash +=
+                payments *
+                job.salary;
+
+              updated.xp +=
+                payments * 5;
+
+              updated.lastJobPayment =
+                current.lastJobPayment +
+                payments *
+                  JOB_PAY_INTERVAL;
+            }
+          }
+        }
+
+        /*
+         * JAIL RELEASE
+         */
+        if (
+          updated.jailUntil &&
+          updated.jailUntil <=
+            now
+        ) {
+          updated.jailUntil =
+            null;
+
+          updated =
+            addActivity(
+              updated,
+              "You were released from jail.",
+              "system"
+            );
+        }
+
+        /*
+         * EDUCATION
+         */
+        if (
+          current.educationActive &&
+          current.educationStartedAt
+        ) {
+          const course =
+            EDUCATION.find(
+              (item) =>
+                item.id ===
+                current.educationActive
+            );
+
+          if (course) {
+            const finish =
+              current.educationStartedAt +
+              course.durationHours *
+                60 *
+                60 *
+                1000;
+
+            if (
+              now >= finish
+            ) {
+              updated.educationCompleted =
+                Array.from(
+                  new Set([
+                    ...current.educationCompleted,
+                    course.id,
+                  ])
+                );
+
+              updated.educationActive =
+                null;
+
+              updated.educationStartedAt =
+                null;
+
+              updated =
+                addActivity(
+                  updated,
+                  `Education complete: ${course.name}.`,
+                  "system"
+                );
+            }
+          }
+        }
+
+        return updated;
+      }
+    );
+  }, [
+    now,
+    maxNerve,
+  ]);
 
   /*
-   * RUN CRIME
+   * Save.
    */
+  useEffect(() => {
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify(save)
+    );
+  }, [save]);
+
+  function update(
+    updater: (
+      current: SaveData
+    ) => SaveData
+  ) {
+    setSave(
+      (current) =>
+        updater(current)
+    );
+  }
+
   function runCrime(
     crime: Crime
   ) {
-    const level =
-      levelInfo.level;
+    if (
+      jailed
+    ) {
+      setMessage(
+        "You're in jail."
+      );
+
+      return;
+    }
 
     if (
       !crimeUnlocked(
         crime,
-        level
+        levelInfo.level
       )
     ) {
       return;
     }
 
-    if (jailed) {
-      return;
-    }
-
     if (
-      data.nerve <
+      save.nerve <
       crime.nerve
     ) {
+      setMessage(
+        "You don't have enough Nerve."
+      );
+
       return;
     }
 
     const successChance =
-      calculateSuccessChance(
+      crimeSuccessChance(
         crime,
-        data.stats
+        save.crimeExperience,
+        save.stats
+          .intelligence,
+        getCrimeStatBonus(
+          save.stats
+        )
       );
 
     const outcome =
@@ -613,132 +720,480 @@ function App() {
         successChance
       );
 
-    let updated: SaveData = {
-      ...data,
+    update(
+      (current) => {
+        let result: SaveData = {
+          ...current,
 
-      /*
-       * CRIMES COST NERVE.
-       *
-       * No crime cooldown is created.
-       */
-      nerve:
-        data.nerve -
-        crime.nerve,
-    };
+          nerve:
+            current.nerve -
+            crime.nerve,
+        };
 
-    /*
-     * SUCCESS
-     */
-    if (
-      outcome ===
-      "success"
-    ) {
-      const reward =
-        randomReward(
-          crime
-        );
-
-      updated.cash +=
-        reward;
-
-      updated.xp +=
-        crime.xp;
-
-      updated.crimesCompleted++;
-
-      updated =
-        addActivity(
-          updated,
-          `${crime.name} succeeded. +${formatMoney(
-            reward
-          )} / +${crime.xp} XP`,
+        if (
+          outcome ===
           "success"
-        );
-    }
+        ) {
+          const reward =
+            randomReward(
+              crime
+            );
 
-    /*
-     * FAILED
-     */
-    if (
-      outcome ===
-      "failed"
-    ) {
-      const failedXp =
-        Math.floor(
-          crime.xp * 0.25
-        );
+          result.cash +=
+            reward;
 
-      updated.xp +=
-        failedXp;
+          result.xp +=
+            crime.xp;
 
-      updated.crimesFailed++;
+          result.crimeExperience +=
+            crime.crimeExperience;
 
-      updated =
-        addActivity(
-          updated,
-          `${crime.name} failed. You got nothing.`,
-          "failure"
-        );
-    }
+          result.crimesCompleted++;
 
-    /*
-     * SPOOKED
-     */
-    if (
-      outcome ===
-      "spooked"
-    ) {
-      updated.crimesSpooked++;
+          result =
+            addActivity(
+              result,
+              `${crime.name} succeeded. +${money(
+                reward
+              )} / +${crime.xp} XP`,
+              "success"
+            );
 
-      updated =
-        addActivity(
-          updated,
-          `You were spooked during ${crime.name} and barely escaped.`,
+          setMessage(
+            `SUCCESS — ${money(
+              reward
+            )} earned.`
+          );
+        }
+
+        if (
+          outcome ===
+          "failed"
+        ) {
+          result.xp +=
+            Math.floor(
+              crime.xp / 4
+            );
+
+          result.crimesFailed++;
+
+          result =
+            addActivity(
+              result,
+              `${crime.name} failed. You got nothing.`,
+              "failure"
+            );
+
+          setMessage(
+            "FAILED — You got away, but empty-handed."
+          );
+        }
+
+        if (
+          outcome ===
           "spooked"
-        );
-    }
+        ) {
+          result.crimesSpooked++;
 
-    /*
-     * JAILED
-     */
-    if (
-      outcome ===
-      "jailed"
-    ) {
-      const jailMinutes =
-        Math.max(
-          1,
-          Math.round(
-            crime.risk / 12
-          )
-        );
+          result =
+            addActivity(
+              result,
+              `You were spooked during ${crime.name} and escaped.`,
+              "spooked"
+            );
 
-      updated.jailUntil =
-        Date.now() +
-        jailMinutes *
-          60 *
-          1000;
+          setMessage(
+            "SPOOKED — Someone noticed you. You got out."
+          );
+        }
 
-      updated.timesJailed++;
-
-      updated =
-        addActivity(
-          updated,
-          `BUSTED! You were arrested after ${crime.name}. Jail: ${jailMinutes}m.`,
+        if (
+          outcome ===
           "jailed"
-        );
-    }
+        ) {
+          const jailMinutes =
+            JAIL_BASE_MINUTES +
+            Math.ceil(
+              crime.risk /
+                15
+            );
 
-    setData(
-      processOfflineState(
-        updated
-      )
+          result.jailUntil =
+            Date.now() +
+            jailMinutes *
+              60 *
+              1000;
+
+          result.timesJailed++;
+
+          result.crimeExperience =
+            Math.max(
+              0,
+              result.crimeExperience -
+                Math.ceil(
+                  crime.crimeExperience *
+                    0.2
+                )
+            );
+
+          result =
+            addActivity(
+              result,
+              `BUSTED — You were jailed for ${jailMinutes} minutes.`,
+              "jailed"
+            );
+
+          setMessage(
+            `BUSTED — Jail time: ${jailMinutes} minutes.`
+          );
+        }
+
+        return result;
+      }
     );
   }
 
-  /*
-   * TAKE JOB
-   */
+  function train(
+    gym: Gym
+  ) {
+    if (
+      jailed
+    ) {
+      setMessage(
+        "You can't train here while jailed."
+      );
+
+      return;
+    }
+
+    if (
+      levelInfo.level <
+      gym.levelRequired
+    ) {
+      return;
+    }
+
+    if (
+      save.energy <
+      gym.energyCost
+    ) {
+      setMessage(
+        "You don't have enough Energy."
+      );
+
+      return;
+    }
+
+    update(
+      (current) => {
+        const gain =
+          1 +
+          propertyGym /
+            100;
+
+        return addActivity(
+          {
+            ...current,
+
+            energy:
+              current.energy -
+              gym.energyCost,
+
+            gymSessions:
+              current.gymSessions +
+              1,
+
+            stats: {
+              strength:
+                current.stats
+                  .strength +
+                (gym.gains
+                  .strength ||
+                  0) *
+                  gain,
+
+              defense:
+                current.stats
+                  .defense +
+                (gym.gains
+                  .defense ||
+                  0) *
+                  gain,
+
+              speed:
+                current.stats
+                  .speed +
+                (gym.gains
+                  .speed ||
+                  0) *
+                  gain,
+
+              dexterity:
+                current.stats
+                  .dexterity +
+                (gym.gains
+                  .dexterity ||
+                  0) *
+                  gain,
+            },
+
+            xp:
+              current.xp +
+              5,
+          },
+
+          `${gym.name} training complete. +5 XP.`,
+          "gym"
+        );
+      }
+    );
+  }
+
+  function fight(
+    opponent: Opponent
+  ) {
+    if (
+      jailed
+    ) {
+      setMessage(
+        "You can't fight while jailed."
+      );
+
+      return;
+    }
+
+    const result =
+      resolveCombat(
+        save.stats,
+        opponent.stats
+      );
+
+    if (
+      result ===
+      "victory"
+    ) {
+      update(
+        (current) =>
+          addActivity(
+            {
+              ...current,
+
+              cash:
+                current.cash +
+                opponent.rewardCash,
+
+              xp:
+                current.xp +
+                opponent.rewardXp,
+
+              health:
+                Math.max(
+                  1,
+                  current.health -
+                    Math.floor(
+                      opponent.health /
+                        12
+                    )
+                ),
+
+              fightsWon:
+                current.fightsWon +
+                1,
+            },
+
+            `You defeated ${opponent.name}. +${money(
+              opponent.rewardCash
+            )}.`,
+            "combat"
+          )
+      );
+
+      setMessage(
+        `VICTORY — ${opponent.name} defeated.`
+      );
+    } else {
+      update(
+        (current) =>
+          addActivity(
+            {
+              ...current,
+
+              health: 1,
+
+              fightsLost:
+                current.fightsLost +
+                1,
+
+              xp:
+                current.xp +
+                Math.floor(
+                  opponent.rewardXp /
+                    3
+                ),
+            },
+
+            `You lost to ${opponent.name} and were rushed to the hospital.`,
+            "combat"
+          )
+      );
+
+      setMessage(
+        "DEFEAT — You were hospitalized."
+      );
+    }
+  }
+
+  function buyItem(
+    item: Item
+  ) {
+    if (
+      save.cash <
+      item.price
+    ) {
+      setMessage(
+        "You don't have enough cash."
+      );
+
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+
+        cash:
+          current.cash -
+          item.price,
+
+        inventory: {
+          ...current.inventory,
+
+          [item.id]:
+            (current
+              .inventory[
+              item.id
+            ] || 0) + 1,
+        },
+      })
+    );
+
+    setMessage(
+      `${item.name} purchased.`
+    );
+  }
+
+  function useItem(
+    item: Item
+  ) {
+    const count =
+      save.inventory[
+        item.id
+      ] || 0;
+
+    if (
+      count <= 0
+    ) {
+      return;
+    }
+
+    update(
+      (current) => {
+        let result = {
+          ...current,
+
+          inventory: {
+            ...current.inventory,
+
+            [item.id]:
+              Math.max(
+                0,
+                count - 1
+              ),
+          },
+        };
+
+        if (
+          item.type ===
+          "medical"
+        ) {
+          result.health =
+            Math.min(
+              maxHealth,
+              result.health +
+                (item.effect ||
+                  0)
+            );
+        }
+
+        if (
+          item.type ===
+          "energy"
+        ) {
+          result.energy =
+            Math.min(
+              MAX_ENERGY,
+              result.energy +
+                (item.effect ||
+                  0)
+            );
+        }
+
+        if (
+          item.type ===
+          "nerve"
+        ) {
+          result.nerve =
+            Math.min(
+              maxNerve,
+              result.nerve +
+                (item.effect ||
+                  0)
+            );
+        }
+
+        return result;
+      }
+    );
+
+    setMessage(
+      `${item.name} used.`
+    );
+  }
+
+  function equipItem(
+    item: Item
+  ) {
+    if (
+      !save.inventory[
+        item.id
+      ]
+    ) {
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+
+        equippedWeapon:
+          item.type ===
+          "weapon"
+            ? item.id
+            : current.equippedWeapon,
+
+        equippedArmor:
+          item.type ===
+          "armor"
+            ? item.id
+            : current.equippedArmor,
+      })
+    );
+
+    setMessage(
+      `${item.name} equipped.`
+    );
+  }
+
   function takeJob(
     job: Job
   ) {
@@ -749,118 +1204,350 @@ function App() {
       return;
     }
 
-    const now =
-      Date.now();
+    update(
+      (current) => ({
+        ...current,
 
-    let updated: SaveData = {
-      ...data,
+        currentJob:
+          job.id,
 
-      currentJob:
-        job.id,
+        jobStartedAt:
+          Date.now(),
 
-      lastJobUpdate:
-        now,
-    };
+        lastJobPayment:
+          Date.now(),
+      })
+    );
 
-    updated =
-      addActivity(
-        updated,
-        `You started working for ${job.company} as a ${job.title}.`,
-        "job"
-      );
-
-    setData(updated);
+    setMessage(
+      `You are now working as a ${job.title}.`
+    );
   }
 
-  /*
-   * QUIT JOB
-   */
   function quitJob() {
-    if (!data.currentJob) {
+    update(
+      (current) => ({
+        ...current,
+
+        currentJob: null,
+      })
+    );
+
+    setMessage(
+      "You quit your job."
+    );
+  }
+
+  function startEducation(
+    course: EducationCourse
+  ) {
+    if (
+      save.educationActive
+    ) {
       return;
     }
 
-    const updated =
-      addActivity(
-        {
-          ...data,
-          currentJob: null,
-          lastJobUpdate:
-            Date.now(),
-        },
-        "You quit your job.",
-        "job"
+    if (
+      save.educationCompleted.includes(
+        course.id
+      )
+    ) {
+      return;
+    }
+
+    if (
+      levelInfo.level <
+      course.levelRequired
+    ) {
+      return;
+    }
+
+    if (
+      save.cash <
+      course.cost
+    ) {
+      setMessage(
+        "You can't afford this course."
       );
 
-    setData(updated);
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+
+        cash:
+          current.cash -
+          course.cost,
+
+        educationActive:
+          course.id,
+
+        educationStartedAt:
+          Date.now(),
+      })
+    );
+
+    setMessage(
+      `You enrolled in ${course.name}.`
+    );
   }
 
-  /*
-   * RESET
-   */
-  function resetGame() {
-    const confirmed =
-      window.confirm(
-        "Reset your RiftCity character? This cannot be undone."
+  function buyProperty(
+    propertyToBuy: Property
+  ) {
+    if (
+      save.cash <
+      propertyToBuy.price
+    ) {
+      setMessage(
+        "You can't afford this property."
       );
 
-    if (!confirmed) {
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+
+        cash:
+          current.cash -
+          propertyToBuy.price,
+
+        ownedProperty:
+          propertyToBuy.id,
+      })
+    );
+
+    setMessage(
+      `You moved into ${propertyToBuy.name}.`
+    );
+  }
+
+  function claimMission(
+    mission: Mission
+  ) {
+    if (
+      save.completedMissions.includes(
+        mission.id
+      )
+    ) {
+      return;
+    }
+
+    let progress = 0;
+
+    if (
+      mission.requirement ===
+      "crime"
+    ) {
+      progress =
+        save.crimesCompleted;
+    }
+
+    if (
+      mission.requirement ===
+      "combat"
+    ) {
+      progress =
+        save.fightsWon;
+    }
+
+    if (
+      mission.requirement ===
+      "gym"
+    ) {
+      progress =
+        save.gymSessions;
+    }
+
+    if (
+      mission.requirement ===
+      "cash"
+    ) {
+      progress =
+        save.cash;
+    }
+
+    if (
+      progress <
+      mission.target
+    ) {
+      return;
+    }
+
+    update(
+      (current) => ({
+        ...current,
+
+        cash:
+          current.cash +
+          mission.rewardCash,
+
+        xp:
+          current.xp +
+          mission.rewardXp,
+
+        completedMissions: [
+          ...current.completedMissions,
+          mission.id,
+        ],
+      })
+    );
+
+    setMessage(
+      `Mission complete — +${money(
+        mission.rewardCash
+      )}.`
+    );
+  }
+
+  function resetGame() {
+    if (
+      !window.confirm(
+        "Reset RiftCity? This cannot be undone."
+      )
+    ) {
       return;
     }
 
     const fresh =
-      newSave();
+      freshSave();
 
-    localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify(
-        fresh
-      )
+    localStorage.removeItem(
+      SAVE_KEY
     );
 
-    setData(fresh);
+    setSave(fresh);
 
     setScreen(
       "city"
     );
+
+    setMessage(
+      "RiftCity reset."
+    );
   }
 
-  const xpPercent =
-    Math.min(
-      100,
-      Math.round(
-        (levelInfo.currentXp /
-          levelInfo.requiredXp) *
-          100
-      )
+  if (!entered) {
+    return (
+      <main className="app landing">
+        <header className="topbar">
+          <div className="logo">
+            <span className="logo-mark">
+              R
+            </span>
+
+            <span>
+              RIFT
+              <span>
+                CITY
+              </span>
+            </span>
+          </div>
+
+          <div className="status">
+            <span className="status-dot" />
+            V2 FOUNDATION
+          </div>
+        </header>
+
+        <section className="hero">
+          <div className="hero-content">
+            <p className="eyebrow">
+              WELCOME TO THE RIFT
+            </p>
+
+            <h1>
+              YOUR CITY.
+              <br />
+              <span>
+                YOUR RULES.
+              </span>
+            </h1>
+
+            <p className="intro">
+              Work. Train. Commit crimes.
+              Fight. Build your character.
+              Climb RiftCity one decision
+              at a time.
+            </p>
+
+            <button
+              className="play-button"
+              onClick={() =>
+                setEntered(
+                  true
+                )
+              }
+            >
+              ENTER RIFTCITY
+              <span>
+                →
+              </span>
+            </button>
+          </div>
+
+          <div className="city-card">
+            <div className="city-glow" />
+
+            <div className="city-info">
+              <span>
+                CITY STATUS
+              </span>
+
+              <strong>
+                WAITING FOR YOU
+              </strong>
+            </div>
+          </div>
+        </section>
+      </main>
     );
+  }
 
   const nervePercent =
     Math.round(
-      (data.nerve /
-        MAX_NERVE) *
+      (save.nerve /
+        maxNerve) *
+        100
+    );
+
+  const healthPercent =
+    Math.round(
+      (save.health /
+        maxHealth) *
+        100
+    );
+
+  const energyPercent =
+    Math.round(
+      (save.energy /
+        MAX_ENERGY) *
         100
     );
 
   const nextNerveAt =
-    data.nerve <
-    MAX_NERVE
-      ? data.lastNerveUpdate +
-        NERVE_REGEN_MS
+    save.nerve <
+    maxNerve
+      ? save.lastNerveUpdate +
+        NERVE_REGEN
       : null;
 
   return (
-    <div className="app">
+    <main className="app game-shell">
       <header className="game-header">
         <div className="logo">
-          <div className="logo-mark">
+          <span className="logo-mark">
             R
-          </div>
+          </span>
 
           <span>
-            Rift
+            RIFT
             <span>
-              City
+              CITY
             </span>
           </span>
         </div>
@@ -871,8 +1558,8 @@ function App() {
           </span>
 
           <strong>
-            {formatMoney(
-              data.cash
+            {money(
+              save.cash
             )}
           </strong>
         </div>
@@ -886,11 +1573,13 @@ function App() {
           }
         >
           LVL{" "}
-          {levelInfo.level}
+          {
+            levelInfo.level
+          }
         </button>
       </header>
 
-      <div className="player-bar">
+      <section className="player-bar">
         <div>
           <span>
             PLAYER
@@ -907,22 +1596,8 @@ function App() {
           </span>
 
           <strong>
-            {levelInfo.level}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            XP
-          </span>
-
-          <strong>
             {
-              levelInfo.currentXp
-            }{" "}
-            /{" "}
-            {
-              levelInfo.requiredXp
+              levelInfo.level
             }
           </strong>
         </div>
@@ -933,9 +1608,21 @@ function App() {
           </span>
 
           <strong>
-            {data.energy} /{" "}
+            {Math.floor(
+              save.energy
+            )}
+            /
             {MAX_ENERGY}
           </strong>
+
+          <div className="resource-bar">
+            <div
+              className="energy-fill"
+              style={{
+                width: `${energyPercent}%`,
+              }}
+            />
+          </div>
         </div>
 
         <div>
@@ -944,27 +1631,41 @@ function App() {
           </span>
 
           <strong>
-            {data.nerve} /{" "}
-            {MAX_NERVE}
+            {save.nerve}/
+            {maxNerve}
           </strong>
 
-          <div className="mini-nerve-bar">
+          <div className="resource-bar">
             <div
+              className="nerve-fill"
               style={{
                 width: `${nervePercent}%`,
               }}
             />
           </div>
+        </div>
 
-          {nextNerveAt && (
-            <small className="regen-text">
-              +1 in{" "}
-              {formatTime(
-                nextNerveAt -
-                  now
-              )}
-            </small>
-          )}
+        <div>
+          <span>
+            HEALTH
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.health
+            )}
+            /
+            {maxHealth}
+          </strong>
+
+          <div className="resource-bar">
+            <div
+              className="health-fill"
+              style={{
+                width: `${healthPercent}%`,
+              }}
+            />
+          </div>
         </div>
 
         <div>
@@ -978,71 +1679,79 @@ function App() {
               : "🟢 Free"}
           </strong>
         </div>
-      </div>
+      </section>
 
-      <main className="game-layout">
-        <aside className="nav-card">
-          <div className="eyebrow">
-            RIFT CITY
-          </div>
+      <div className="game-layout">
+        <nav className="nav-card">
+          <p className="eyebrow">
+            CITY MENU
+          </p>
 
-          <button
-            className={`nav-button ${
-              screen === "city"
-                ? "active"
-                : ""
-            }`}
-            onClick={() =>
-              setScreen("city")
-            }
-          >
-            🏙️ City
-          </button>
-
-          <button
-            className={`nav-button ${
-              screen ===
-              "crimes"
-                ? "active"
-                : ""
-            }`}
-            onClick={() =>
-              setScreen(
-                "crimes"
-              )
-            }
-          >
-            🔪 Crimes
-          </button>
-
-          <button
-            className={`nav-button ${
-              screen === "job"
-                ? "active"
-                : ""
-            }`}
-            onClick={() =>
-              setScreen("job")
-            }
-          >
-            💼 Jobs
-          </button>
-
-          <button
-            className={`nav-button ${
-              screen ===
-              "character"
-                ? "active"
-                : ""
-            }`}
-            onClick={() =>
-              setScreen(
-                "character"
-              )
-            }
-          >
-            👤 Character
-          </button>
+          {(
+            [
+              [
+                "city",
+                "🏙️ City",
+              ],
+              [
+                "crimes",
+                "🔪 Crimes",
+              ],
+              [
+                "combat",
+                "⚔️ Combat",
+              ],
+              [
+                "gym",
+                "🏋️ Gym",
+              ],
+              [
+                "jobs",
+                "💼 Jobs",
+              ],
+              [
+                "items",
+                "🎒 Items",
+              ],
+              [
+                "missions",
+                "🎯 Missions",
+              ],
+              [
+                "education",
+                "🎓 Education",
+              ],
+              [
+                "property",
+                "🏠 Property",
+              ],
+              [
+                "character",
+                "👤 Character",
+              ],
+            ] as [
+              Screen,
+              string
+            ][]
+          ).map(
+            ([id, label]) => (
+              <button
+                key={id}
+                className={`nav-button ${
+                  screen === id
+                    ? "active"
+                    : ""
+                }`}
+                onClick={() =>
+                  setScreen(
+                    id
+                  )
+                }
+              >
+                {label}
+              </button>
+            )
+          )}
 
           <button
             className="nav-button reset-button"
@@ -1050,34 +1759,55 @@ function App() {
               resetGame
             }
           >
-            Reset Game
+            ↻ Reset Game
           </button>
-        </aside>
+        </nav>
 
         <section className="content-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">
+                RIFTCITY
+              </p>
+
+              <h2>
+                {screen ===
+                "city"
+                  ? "THE CITY"
+                  : screen
+                      .charAt(0)
+                      .toUpperCase() +
+                    screen.slice(
+                      1
+                    )}
+              </h2>
+            </div>
+
+            <span className="level">
+              LVL{" "}
+              {
+                levelInfo.level
+              }
+            </span>
+          </div>
+
           {screen ===
             "city" && (
             <CityScreen
-              data={data}
-              levelInfo={
-                levelInfo
-              }
+              save={save}
               currentJob={
                 currentJob
               }
-              jailed={
-                jailed
+              maxNerve={
+                maxNerve
               }
-              jailUntil={
-                data.jailUntil
+              maxHealth={
+                maxHealth
+              }
+              nextNerveAt={
+                nextNerveAt
               }
               now={now}
-              xpPercent={
-                xpPercent
-              }
-              nervePercent={
-                nervePercent
-              }
               setScreen={
                 setScreen
               }
@@ -1087,15 +1817,15 @@ function App() {
           {screen ===
             "crimes" && (
             <CrimeScreen
-              data={data}
+              save={save}
               level={
                 levelInfo.level
               }
+              maxNerve={
+                maxNerve
+              }
               jailed={
                 jailed
-              }
-              jailUntil={
-                data.jailUntil
               }
               now={now}
               onCrime={
@@ -1105,9 +1835,41 @@ function App() {
           )}
 
           {screen ===
-            "job" && (
-            <JobScreen
-              data={data}
+            "combat" && (
+            <CombatScreen
+              save={save}
+              level={
+                levelInfo.level
+              }
+              jailed={
+                jailed
+              }
+              onFight={
+                fight
+              }
+            />
+          )}
+
+          {screen ===
+            "gym" && (
+            <GymScreen
+              save={save}
+              level={
+                levelInfo.level
+              }
+              jailed={
+                jailed
+              }
+              onTrain={
+                train
+              }
+            />
+          )}
+
+          {screen ===
+            "jobs" && (
+            <JobsScreen
+              save={save}
               level={
                 levelInfo.level
               }
@@ -1124,102 +1886,107 @@ function App() {
           )}
 
           {screen ===
-            "character" && (
-            <CharacterScreen
-              data={data}
-              levelInfo={
-                levelInfo
+            "items" && (
+            <ItemsScreen
+              save={save}
+              onBuy={
+                buyItem
+              }
+              onUse={
+                useItem
+              }
+              onEquip={
+                equipItem
               }
             />
           )}
+
+          {screen ===
+            "missions" && (
+            <MissionScreen
+              save={save}
+              onClaim={
+                claimMission
+              }
+            />
+          )}
+
+          {screen ===
+            "education" && (
+            <EducationScreen
+              save={save}
+              level={
+                levelInfo.level
+              }
+              active={
+                activeEducation
+              }
+              now={now}
+              onStart={
+                startEducation
+              }
+            />
+          )}
+
+          {screen ===
+            "property" && (
+            <PropertyScreen
+              save={save}
+              onBuy={
+                buyProperty
+              }
+            />
+          )}
+
+          {screen ===
+            "character" && (
+            <CharacterScreen
+              save={save}
+              maxNerve={
+                maxNerve
+              }
+              maxHealth={
+                maxHealth
+              }
+            />
+          )}
+
+          {message && (
+            <div className="system-message">
+              {message}
+            </div>
+          )}
         </section>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
 
+/* =========================
+   CITY
+========================= */
+
 function CityScreen({
-  data,
-  levelInfo,
+  save,
   currentJob,
-  jailed,
-  jailUntil,
+  maxNerve,
+  maxHealth,
+  nextNerveAt,
   now,
-  xpPercent,
-  nervePercent,
   setScreen,
 }: {
-  data: SaveData;
-  levelInfo: ReturnType<
-    typeof getLevel
-  >;
+  save: SaveData;
   currentJob: Job | null;
-  jailed: boolean;
-  jailUntil: number | null;
+  maxNerve: number;
+  maxHealth: number;
+  nextNerveAt: number | null;
   now: number;
-  xpPercent: number;
-  nervePercent: number;
   setScreen: (
     screen: Screen
   ) => void;
 }) {
-  const nextNerveAt =
-    data.nerve <
-    MAX_NERVE
-      ? data.lastNerveUpdate +
-        NERVE_REGEN_MS
-      : null;
-
   return (
     <>
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">
-            WELCOME TO
-          </div>
-
-          <h2>
-            RiftCity
-          </h2>
-
-          <p className="intro">
-            A city where everyone wants
-            something and nobody asks too
-            many questions.
-          </p>
-        </div>
-
-        <div className="level">
-          LEVEL{" "}
-          {levelInfo.level}
-        </div>
-      </div>
-
-      {jailed &&
-        jailUntil && (
-          <div className="panel jail-panel">
-            <div className="eyebrow">
-              🚨 ARRESTED
-            </div>
-
-            <h3>
-              You're in jail.
-            </h3>
-
-            <p>
-              Keep your head down. You'll
-              be released in{" "}
-              <strong>
-                {formatTime(
-                  jailUntil -
-                    now
-                )}
-              </strong>
-              .
-            </p>
-          </div>
-        )}
-
       <div className="city-dashboard">
         <div>
           <span>
@@ -1227,20 +1994,9 @@ function CityScreen({
           </span>
 
           <strong>
-            {formatMoney(
-              data.cash
+            {money(
+              save.cash
             )}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            ENERGY
-          </span>
-
-          <strong>
-            {data.energy}/
-            {MAX_ENERGY}
           </strong>
         </div>
 
@@ -1250,117 +2006,92 @@ function CityScreen({
           </span>
 
           <strong>
-            {data.nerve}/
-            {MAX_NERVE}
+            {save.nerve}/
+            {maxNerve}
           </strong>
 
-          <div className="nerve-bar">
-            <div
-              style={{
-                width: `${nervePercent}%`,
-              }}
-            />
-          </div>
-
           {nextNerveAt && (
-            <small className="regen-text">
-              Next nerve in{" "}
-              {formatTime(
+            <small>
+              +1 in{" "}
+              {duration(
                 nextNerveAt -
                   now
               )}
             </small>
           )}
         </div>
-      </div>
 
-      <div className="panel">
-        <div className="eyebrow">
-          EXPERIENCE
+        <div>
+          <span>
+            HEALTH
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.health
+            )}
+            /
+            {maxHealth}
+          </strong>
         </div>
-
-        <div className="xp-bar">
-          <div
-            style={{
-              width: `${xpPercent}%`,
-            }}
-          />
-        </div>
-
-        <p>
-          {
-            levelInfo.currentXp
-          }{" "}
-          /{" "}
-          {
-            levelInfo.requiredXp
-          }{" "}
-          XP until Level{" "}
-          {levelInfo.level +
-            1}
-        </p>
       </div>
 
       <div className="action-grid">
-        <button
-          className="action-card"
+        <ActionCard
+          icon="🔪"
+          title="Commit a Crime"
+          description="Spend Nerve and take your chances."
           onClick={() =>
             setScreen(
               "crimes"
             )
           }
-        >
-          <span>
-            🔪
-          </span>
+        />
 
-          <strong>
-            Commit a Crime
-          </strong>
-
-          <small>
-            Spend nerve, make money, and
-            try not to get caught.
-          </small>
-        </button>
-
-        <button
-          className="action-card"
+        <ActionCard
+          icon="⚔️"
+          title="Find a Fight"
+          description="Test your combat stats."
           onClick={() =>
-            setScreen("job")
+            setScreen(
+              "combat"
+            )
           }
-        >
-          <span>
-            💼
-          </span>
+        />
 
-          <strong>
-            Find Work
-          </strong>
+        <ActionCard
+          icon="🏋️"
+          title="Train"
+          description="Spend Energy to improve your stats."
+          onClick={() =>
+            setScreen("gym")
+          }
+        />
 
-          <small>
-            Earn passive income while
-            you're away.
-          </small>
-        </button>
+        <ActionCard
+          icon="💼"
+          title="Find Work"
+          description={
+            currentJob
+              ? `Working as ${currentJob.title}.`
+              : "Get a job and earn passive income."
+          }
+          onClick={() =>
+            setScreen(
+              "jobs"
+            )
+          }
+        />
       </div>
 
-      <div className="panel activity-panel">
-        <div className="section-heading">
-          <div>
-            <div className="eyebrow">
-              CITY FEED
-            </div>
-
-            <h3>
-              Recent Activity
-            </h3>
-          </div>
-        </div>
+      <div className="panel">
+        <p className="eyebrow">
+          RECENT ACTIVITY
+        </p>
 
         <ActivityFeed
           activities={
-            data.activities
+            save.activities
           }
         />
       </div>
@@ -1368,104 +2099,69 @@ function CityScreen({
   );
 }
 
+/* =========================
+   CRIMES
+========================= */
+
 function CrimeScreen({
-  data,
+  save,
   level,
+  maxNerve,
   jailed,
-  jailUntil,
   now,
   onCrime,
 }: {
-  data: SaveData;
+  save: SaveData;
   level: number;
+  maxNerve: number;
   jailed: boolean;
-  jailUntil: number | null;
   now: number;
   onCrime: (
     crime: Crime
   ) => void;
 }) {
-  const nextNerveAt =
-    data.nerve <
-    MAX_NERVE
-      ? data.lastNerveUpdate +
-        NERVE_REGEN_MS
+  const nextNerve =
+    save.nerve <
+    maxNerve
+      ? save.lastNerveUpdate +
+        NERVE_REGEN
       : null;
 
   return (
     <>
-      <div className="section-heading">
+      <div className="resource-heading">
         <div>
-          <div className="eyebrow">
+          <p className="eyebrow">
             CRIMINAL ACTIVITY
-          </div>
-
-          <h2>
-            Crimes
-          </h2>
-
-          <p className="intro">
-            Every score has a price. The
-            question is whether you're
-            willing to pay it.
           </p>
+
+          <h3>
+            Nerve{" "}
+            {save.nerve}/
+            {maxNerve}
+          </h3>
         </div>
 
-        <div className="nerve-display">
-          <span>
-            NERVE
-          </span>
-
-          <strong>
-            {data.nerve}/
-            {MAX_NERVE}
-          </strong>
-
-          {nextNerveAt && (
-            <small>
-              +1 in{" "}
-              {formatTime(
-                nextNerveAt -
-                  now
-              )}
-            </small>
-          )}
-        </div>
-      </div>
-
-      {jailed &&
-        jailUntil && (
-          <div className="panel jail-panel">
-            <div className="eyebrow">
-              🔒 YOU ARE JAILED
-            </div>
-
-            <h3>
-              Come back later.
-            </h3>
-
-            <p>
-              Release in{" "}
-              <strong>
-                {formatTime(
-                  jailUntil -
-                    now
-                )}
-              </strong>
-              .
-            </p>
-          </div>
+        {nextNerve && (
+          <small>
+            Next nerve in{" "}
+            {duration(
+              nextNerve -
+                now
+            )}
+          </small>
         )}
+      </div>
 
       <div className="crime-summary">
         <div>
           <span>
-            COMPLETED
+            SUCCESS
           </span>
 
           <strong>
             {
-              data.crimesCompleted
+              save.crimesCompleted
             }
           </strong>
         </div>
@@ -1477,7 +2173,19 @@ function CrimeScreen({
 
           <strong>
             {
-              data.crimesFailed
+              save.crimesFailed
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            SPOOKED
+          </span>
+
+          <strong>
+            {
+              save.crimesSpooked
             }
           </strong>
         </div>
@@ -1488,225 +2196,428 @@ function CrimeScreen({
           </span>
 
           <strong>
-            {data.timesJailed}
+            {
+              save.timesJailed
+            }
           </strong>
         </div>
       </div>
 
       <div className="crime-list">
         {CRIMES.map(
-          (crime) => (
-            <CrimeCard
-              key={
-                crime.id
-              }
-              crime={
-                crime
-              }
-              data={
-                data
-              }
-              level={
+          (crime) => {
+            const unlocked =
+              crimeUnlocked(
+                crime,
                 level
-              }
-              jailed={
-                jailed
-              }
-              onCrime={
-                onCrime
-              }
-            />
-          )
+              );
+
+            const enoughNerve =
+              save.nerve >=
+              crime.nerve;
+
+            const chance =
+              crimeSuccessChance(
+                crime,
+                save.crimeExperience,
+                save.stats
+                  .intelligence,
+                0
+              );
+
+            return (
+              <div
+                className={`crime-card ${
+                  !unlocked
+                    ? "locked"
+                    : ""
+                }`}
+                key={
+                  crime.id
+                }
+              >
+                <div className="crime-main">
+                  <div>
+                    <span className="crime-tag">
+                      {crime.risk >=
+                      70
+                        ? "EXTREME RISK"
+                        : crime.risk >=
+                          45
+                        ? "HIGH RISK"
+                        : "RISK"}
+                    </span>
+
+                    <h3>
+                      {
+                        crime.name
+                      }
+                    </h3>
+
+                    <p>
+                      {
+                        crime.description
+                      }
+                    </p>
+                  </div>
+
+                  <button
+                    className="crime-button"
+                    disabled={
+                      !unlocked ||
+                      !enoughNerve ||
+                      jailed
+                    }
+                    onClick={() =>
+                      onCrime(
+                        crime
+                      )
+                    }
+                  >
+                    {!unlocked
+                      ? `LEVEL ${crime.levelRequired}`
+                      : jailed
+                      ? "JAILED"
+                      : !enoughNerve
+                      ? "LOW NERVE"
+                      : "COMMIT"}
+                  </button>
+                </div>
+
+                <div className="crime-stats">
+                  <div>
+                    <span>
+                      NERVE
+                    </span>
+
+                    <strong>
+                      {crime.nerve}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      SUCCESS
+                    </span>
+
+                    <strong>
+                      {Math.floor(
+                        chance
+                      )}
+                      %
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      REWARD
+                    </span>
+
+                    <strong>
+                      {money(
+                        crime.minReward
+                      )}
+                      –
+                      {money(
+                        crime.maxReward
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      XP
+                    </span>
+
+                    <strong>
+                      +{crime.xp}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      CE
+                    </span>
+
+                    <strong>
+                      +{
+                        crime.crimeExperience
+                      }
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            );
+          }
         )}
       </div>
     </>
   );
 }
 
-function CrimeCard({
-  crime,
-  data,
+/* =========================
+   COMBAT
+========================= */
+
+function CombatScreen({
+  save,
   level,
   jailed,
-  onCrime,
+  onFight,
 }: {
-  crime: Crime;
-  data: SaveData;
+  save: SaveData;
   level: number;
   jailed: boolean;
-  onCrime: (
-    crime: Crime
+  onFight: (
+    opponent: Opponent
   ) => void;
 }) {
-  const unlocked =
-    crimeUnlocked(
-      crime,
-      level
-    );
-
-  const insufficientNerve =
-    data.nerve <
-    crime.nerve;
-
-  const disabled =
-    !unlocked ||
-    jailed ||
-    insufficientNerve;
-
-  const successChance =
-    calculateSuccessChance(
-      crime,
-      data.stats
-    );
-
   return (
-    <div
-      className={`crime-card ${
-        !unlocked
-          ? "locked"
-          : ""
-      }`}
-    >
-      <div className="crime-main">
-        <div>
-          <div className="crime-tag">
-            {crime.risk >=
-            70
-              ? "EXTREME RISK"
-              : crime.risk >=
-                45
-              ? "HIGH RISK"
-              : crime.risk >=
-                25
-              ? "MEDIUM RISK"
-              : "LOW RISK"}
-          </div>
+    <div className="list">
+      <div className="panel">
+        <p className="eyebrow">
+          COMBAT STATS
+        </p>
 
-          <h3>
-            {crime.name}
-          </h3>
-
-          <p>
-            {
-              crime.description
+        <div className="stats-grid">
+          <Stat
+            label="Strength"
+            value={
+              save.stats
+                .strength
             }
-          </p>
-        </div>
+          />
 
-        <button
-          className="crime-button"
-          disabled={
-            disabled
-          }
-          onClick={() =>
-            onCrime(
-              crime
-            )
-          }
-        >
-          {!unlocked
-            ? `LEVEL ${crime.levelRequired}`
-            : jailed
-            ? "JAILED"
-            : insufficientNerve
-            ? "LOW NERVE"
-            : "COMMIT"}
-        </button>
-      </div>
+          <Stat
+            label="Defense"
+            value={
+              save.stats
+                .defense
+            }
+          />
 
-      <div className="crime-stats">
-        <div>
-          <span>
-            NERVE
-          </span>
+          <Stat
+            label="Speed"
+            value={
+              save.stats.speed
+            }
+          />
 
-          <strong>
-            🧠{" "}
-            {crime.nerve}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            SUCCESS
-          </span>
-
-          <strong>
-            {Math.round(
-              successChance
-            )}
-            %
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            REWARD
-          </span>
-
-          <strong>
-            {formatMoney(
-              crime.minReward
-            )}
-            –
-            {formatMoney(
-              crime.maxReward
-            )}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            XP
-          </span>
-
-          <strong>
-            +{crime.xp}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            RISK
-          </span>
-
-          <strong>
-            {crime.risk}%
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            LEVEL
-          </span>
-
-          <strong>
-            {crime.levelRequired}
-          </strong>
+          <Stat
+            label="Dexterity"
+            value={
+              save.stats
+                .dexterity
+            }
+          />
         </div>
       </div>
 
-      {!unlocked && (
-        <div className="locked-message">
-          Reach Level{" "}
-          {
-            crime.levelRequired
-          }{" "}
-          to unlock this crime.
-        </div>
+      {OPPONENTS.map(
+        (opponent) => {
+          const locked =
+            level <
+            opponent.level;
+
+          return (
+            <div
+              className="list-card"
+              key={
+                opponent.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  LEVEL{" "}
+                  {
+                    opponent.level
+                  }
+                </span>
+
+                <h3>
+                  {
+                    opponent.name
+                  }
+                </h3>
+
+                <p>
+                  Health:{" "}
+                  {
+                    opponent.health
+                  }
+                </p>
+              </div>
+
+              <button
+                className="job-button"
+                disabled={
+                  locked ||
+                  jailed
+                }
+                onClick={() =>
+                  onFight(
+                    opponent
+                  )
+                }
+              >
+                {locked
+                  ? `LEVEL ${opponent.level}`
+                  : jailed
+                  ? "JAILED"
+                  : "ATTACK"}
+              </button>
+            </div>
+          );
+        }
       )}
     </div>
   );
 }
 
-function JobScreen({
-  data,
+/* =========================
+   GYM
+========================= */
+
+function GymScreen({
+  save,
+  level,
+  jailed,
+  onTrain,
+}: {
+  save: SaveData;
+  level: number;
+  jailed: boolean;
+  onTrain: (
+    gym: Gym
+  ) => void;
+}) {
+  return (
+    <div className="list">
+      <div className="panel">
+        <p className="eyebrow">
+          TRAINING
+        </p>
+
+        <h3>
+          Energy:{" "}
+          {Math.floor(
+            save.energy
+          )}
+          /100
+        </h3>
+
+        <p>
+          Energy regenerates automatically.
+          Spend it to permanently improve
+          your combat stats.
+        </p>
+      </div>
+
+      {GYMS.map(
+        (gym) => {
+          const locked =
+            level <
+            gym.levelRequired;
+
+          return (
+            <div
+              className="list-card"
+              key={
+                gym.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  LEVEL{" "}
+                  {
+                    gym.levelRequired
+                  }
+                </span>
+
+                <h3>
+                  {gym.name}
+                </h3>
+
+                <p>
+                  {
+                    gym.description
+                  }
+                </p>
+
+                <small>
+                  Energy:{" "}
+                  {
+                    gym.energyCost
+                  }
+                  {" • "}
+                  STR +
+                  {
+                    gym.gains
+                      .strength ||
+                    0
+                  }
+                  {" • "}
+                  DEF +
+                  {
+                    gym.gains
+                      .defense ||
+                    0
+                  }
+                  {" • "}
+                  SPD +
+                  {
+                    gym.gains
+                      .speed ||
+                    0
+                  }
+                  {" • "}
+                  DEX +
+                  {
+                    gym.gains
+                      .dexterity ||
+                    0
+                  }
+                </small>
+              </div>
+
+              <button
+                className="job-button"
+                disabled={
+                  locked ||
+                  jailed ||
+                  save.energy <
+                    gym.energyCost
+                }
+                onClick={() =>
+                  onTrain(
+                    gym
+                  )
+                }
+              >
+                {locked
+                  ? `LEVEL ${gym.levelRequired}`
+                  : "TRAIN"}
+              </button>
+            </div>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   JOBS
+========================= */
+
+function JobsScreen({
+  save,
   level,
   currentJob,
   onTakeJob,
   onQuitJob,
 }: {
-  data: SaveData;
+  save: SaveData;
   level: number;
   currentJob: Job | null;
   onTakeJob: (
@@ -1716,24 +2627,6 @@ function JobScreen({
 }) {
   return (
     <>
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">
-            EMPLOYMENT
-          </div>
-
-          <h2>
-            Jobs
-          </h2>
-
-          <p className="intro">
-            Work quietly. Get paid. Use the
-            money for things your employer
-            definitely wouldn't approve of.
-          </p>
-        </div>
-      </div>
-
       {currentJob && (
         <div className="income-summary">
           <div>
@@ -1752,7 +2645,7 @@ function JobScreen({
                 currentJob.company
               }
               {" • "}
-              {formatMoney(
+              {money(
                 currentJob.salary
               )}
               / hour
@@ -1765,105 +2658,78 @@ function JobScreen({
               onQuitJob
             }
           >
-            Quit Job
+            QUIT
           </button>
         </div>
       )}
 
-      <div className="jobs-list">
+      <div className="list">
         {JOBS.map(
           (job) => {
-            const unlocked =
-              level >=
+            const locked =
+              level <
               job.levelRequired;
 
-            const selected =
-              data.currentJob ===
+            const active =
+              save.currentJob ===
               job.id;
 
             return (
               <div
-                key={
-                  job.id
-                }
-                className={`job-card ${
-                  !unlocked
-                    ? "locked"
-                    : ""
-                } ${
-                  selected
+                className={`list-card ${
+                  active
                     ? "owned"
                     : ""
                 }`}
+                key={
+                  job.id
+                }
               >
-                <div className="job-main">
-                  <div>
-                    <div className="job-tag">
-                      {
-                        job.company
-                      }
-                    </div>
-
-                    <h3>
-                      {
-                        job.title
-                      }
-                    </h3>
-
-                    <p>
-                      {
-                        job.description
-                      }
-                    </p>
-                  </div>
-
-                  <button
-                    className="job-button"
-                    disabled={
-                      !unlocked ||
-                      selected
+                <div>
+                  <span className="job-tag">
+                    {
+                      job.company
                     }
-                    onClick={() =>
-                      onTakeJob(
-                        job
-                      )
+                  </span>
+
+                  <h3>
+                    {
+                      job.title
                     }
-                  >
-                    {selected
-                      ? "CURRENT"
-                      : !unlocked
-                      ? `LEVEL ${job.levelRequired}`
-                      : "TAKE JOB"}
-                  </button>
+                  </h3>
+
+                  <p>
+                    {
+                      job.description
+                    }
+                  </p>
+
+                  <small>
+                    {money(
+                      job.salary
+                    )}
+                    /hour
+                  </small>
                 </div>
 
-                <div className="job-rewards">
-                  <div>
-                    <span>
-                      PAY
-                    </span>
-
-                    <strong>
-                      {formatMoney(
-                        job.salary
-                      )}
-                      /hr
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      REQUIREMENT
-                    </span>
-
-                    <strong>
-                      Level{" "}
-                      {
-                        job.levelRequired
-                      }
-                    </strong>
-                  </div>
-                </div>
+                <button
+                  className="job-button"
+                  disabled={
+                    locked ||
+                    active
+                  }
+                  onClick={() =>
+                    onTakeJob(
+                      job
+                    )
+                  }
+                >
+                  {active
+                    ? "CURRENT"
+                    : locked
+                    ? `LEVEL ${job.levelRequired}`
+                    : "TAKE JOB"}
+                </button>
               </div>
             );
           }
@@ -1873,79 +2739,574 @@ function JobScreen({
   );
 }
 
-function CharacterScreen({
-  data,
-  levelInfo,
+/* =========================
+   ITEMS
+========================= */
+
+function ItemsScreen({
+  save,
+  onBuy,
+  onUse,
+  onEquip,
 }: {
-  data: SaveData;
-  levelInfo: ReturnType<
-    typeof getLevel
-  >;
+  save: SaveData;
+  onBuy: (
+    item: Item
+  ) => void;
+  onUse: (
+    item: Item
+  ) => void;
+  onEquip: (
+    item: Item
+  ) => void;
+}) {
+  return (
+    <div className="list">
+      {ITEMS.map(
+        (item) => {
+          const count =
+            save.inventory[
+              item.id
+            ] || 0;
+
+          const equipped =
+            save.equippedWeapon ===
+              item.id ||
+            save.equippedArmor ===
+              item.id;
+
+          return (
+            <div
+              className="list-card"
+              key={
+                item.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  {
+                    item.type.toUpperCase()
+                  }
+                </span>
+
+                <h3>
+                  {item.name}
+                </h3>
+
+                <p>
+                  {
+                    item.description
+                  }
+                </p>
+
+                <small>
+                  Owned:{" "}
+                  {count}
+                  {" • "}
+                  {money(
+                    item.price
+                  )}
+                </small>
+              </div>
+
+              <div className="button-row">
+                <button
+                  className="job-button"
+                  onClick={() =>
+                    onBuy(
+                      item
+                    )
+                  }
+                >
+                  BUY
+                </button>
+
+                {count >
+                  0 &&
+                  (item.type ===
+                    "medical" ||
+                    item.type ===
+                      "energy" ||
+                    item.type ===
+                      "nerve") && (
+                    <button
+                      className="small-button"
+                      onClick={() =>
+                        onUse(
+                          item
+                        )
+                      }
+                    >
+                      USE
+                    </button>
+                  )}
+
+                {count >
+                  0 &&
+                  (item.type ===
+                    "weapon" ||
+                    item.type ===
+                      "armor") && (
+                    <button
+                      className="small-button"
+                      onClick={() =>
+                        onEquip(
+                          item
+                        )
+                      }
+                    >
+                      {equipped
+                        ? "EQUIPPED"
+                        : "EQUIP"}
+                    </button>
+                  )}
+              </div>
+            </div>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   MISSIONS
+========================= */
+
+function MissionScreen({
+  save,
+  onClaim,
+}: {
+  save: SaveData;
+  onClaim: (
+    mission: Mission
+  ) => void;
+}) {
+  return (
+    <div className="list">
+      {MISSIONS.map(
+        (mission) => {
+          let progress = 0;
+
+          if (
+            mission.requirement ===
+            "crime"
+          ) {
+            progress =
+              save.crimesCompleted;
+          }
+
+          if (
+            mission.requirement ===
+            "combat"
+          ) {
+            progress =
+              save.fightsWon;
+          }
+
+          if (
+            mission.requirement ===
+            "gym"
+          ) {
+            progress =
+              save.gymSessions;
+          }
+
+          if (
+            mission.requirement ===
+            "cash"
+          ) {
+            progress =
+              save.cash;
+          }
+
+          const complete =
+            progress >=
+            mission.target;
+
+          const claimed =
+            save.completedMissions.includes(
+              mission.id
+            );
+
+          return (
+            <div
+              className="list-card"
+              key={
+                mission.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  MISSION
+                </span>
+
+                <h3>
+                  {
+                    mission.name
+                  }
+                </h3>
+
+                <p>
+                  {
+                    mission.description
+                  }
+                </p>
+
+                <small>
+                  Progress:{" "}
+                  {Math.min(
+                    progress,
+                    mission.target
+                  )}
+                  /
+                  {
+                    mission.target
+                  }
+                  {" • Reward "}
+                  {money(
+                    mission.rewardCash
+                  )}
+                  {" + "}
+                  {
+                    mission.rewardXp
+                  }{" "}
+                  XP
+                </small>
+              </div>
+
+              <button
+                className="job-button"
+                disabled={
+                  !complete ||
+                  claimed
+                }
+                onClick={() =>
+                  onClaim(
+                    mission
+                  )
+                }
+              >
+                {claimed
+                  ? "CLAIMED"
+                  : complete
+                  ? "CLAIM"
+                  : "IN PROGRESS"}
+              </button>
+            </div>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   EDUCATION
+========================= */
+
+function EducationScreen({
+  save,
+  level,
+  active,
+  now,
+  onStart,
+}: {
+  save: SaveData;
+  level: number;
+  active: EducationCourse | null;
+  now: number;
+  onStart: (
+    course: EducationCourse
+  ) => void;
+}) {
+  return (
+    <div className="list">
+      {active && (
+        <div className="panel">
+          <p className="eyebrow">
+            CURRENT COURSE
+          </p>
+
+          <h3>
+            {active.name}
+          </h3>
+
+          {save.educationStartedAt && (
+            <p>
+              Finishes in{" "}
+              {duration(
+                Math.max(
+                  0,
+                  save.educationStartedAt +
+                    active.durationHours *
+                      60 *
+                      60 *
+                      1000 -
+                    now
+                )
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
+      {EDUCATION.map(
+        (course) => {
+          const completed =
+            save.educationCompleted.includes(
+              course.id
+            );
+
+          const locked =
+            level <
+            course.levelRequired;
+
+          return (
+            <div
+              className="list-card"
+              key={
+                course.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  LEVEL{" "}
+                  {
+                    course.levelRequired
+                  }
+                </span>
+
+                <h3>
+                  {
+                    course.name
+                  }
+                </h3>
+
+                <p>
+                  {
+                    course.description
+                  }
+                </p>
+
+                <small>
+                  Cost:{" "}
+                  {money(
+                    course.cost
+                  )}
+                  {" • "}
+                  {
+                    course.durationHours
+                  }
+                  h
+                  {" • "}
+                  +{
+                    course.bonusAmount
+                  }{" "}
+                  {
+                    course.bonus
+                  }
+                </small>
+              </div>
+
+              <button
+                className="job-button"
+                disabled={
+                  locked ||
+                  completed ||
+                  !!active
+                }
+                onClick={() =>
+                  onStart(
+                    course
+                  )
+                }
+              >
+                {completed
+                  ? "COMPLETE"
+                  : locked
+                  ? `LEVEL ${course.levelRequired}`
+                  : active
+                  ? "STUDYING"
+                  : "ENROLL"}
+              </button>
+            </div>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   PROPERTY
+========================= */
+
+function PropertyScreen({
+  save,
+  onBuy,
+}: {
+  save: SaveData;
+  onBuy: (
+    property: Property
+  ) => void;
+}) {
+  return (
+    <div className="list">
+      {PROPERTIES.map(
+        (property) => {
+          const owned =
+            save.ownedProperty ===
+            property.id;
+
+          return (
+            <div
+              className={`list-card ${
+                owned
+                  ? "owned"
+                  : ""
+              }`}
+              key={
+                property.id
+              }
+            >
+              <div>
+                <span className="job-tag">
+                  PROPERTY
+                </span>
+
+                <h3>
+                  {
+                    property.name
+                  }
+                </h3>
+
+                <p>
+                  {
+                    property.description
+                  }
+                </p>
+
+                <small>
+                  Health +{
+                    property.maxHealthBonus
+                  }
+                  {" • "}
+                  Gym +
+                  {
+                    property.gymBonus
+                  }%
+                  {" • "}
+                  Nerve +
+                  {
+                    property.nerveBonus
+                  }
+                </small>
+              </div>
+
+              <button
+                className="job-button"
+                disabled={
+                  owned
+                }
+                onClick={() =>
+                  onBuy(
+                    property
+                  )
+                }
+              >
+                {owned
+                  ? "OWNED"
+                  : money(
+                      property.price
+                    )}
+              </button>
+            </div>
+          );
+        }
+      )}
+    </div>
+  );
+}
+
+/* =========================
+   CHARACTER
+========================= */
+
+function CharacterScreen({
+  save,
+  maxNerve,
+  maxHealth,
+}: {
+  save: SaveData;
+  maxNerve: number;
+  maxHealth: number;
 }) {
   return (
     <>
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">
-            CHARACTER
-          </div>
-
-          <h2>
-            Your Criminal Record
-          </h2>
-        </div>
-
-        <div className="level">
-          LEVEL{" "}
-          {levelInfo.level}
-        </div>
-      </div>
-
       <div className="city-dashboard">
         <div>
           <span>
-            CASH
+            LEVEL
           </span>
 
           <strong>
-            {formatMoney(
-              data.cash
+            {
+              getLevel(
+                save.xp
+              ).level
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            CRIME EXPERIENCE
+          </span>
+
+          <strong>
+            {
+              save.crimeExperience
+            }
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            NERVE BAR
+          </span>
+
+          <strong>
+            {save.nerve}/
+            {maxNerve}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            HEALTH
+          </span>
+
+          <strong>
+            {Math.floor(
+              save.health
             )}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            NERVE
-          </span>
-
-          <strong>
-            {data.nerve}/
-            {MAX_NERVE}
-          </strong>
-        </div>
-
-        <div>
-          <span>
-            TIMES JAILED
-          </span>
-
-          <strong>
-            {data.timesJailed}
+            /
+            {maxHealth}
           </strong>
         </div>
       </div>
 
       <div className="panel">
-        <div className="eyebrow">
-          STATS
-        </div>
+        <p className="eyebrow">
+          COMBAT STATS
+        </p>
 
         <div className="stats-grid">
           <Stat
             label="Strength"
             value={
-              data.stats
+              save.stats
                 .strength
             }
           />
@@ -1953,7 +3314,7 @@ function CharacterScreen({
           <Stat
             label="Defense"
             value={
-              data.stats
+              save.stats
                 .defense
             }
           />
@@ -1961,59 +3322,58 @@ function CharacterScreen({
           <Stat
             label="Speed"
             value={
-              data.stats
-                .speed
+              save.stats.speed
             }
           />
 
           <Stat
-            label="Intelligence"
+            label="Dexterity"
             value={
-              data.stats
-                .intelligence
+              save.stats
+                .dexterity
             }
           />
         </div>
       </div>
 
       <div className="panel">
-        <div className="eyebrow">
+        <p className="eyebrow">
           RECORD
-        </div>
+        </p>
 
         <div className="record-grid">
           <div>
             <span>
-              SUCCESSFUL CRIMES
+              CRIMES
             </span>
 
             <strong>
               {
-                data.crimesCompleted
+                save.crimesCompleted
               }
             </strong>
           </div>
 
           <div>
             <span>
-              FAILED CRIMES
+              FIGHTS WON
             </span>
 
             <strong>
               {
-                data.crimesFailed
+                save.fightsWon
               }
             </strong>
           </div>
 
           <div>
             <span>
-              SPOOKED
+              GYM SESSIONS
             </span>
 
             <strong>
               {
-                data.crimesSpooked
+                save.gymSessions
               }
             </strong>
           </div>
@@ -2025,25 +3385,50 @@ function CharacterScreen({
 
             <strong>
               {
-                data.timesJailed
+                save.timesJailed
               }
             </strong>
           </div>
         </div>
       </div>
-
-      <div className="panel">
-        <div className="eyebrow">
-          HISTORY
-        </div>
-
-        <ActivityFeed
-          activities={
-            data.activities
-          }
-        />
-      </div>
     </>
+  );
+}
+
+/* =========================
+   COMPONENTS
+========================= */
+
+function ActionCard({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="action-card"
+      onClick={
+        onClick
+      }
+    >
+      <span>
+        {icon}
+      </span>
+
+      <strong>
+        {title}
+      </strong>
+
+      <small>
+        {description}
+      </small>
+    </button>
   );
 }
 
@@ -2061,7 +3446,9 @@ function Stat({
       </span>
 
       <strong>
-        {value}
+        {value.toFixed(
+          1
+        )}
       </strong>
     </div>
   );
@@ -2072,30 +3459,19 @@ function ActivityFeed({
 }: {
   activities: Activity[];
 }) {
-  if (
-    activities.length ===
-    0
-  ) {
-    return (
-      <p>
-        Nothing has happened yet.
-      </p>
-    );
-  }
-
   return (
     <div className="activity-feed">
       {activities
-        .slice(0, 15)
+        .slice(0, 12)
         .map(
           (activity) => (
             <div
-              key={
-                activity.id
-              }
               className={`activity ${
                 activity.type
               }`}
+              key={
+                activity.id
+              }
             >
               <span>
                 {new Date(
@@ -2111,7 +3487,9 @@ function ActivityFeed({
               </span>
 
               <strong>
-                {activity.text}
+                {
+                  activity.text
+                }
               </strong>
             </div>
           )
