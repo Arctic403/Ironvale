@@ -6,17 +6,23 @@ import {
   executeCombatTurn,
 } from "../systems/combatSystem";
 
-const DEFAULT_WEAPONS: WeaponOption[] = [
-  { id: "primary", name: "Heavy Pistol", type: "primary", baseDamage: 25, accuracy: 80, critChance: 15 },
-  { id: "secondary", name: "Knife", type: "melee", baseDamage: 15, accuracy: 90, critChance: 25 },
-  { id: "temp", name: "Pepper Spray", type: "temporary", baseDamage: 8, accuracy: 95, critChance: 5 },
-];
+interface InteractiveCombatViewProps {
+  player: DynamicFighter;
+  enemy: DynamicFighter;
+  onFinish: (
+    outcome: "leave" | "hospitalize" | "mug",
+    enemy: DynamicFighter,
+    finalPlayerHealth: number
+  ) => void;
+  onDefeat: (finalPlayerHealth: number) => void;
+}
 
-export function InteractiveCombatView({ player, enemy, onFinish }: { 
-  player: DynamicFighter; 
-  enemy: DynamicFighter; 
-  onFinish: (outcome: "leave" | "hospitalize" | "mug", enemy: DynamicFighter) => void;
-}) {
+export function InteractiveCombatView({
+  player,
+  enemy,
+  onFinish,
+  onDefeat,
+}: InteractiveCombatViewProps) {
   const [pState, setPState] = useState<DynamicFighter>(player);
   const [eState, setEState] = useState<DynamicFighter>(enemy);
   const [combatLogs, setCombatLogs] = useState<TurnLog[]>([]);
@@ -26,25 +32,26 @@ export function InteractiveCombatView({ player, enemy, onFinish }: {
   const handlePlayerAttack = (weapon: WeaponOption) => {
     if (turn !== "player" || winner) return;
 
-    // Player Turn
-    const { updatedDefender, log } = executeCombatTurn(pState, eState, weapon);
-    setEState(updatedDefender);
-    setCombatLogs((prev) => [log, ...prev]);
+    // Player Turn Execution
+    const playerResult = executeCombatTurn(pState, eState, weapon);
+    setEState(playerResult.updatedDefender);
+    setCombatLogs((prev) => [playerResult.log, ...prev]);
 
-    if (updatedDefender.health <= 0) {
+    if (playerResult.updatedDefender.health <= 0) {
       setWinner("player");
       return;
     }
 
-    // AI Turn (Delayed slightly for combat feedback)
+    // AI Opponent Counter-Attack
     setTurn("enemy");
     setTimeout(() => {
-      const aiTurn = executeCombatTurn(eState, pState);
-      setPState(aiTurn.updatedDefender);
-      setCombatLogs((prev) => [aiTurn.log, ...prev]);
+      const aiResult = executeCombatTurn(playerResult.updatedDefender, pState);
+      setPState(aiResult.updatedDefender);
+      setCombatLogs((prev) => [aiResult.log, ...prev]);
 
-      if (aiTurn.updatedDefender.health <= 0) {
+      if (aiResult.updatedDefender.health <= 0) {
         setWinner("enemy");
+        onDefeat(aiResult.updatedDefender.health);
       } else {
         setTurn("player");
       }
@@ -53,54 +60,80 @@ export function InteractiveCombatView({ player, enemy, onFinish }: {
 
   return (
     <div className="combat-container" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      {/* FIGHTERS STATUS BARS */}
+      {/* Vitals Display */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        {/* PLAYER */}
         <div className="card" style={{ padding: "12px" }}>
           <h3>{pState.name} (LV {pState.level})</h3>
           <p>Health: {pState.health} / {pState.maxHealth}</p>
           <div style={{ height: "8px", background: "#333", borderRadius: "4px", overflow: "hidden" }}>
-            <div style={{ width: `${(pState.health / pState.maxHealth) * 100}%`, height: "100%", background: "#22c55e" }} />
+            <div
+              style={{
+                width: `${Math.max(0, (pState.health / pState.maxHealth) * 100)}%`,
+                height: "100%",
+                background: "#22c55e",
+                transition: "width 0.3s",
+              }}
+            />
           </div>
         </div>
 
-        {/* ENEMY */}
         <div className="card" style={{ padding: "12px" }}>
           <h3>{eState.name} (LV {eState.level})</h3>
           <p>Health: {eState.health} / {eState.maxHealth}</p>
           <div style={{ height: "8px", background: "#333", borderRadius: "4px", overflow: "hidden" }}>
-            <div style={{ width: `${(eState.health / eState.maxHealth) * 100}%`, height: "100%", background: "#ef4444" }} />
+            <div
+              style={{
+                width: `${Math.max(0, (eState.health / eState.maxHealth) * 100)}%`,
+                height: "100%",
+                background: "#ef4444",
+                transition: "width 0.3s",
+              }}
+            />
           </div>
         </div>
       </div>
 
-      {/* WEAPON SELECTION & ACTIONS */}
+      {/* Player Action Controls */}
       {!winner && turn === "player" && (
         <div className="card" style={{ padding: "12px" }}>
-          <p style={{ marginBottom: "8px", fontWeight: "bold" }}>Select Attack Type:</p>
+          <p style={{ marginBottom: "8px", fontWeight: "bold" }}>Select Attack:</p>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {DEFAULT_WEAPONS.map((w) => (
+            {pState.weapons.map((w) => (
               <button key={w.id} className="btn-primary" onClick={() => handlePlayerAttack(w)}>
-                {w.name} ({w.baseDamage} Dmg)
+                {w.icon || "⚔️"} {w.name} ({w.baseDamage} Dmg)
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* TORN-STYLE FINISHING OPTIONS */}
+      {turn === "enemy" && !winner && (
+        <div className="card" style={{ padding: "12px", textAlign: "center", color: "#a1a1aa" }}>
+          {eState.name} is making a move...
+        </div>
+      )}
+
+      {/* Torn-Style Finishing Actions */}
       {winner === "player" && (
         <div className="card" style={{ padding: "16px", border: "1px solid #22c55e", textAlign: "center" }}>
           <h2 style={{ color: "#22c55e" }}>VICTORY!</h2>
-          <p style={{ margin: "8px 0 16px" }}>Choose how to finish your target:</p>
+          <p style={{ margin: "8px 0 16px" }}>Select Finishing Outcome:</p>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
-            <button className="btn-primary" onClick={() => onFinish("leave", eState)}>
-              🚶 Leave ( +EXP Bonus )
+            <button className="btn-primary" onClick={() => onFinish("leave", eState, pState.health)}>
+              🚶 Leave ( Max EXP Bonus )
             </button>
-            <button className="btn-primary" style={{ background: "#dc2626" }} onClick={() => onFinish("hospitalize", eState)}>
-              🏥 Hospitalize ( Max Hospital Time )
+            <button
+              className="btn-primary"
+              style={{ background: "#dc2626" }}
+              onClick={() => onFinish("hospitalize", eState, pState.health)}
+            >
+              🏥 Hospitalize ( Extended Hospital Time )
             </button>
-            <button className="btn-primary" style={{ background: "#eab308", color: "#000" }} onClick={() => onFinish("mug", eState)}>
+            <button
+              className="btn-primary"
+              style={{ background: "#eab308", color: "#000" }}
+              onClick={() => onFinish("mug", eState, pState.health)}
+            >
               💵 Mug ( Steal Cash )
             </button>
           </div>
@@ -110,15 +143,22 @@ export function InteractiveCombatView({ player, enemy, onFinish }: {
       {winner === "enemy" && (
         <div className="card" style={{ padding: "16px", border: "1px solid #ef4444", textAlign: "center" }}>
           <h2 style={{ color: "#ef4444" }}>DEFEATED</h2>
-          <p>You were knocked out and taken to the hospital.</p>
+          <p>You were knocked out and admitted to the hospital.</p>
         </div>
       )}
 
-      {/* TURN LOG CONSOLE */}
+      {/* Combat Log */}
       <div className="card" style={{ padding: "12px", maxHeight: "200px", overflowY: "auto", background: "#09090b" }}>
         <p style={{ fontSize: "12px", color: "#a1a1aa", marginBottom: "8px" }}>COMBAT LOG</p>
-        {combatLogs.map((log, idx) => (
-          <div key={idx} style={{ fontSize: "13px", marginBottom: "4px", color: log.isCrit ? "#f59e0b" : log.isMiss ? "#71717a" : "#f4f4f5" }}>
+        {combatLogs.map((log) => (
+          <div
+            key={log.id}
+            style={{
+              fontSize: "13px",
+              marginBottom: "4px",
+              color: log.isCrit ? "#f59e0b" : log.isMiss ? "#71717a" : "#f4f4f5",
+            }}
+          >
             {log.actionText}
           </div>
         ))}
