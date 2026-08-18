@@ -265,10 +265,11 @@ function loadSave(): SaveData {
         timesJailed: oldSave.timesJailed || 0,
         fightsWon: oldSave.fightsWon || 0,
         fightsLost: oldSave.fightsLost || 0,
+        gymSessions: typeof oldSave.gymSessions === "number" ? oldSave.gymSessions : 0,
       };
     }
   } catch (e) {
-    print("Failed to parse save data:", e)
+    console.error("Failed to parse save data:", e);
   }
   return freshSave();
 }
@@ -297,6 +298,16 @@ export function useRiftCity() {
     return EDUCATION.find((c) => c.id === gameState.educationActive) || null;
   }, [gameState.educationActive]);
 
+  // VITAL DIAGNOSTIC FIX FOR THE GYM RENDERING CRASH:
+  // Dynamically resolve the gym object, falling back safely to the primary array element if state becomes un-synced.
+  const activeGymData = useMemo(() => {
+    const found = GYMS.find((g) => g.id === gameState.activeGym);
+    if (!found && GYMS.length > 0) {
+      return GYMS[0]; 
+    }
+    return found || null;
+  }, [gameState.activeGym]);
+
   const logActivity = (text: string, type: ActivityType) => {
     setGameState((prev) => ({
       ...prev,
@@ -323,7 +334,7 @@ export function useRiftCity() {
         if (updated.jailUntil && now >= updated.jailUntil) {
           updated.jailUntil = null;
           stateChanged = true;
-          setTimeout(() => logActivity("You have served your time and are released from jail.", "system"), 0);
+          setTimeout(() => logActivity("You have been released from jail.", "system"), 0);
         }
 
         if (updated.energy < MAX_ENERGY && now - updated.lastEnergyUpdate >= ENERGY_REGEN_INTERVAL) {
@@ -355,11 +366,10 @@ export function useRiftCity() {
             updated.cash += activeJobData.payPerInterval * payTicks;
             updated.lastJobPayment = updated.lastJobPayment + payTicks * JOB_PAY_INTERVAL;
             stateChanged = true;
-            setTimeout(() => logActivity(`Received salary payment of $${activeJobData.payPerInterval * payTicks} from ${activeJobData.name}.`, "job"), 0);
+            setTimeout(() => logActivity(`Received salary payment of $${activeJobData.payPerInterval * payTicks}.`, "job"), 0);
           }
         }
 
-        const HEALTH_REGEN_INTERVAL = 30 * 1000;
         if (updated.health < maxHealth && !updated.jailUntil) {
           updated.health = Math.min(maxHealth, updated.health + 2);
           stateChanged = true;
@@ -374,7 +384,6 @@ export function useRiftCity() {
 
   const checkAndCompleteEducation = () => {
     if (!gameState.educationActive || !gameState.educationStartedAt || !activeCourseData) return;
-    
     const now = Date.now();
     if (now >= gameState.educationStartedAt + activeCourseData.durationMs) {
       setGameState((prev) => ({
@@ -383,16 +392,13 @@ export function useRiftCity() {
         educationActive: null,
         educationStartedAt: null,
       }));
-      logActivity(`Congratulations! You completed the course: ${activeCourseData.name}.`, "success");
-    } else {
-      const remainingMins = Math.ceil(((gameState.educationStartedAt + activeCourseData.durationMs) - now) / 60000);
-      logActivity(`Course "${activeCourseData.name}" is still in progress. ${remainingMins} minutes remaining.`, "system");
+      logActivity(`Completed course: ${activeCourseData.name}.`, "success");
     }
   };
 
   const commitCrime = (crime: Crime) => {
-    if (gameState.jailUntil) return logActivity("You cannot commit crimes while incarcerated.", "system");
-    if (gameState.nerve < crime.nerveCost) return logActivity("Not enough nerve to attempt this action.", "system");
+    if (gameState.jailUntil) return logActivity("Incarcerated.", "system");
+    if (gameState.nerve < crime.nerveCost) return logActivity("Not enough nerve.", "system");
 
     setGameState((prev) => {
       const outcome = rollCrimeOutcome(crime, prev.crimeExperience, prev.stats);
@@ -406,16 +412,16 @@ export function useRiftCity() {
         if (outcome.itemReward) {
           updated.inventory[outcome.itemReward] = (updated.inventory[outcome.itemReward] || 0) + 1;
         }
-        setTimeout(() => logActivity(`Success! ${crime.successText}. Reward: $${outcome.cashReward}.`, "success"), 0);
+        setTimeout(() => logActivity(`Success: ${crime.successText}`, "success"), 0);
       } else if (outcome.type === "spooked") {
         updated.crimesSpooked += 1;
-        setTimeout(() => logActivity(`Spooked! ${crime.spookedText || "You backed out before getting caught."}`, "spooked"), 0);
+        setTimeout(() => logActivity(`Spooked!`, "spooked"), 0);
       } else {
         updated.crimesFailed += 1;
         if (outcome.jailed) {
           updated.timesJailed += 1;
           updated.jailUntil = Date.now() + JAIL_BASE_MINUTES * 60 * 1000;
-          setTimeout(() => logActivity(`Busted! ${crime.failText}. You are now in jail for ${JAIL_BASE_MINUTES} minutes.`, "jailed"), 0);
+          setTimeout(() => logActivity(`Jailed! ${crime.failText}`, "jailed"), 0);
         } else {
           setTimeout(() => logActivity(`Failed! ${crime.failText}`, "failure"), 0);
         }
@@ -425,12 +431,12 @@ export function useRiftCity() {
   };
 
   const trainGymStat = (stat: TrainingStat, energyAmount: number) => {
-    if (gameState.jailUntil) return logActivity("You cannot hit the gym while incarcerated.", "system");
-    if (gameState.energy < energyAmount) return logActivity("Not enough energy to train.", "system");
+    if (gameState.jailUntil) return logActivity("Incarcerated.", "system");
+    if (gameState.energy < energyAmount) return logActivity("Not enough energy.", "system");
 
-    const currentGym = GYMS.find((g) => g.id === gameState.activeGym);
+    const currentGym = activeGymData;
     if (!currentGym || !canTrainStat(currentGym, stat)) {
-      return logActivity("Your active gym does not allow training this attribute.", "system");
+      return logActivity("Cannot train this stat here.", "system");
     }
 
     setGameState((prev) => {
@@ -449,13 +455,11 @@ export function useRiftCity() {
       if (nextGym && !updated.gymMemberships.includes(nextGym.id)) {
         updated.gymMemberships.push(nextGym.id);
         updated.activeGym = nextGym.id;
-        setTimeout(() => logActivity(`Gym Level Up! You unlocked and entered a new fitness club: ${nextGym.name}.`, "system"), 0);
+        setTimeout(() => logActivity(`Unlocked gym: ${nextGym.name}`, "system"), 0);
       }
 
       return updated;
     });
-
-    logActivity(`Trained ${stat} inside ${currentGym.name}. Stats increased.`, "gym");
   };
 
   return {
@@ -469,6 +473,7 @@ export function useRiftCity() {
     maxHappiness,
     activeJobData,
     activeCourseData,
+    activeGymData, // Exported to ensure components render correctly!
     commitCrime,
     trainGymStat,
     checkAndCompleteEducation,
