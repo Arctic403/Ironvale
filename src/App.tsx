@@ -12,11 +12,15 @@ import {
   CombatStats,
   getLevel,
   getMaxHealth,
+  getNaturalNerveMax,
 } from "./systems/progressionSystem";
 import {
   ENERGY_REGEN_INTERVAL,
   MAX_ENERGY,
   NERVE_REGEN_INTERVAL,
+  regenerateResources,
+  getEnergyTimeRemaining,
+  getNerveTimeRemaining,
 } from "./systems/resourceSystem";
 import {
   GYMS,
@@ -44,8 +48,8 @@ import {
   getProperty,
 } from "./data/gameData";
 
-type Screen = "city" | "crimes" | "combat" | "gym" | "jobs" | "items" | "missions" | "education" | "property" | "character";
-type ActivityType = "success" | "failure" | "critical" | "spooked" | "jailed" | "combat" | "gym" | "job" | "system";
+type Screen = "character" | "city" | "crimes" | "combat" | "gym" | "jobs" | "items" | "missions" | "education" | "property" | "bank" | "market";
+type ActivityType = "success" | "failure" | "critical" | "spooked" | "jailed" | "combat" | "gym" | "job" | "system" | "bank" | "market" | "travel";
 type Activity = { id: number; text: string; type: ActivityType; time: number };
 type Encounter = { id: string; title: string; text: string; choices: { label: string; cash?: number; xp?: number; health?: number; energy?: number; nerve?: number; text: string }[] };
 
@@ -55,6 +59,14 @@ type SaveData = {
   nerve: number; lastNerveUpdate: number;
   health: number;
   crimeExperience: number;
+  crimesById: Record<string, number>;
+  bankLastInterest: number;
+  bankInterestEarned: number;
+  points: number;
+  merits: number;
+  dailyStreak: number;
+  lastDailyClaim: number | null;
+  netWorthPeak: number;
   stats: CombatStats;
   gymExperience: number; gymMemberships: string[]; activeGym: string;
   happiness: number; lastHappinessUpdate: number;
@@ -70,7 +82,10 @@ type SaveData = {
   activities: Activity[];
 };
 
-const SAVE_KEY = "riftcity-core-v4";
+const SAVE_KEY = "riftcity-core-v6";
+const BANK_INTEREST_INTERVAL = 24 * 60 * 60 * 1000;
+const BANK_INTEREST_RATE = 0.005;
+const DAILY_INTERVAL = 24 * 60 * 60 * 1000;
 const JOB_PAY_INTERVAL = 60 * 60 * 1000;
 const HAPPINESS_TICK = 15 * 60 * 1000;
 const JAIL_MINUTES = 2;
@@ -104,6 +119,8 @@ function freshSave(): SaveData {
   return {
     cash: 1000, bank: 0, xp: 0, energy: 100, lastEnergyUpdate: now,
     nerve: 10, lastNerveUpdate: now, health: 100, crimeExperience: 0,
+    crimesById: {}, bankLastInterest: now, bankInterestEarned: 0,
+    points: 0, merits: 0, dailyStreak: 0, lastDailyClaim: null, netWorthPeak: 1000,
     stats: { strength: 1, defense: 1, speed: 1, dexterity: 1 },
     gymExperience: 0, gymMemberships: ["premier-fitness"], activeGym: "premier-fitness",
     happiness: BASE_HAPPINESS, lastHappinessUpdate: now, currentJob: null,
@@ -125,6 +142,14 @@ function loadSave(): SaveData {
     const parsed = JSON.parse(raw);
     return {
       ...base, ...parsed,
+      crimesById: parsed.crimesById || {},
+      bankLastInterest: typeof parsed.bankLastInterest === "number" ? parsed.bankLastInterest : base.bankLastInterest,
+      bankInterestEarned: parsed.bankInterestEarned || 0,
+      points: parsed.points || 0,
+      merits: parsed.merits || 0,
+      dailyStreak: parsed.dailyStreak || 0,
+      lastDailyClaim: parsed.lastDailyClaim ?? null,
+      netWorthPeak: parsed.netWorthPeak || (parsed.cash || 0) + (parsed.bank || 0),
       stats: { ...base.stats, ...(parsed.stats || {}) },
       inventory: parsed.inventory || {},
       activities: Array.isArray(parsed.activities) ? parsed.activities : base.activities,
@@ -150,10 +175,11 @@ export function useRiftCity() {
   const level = getLevel(gameState.xp).level;
   const property = getProperty(gameState.ownedProperty);
   const maxHealth = getMaxHealth(property?.maxHealthBonus ?? 0);
-  const maxNerve = 10 + Math.min(50, Math.floor(gameState.crimeExperience / 100) * 5) + (property?.nerveBonus ?? 0);
+  const maxNerve = getNaturalNerveMax(gameState.crimeExperience) + (property?.nerveBonus ?? 0);
   const gym = GYMS.find(g => g.id === gameState.activeGym) ?? GYMS[0];
   const job = getJob(gameState.currentJob);
   const education = EDUCATION.find(e => e.id === gameState.educationActive) ?? null;
+  const propertyMaxHappiness = property?.maxHappiness ?? 100;
 
   const log = (text: string, type: ActivityType = "system") => setGameState(s => ({ ...s, activities: [{ id: Date.now() + Math.random(), text, type, time: Date.now() }, ...s.activities].slice(0, 60) }));
 
@@ -165,25 +191,72 @@ export function useRiftCity() {
       setGameState(prev => {
         let s = { ...prev };
         let changed = false;
-        if (s.energy < MAX_ENERGY) {
-          const ticks = Math.floor((now - s.lastEnergyUpdate) / ENERGY_REGEN_INTERVAL);
-          if (ticks > 0) { s.energy = Math.min(MAX_ENERGY, s.energy + ticks); s.lastEnergyUpdate += ticks * ENERGY_REGEN_INTERVAL; changed = true; }
-        } else s.lastEnergyUpdate = now;
-        if (s.nerve < maxNerve) {
-          const ticks = Math.floor((now - s.lastNerveUpdate) / NERVE_REGEN_INTERVAL);
-          if (ticks > 0) { s.nerve = Math.min(maxNerve, s.nerve + ticks); s.lastNerveUpdate += ticks * NERVE_REGEN_INTERVAL; changed = true; }
-        } else s.lastNerveUpdate = now;
-        if (s.happiness < (property?.maxHappiness ?? 100)) {
-          const ticks = Math.floor((now - s.lastHappinessUpdate) / HAPPINESS_TICK);
-          if (ticks > 0) { s.happiness = Math.min(property?.maxHappiness ?? 100, s.happiness + ticks * 5); s.lastHappinessUpdate += ticks * HAPPINESS_TICK; changed = true; }
+
+        const resources = regenerateResources(
+          { energy: s.energy, nerve: s.nerve, lastEnergyUpdate: s.lastEnergyUpdate, lastNerveUpdate: s.lastNerveUpdate },
+          now,
+          maxNerve
+        );
+        if (resources.energy !== s.energy || resources.nerve !== s.nerve ||
+            resources.lastEnergyUpdate !== s.lastEnergyUpdate || resources.lastNerveUpdate !== s.lastNerveUpdate) {
+          s = { ...s, ...resources }; changed = true;
         }
-        if (s.health < maxHealth && !s.hospitalUntil && !s.jailUntil) { s.health = Math.min(maxHealth, s.health + 1); changed = true; }
-        if (s.jailUntil && now >= s.jailUntil) { s.jailUntil = null; changed = true; }
-        if (s.hospitalUntil && now >= s.hospitalUntil) { s.hospitalUntil = null; s.health = maxHealth; changed = true; }
+
+        const maxHappy = property?.maxHappiness ?? 100;
+        if (s.happiness < maxHappy) {
+          const ticks = Math.floor(Math.max(0, now - s.lastHappinessUpdate) / HAPPINESS_TICK);
+          if (ticks > 0) {
+            s.happiness = Math.min(maxHappy, s.happiness + ticks * 2);
+            s.lastHappinessUpdate += ticks * HAPPINESS_TICK;
+            changed = true;
+          }
+        } else if (s.lastHappinessUpdate !== now) {
+          s.lastHappinessUpdate = now;
+        }
+
+        if (s.health < maxHealth && !s.hospitalUntil && !s.jailUntil) {
+          s.health = Math.min(maxHealth, s.health + 1);
+          changed = true;
+        }
+
+        if (s.jailUntil && now >= s.jailUntil) {
+          s.jailUntil = null; s.happiness = Math.min(maxHappy, s.happiness + 3); changed = true;
+          s.activities = [{ id: now + Math.random(), text: "You have been released from jail.", type: "success", time: now }, ...s.activities].slice(0, 60);
+        }
+
+        if (s.hospitalUntil && now >= s.hospitalUntil) {
+          s.hospitalUntil = null; s.health = maxHealth; changed = true;
+          s.activities = [{ id: now + Math.random(), text: "You have recovered and left hospital.", type: "success", time: now }, ...s.activities].slice(0, 60);
+        }
+
         if (s.currentJob && now - s.lastJobPayment >= JOB_PAY_INTERVAL && job) {
           const ticks = Math.floor((now - s.lastJobPayment) / JOB_PAY_INTERVAL);
-          s.cash += job.salary * ticks; s.lastJobPayment += ticks * JOB_PAY_INTERVAL; changed = true;
+          const pay = job.salary * ticks;
+          s.cash += pay;
+          s.lastJobPayment += ticks * JOB_PAY_INTERVAL;
+          s.points += Math.min(10, ticks);
+          changed = true;
+          s.activities = [{ id: now + Math.random(), text: `Salary received: ${money(pay)}.`, type: "job", time: now }, ...s.activities].slice(0, 60);
         }
+
+        if (s.bank > 0 && now - s.bankLastInterest >= BANK_INTEREST_INTERVAL) {
+          const ticks = Math.floor((now - s.bankLastInterest) / BANK_INTEREST_INTERVAL);
+          const interest = Math.floor(s.bank * (Math.pow(1 + BANK_INTEREST_RATE, ticks) - 1));
+          if (interest > 0) {
+            s.bank += interest;
+            s.bankInterestEarned += interest;
+            s.bankLastInterest += ticks * BANK_INTEREST_INTERVAL;
+            s.points += 1;
+            changed = true;
+            s.activities = [{ id: now + Math.random(), text: `Bank interest credited: ${money(interest)}.`, type: "bank", time: now }, ...s.activities].slice(0, 60);
+          } else {
+            s.bankLastInterest = now;
+          }
+        }
+
+        const worth = s.cash + s.bank;
+        if (worth > s.netWorthPeak) { s.netWorthPeak = worth; changed = true; }
+
         return changed ? s : prev;
       });
     }, 1000);
@@ -202,9 +275,9 @@ export function useRiftCity() {
       const outcome = roll < chance * 0.08 ? "critical" : roll > 99.5 ? "critical-fail" : roll < chance ? "success" : roll < chance + crime.risk * 0.55 ? "jailed" : "spooked";
       const s = { ...prev, nerve: prev.nerve - crime.nerve };
       if (outcome === "critical") {
-        const reward = Math.floor(randomReward(crime) * 1.75); s.cash += reward; s.xp += crime.xp * 2; s.crimeExperience += crime.crimeExperience * 2; s.crimesCompleted++; s.crimesCritical++; log(`CRITICAL SUCCESS: ${crime.name} paid ${money(reward)}.`, "critical");
+        const reward = Math.floor(randomReward(crime) * 1.75); s.cash += reward; s.xp += crime.xp * 2; s.crimeExperience += crime.crimeExperience * 2; s.crimesCompleted++; s.crimesCritical++; s.crimesById[crime.id] = (s.crimesById[crime.id] || 0) + 1; s.points += 3; log(`CRITICAL SUCCESS: ${crime.name} paid ${money(reward)}.`, "critical");
       } else if (outcome === "success") {
-        const reward = randomReward(crime); s.cash += reward; s.xp += crime.xp; s.crimeExperience += crime.crimeExperience; s.crimesCompleted++; log(`SUCCESS: ${crime.name} paid ${money(reward)}.`, "success");
+        const reward = randomReward(crime); s.cash += reward; s.xp += crime.xp; s.crimeExperience += crime.crimeExperience; s.crimesCompleted++; s.crimesById[crime.id] = (s.crimesById[crime.id] || 0) + 1; s.points += 1; log(`SUCCESS: ${crime.name} paid ${money(reward)}.`, "success");
       } else if (outcome === "jailed") {
         s.crimesFailed++; s.timesJailed++; s.jailUntil = Date.now() + JAIL_MINUTES * 60000; log(`FAILED: ${crime.name}. You were jailed.`, "jailed");
       } else if (outcome === "critical-fail") {
@@ -249,18 +322,23 @@ export function useRiftCity() {
       const player: CombatStats = { ...prev.stats, strength: prev.stats.strength + (weapon?.effect ?? 0), defense: prev.stats.defense + (armor?.effect ?? 0) };
       const result = resolveCombat(player, combatOpponent.stats);
       const s = { ...prev, energy: prev.energy - 25, attacks: prev.attacks + 1 };
-      if (result === "victory") { s.fightsWon++; s.cash += combatOpponent.rewardCash; s.xp += combatOpponent.rewardXp; s.health = Math.max(1, s.health - Math.floor(Math.random() * 15)); setCombatMessage(`VICTORY. You earned ${money(combatOpponent.rewardCash)} and ${combatOpponent.rewardXp} XP.`); log(`COMBAT WIN: ${combatOpponent.name}.`, "combat"); }
+      if (result === "victory") { s.fightsWon++; s.cash += combatOpponent.rewardCash; s.xp += combatOpponent.rewardXp; s.points += 2; s.health = Math.max(1, s.health - Math.floor(Math.random() * 15)); setCombatMessage(`VICTORY. You earned ${money(combatOpponent.rewardCash)} and ${combatOpponent.rewardXp} XP.`); log(`COMBAT WIN: ${combatOpponent.name}.`, "combat"); }
       else { s.fightsLost++; s.health = Math.max(1, s.health - Math.floor(20 + Math.random() * 30)); setCombatMessage(`DEFEAT. You were sent to hospital.`); s.hospitalUntil = Date.now() + HOSPITAL_MINUTES * 60000; log(`COMBAT LOSS: ${combatOpponent.name}. Hospital for ${HOSPITAL_MINUTES} minutes.`, "failure"); }
       return s;
     });
   };
 
-  const buyItem = (id: string) => setGameState(prev => { const item = getItem(id); if (!item || prev.cash < item.price) { log("Not enough cash."); return prev; } log(`Bought ${item.name}.`, "success"); return { ...prev, cash: prev.cash - item.price, inventory: { ...prev.inventory, [id]: (prev.inventory[id] || 0) + 1 } }; });
+  const buyItem = (id: string) => setGameState(prev => { const item = getItem(id); if (!item || prev.cash < item.price) { log("Not enough cash."); return prev; } log(`Bought ${item.name}.`, "success"); return { ...prev, cash: prev.cash - item.price, points: prev.points + 1, happiness: prev.happiness, inventory: { ...prev.inventory, [id]: (prev.inventory[id] || 0) + 1 } }; });
   const useItem = (id: string) => setGameState(prev => { const item = getItem(id); const count = prev.inventory[id] || 0; if (!item || count <= 0) return prev; const s = { ...prev, inventory: { ...prev.inventory, [id]: count - 1 } }; if (item.type === "medical") s.health = Math.min(maxHealth, s.health + (item.effect || 0)); if (item.type === "energy") s.energy = Math.min(MAX_ENERGY, s.energy + (item.effect || 0)); if (item.type === "nerve") s.nerve = Math.min(maxNerve, s.nerve + (item.effect || 0)); log(`Used ${item.name}.`, "success"); return s; });
   const equip = (id: string) => setGameState(prev => { const item = getItem(id); if (!item || (prev.inventory[id] || 0) <= 0) return prev; return item.type === "weapon" ? { ...prev, equippedWeapon: id } : { ...prev, equippedArmor: id }; });
   const chooseEncounter = (choice: Encounter["choices"][number]) => { setGameState(prev => ({ ...prev, cash: Math.max(0, prev.cash + (choice.cash || 0)), xp: Math.max(0, prev.xp + (choice.xp || 0)), health: Math.max(1, Math.min(maxHealth, prev.health + (choice.health || 0))), energy: Math.max(0, Math.min(MAX_ENERGY, prev.energy + (choice.energy || 0))), nerve: Math.max(0, Math.min(maxNerve, prev.nerve + (choice.nerve || 0))) })); log(choice.text, "system"); setEncounter(null); };
   const randomEncounter = () => { if (blocked()) return log("You cannot explore right now."); setEncounter(ENCOUNTERS[Math.floor(Math.random() * ENCOUNTERS.length)]); };
-  const travel = (id: string) => setGameState(prev => ({ ...prev, currentLocation: id, locationsVisited: prev.locationsVisited.includes(id) ? prev.locationsVisited : [...prev.locationsVisited, id] }));
+  const travel = (id: string) => setGameState(prev => {
+    if (prev.currentLocation === id) return prev;
+    if (prev.energy < 2) { log("You need 2 energy to travel."); return prev; }
+    log(`Travelled to ${LOCATIONS.find(x => x[0] === id)?.[1] || id}.`, "travel");
+    return { ...prev, energy: prev.energy - 2, happiness: Math.max(0, prev.happiness - 1), currentLocation: id, locationsVisited: prev.locationsVisited.includes(id) ? prev.locationsVisited : [...prev.locationsVisited, id] };
+  });
   const joinJob = (id: string) => setGameState(prev => { const j = getJob(id); if (!j || level < j.levelRequired) return prev; log(`Started work as ${j.title}.`, "job"); return { ...prev, currentJob: id, jobStartedAt: Date.now(), lastJobPayment: Date.now() }; });
   const buyProperty = (id: string) => setGameState(prev => { const p = getProperty(id); if (!p || prev.cash < p.price || p.price < (getProperty(prev.ownedProperty)?.price || 0)) return prev; log(`Moved into ${p.name}.`, "success"); return { ...prev, cash: prev.cash - p.price, ownedProperty: id, happiness: Math.min(p.maxHappiness, prev.happiness + 10) }; });
   const bankDeposit = (amount: number) => setGameState(prev => { const n = Math.min(prev.cash, Math.max(0, amount)); return { ...prev, cash: prev.cash - n, bank: prev.bank + n }; });
@@ -271,7 +349,41 @@ export function useRiftCity() {
   const missionProgress = (m: typeof MISSIONS[number]) => m.requirement === "crime" ? gameState.crimesCompleted : m.requirement === "combat" ? gameState.fightsWon : m.requirement === "gym" ? gameState.gymSessions : gameState.cash;
   const claimMission = (id: string) => setGameState(prev => { const m = MISSIONS.find(x => x.id === id); if (!m || prev.completedMissions.includes(id)) return prev; const progress = m.requirement === "crime" ? prev.crimesCompleted : m.requirement === "combat" ? prev.fightsWon : m.requirement === "gym" ? prev.gymSessions : prev.cash; if (progress < m.target) return prev; log(`Mission complete: ${m.name}.`, "success"); return { ...prev, cash: prev.cash + m.rewardCash, xp: prev.xp + m.rewardXp, completedMissions: [...prev.completedMissions, id] }; });
 
-  return { gameState, setGameState, currentScreen, setCurrentScreen, level, maxHealth, maxNerve, gym, job, education, encounter, setEncounter, combatOpponent, combatMessage, commitCrime, train, buyGym, attack, resolveAttack, buyItem, useItem, equip, randomEncounter, chooseEncounter, travel, joinJob, buyProperty, bankDeposit, bankWithdraw, startEducation, finishEducation, missionProgress, claimMission, log, resetGame: () => setGameState(freshSave()) };
+  const quitJob = () => setGameState(prev => {
+    if (!prev.currentJob) return prev;
+    log("You resigned from your current job.", "job");
+    return { ...prev, currentJob: null, jobStartedAt: Date.now(), lastJobPayment: Date.now() };
+  });
+
+  const claimDaily = () => setGameState(prev => {
+    const now = Date.now();
+    if (prev.lastDailyClaim && now - prev.lastDailyClaim < DAILY_INTERVAL) return prev;
+    const streak = prev.lastDailyClaim && now - prev.lastDailyClaim < DAILY_INTERVAL * 2 ? prev.dailyStreak + 1 : 1;
+    const reward = 250 + Math.min(10, streak) * 50;
+    log(`Daily reward claimed: ${money(reward)}.`, "success");
+    return { ...prev, cash: prev.cash + reward, points: prev.points + 5, dailyStreak: streak, lastDailyClaim: now };
+  });
+
+  const rest = () => setGameState(prev => {
+    if (blocked()) return prev;
+    const maxHappy = property?.maxHappiness ?? 100;
+    const gain = Math.min(15, maxHappy - prev.happiness);
+    const energyGain = Math.min(10, MAX_ENERGY - prev.energy);
+    log(`You rested. +${gain} happiness, +${energyGain} energy.`, "system");
+    return { ...prev, happiness: prev.happiness + gain, energy: prev.energy + energyGain };
+  });
+
+  const sellItem = (id: string, quantity = 1) => setGameState(prev => {
+    const item = getItem(id);
+    const owned = prev.inventory[id] || 0;
+    const qty = Math.max(0, Math.min(owned, Math.floor(quantity)));
+    if (!item || qty <= 0) return prev;
+    const value = Math.floor(item.price * 0.6) * qty;
+    log(`Sold ${qty} × ${item.name} for ${money(value)}.`, "market");
+    return { ...prev, cash: prev.cash + value, inventory: { ...prev.inventory, [id]: owned - qty } };
+  });
+
+  return { gameState, setGameState, currentScreen, propertyMaxHappiness, setCurrentScreen, level, maxHealth, maxNerve, gym, job, education, encounter, setEncounter, combatOpponent, combatMessage, commitCrime, train, buyGym, attack, resolveAttack, buyItem, useItem, equip, randomEncounter, chooseEncounter, travel, joinJob, buyProperty, bankDeposit, bankWithdraw, startEducation, finishEducation, missionProgress, claimMission, quitJob, claimDaily, rest, sellItem, log, resetGame: () => setGameState(freshSave()) };
 }
 
 function App() {
@@ -279,7 +391,7 @@ function App() {
   const [bankAmount, setBankAmount] = useState("100");
   const levelInfo = getLevel(g.gameState.xp);
   const nav: { id: Screen; label: string; icon: string }[] = [
-    {id:"character",label:"Character",icon:"👤"},{id:"city",label:"City",icon:"🏙️"},{id:"crimes",label:"Crimes",icon:"🕵️"},{id:"combat",label:"Combat",icon:"⚔️"},{id:"gym",label:"Gym",icon:"🏋️"},{id:"jobs",label:"Jobs",icon:"💼"},{id:"items",label:"Items",icon:"🎒"},{id:"missions",label:"Missions",icon:"📜"},{id:"education",label:"Education",icon:"🎓"},{id:"property",label:"Property",icon:"🏠"},
+    {id:"character",label:"Character",icon:"👤"},{id:"city",label:"City",icon:"🏙️"},{id:"crimes",label:"Crimes",icon:"🕵️"},{id:"combat",label:"Combat",icon:"⚔️"},{id:"gym",label:"Gym",icon:"🏋️"},{id:"jobs",label:"Jobs",icon:"💼"},{id:"items",label:"Items",icon:"🎒"},{id:"missions",label:"Missions",icon:"📜"},{id:"education",label:"Education",icon:"🎓"},{id:"property",label:"Property",icon:"🏠"},{id:"bank",label:"Bank",icon:"🏦"},{id:"market",label:"Market",icon:"🛒"},
   ];
   const title = nav.find(n => n.id === g.currentScreen)?.label || "RiftCity";
   return <div className="app-shell">
@@ -297,7 +409,7 @@ function App() {
       {g.currentScreen === "items" && <Items g={g}/>} 
       {g.currentScreen === "missions" && <Missions g={g}/>} 
       {g.currentScreen === "education" && <Education g={g}/>} 
-      {g.currentScreen === "property" && <PropertyView g={g}/>} 
+      {g.currentScreen === "property" && <PropertyView g={g}/>} {g.currentScreen === "bank" && <BankView g={g}/>} {g.currentScreen === "market" && <MarketView g={g}/>} 
       <section className="panel activity"><div className="panel-title"><span>Activity</span><small>Latest events</small></div>{g.gameState.activities.slice(0, 10).map(a => <div className={`activity-row ${a.type}`} key={a.id}><span>{new Date(a.time).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</span><b>{a.type.toUpperCase()}</b><p>{a.text}</p></div>)}</section>
     </main>
     {g.encounter && <div className="modal-backdrop"><div className="modal"><span className="eyebrow">RANDOM ENCOUNTER</span><h2>{g.encounter.title}</h2><p>{g.encounter.text}</p>{g.encounter.choices.map((c, i) => <button className="choice" key={i} onClick={() => g.chooseEncounter(c)}>{c.label}</button>)}<button className="ghost" onClick={() => g.setEncounter(null)}>Leave</button></div></div>}
@@ -310,7 +422,25 @@ function Button({children, onClick, disabled=false, className=""}: {children: Re
 function Character({g}: {g: ReturnType<typeof useRiftCity>}) {
   const [amount,setAmount]=useState("100");
   const n=Math.max(0,Number(amount)||0);
-  return <div className="grid two"><Panel title="Combat Stats"><div className="stat-grid">{Object.entries(g.gameState.stats).map(([k,v]) => <div className="stat" key={k}><span>{k}</span><strong>{(v as number).toFixed(2)}</strong></div>)}</div></Panel><Panel title="Progress"><div className="rows"><p><span>Crime experience</span><b>{g.gameState.crimeExperience}</b></p><p><span>Gym experience</span><b>{g.gameState.gymExperience}</b></p><p><span>Crimes</span><b>{g.gameState.crimesCompleted} / {g.gameState.crimesFailed} failed</b></p><p><span>Fights</span><b>{g.gameState.fightsWon}W / {g.gameState.fightsLost}L</b></p><p><span>Current job</span><b>{g.job?.title ?? "Unemployed"}</b></p><p><span>Property</span><b>{getProperty(g.gameState.ownedProperty)?.name}</b></p></div></Panel><Panel title="Bank"><div className="bank"><h3>{money(g.gameState.bank)}</h3><input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)} /><div><Button onClick={() => g.bankDeposit(n)}>Deposit</Button><Button onClick={() => g.bankWithdraw(n)}>Withdraw</Button></div></div></Panel><Panel title="Wallet & Equipment"><div className="rows"><p><span>Cash</span><b>{money(g.gameState.cash)}</b></p><p><span>Weapon</span><b>{getItem(g.gameState.equippedWeapon || "")?.name || "None"}</b></p><p><span>Armor</span><b>{getItem(g.gameState.equippedArmor || "")?.name || "None"}</b></p></div></Panel></div> }
+  const info=getLevel(g.gameState.xp);
+  const netWorth=g.gameState.cash+g.gameState.bank;
+  const dailyReady=!g.gameState.lastDailyClaim || Date.now()-g.gameState.lastDailyClaim>=DAILY_INTERVAL;
+  const energyTimer=getEnergyTimeRemaining(g.gameState.energy,Date.now(),g.gameState.lastEnergyUpdate);
+  const nerveTimer=getNerveTimeRemaining(g.gameState.nerve,g.maxNerve,Date.now(),g.gameState.lastNerveUpdate);
+  return <div className="grid two">
+    <Panel title="Core Resources"><div className="stat-grid">
+      <div className="stat"><span>❤️ Health</span><strong>{Math.floor(g.gameState.health)} / {g.maxHealth}</strong></div>
+      <div className="stat"><span>⚡ Energy</span><strong>{g.gameState.energy} / {MAX_ENERGY}</strong><small>{g.gameState.energy<MAX_ENERGY ? `next +1 in ${Math.ceil(energyTimer/1000)}s` : "FULL"}</small></div>
+      <div className="stat"><span>🧠 Nerve</span><strong>{g.gameState.nerve} / {g.maxNerve}</strong><small>{g.gameState.nerve<g.maxNerve ? `next +1 in ${Math.ceil(nerveTimer/1000)}s` : "FULL"}</small></div>
+      <div className="stat"><span>😊 Happiness</span><strong>{Math.floor(g.gameState.happiness)} / {g.propertyMaxHappiness}</strong></div>
+    </div></Panel>
+    <Panel title="Combat Stats"><div className="stat-grid">{Object.entries(g.gameState.stats).map(([k,v])=><div className="stat" key={k}><span>{k}</span><strong>{(v as number).toFixed(2)}</strong></div>)}</div></Panel>
+    <Panel title="Progress"><div className="rows"><p><span>Level</span><b>{g.level}</b></p><p><span>XP</span><b>{info.currentXp} / 100</b></p><p><span>Crime experience</span><b>{g.gameState.crimeExperience}</b></p><p><span>Gym experience</span><b>{g.gameState.gymExperience}</b></p><p><span>Points</span><b>{g.gameState.points}</b></p><p><span>Merits</span><b>{g.gameState.merits}</b></p><p><span>Net worth</span><b>{money(netWorth)}</b></p><p><span>Peak net worth</span><b>{money(g.gameState.netWorthPeak)}</b></p></div></Panel>
+    <Panel title="Career & Streak"><div className="rows"><p><span>Job</span><b>{g.job?.title || "Unemployed"}</b></p><p><span>Daily streak</span><b>{g.gameState.dailyStreak}</b></p></div><Button onClick={g.claimDaily} disabled={!dailyReady}>{dailyReady ? "Claim Daily Reward" : "Daily Reward Claimed"}</Button><Button onClick={g.rest}>Rest & Recover</Button></Panel>
+    <Panel title="Banking"><div className="rows"><p><span>Cash</span><b>{money(g.gameState.cash)}</b></p><p><span>Bank</span><b>{money(g.gameState.bank)}</b></p><p><span>Interest</span><b>0.5% / 24h</b></p><p><span>Lifetime interest</span><b>{money(g.gameState.bankInterestEarned)}</b></p></div><input value={amount} onChange={e=>setAmount(e.target.value)} inputMode="numeric" /><Button onClick={()=>g.bankDeposit(n)} disabled={n<=0}>Deposit</Button><Button onClick={()=>g.bankWithdraw(n)} disabled={n<=0}>Withdraw</Button></Panel>
+  </div>;
+}
+
 function City({g}: {g: ReturnType<typeof useRiftCity>}) { return <><div className="grid four">{LOCATIONS.map(([id,name,desc]) => <div className="card" key={id}><span className="eyebrow">LOCATION</span><h3>{name}</h3><p>{desc}</p><Button onClick={() => g.travel(id)}>{g.gameState.currentLocation === id ? "Current Location" : "Travel"}</Button></div>)}</div><Panel title="City Interactions"><div className="grid three"><Button onClick={g.randomEncounter}>🎲 Explore</Button><Button onClick={() => g.setCurrentScreen("crimes")}>🕵️ Find Work</Button><Button onClick={() => g.setCurrentScreen("combat")}>⚔️ Find a Fight</Button></div></Panel></> }
 function Crimes({g}: {g: ReturnType<typeof useRiftCity>}) { return <div className="grid two">{CRIMES.map(c => { const chance = crimeSuccessChance(c, g.gameState.crimeExperience, 1, getCrimeStatBonus(g.gameState.stats)); const unlocked = crimeUnlocked(c, g.level); return <div className={`card ${unlocked ? "" : "locked"}`} key={c.id}><div className="card-top"><span className="tag">NERVE {c.nerve}</span><span className="chance">{unlocked ? `${chance.toFixed(0)}%` : `LV ${c.levelRequired}`}</span></div><h3>{c.name}</h3><p>{c.description}</p><div className="meter"><i style={{width: `${unlocked ? chance : 0}%`}}/></div><small>Success chance · risk {c.risk}%</small><Button disabled={!unlocked || g.gameState.nerve < c.nerve} onClick={() => g.commitCrime(c)}>Commit Crime</Button></div>})}</div> }
 function Combat({g}: {g: ReturnType<typeof useRiftCity>}) { return <><div className="grid two">{OPPONENTS.map(o => <div className="card" key={o.id}><div className="card-top"><span className="tag">HP {o.health}</span><span className="chance">{calculateWinChance(g.gameState.stats, o.stats).toFixed(0)}%</span></div><h3>{o.name}</h3><p>{o.description}</p><small>Win chance is an estimate, not a prophecy. Humanity already has enough prophecies.</small><Button onClick={() => g.attack(o)}>Attack · 25 ⚡</Button></div>)}</div>{g.combatOpponent && <Panel title={`Encounter: ${g.combatOpponent.name}`}><div className="combat-box"><p>{g.combatMessage}</p><Button onClick={g.resolveAttack}>Resolve Fight</Button><Button className="ghost" onClick={() => g.setCurrentScreen("combat")}>Keep Browsing</Button></div></Panel>}</> }
@@ -319,6 +449,17 @@ function Jobs({g}: {g: ReturnType<typeof useRiftCity>}) { return <div className=
 function Items({g}: {g: ReturnType<typeof useRiftCity>}) { return <div className="grid three">{ITEMS.map(i => <div className="card" key={i.id}><span className="tag">{i.type}</span><h3>{i.name}</h3><p>{i.description}</p><strong>{money(i.price)}</strong><div className="button-row"><Button onClick={() => g.buyItem(i.id)}>Buy</Button>{(g.gameState.inventory[i.id]||0)>0 && <Button onClick={() => i.type === "weapon" || i.type === "armor" ? g.equip(i.id) : g.useItem(i.id)}>{i.type === "weapon" || i.type === "armor" ? "Equip" : "Use"}</Button>}</div><small>Owned: {g.gameState.inventory[i.id]||0}</small></div>)}</div> }
 function Missions({g}: {g: ReturnType<typeof useRiftCity>}) { return <div className="grid two">{MISSIONS.map(m => { const p=g.missionProgress(m); const done=g.gameState.completedMissions.includes(m.id); return <div className="card" key={m.id}><span className="eyebrow">MISSION</span><h3>{m.name}</h3><p>{m.description}</p><div className="meter"><i style={{width:`${Math.min(100,p/m.target*100)}%`}}/></div><p>{Math.min(p,m.target).toLocaleString()} / {m.target.toLocaleString()}</p><Button disabled={done || p<m.target} onClick={() => g.claimMission(m.id)}>{done ? "Claimed" : "Claim Reward"}</Button></div>})}</div> }
 function Education({g}: {g: ReturnType<typeof useRiftCity>}) { return <><Panel title="Active Course">{g.education ? <><h3>{g.education.name}</h3><p>Started {new Date(g.gameState.educationStartedAt || Date.now()).toLocaleString()} · {g.education.durationHours}h</p><Button onClick={g.finishEducation}>Check Completion</Button></> : <p>No active course.</p>}</Panel><div className="grid two">{EDUCATION.map(c => <div className="card" key={c.id}><h3>{c.name}</h3><p>{c.description}</p><div className="rows"><p><span>Cost</span><b>{money(c.cost)}</b></p><p><span>Time</span><b>{c.durationHours}h</b></p><p><span>Requirement</span><b>Level {c.levelRequired}</b></p></div><Button disabled={g.level<c.levelRequired || g.gameState.educationCompleted.includes(c.id) || Boolean(g.education)} onClick={() => g.startEducation(c.id)}>{g.gameState.educationCompleted.includes(c.id)?"Completed":"Enroll"}</Button></div>)}</div></> }
+function BankView({g}: {g: ReturnType<typeof useRiftCity>}) {
+  const [amount,setAmount]=useState("100");
+  const n=Math.max(0,Number(amount)||0);
+  const next=Math.max(0, BANK_INTEREST_INTERVAL-(Date.now()-g.gameState.bankLastInterest));
+  return <div className="grid two"><Panel title="RiftCity Bank"><div className="rows"><p><span>Cash</span><b>{money(g.gameState.cash)}</b></p><p><span>Account balance</span><b>{money(g.gameState.bank)}</b></p><p><span>Interest rate</span><b>0.5% every 24h</b></p><p><span>Lifetime interest</span><b>{money(g.gameState.bankInterestEarned)}</b></p><p><span>Next interest cycle</span><b>{formatTime(next)}</b></p></div><input value={amount} onChange={e=>setAmount(e.target.value)} inputMode="numeric"/><Button onClick={()=>g.bankDeposit(n)} disabled={n<=0}>Deposit</Button><Button onClick={()=>g.bankWithdraw(n)} disabled={n<=0}>Withdraw</Button></Panel><Panel title="Financial Record"><p>Banking is persistent and continues while you are offline. Interest is calculated from elapsed 24-hour cycles.</p><p>Your net worth is tracked automatically.</p></Panel></div>;
+}
+
+function MarketView({g}: {g: ReturnType<typeof useRiftCity>}) {
+  return <><Panel title="City Market"><p>Buy useful equipment and resell owned items at the standard 60% vendor value.</p></Panel><div className="grid two">{ITEMS.map(i=><div className="card" key={i.id}><span className="eyebrow">{i.type.toUpperCase()}</span><h3>{i.name}</h3><p>{i.description}</p><div className="rows"><p><span>Buy</span><b>{money(i.price)}</b></p><p><span>Sell</span><b>{money(i.price*0.6)}</b></p><p><span>Owned</span><b>{g.gameState.inventory[i.id]||0}</b></p></div><Button onClick={()=>g.buyItem(i.id)} disabled={g.gameState.cash<i.price}>Buy</Button><Button onClick={()=>g.sellItem(i.id)} disabled={(g.gameState.inventory[i.id]||0)<=0}>Sell</Button></div>)}</div></>;
+}
+
 function PropertyView({g}: {g: ReturnType<typeof useRiftCity>}) { const current=getProperty(g.gameState.ownedProperty)?.price||0; return <div className="grid two">{PROPERTIES.map(p=><div className={`card ${p.price<current?"locked":""}`} key={p.id}><span className="eyebrow">PROPERTY</span><h3>{p.name}</h3><p>{p.description}</p><div className="rows"><p><span>Price</span><b>{money(p.price)}</b></p><p><span>Health bonus</span><b>+{p.maxHealthBonus}</b></p><p><span>Nerve bonus</span><b>+{p.nerveBonus}</b></p></div><Button disabled={p.price<current || g.gameState.cash<p.price} onClick={()=>g.buyProperty(p.id)}>{g.gameState.ownedProperty===p.id?"Current Home":"Move In"}</Button></div>)}</div> }
 
 export default App;
