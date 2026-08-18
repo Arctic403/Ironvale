@@ -14,267 +14,135 @@ export type Gym = {
   description: string;
 
   /*
-   * Torn-style progression:
-   * gyms are unlocked by gym experience,
-   * not by player level.
+   * Gym progression.
+   *
+   * Gym EXP unlocks the facility.
+   * Membership is purchased separately.
    */
   gymExpRequired: number;
-
-  /*
-   * One-time membership fee.
-   */
   membershipCost: number;
 
   /*
-   * Energy consumed by one train.
+   * Energy spent per training session.
    */
   energyCost: number;
 
   /*
-   * Torn-style gym dots/gains.
-   * Each stat can have a different value.
-   * null means the gym cannot train that stat.
+   * Base gain for each battle stat.
+   *
+   * null = this gym cannot train that stat.
    */
   gains: Record<
     TrainingStat,
     number | null
   >;
+
+  /*
+   * Jail-only facility.
+   */
+  jailOnly?: boolean;
 };
 
-export const TRAINING_STATS: {
+export type TrainingStatInfo = {
   id: TrainingStat;
   name: string;
   icon: string;
   description: string;
-}[] = [
+};
+
+export type TrainingResult = {
+  stats: CombatStats;
+  gain: number;
+};
+
+export const TRAINING_STATS: TrainingStatInfo[] = [
   {
     id: "strength",
     name: "Strength",
     icon: "💪",
     description:
-      "Raw offensive power.",
-  },
-  {
-    id: "speed",
-    name: "Speed",
-    icon: "⚡",
-    description:
-      "Speed and offensive pressure.",
+      "Improves your physical attacking ability.",
   },
   {
     id: "defense",
     name: "Defense",
     icon: "🛡️",
     description:
-      "Damage resistance and survivability.",
+      "Improves your ability to absorb attacks.",
+  },
+  {
+    id: "speed",
+    name: "Speed",
+    icon: "⚡",
+    description:
+      "Improves your speed and combat initiative.",
   },
   {
     id: "dexterity",
     name: "Dexterity",
     icon: "🎯",
     description:
-      "Accuracy, evasion and defensive ability.",
+      "Improves accuracy, agility and precision.",
   },
 ];
 
 /*
- * These are deliberately inspired by Torn's
- * progression rather than being a 1:1 copy.
+ * Torn-inspired gym progression.
  *
- * Torn currently has many more gyms. This gives
- * RiftCity a scalable progression while keeping
- * the game manageable.
+ * The important distinction is:
+ *
+ * - Energy is the training resource.
+ * - Gym EXP unlocks better gyms.
+ * - Memberships unlock access.
+ * - There is NO gym cooldown.
+ * - The player chooses the stat trained.
  */
 export const GYMS: Gym[] = [
   {
     id: "premier-fitness",
     name: "Premier Fitness",
     description:
-      "The city's entry-level gym. Cheap, simple and available to everyone.",
+      "The entry-level city gym. A reliable place to build your first battle stats.",
     gymExpRequired: 0,
-    membershipCost: 10,
+    membershipCost: 0,
     energyCost: 5,
     gains: {
-      strength: 2.0,
-      speed: 2.0,
-      defense: 2.0,
-      dexterity: 2.0,
+      strength: 0.65,
+      defense: 0.65,
+      speed: 0.55,
+      dexterity: 0.45,
     },
   },
 
   {
-    id: "average-joes",
-    name: "Average Joe's",
+    id: "ricks-gym",
+    name: "Ricks Gym",
     description:
-      "A step up from Premier Fitness with slightly better training equipment.",
-    gymExpRequired: 200,
-    membershipCost: 100,
-    energyCost: 5,
-    gains: {
-      strength: 2.4,
-      speed: 2.4,
-      defense: 2.8,
-      dexterity: 2.4,
-    },
-  },
-
-  {
-    id: "woodys-workout",
-    name: "Woody's Workout",
-    description:
-      "A serious neighborhood gym with improved equipment.",
-    gymExpRequired: 700,
-    membershipCost: 250,
-    energyCost: 5,
-    gains: {
-      strength: 2.8,
-      speed: 3.2,
-      defense: 3.0,
-      dexterity: 2.8,
-    },
-  },
-
-  {
-    id: "beach-bods",
-    name: "Beach Bods",
-    description:
-      "Specialized equipment focused on strength, speed and defense.",
-    gymExpRequired: 1700,
-    membershipCost: 500,
-    energyCost: 5,
-    gains: {
-      strength: 3.2,
-      speed: 3.2,
-      defense: 3.2,
-      dexterity: null,
-    },
-  },
-
-  {
-    id: "silver-gym",
-    name: "Silver Gym",
-    description:
-      "A premium gym with balanced, high-quality equipment.",
-    gymExpRequired: 3700,
-    membershipCost: 1000,
-    energyCost: 5,
-    gains: {
-      strength: 3.4,
-      speed: 3.6,
-      defense: 3.4,
-      dexterity: 3.2,
-    },
-  },
-
-  {
-    id: "pour-femme",
-    name: "Pour Femme",
-    description:
-      "A specialized facility with excellent dexterity equipment.",
-    gymExpRequired: 6450,
-    membershipCost: 2500,
-    energyCost: 5,
-    gains: {
-      strength: 3.4,
-      speed: 3.6,
-      defense: 3.6,
-      dexterity: 3.8,
-    },
-  },
-
-  {
-    id: "global-gym",
-    name: "Global Gym",
-    description:
-      "A major training facility with excellent all-round gains.",
-    gymExpRequired: 9450,
-    membershipCost: 10000,
-    energyCost: 5,
-    gains: {
-      strength: 4.0,
-      speed: 4.0,
-      defense: 4.0,
-      dexterity: 4.0,
-    },
-  },
-
-  {
-    id: "knuckle-heads",
-    name: "Knuckle Heads",
-    description:
-      "The first serious middleweight gym.",
-    gymExpRequired: 13450,
-    membershipCost: 50000,
+      "A serious training facility for players who have started building their battle stats.",
+    gymExpRequired: 500,
+    membershipCost: 5000,
     energyCost: 10,
     gains: {
-      strength: 4.8,
-      speed: 4.4,
-      defense: 4.0,
-      dexterity: 4.2,
+      strength: 1.10,
+      defense: 1.05,
+      speed: 0.90,
+      dexterity: 0.80,
     },
   },
 
   {
-    id: "pioneer-fitness",
-    name: "Pioneer Fitness",
+    id: "frontline-fitness",
+    name: "Frontline Fitness",
     description:
-      "High-end equipment for experienced fighters.",
-    gymExpRequired: 19450,
-    membershipCost: 100000,
-    energyCost: 10,
+      "Specialized equipment designed for experienced fighters.",
+    gymExpRequired: 2500,
+    membershipCost: 15000,
+    energyCost: 15,
     gains: {
-      strength: 4.4,
-      speed: 4.5,
-      defense: 4.8,
-      dexterity: 4.4,
-    },
-  },
-
-  {
-    id: "anabolic-anomalies",
-    name: "Anabolic Anomalies",
-    description:
-      "An elite gym designed for serious stat growth.",
-    gymExpRequired: 26450,
-    membershipCost: 250000,
-    energyCost: 10,
-    gains: {
-      strength: 5.0,
-      speed: 4.5,
-      defense: 5.2,
-      dexterity: 4.5,
-    },
-  },
-
-  {
-    id: "core",
-    name: "Core",
-    description:
-      "A specialized high-performance training facility.",
-    gymExpRequired: 34450,
-    membershipCost: 500000,
-    energyCost: 10,
-    gains: {
-      strength: 5.0,
-      speed: 5.2,
-      defense: 5.0,
-      dexterity: 5.0,
-    },
-  },
-
-  {
-    id: "deep-burn",
-    name: "Deep Burn",
-    description:
-      "An advanced gym for players approaching endgame training.",
-    gymExpRequired: 56450,
-    membershipCost: 5000000,
-    energyCost: 10,
-    gains: {
-      strength: 6.0,
-      speed: 6.0,
-      defense: 6.0,
-      dexterity: 6.0,
+      strength: 1.55,
+      defense: 1.50,
+      speed: 1.30,
+      dexterity: 1.20,
     },
   },
 
@@ -282,86 +150,69 @@ export const GYMS: Gym[] = [
     id: "apollo-gym",
     name: "Apollo Gym",
     description:
-      "Heavyweight equipment for veteran fighters.",
-    gymExpRequired: 80590,
-    membershipCost: 7500000,
-    energyCost: 10,
+      "A premium facility reserved for dedicated fighters.",
+    gymExpRequired: 7500,
+    membershipCost: 50000,
+    energyCost: 20,
     gains: {
-      strength: 6.0,
-      speed: 6.2,
-      defense: 6.4,
-      dexterity: 6.2,
+      strength: 2.05,
+      defense: 2.00,
+      speed: 1.80,
+      dexterity: 1.70,
     },
   },
 
   {
-    id: "georges",
-    name: "George's",
+    id: "gym-3000",
+    name: "Gym 3000",
     description:
-      "The pinnacle of standard RiftCity gym training.",
-    gymExpRequired: 200000,
-    membershipCost: 100000000,
-    energyCost: 10,
+      "An elite training facility with advanced equipment across every discipline.",
+    gymExpRequired: 20000,
+    membershipCost: 150000,
+    energyCost: 25,
     gains: {
-      strength: 7.3,
-      speed: 7.3,
-      defense: 7.3,
-      dexterity: 7.3,
+      strength: 2.70,
+      defense: 2.65,
+      speed: 2.45,
+      dexterity: 2.35,
     },
   },
 
-  /*
-   * Jail-only gym.
-   */
   {
     id: "crims-gym",
     name: "Crims Gym",
     description:
-      "The jail gym. Defense training is especially effective here.",
+      "A prison gym. Basic equipment, limited resources, but training is still possible while incarcerated.",
     gymExpRequired: 0,
     membershipCost: 0,
     energyCost: 5,
     gains: {
-      strength: 3.4,
-      speed: 3.4,
-      defense: 4.5,
+      strength: null,
+      defense: 0.45,
+      speed: null,
       dexterity: null,
     },
+    jailOnly: true,
   },
 ];
-
-export function getGym(
-  id: string
-): Gym | null {
-  return (
-    GYMS.find(
-      (gym) =>
-        gym.id === id
-    ) || null
-  );
-}
-
-export function getStandardGyms(): Gym[] {
-  return GYMS.filter(
-    (gym) =>
-      gym.id !== "crims-gym"
-  );
-}
 
 export function isJailGym(
   gym: Gym
 ): boolean {
-  return gym.id === "crims-gym";
+  return gym.jailOnly === true;
 }
 
 export function gymUnlocked(
   gym: Gym,
   gymExperience: number
 ): boolean {
+  if (isJailGym(gym)) {
+    return true;
+  }
+
   return (
-    isJailGym(gym) ||
     gymExperience >=
-      gym.gymExpRequired
+    gym.gymExpRequired
   );
 }
 
@@ -370,163 +221,39 @@ export function canTrainStat(
   stat: TrainingStat
 ): boolean {
   return (
-    gym.gains[stat] !== null
+    gym.gains[stat] !== null &&
+    gym.gains[stat] !== undefined
   );
 }
 
 /*
- * Happiness is one of the most important
- * differences between a basic RPG gym and
- * Torn-style training.
- *
- * We keep it bounded and use diminishing
- * returns so huge happiness values don't
- * explode the stat system.
+ * Returns the first gym that is not yet
+ * unlocked by Gym EXP.
  */
-export function getHappinessMultiplier(
-  happiness: number
-): number {
-  const safeHappy =
-    Math.max(
-      0,
-      happiness
-    );
-
-  /*
-   * 100 happy = roughly baseline.
-   * 1,000+ begins becoming meaningful.
-   * Returns diminish naturally.
-   */
-  const multiplier =
-    0.72 +
-    0.28 *
-      Math.log10(
-        safeHappy + 100
-      );
-
-  return Math.max(
-    0.72,
-    Math.min(
-      2.25,
-      multiplier
-    )
-  );
-}
-
-/*
- * Training gains scale from:
- *
- * gym gain
- * × energy
- * × happiness
- * × education modifier
- * × other modifiers
- *
- * This is intentionally an approximation
- * rather than reproducing Torn's proprietary
- * server-side calculation exactly.
- */
-export function calculateTrainingGain(
-  gym: Gym,
-  stat: TrainingStat,
-  currentStat: number,
-  happiness: number,
-  energyMultiplier = 1,
-  educationMultiplier = 1,
-  otherMultiplier = 1
-): number {
-  const gymGain =
-    gym.gains[stat];
-
-  if (
-    gymGain === null ||
-    gymGain === undefined
-  ) {
-    return 0;
-  }
-
-  /*
-   * Small stat growth bonus as the stat rises,
-   * with strong diminishing returns.
-   */
-  const statMultiplier =
-    1 +
-    Math.log10(
-      Math.max(
-        1,
-        currentStat
+export function getNextGym(
+  gymExperience: number
+): Gym | null {
+  const next =
+    GYMS
+      .filter(
+        (gym) =>
+          !isJailGym(gym) &&
+          gym.gymExpRequired >
+            gymExperience
       )
-    ) *
-      0.035;
+      .sort(
+        (a, b) =>
+          a.gymExpRequired -
+          b.gymExpRequired
+      )[0];
 
-  const happinessMultiplier =
-    getHappinessMultiplier(
-      happiness
-    );
-
-  /*
-   * 5 Energy is the base unit.
-   */
-  const energyFactor =
-    Math.max(
-      0.1,
-      energyMultiplier
-    );
-
-  const result =
-    gymGain *
-    energyFactor *
-    happinessMultiplier *
-    statMultiplier *
-    educationMultiplier *
-    otherMultiplier;
-
-  return Number(
-    Math.max(
-      0.01,
-      result
-    ).toFixed(2)
-  );
-}
-
-export function applyTraining(
-  stats: CombatStats,
-  gym: Gym,
-  stat: TrainingStat,
-  happiness: number,
-  educationMultiplier = 1,
-  otherMultiplier = 1
-): {
-  stats: CombatStats;
-  gain: number;
-} {
-  const gain =
-    calculateTrainingGain(
-      gym,
-      stat,
-      stats[stat],
-      happiness,
-      gym.energyCost / 5,
-      educationMultiplier,
-      otherMultiplier
-    );
-
-  return {
-    stats: {
-      ...stats,
-      [stat]:
-        stats[stat] +
-        gain,
-    },
-    gain,
-  };
+  return next || null;
 }
 
 /*
- * Gym EXP is deliberately slow.
+ * Gym EXP gained from a training session.
  *
- * In Torn, gym EXP is gained from training
- * and is what unlocks the next gym.
+ * More Energy spent = more Gym EXP.
  */
 export function getGymExperienceGain(
   energyCost: number
@@ -534,45 +261,96 @@ export function getGymExperienceGain(
   return Math.max(
     1,
     Math.floor(
-      energyCost / 5
+      energyCost
     )
   );
 }
 
-export function getNextGym(
-  gymExperience: number
-): Gym | null {
-  const standard =
-    getStandardGyms();
+/*
+ * Happiness affects training gains.
+ *
+ * This deliberately has diminishing extremes:
+ *
+ * 100 happiness = full gain
+ * 50 happiness  = roughly 75% gain
+ * 0 happiness   = roughly 50% gain
+ *
+ * This keeps Happiness meaningful without
+ * making low Happiness completely disable training.
+ */
+export function getHappinessMultiplier(
+  happiness: number
+): number {
+  const clamped =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        happiness
+      )
+    );
 
   return (
-    standard.find(
-      (gym) =>
-        gym.gymExpRequired >
-        gymExperience
-    ) || null
+    0.5 +
+    clamped / 200
   );
 }
 
-export function getBestUnlockedGym(
-  gymExperience: number
-): Gym {
-  const standard =
-    getStandardGyms();
+/*
+ * Apply one training session.
+ *
+ * IMPORTANT:
+ * This function changes the selected stat
+ * exactly once.
+ *
+ * The old App implementation had a bug where
+ * applyTraining() was called and the stat was
+ * then manually incremented again.
+ */
+export function applyTraining(
+  stats: CombatStats,
+  gym: Gym,
+  stat: TrainingStat,
+  happiness: number = 100,
+  educationMultiplier: number = 1
+): TrainingResult {
+  const baseGain =
+    gym.gains[stat];
 
-  let best =
-    standard[0];
-
-  for (
-    const gym of standard
+  if (
+    baseGain === null ||
+    baseGain === undefined
   ) {
-    if (
-      gym.gymExpRequired <=
-      gymExperience
-    ) {
-      best = gym;
-    }
+    return {
+      stats: {
+        ...stats,
+      },
+      gain: 0,
+    };
   }
 
-  return best;
+  const happinessMultiplier =
+    getHappinessMultiplier(
+      happiness
+    );
+
+  const gain =
+    baseGain *
+    happinessMultiplier *
+    Math.max(
+      0,
+      educationMultiplier
+    );
+
+  return {
+    stats: {
+      ...stats,
+
+      [stat]:
+        stats[stat] +
+        gain,
+    },
+
+    gain,
+  };
 }
