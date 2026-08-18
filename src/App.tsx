@@ -7,7 +7,6 @@ import React, {
 import {
   CRIMES,
   Crime,
-  CrimeOutcome,
   calculateSuccessChance,
   crimeUnlocked,
   randomReward,
@@ -51,38 +50,48 @@ type Job = {
 
 type SaveData = {
   cash: number;
+
   xp: number;
+
   energy: number;
+
+  nerve: number;
 
   stats: Stats;
 
   currentJob: string | null;
 
-  crimeCooldowns: Record<
-    string,
-    number
-  >;
-
   jailUntil: number | null;
 
   crimesCompleted: number;
+
   crimesFailed: number;
+
   crimesSpooked: number;
+
   timesJailed: number;
 
   activities: Activity[];
 
   lastEnergyUpdate: number;
+
+  lastNerveUpdate: number;
+
   lastJobUpdate: number;
 };
 
 const SAVE_KEY =
-  "riftcity-simple-v2";
+  "riftcity-simple-v3";
 
 const MAX_ENERGY = 100;
 
+const MAX_NERVE = 20;
+
 const ENERGY_REGEN_MS =
   60 * 1000;
+
+const NERVE_REGEN_MS =
+  5 * 60 * 1000;
 
 const JOB_PAY_INTERVAL =
   60 * 60 * 1000;
@@ -97,7 +106,6 @@ const JOBS: Job[] = [
     description:
       "Deliver packages across RiftCity.",
   },
-
   {
     id: "security",
     company: "RiftShield",
@@ -107,7 +115,6 @@ const JOBS: Job[] = [
     description:
       "Protect businesses around the city.",
   },
-
   {
     id: "construction",
     company: "Ironworks",
@@ -117,7 +124,6 @@ const JOBS: Job[] = [
     description:
       "Build the city while building your wallet.",
   },
-
   {
     id: "technician",
     company: "RiftTech",
@@ -127,7 +133,6 @@ const JOBS: Job[] = [
     description:
       "Keep RiftCity's systems running.",
   },
-
   {
     id: "finance",
     company: "Rift Capital",
@@ -149,6 +154,8 @@ function newSave(): SaveData {
 
     energy: 100,
 
+    nerve: 20,
+
     stats: {
       strength: 1,
       defense: 1,
@@ -157,8 +164,6 @@ function newSave(): SaveData {
     },
 
     currentJob: null,
-
-    crimeCooldowns: {},
 
     jailUntil: null,
 
@@ -182,6 +187,8 @@ function newSave(): SaveData {
 
     lastEnergyUpdate: now,
 
+    lastNerveUpdate: now,
+
     lastJobUpdate: now,
   };
 }
@@ -200,20 +207,36 @@ function loadSave(): SaveData {
     const parsed =
       JSON.parse(raw);
 
+    const fresh =
+      newSave();
+
     return {
-      ...newSave(),
+      ...fresh,
       ...parsed,
 
       stats: {
-        ...newSave().stats,
+        ...fresh.stats,
         ...(parsed.stats || {}),
       },
 
-      crimeCooldowns:
-        parsed.crimeCooldowns || {},
-
       activities:
         parsed.activities || [],
+
+      /*
+       * This protects players who already
+       * had an older save without nerve.
+       */
+      nerve:
+        typeof parsed.nerve ===
+        "number"
+          ? parsed.nerve
+          : MAX_NERVE,
+
+      lastNerveUpdate:
+        typeof parsed.lastNerveUpdate ===
+        "number"
+          ? parsed.lastNerveUpdate
+          : Date.now(),
     };
   } catch {
     return newSave();
@@ -263,7 +286,9 @@ function formatTime(
   return `${seconds}s`;
 }
 
-function getLevel(xp: number) {
+function getLevel(
+  xp: number
+) {
   let level = 1;
 
   let required = 100;
@@ -277,14 +302,13 @@ function getLevel(xp: number) {
 
     level++;
 
-    required =
-      Math.floor(
-        100 *
-          Math.pow(
-            1.16,
-            level - 1
-          )
-      );
+    required = Math.floor(
+      100 *
+        Math.pow(
+          1.16,
+          level - 1
+        )
+    );
   }
 
   return {
@@ -304,7 +328,9 @@ function addActivity(
 
     activities: [
       {
-        id: Date.now(),
+        id:
+          Date.now() +
+          Math.random(),
         text,
         type,
         time: Date.now(),
@@ -319,12 +345,16 @@ function processOfflineState(
 ) {
   const now = Date.now();
 
-  let updated = {
+  let updated: SaveData = {
     ...data,
   };
 
   /*
-   * Energy regeneration.
+   * ENERGY REGEN
+   *
+   * Energy is not used by crimes.
+   * It remains available for future
+   * systems such as training/combat.
    */
   const elapsedEnergy =
     now -
@@ -340,15 +370,47 @@ function processOfflineState(
     updated.energy =
       Math.min(
         MAX_ENERGY,
-        data.energy + energyTicks
+        data.energy +
+          energyTicks
       );
 
     updated.lastEnergyUpdate =
-      now;
+      data.lastEnergyUpdate +
+      energyTicks *
+        ENERGY_REGEN_MS;
   }
 
   /*
-   * Job income.
+   * NERVE REGEN
+   *
+   * One nerve every five minutes.
+   */
+  const elapsedNerve =
+    now -
+    data.lastNerveUpdate;
+
+  const nerveTicks =
+    Math.floor(
+      elapsedNerve /
+        NERVE_REGEN_MS
+    );
+
+  if (nerveTicks > 0) {
+    updated.nerve =
+      Math.min(
+        MAX_NERVE,
+        data.nerve +
+          nerveTicks
+      );
+
+    updated.lastNerveUpdate =
+      data.lastNerveUpdate +
+      nerveTicks *
+        NERVE_REGEN_MS;
+  }
+
+  /*
+   * JOB PAY
    */
   if (data.currentJob) {
     const job =
@@ -374,10 +436,13 @@ function processOfflineState(
           payments *
           job.salary;
 
-        updated.cash += income;
+        updated.cash +=
+          income;
 
         updated.lastJobUpdate =
-          now;
+          data.lastJobUpdate +
+          payments *
+            JOB_PAY_INTERVAL;
 
         updated =
           addActivity(
@@ -392,7 +457,7 @@ function processOfflineState(
   }
 
   /*
-   * Automatically clear expired jail.
+   * JAIL EXPIRATION
    */
   if (
     updated.jailUntil &&
@@ -433,7 +498,9 @@ function App() {
   const [
     now,
     setNow,
-  ] = useState(Date.now());
+  ] = useState(
+    Date.now()
+  );
 
   const levelInfo =
     useMemo(
@@ -453,7 +520,7 @@ function App() {
     data.jailUntil > now;
 
   /*
-   * Save whenever state changes.
+   * SAVE
    */
   useEffect(() => {
     localStorage.setItem(
@@ -463,13 +530,18 @@ function App() {
   }, [data]);
 
   /*
-   * One-second game clock.
+   * CLOCK
    */
   useEffect(() => {
     const interval =
-      window.setInterval(() => {
-        setNow(Date.now());
-      }, 1000);
+      window.setInterval(
+        () => {
+          setNow(
+            Date.now()
+          );
+        },
+        1000
+      );
 
     return () =>
       window.clearInterval(
@@ -478,17 +550,21 @@ function App() {
   }, []);
 
   /*
-   * Process passive systems.
+   * PASSIVE SYSTEMS
    */
   useEffect(() => {
     const interval =
-      window.setInterval(() => {
-        setData((current) =>
-          processOfflineState(
-            current
-          )
-        );
-      }, 5000);
+      window.setInterval(
+        () => {
+          setData(
+            (current) =>
+              processOfflineState(
+                current
+              )
+          );
+        },
+        5000
+      );
 
     return () =>
       window.clearInterval(
@@ -496,6 +572,9 @@ function App() {
       );
   }, []);
 
+  /*
+   * RUN CRIME
+   */
   function runCrime(
     crime: Crime
   ) {
@@ -515,18 +594,9 @@ function App() {
       return;
     }
 
-    const cooldown =
-      data.crimeCooldowns[
-        crime.id
-      ] || 0;
-
-    if (cooldown > now) {
-      return;
-    }
-
     if (
-      data.energy <
-      crime.energy
+      data.nerve <
+      crime.nerve
     ) {
       return;
     }
@@ -546,21 +616,19 @@ function App() {
     let updated: SaveData = {
       ...data,
 
-      energy:
-        data.energy -
-        crime.energy,
-
-      crimeCooldowns: {
-        ...data.crimeCooldowns,
-
-        [crime.id]:
-          now +
-          crime.cooldownMinutes *
-            60 *
-            1000,
-      },
+      /*
+       * CRIMES COST NERVE.
+       *
+       * No crime cooldown is created.
+       */
+      nerve:
+        data.nerve -
+        crime.nerve,
     };
 
+    /*
+     * SUCCESS
+     */
     if (
       outcome ===
       "success"
@@ -588,16 +656,22 @@ function App() {
         );
     }
 
+    /*
+     * FAILED
+     */
     if (
       outcome ===
       "failed"
     ) {
-      updated.crimesFailed++;
-
-      updated.xp +=
+      const failedXp =
         Math.floor(
           crime.xp * 0.25
         );
+
+      updated.xp +=
+        failedXp;
+
+      updated.crimesFailed++;
 
       updated =
         addActivity(
@@ -607,21 +681,14 @@ function App() {
         );
     }
 
+    /*
+     * SPOOKED
+     */
     if (
       outcome ===
       "spooked"
     ) {
       updated.crimesSpooked++;
-
-      /*
-       * Getting spooked costs a little
-       * extra energy.
-       */
-      updated.energy =
-        Math.max(
-          0,
-          updated.energy - 2
-        );
 
       updated =
         addActivity(
@@ -631,14 +698,13 @@ function App() {
         );
     }
 
+    /*
+     * JAILED
+     */
     if (
       outcome ===
       "jailed"
     ) {
-      /*
-       * Jail time scales with crime risk.
-       * Roughly 1–8 minutes.
-       */
       const jailMinutes =
         Math.max(
           1,
@@ -648,7 +714,7 @@ function App() {
         );
 
       updated.jailUntil =
-        now +
+        Date.now() +
         jailMinutes *
           60 *
           1000;
@@ -670,6 +736,9 @@ function App() {
     );
   }
 
+  /*
+   * TAKE JOB
+   */
   function takeJob(
     job: Job
   ) {
@@ -683,12 +752,14 @@ function App() {
     const now =
       Date.now();
 
-    let updated = {
+    let updated: SaveData = {
       ...data,
 
-      currentJob: job.id,
+      currentJob:
+        job.id,
 
-      lastJobUpdate: now,
+      lastJobUpdate:
+        now,
     };
 
     updated =
@@ -701,6 +772,9 @@ function App() {
     setData(updated);
   }
 
+  /*
+   * QUIT JOB
+   */
   function quitJob() {
     if (!data.currentJob) {
       return;
@@ -721,6 +795,9 @@ function App() {
     setData(updated);
   }
 
+  /*
+   * RESET
+   */
   function resetGame() {
     const confirmed =
       window.confirm(
@@ -758,6 +835,20 @@ function App() {
       )
     );
 
+  const nervePercent =
+    Math.round(
+      (data.nerve /
+        MAX_NERVE) *
+        100
+    );
+
+  const nextNerveAt =
+    data.nerve <
+    MAX_NERVE
+      ? data.lastNerveUpdate +
+        NERVE_REGEN_MS
+      : null;
+
   return (
     <div className="app">
       <header className="game-header">
@@ -767,7 +858,10 @@ function App() {
           </div>
 
           <span>
-            Rift<span>City</span>
+            Rift
+            <span>
+              City
+            </span>
           </span>
         </div>
 
@@ -823,8 +917,13 @@ function App() {
           </span>
 
           <strong>
-            {levelInfo.currentXp} /{" "}
-            {levelInfo.requiredXp}
+            {
+              levelInfo.currentXp
+            }{" "}
+            /{" "}
+            {
+              levelInfo.requiredXp
+            }
           </strong>
         </div>
 
@@ -837,6 +936,35 @@ function App() {
             {data.energy} /{" "}
             {MAX_ENERGY}
           </strong>
+        </div>
+
+        <div>
+          <span>
+            NERVE
+          </span>
+
+          <strong>
+            {data.nerve} /{" "}
+            {MAX_NERVE}
+          </strong>
+
+          <div className="mini-nerve-bar">
+            <div
+              style={{
+                width: `${nervePercent}%`,
+              }}
+            />
+          </div>
+
+          {nextNerveAt && (
+            <small className="regen-text">
+              +1 in{" "}
+              {formatTime(
+                nextNerveAt -
+                  now
+              )}
+            </small>
+          )}
         </div>
 
         <div>
@@ -937,13 +1065,18 @@ function App() {
               currentJob={
                 currentJob
               }
-              jailed={jailed}
+              jailed={
+                jailed
+              }
               jailUntil={
                 data.jailUntil
               }
               now={now}
               xpPercent={
                 xpPercent
+              }
+              nervePercent={
+                nervePercent
               }
               setScreen={
                 setScreen
@@ -958,7 +1091,9 @@ function App() {
               level={
                 levelInfo.level
               }
-              jailed={jailed}
+              jailed={
+                jailed
+              }
               jailUntil={
                 data.jailUntil
               }
@@ -1011,6 +1146,7 @@ function CityScreen({
   jailUntil,
   now,
   xpPercent,
+  nervePercent,
   setScreen,
 }: {
   data: SaveData;
@@ -1022,10 +1158,18 @@ function CityScreen({
   jailUntil: number | null;
   now: number;
   xpPercent: number;
+  nervePercent: number;
   setScreen: (
     screen: Screen
   ) => void;
 }) {
+  const nextNerveAt =
+    data.nerve <
+    MAX_NERVE
+      ? data.lastNerveUpdate +
+        NERVE_REGEN_MS
+      : null;
+
   return (
     <>
       <div className="section-heading">
@@ -1095,20 +1239,38 @@ function CityScreen({
           </span>
 
           <strong>
-            {data.energy}/100
+            {data.energy}/
+            {MAX_ENERGY}
           </strong>
         </div>
 
         <div>
           <span>
-            JOB
+            NERVE
           </span>
 
           <strong>
-            {currentJob
-              ? currentJob.title
-              : "Unemployed"}
+            {data.nerve}/
+            {MAX_NERVE}
           </strong>
+
+          <div className="nerve-bar">
+            <div
+              style={{
+                width: `${nervePercent}%`,
+              }}
+            />
+          </div>
+
+          {nextNerveAt && (
+            <small className="regen-text">
+              Next nerve in{" "}
+              {formatTime(
+                nextNerveAt -
+                  now
+              )}
+            </small>
+          )}
         </div>
       </div>
 
@@ -1126,9 +1288,14 @@ function CityScreen({
         </div>
 
         <p>
-          {levelInfo.currentXp} /{" "}
-          {levelInfo.requiredXp} XP
-          until Level{" "}
+          {
+            levelInfo.currentXp
+          }{" "}
+          /{" "}
+          {
+            levelInfo.requiredXp
+          }{" "}
+          XP until Level{" "}
           {levelInfo.level +
             1}
         </p>
@@ -1152,8 +1319,8 @@ function CityScreen({
           </strong>
 
           <small>
-            Make money. Take risks.
-            Try not to get caught.
+            Spend nerve, make money, and
+            try not to get caught.
           </small>
         </button>
 
@@ -1218,6 +1385,13 @@ function CrimeScreen({
     crime: Crime
   ) => void;
 }) {
+  const nextNerveAt =
+    data.nerve <
+    MAX_NERVE
+      ? data.lastNerveUpdate +
+        NERVE_REGEN_MS
+      : null;
+
   return (
     <>
       <div className="section-heading">
@@ -1235,6 +1409,27 @@ function CrimeScreen({
             question is whether you're
             willing to pay it.
           </p>
+        </div>
+
+        <div className="nerve-display">
+          <span>
+            NERVE
+          </span>
+
+          <strong>
+            {data.nerve}/
+            {MAX_NERVE}
+          </strong>
+
+          {nextNerveAt && (
+            <small>
+              +1 in{" "}
+              {formatTime(
+                nextNerveAt -
+                  now
+              )}
+            </small>
+          )}
         </div>
       </div>
 
@@ -1317,9 +1512,6 @@ function CrimeScreen({
               jailed={
                 jailed
               }
-              now={
-                now
-              }
               onCrime={
                 onCrime
               }
@@ -1336,14 +1528,12 @@ function CrimeCard({
   data,
   level,
   jailed,
-  now,
   onCrime,
 }: {
   crime: Crime;
   data: SaveData;
   level: number;
   jailed: boolean;
-  now: number;
   onCrime: (
     crime: Crime
   ) => void;
@@ -1354,23 +1544,14 @@ function CrimeCard({
       level
     );
 
-  const cooldown =
-    data.crimeCooldowns[
-      crime.id
-    ] || 0;
-
-  const onCooldown =
-    cooldown > now;
-
-  const insufficientEnergy =
-    data.energy <
-    crime.energy;
+  const insufficientNerve =
+    data.nerve <
+    crime.nerve;
 
   const disabled =
     !unlocked ||
     jailed ||
-    onCooldown ||
-    insufficientEnergy;
+    insufficientNerve;
 
   const successChance =
     calculateSuccessChance(
@@ -1427,13 +1608,8 @@ function CrimeCard({
             ? `LEVEL ${crime.levelRequired}`
             : jailed
             ? "JAILED"
-            : onCooldown
-            ? formatTime(
-                cooldown -
-                  now
-              )
-            : insufficientEnergy
-            ? "LOW ENERGY"
+            : insufficientNerve
+            ? "LOW NERVE"
             : "COMMIT"}
         </button>
       </div>
@@ -1441,12 +1617,12 @@ function CrimeCard({
       <div className="crime-stats">
         <div>
           <span>
-            ENERGY
+            NERVE
           </span>
 
           <strong>
-            ⚡{" "}
-            {crime.energy}
+            🧠{" "}
+            {crime.nerve}
           </strong>
         </div>
 
@@ -1491,21 +1667,21 @@ function CrimeCard({
 
         <div>
           <span>
-            COOLDOWN
+            RISK
           </span>
 
           <strong>
-            {crime.cooldownMinutes}m
+            {crime.risk}%
           </strong>
         </div>
 
         <div>
           <span>
-            JAIL RISK
+            LEVEL
           </span>
 
           <strong>
-            {crime.risk}%
+            {crime.levelRequired}
           </strong>
         </div>
       </div>
@@ -1740,13 +1916,12 @@ function CharacterScreen({
 
         <div>
           <span>
-            CRIMES
+            NERVE
           </span>
 
           <strong>
-            {
-              data.crimesCompleted
-            }
+            {data.nerve}/
+            {MAX_NERVE}
           </strong>
         </div>
 
@@ -1786,7 +1961,8 @@ function CharacterScreen({
           <Stat
             label="Speed"
             value={
-              data.stats.speed
+              data.stats
+                .speed
             }
           />
 
