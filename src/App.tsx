@@ -152,6 +152,8 @@ function freshSave(): SaveData {
 
     energy: 100,
 
+    lastEnergyUpdate: now,
+
     nerve: 10,
 
     lastNerveUpdate: now,
