@@ -1,3 +1,7 @@
+import {
+  CombatStats,
+} from "./progressionSystem";
+
 export type CrimeOutcome =
   | "success"
   | "failed"
@@ -8,18 +12,14 @@ export type Crime = {
   id: string;
   name: string;
   description: string;
-
-  levelRequired: number;
-
   nerve: number;
-
   minReward: number;
   maxReward: number;
-
   xp: number;
-
+  crimeExperience: number;
+  levelRequired: number;
   risk: number;
-  successChance: number;
+  baseSuccess: number;
 };
 
 export const CRIMES: Crime[] = [
@@ -27,152 +27,166 @@ export const CRIMES: Crime[] = [
     id: "pickpocket",
     name: "Pickpocket",
     description:
-      "Lift something from an unsuspecting target without drawing attention.",
-    levelRequired: 1,
+      "Lift something from an unsuspecting target.",
     nerve: 1,
     minReward: 20,
     maxReward: 65,
     xp: 7,
+    crimeExperience: 12,
+    levelRequired: 1,
     risk: 10,
-    successChance: 72,
+    baseSuccess: 72,
   },
-
   {
     id: "shoplift",
     name: "Shoplifting",
     description:
-      "Slip into a small store and walk out with something valuable.",
-    levelRequired: 2,
+      "Walk out of a small store with something valuable.",
     nerve: 2,
     minReward: 45,
     maxReward: 140,
     xp: 12,
+    crimeExperience: 18,
+    levelRequired: 2,
     risk: 20,
-    successChance: 66,
+    baseSuccess: 66,
   },
-
   {
     id: "burglary",
     name: "Residential Burglary",
     description:
       "Break into a residence and search for valuables.",
-    levelRequired: 5,
     nerve: 3,
     minReward: 120,
     maxReward: 360,
     xp: 20,
+    crimeExperience: 28,
+    levelRequired: 5,
     risk: 32,
-    successChance: 58,
+    baseSuccess: 58,
   },
-
   {
     id: "vehicle-theft",
     name: "Vehicle Theft",
     description:
-      "Steal a vehicle before anyone realizes what happened.",
-    levelRequired: 8,
+      "Steal a vehicle before anyone notices.",
     nerve: 4,
     minReward: 180,
     maxReward: 500,
     xp: 24,
+    crimeExperience: 34,
+    levelRequired: 8,
     risk: 42,
-    successChance: 52,
+    baseSuccess: 52,
   },
-
   {
     id: "store-robbery",
     name: "Store Robbery",
     description:
-      "Hit a local business and get out before the police arrive.",
-    levelRequired: 12,
+      "Hit a local business and get out quickly.",
     nerve: 5,
     minReward: 300,
     maxReward: 850,
     xp: 35,
+    crimeExperience: 45,
+    levelRequired: 12,
     risk: 55,
-    successChance: 48,
+    baseSuccess: 48,
   },
-
   {
     id: "system-intrusion",
     name: "System Intrusion",
     description:
-      "Break into a poorly secured computer system and extract something valuable.",
-    levelRequired: 15,
+      "Break into a poorly secured computer system.",
     nerve: 4,
     minReward: 300,
     maxReward: 1000,
     xp: 40,
+    crimeExperience: 50,
+    levelRequired: 15,
     risk: 48,
-    successChance: 50,
+    baseSuccess: 50,
   },
-
   {
     id: "major-robbery",
     name: "Major Robbery",
     description:
-      "A serious operation with a serious payout — and serious consequences.",
-    levelRequired: 20,
+      "A serious operation with a serious payout.",
     nerve: 7,
     minReward: 900,
     maxReward: 2500,
     xp: 65,
+    crimeExperience: 75,
+    levelRequired: 20,
     risk: 75,
-    successChance: 40,
+    baseSuccess: 40,
   },
-
   {
     id: "bank-heist",
     name: "Bank Heist",
     description:
       "The big score. Almost nobody gets away clean.",
-    levelRequired: 30,
     nerve: 10,
     minReward: 2500,
     maxReward: 7500,
     xp: 100,
+    crimeExperience: 110,
+    levelRequired: 30,
     risk: 90,
-    successChance: 30,
+    baseSuccess: 30,
   },
 ];
 
 export function crimeUnlocked(
   crime: Crime,
   level: number
-) {
-  return level >= crime.levelRequired;
+): boolean {
+  return (
+    level >=
+    crime.levelRequired
+  );
 }
 
-export function calculateSuccessChance(
+export function crimeSuccessChance(
   crime: Crime,
-  stats: {
-    strength: number;
-    defense: number;
-    intelligence: number;
-    speed: number;
-  }
-) {
-  const averageStat =
-    (
-      stats.strength +
-      stats.defense +
-      stats.intelligence +
-      stats.speed
-    ) / 4;
-
-  const statBonus =
+  crimeExperience: number,
+  intelligence: number,
+  educationBonus: number
+): number {
+  const experienceBonus =
     Math.min(
       25,
-      averageStat * 0.45
+      crimeExperience / 40
+    );
+
+  const intelligenceBonus =
+    Math.min(
+      12,
+      intelligence / 20
     );
 
   return Math.max(
-    10,
+    5,
     Math.min(
-      90,
-      crime.successChance +
-        statBonus
+      95,
+      crime.baseSuccess +
+        experienceBonus +
+        intelligenceBonus +
+        educationBonus
     )
+  );
+}
+
+export function randomReward(
+  crime: Crime
+): number {
+  return (
+    Math.floor(
+      Math.random() *
+        (crime.maxReward -
+          crime.minReward +
+          1)
+    ) + crime.minReward
   );
 }
 
@@ -190,35 +204,19 @@ export function rollCrimeOutcome(
     return "success";
   }
 
-  const remaining =
-    100 - successChance;
-
-  const jailChance =
-    Math.min(
-      remaining * 0.55,
-      crime.risk * 0.38
-    );
-
-  const spookedChance =
-    Math.min(
-      remaining * 0.45,
-      crime.risk * 0.62
-    );
-
-  const consequenceRoll =
-    Math.random() * remaining;
+  const failureRoll =
+    Math.random() * 100;
 
   if (
-    consequenceRoll <
-    jailChance
+    failureRoll <
+    crime.risk * 0.35
   ) {
     return "jailed";
   }
 
   if (
-    consequenceRoll <
-    jailChance +
-      spookedChance
+    failureRoll <
+    crime.risk * 0.75
   ) {
     return "spooked";
   }
@@ -226,18 +224,11 @@ export function rollCrimeOutcome(
   return "failed";
 }
 
-export function randomReward(
-  crime: Crime
-) {
-  return (
-    Math.floor(
-      Math.random() *
-        (
-          crime.maxReward -
-          crime.minReward +
-          1
-        )
-    ) +
-    crime.minReward
+export function getCrimeStatBonus(
+  stats: CombatStats
+): number {
+  return Math.min(
+    15,
+    stats.intelligence / 10
   );
 }
