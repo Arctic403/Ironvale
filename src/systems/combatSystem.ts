@@ -1,89 +1,102 @@
-import { CombatStats } from "./progressionSystem";
-import { PLAYER_PROFILES, type PlayerProfile } from "../data/playerProfiles";
+export type BodyPart = "head" | "chest" | "stomach" | "arms" | "legs";
 
-// Type-only re-export guarantees bundlers ignore PlayerProfile during JS generation
-export { PLAYER_PROFILES };
-export type { PlayerProfile };
-
-export type CombatDifficulty = "easy" | "fair" | "dangerous" | "very-dangerous";
-export type Opponent = PlayerProfile;
-
-export const PLAYER_OPPONENTS: Opponent[] = PLAYER_PROFILES;
-export const OPPONENTS: Opponent[] = PLAYER_PROFILES;
-
-export interface CombatResult {
-  winner: "player" | "opponent";
-  damageDealtToPlayer: number;
-  damageDealtToOpponent: number;
-  cashReward: number;
-  xpReward: number;
-  turns: number;
+export interface WeaponOption {
+  id: string;
+  name: string;
+  type: "primary" | "secondary" | "melee" | "temporary";
+  baseDamage: number;
+  accuracy: number; // 0 - 100
+  critChance: number; // 0 - 100
 }
 
-function power(s: CombatStats): number {
-  return s.strength * 1.2 + s.defense + s.speed * 1.05 + s.dexterity * 1.1;
+export interface DynamicFighter {
+  id: string;
+  name: string;
+  level: number;
+  health: number;
+  maxHealth: number;
+  strength: number;
+  defense: number;
+  speed: number;
+  dexterity: number;
+  weapon: WeaponOption;
 }
 
-export function calculateAttackPower(s: CombatStats): number {
-  return s.strength * 1.2 + s.speed * 0.25;
+export interface TurnLog {
+  attacker: string;
+  defender: string;
+  actionText: string;
+  damage: number;
+  isCrit: boolean;
+  isMiss: boolean;
+  hitPart?: BodyPart;
 }
 
-export function calculateDefensePower(s: CombatStats): number {
-  return s.defense * 1.2 + s.dexterity * 0.2;
-}
+const BODY_PARTS: { part: BodyPart; multiplier: number; label: string }[] = [
+  { part: "head", multiplier: 1.8, label: "Head" },
+  { part: "chest", multiplier: 1.2, label: "Chest" },
+  { part: "stomach", multiplier: 1.1, label: "Stomach" },
+  { part: "arms", multiplier: 0.8, label: "Arm" },
+  { part: "legs", multiplier: 0.9, label: "Leg" },
+];
 
-export function calculateCombatPower(s: CombatStats): number {
-  return power(s);
-}
+export function executeCombatTurn(
+  attacker: DynamicFighter,
+  defender: DynamicFighter,
+  selectedWeapon?: WeaponOption
+): { updatedDefender: DynamicFighter; log: TurnLog } {
+  const weapon = selectedWeapon || attacker.weapon;
+  
+  // Accuracy vs Dexterity / Speed calculation
+  const hitChance = Math.min(
+    95,
+    Math.max(15, weapon.accuracy + (attacker.dexterity - defender.speed) * 2)
+  );
+  const roll = Math.random() * 100;
 
-export function calculateWinChance(a: CombatStats, b: CombatStats): number {
-  const ap = power(a);
-  const bp = power(b);
-  const total = Math.max(1, ap + bp);
-  const rawRate = 50 + ((ap - bp) / total) * 70;
-  return Math.round(Math.max(5, Math.min(95, rawRate)));
-}
-
-export function getCombatDifficulty(a: CombatStats, b: CombatStats): CombatDifficulty {
-  const c = calculateWinChance(a, b);
-  return c >= 70 ? "easy" : c >= 50 ? "fair" : c >= 30 ? "dangerous" : "very-dangerous";
-}
-
-export function getCombatDifficultyLabel(d: CombatDifficulty): string {
-  return d.replace("-", " ");
-}
-
-export function resolveCombat(player: CombatStats, opponent: CombatStats): "victory" | "defeat" {
-  return Math.random() * 100 < calculateWinChance(player, opponent) ? "victory" : "defeat";
-}
-
-export function simulateCombat(
-  playerName: string,
-  playerStats: CombatStats,
-  playerMaxHp: number,
-  opponent: PlayerProfile
-): CombatResult {
-  const winChance = calculateWinChance(playerStats, opponent.stats);
-  const isVictory = Math.random() * 100 < winChance;
-
-  if (isVictory) {
-    const damageTaken = Math.floor(Math.random() * (playerMaxHp * 0.35));
+  if (roll > hitChance) {
     return {
-      winner: "player",
-      damageDealtToPlayer: damageTaken,
-      damageDealtToOpponent: opponent.maxHealth,
-      cashReward: opponent.cashReward,
-      xpReward: opponent.xpReward,
-      turns: Math.floor(Math.random() * 3) + 2,
-    };
-  } else {
-    return {
-      winner: "opponent",
-      damageDealtToPlayer: playerMaxHp,
-      damageDealtToOpponent: Math.floor(Math.random() * (opponent.maxHealth * 0.5)),
-      cashReward: 0,
-      xpReward: 0,
-      turns: Math.floor(Math.random() * 4) + 1,
+      updatedDefender: defender,
+      log: {
+        attacker: attacker.name,
+        defender: defender.name,
+        actionText: `${attacker.name} attacked ${defender.name} with ${weapon.name} but missed!`,
+        damage: 0,
+        isCrit: false,
+        isMiss: true,
+      },
     };
   }
+
+  // Body part hit selection
+  const target = BODY_PARTS[Math.floor(Math.random() * BODY_PARTS.length)];
+  const isCrit = Math.random() * 100 < weapon.critChance;
+  const critMultiplier = isCrit ? 1.75 : 1.0;
+
+  // Damage calculation based on Strength vs Defense
+  const rawDamage =
+    (weapon.baseDamage + attacker.strength * 1.5 - defender.defense * 0.8) *
+    target.multiplier *
+    critMultiplier;
+    
+  const finalDamage = Math.max(5, Math.floor(rawDamage + (Math.random() * 6 - 3)));
+
+  const newHealth = Math.max(0, defender.health - finalDamage);
+
+  const actionText = `${attacker.name} hit ${defender.name} in the ${target.label} with ${weapon.name} for ${finalDamage} damage! ${
+    isCrit ? "🎯 CRITICAL HIT!" : ""
+  }`;
+
+  return {
+    updatedDefender: { ...defender, health: newHealth },
+    log: {
+      attacker: attacker.name,
+      defender: defender.name,
+      actionText,
+      damage: finalDamage,
+      isCrit,
+      isMiss: false,
+      hitPart: target.part,
+    },
+  };
 }
