@@ -144,14 +144,6 @@ lastNerveUpdate: number;
 const SAVE_KEY =
   "riftcity-core-v2";
 
-const MAX_ENERGY = 100;
-
-const ENERGY_REGEN =
-  60 * 1000;
-
-const NERVE_REGEN =
-  5 * 60 * 1000;
-
 const JOB_PAY_INTERVAL =
   60 * 60 * 1000;
 
