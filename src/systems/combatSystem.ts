@@ -1,7 +1,7 @@
 import { CombatStats } from "./progressionSystem";
 import { PLAYER_PROFILES, type PlayerProfile } from "../data/playerProfiles";
 
-// Type-safe re-exports for App.tsx
+// Type-only re-export guarantees bundlers ignore PlayerProfile during JS generation
 export { PLAYER_PROFILES };
 export type { PlayerProfile };
 
