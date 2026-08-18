@@ -1,24 +1,16 @@
-import {
-
-  MAX_ENERGY,
-
-  ENERGY_REGEN_INTERVAL,
-
-  NERVE_REGEN_INTERVAL,
-
-  regenerateResources,
-
-  getEnergyTimeRemaining,
-
-  getNerveTimeRemaining,
-
-} from "./systems/resourceSystem";
-
 import React, {
   useEffect,
   useMemo,
   useState,
 } from "react";
+
+import {
+  MAX_ENERGY,
+  NERVE_REGEN_INTERVAL,
+  regenerateResources,
+  getEnergyTimeRemaining,
+  getNerveTimeRemaining,
+} from "./systems/resourceSystem";
 
 import {
   CRIMES,
@@ -96,12 +88,10 @@ type SaveData = {
   xp: number;
 
   energy: number;
+  lastEnergyUpdate: number;
 
-lastEnergyUpdate: number;
-
-nerve: number;
-
-lastNerveUpdate: number;
+  nerve: number;
+  lastNerveUpdate: number;
 
   health: number;
 
@@ -235,11 +225,36 @@ function loadSave(): SaveData {
       );
 
     if (current) {
+      const parsed =
+        JSON.parse(current);
+
+      const fresh =
+        freshSave();
+
       return {
-        ...freshSave(),
-        ...JSON.parse(
-          current
-        ),
+        ...fresh,
+        ...parsed,
+
+        /*
+         * Resource timer migration.
+         *
+         * Older saves only had
+         * lastNerveUpdate.
+         */
+        lastEnergyUpdate:
+          typeof parsed.lastEnergyUpdate ===
+          "number"
+            ? parsed.lastEnergyUpdate
+            : typeof parsed.lastNerveUpdate ===
+              "number"
+            ? parsed.lastNerveUpdate
+            : fresh.lastEnergyUpdate,
+
+        lastNerveUpdate:
+          typeof parsed.lastNerveUpdate ===
+          "number"
+            ? parsed.lastNerveUpdate
+            : fresh.lastNerveUpdate,
       };
     }
 
@@ -256,8 +271,11 @@ function loadSave(): SaveData {
       const oldSave =
         JSON.parse(old);
 
+      const migrated =
+        freshSave();
+
       return {
-        ...freshSave(),
+        ...migrated,
 
         cash:
           typeof oldSave.cash ===
@@ -276,6 +294,12 @@ function loadSave(): SaveData {
           "number"
             ? oldSave.energy
             : 100,
+
+        lastEnergyUpdate:
+          Date.now(),
+
+        lastNerveUpdate:
+          Date.now(),
 
         currentJob:
           oldSave.currentJob ||
@@ -499,53 +523,42 @@ function App() {
         };
 
         /*
-         * ENERGY
+         * ENERGY + NERVE
+         *
+         * These now use completely
+         * independent regeneration
+         * timers.
          */
-        const energyTicks =
-          Math.floor(
-            (now -
-              current.lastNerveUpdate) /
-              ENERGY_REGEN
+        const resources =
+          regenerateResources(
+            {
+              energy:
+                current.energy,
+
+              nerve:
+                current.nerve,
+
+              lastEnergyUpdate:
+                current.lastEnergyUpdate,
+
+              lastNerveUpdate:
+                current.lastNerveUpdate,
+            },
+            now,
+            maxNerve
           );
 
-        if (
-          energyTicks > 0 &&
-          current.energy <
-            MAX_ENERGY
-        ) {
-          updated.energy =
-            Math.min(
-              MAX_ENERGY,
-              current.energy +
-                energyTicks
-            );
-        }
+        updated.energy =
+          resources.energy;
 
-        /*
-         * NERVE
-         */
-        const nerveTicks =
-          Math.floor(
-            (now -
-              current.lastNerveUpdate) /
-              NERVE_REGEN
-          );
+        updated.lastEnergyUpdate =
+          resources.lastEnergyUpdate;
 
-        if (
-          nerveTicks > 0
-        ) {
-          updated.nerve =
-            Math.min(
-              maxNerve,
-              current.nerve +
-                nerveTicks
-            );
+        updated.nerve =
+          resources.nerve;
 
-          updated.lastNerveUpdate =
-            current.lastNerveUpdate +
-            nerveTicks *
-              NERVE_REGEN;
-        }
+        updated.lastNerveUpdate =
+          resources.lastNerveUpdate;
 
         /*
          * JOB PAY
@@ -1542,11 +1555,26 @@ function App() {
         100
     );
 
+  const energyTimeRemaining =
+    getEnergyTimeRemaining(
+      save.energy,
+      now,
+      save.lastEnergyUpdate
+    );
+
+  const nerveTimeRemaining =
+    getNerveTimeRemaining(
+      save.nerve,
+      maxNerve,
+      now,
+      save.lastNerveUpdate
+    );
+
   const nextNerveAt =
     save.nerve <
     maxNerve
       ? save.lastNerveUpdate +
-        NERVE_REGEN
+        NERVE_REGEN_INTERVAL
       : null;
 
   return (
@@ -1636,6 +1664,16 @@ function App() {
               }}
             />
           </div>
+
+          {save.energy <
+            MAX_ENERGY && (
+            <small>
+              +1 in{" "}
+              {duration(
+                energyTimeRemaining
+              )}
+            </small>
+          )}
         </div>
 
         <div>
@@ -1656,6 +1694,16 @@ function App() {
               }}
             />
           </div>
+
+          {save.nerve <
+            maxNerve && (
+            <small>
+              +1 in{" "}
+              {duration(
+                nerveTimeRemaining
+              )}
+            </small>
+          )}
         </div>
 
         <div>
@@ -1998,6 +2046,17 @@ function CityScreen({
     screen: Screen
   ) => void;
 }) {
+  const nerveTime =
+    save.nerve <
+    maxNerve
+      ? getNerveTimeRemaining(
+          save.nerve,
+          maxNerve,
+          now,
+          save.lastNerveUpdate
+        )
+      : 0;
+
   return (
     <>
       <div className="city-dashboard">
@@ -2027,8 +2086,7 @@ function CityScreen({
             <small>
               +1 in{" "}
               {duration(
-                nextNerveAt -
-                  now
+                nerveTime
               )}
             </small>
           )}
@@ -2137,8 +2195,19 @@ function CrimeScreen({
     save.nerve <
     maxNerve
       ? save.lastNerveUpdate +
-        NERVE_REGEN
+        NERVE_REGEN_INTERVAL
       : null;
+
+  const nerveTime =
+    save.nerve <
+    maxNerve
+      ? getNerveTimeRemaining(
+          save.nerve,
+          maxNerve,
+          now,
+          save.lastNerveUpdate
+        )
+      : 0;
 
   return (
     <>
@@ -2159,8 +2228,7 @@ function CrimeScreen({
           <small>
             Next nerve in{" "}
             {duration(
-              nextNerve -
-                now
+              nerveTime
             )}
           </small>
         )}
@@ -2504,6 +2572,16 @@ function GymScreen({
     gym: Gym
   ) => void;
 }) {
+  const energyTime =
+    save.energy <
+    MAX_ENERGY
+      ? getEnergyTimeRemaining(
+          save.energy,
+          Date.now(),
+          save.lastEnergyUpdate
+        )
+      : 0;
+
   return (
     <div className="list">
       <div className="panel">
@@ -2518,6 +2596,16 @@ function GymScreen({
           )}
           /100
         </h3>
+
+        {save.energy <
+          MAX_ENERGY && (
+          <small>
+            +1 in{" "}
+            {duration(
+              energyTime
+            )}
+          </small>
+        )}
 
         <p>
           Energy regenerates automatically.
