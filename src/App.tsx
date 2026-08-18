@@ -756,6 +756,13 @@ export function useRiftCity() {
 function App() {
   const g = useRiftCity();
   const levelInfo = getLevel(g.gameState.xp);
+  const maxHappy = getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100;
+
+  const energyPct = Math.min(100, (g.gameState.energy / MAX_ENERGY) * 100);
+  const nervePct = Math.min(100, (g.gameState.nerve / g.maxNerve) * 100);
+  const happyPct = Math.min(100, (g.gameState.happiness / maxHappy) * 100);
+  const lifePct = Math.min(100, (g.gameState.health / g.maxHealth) * 100);
+
   const nav: { id: Screen; label: string; icon: string }[] = [
     { id: "character", label: "Character", icon: "👤" },
     { id: "city", label: "City", icon: "🏙️" },
@@ -771,25 +778,69 @@ function App() {
     { id: "faction", label: "Faction", icon: "🛡️" },
     { id: "awards", label: "Awards", icon: "🏆" },
   ];
+
   const title = nav.find((n) => n.id === g.currentScreen)?.label || "RiftCity";
 
   return (
     <div className="app-shell">
+      {/* HEADER BAR */}
       <header className="topbar">
         <div>
           <strong>RIFTCITY</strong>
-          <span className="muted">CORE</span>
+          <span className="muted" style={{ marginLeft: "6px" }}>CORE</span>
         </div>
         <div className="topstats">
           <span>LV {g.level}</span>
           <span>💵 {money(g.gameState.cash)}</span>
           <span>🏦 {money(g.gameState.bank)}</span>
-          <span>⚡ {g.gameState.energy}/{MAX_ENERGY}</span>
-          <span>🧠 {g.gameState.nerve}/{g.maxNerve}</span>
-          <span>❤️ {Math.floor(g.gameState.health)}/{g.maxHealth}</span>
-          <span>😊 {Math.floor(g.gameState.happiness)}/{getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100}</span>
+          <span>💎 {g.gameState.points} Points</span>
         </div>
       </header>
+
+      {/* RESOURCE BARS PANEL */}
+      <section style={styles.resourcePanel}>
+        <div style={styles.meterContainer}>
+          <div style={styles.meterHeader}>
+            <span style={{ ...styles.meterTitle, color: '#e74c3c' }}>⚡ Energy</span>
+            <span>{g.gameState.energy} / {MAX_ENERGY}</span>
+          </div>
+          <div style={styles.track}>
+            <div style={{ ...styles.fill, width: `${energyPct}%`, backgroundColor: '#e74c3c' }} />
+          </div>
+        </div>
+
+        <div style={styles.meterContainer}>
+          <div style={styles.meterHeader}>
+            <span style={{ ...styles.meterTitle, color: '#e67e22' }}>🔥 Nerve</span>
+            <span>{g.gameState.nerve} / {g.maxNerve}</span>
+          </div>
+          <div style={styles.track}>
+            <div style={{ ...styles.fill, width: `${nervePct}%`, backgroundColor: '#e67e22' }} />
+          </div>
+        </div>
+
+        <div style={styles.meterContainer}>
+          <div style={styles.meterHeader}>
+            <span style={{ ...styles.meterTitle, color: '#f1c40f' }}>😊 Happiness</span>
+            <span>{Math.floor(g.gameState.happiness)} / {maxHappy}</span>
+          </div>
+          <div style={styles.track}>
+            <div style={{ ...styles.fill, width: `${happyPct}%`, backgroundColor: '#f1c40f' }} />
+          </div>
+        </div>
+
+        <div style={styles.meterContainer}>
+          <div style={styles.meterHeader}>
+            <span style={{ ...styles.meterTitle, color: '#2ecc71' }}>❤️ Life</span>
+            <span>{Math.floor(g.gameState.health)} / {g.maxHealth}</span>
+          </div>
+          <div style={styles.track}>
+            <div style={{ ...styles.fill, width: `${lifePct}%`, backgroundColor: '#2ecc71' }} />
+          </div>
+        </div>
+      </section>
+
+      {/* SIDEBAR NAVIGATION */}
       <aside className="sidebar">
         {nav.map((n) => (
           <button className={g.currentScreen === n.id ? "nav active" : "nav"} onClick={() => g.setCurrentScreen(n.id)} key={n.id}>
@@ -808,6 +859,8 @@ function App() {
           </button>
         </div>
       </aside>
+
+      {/* MAIN CONTENT AREA */}
       <main className="content">
         <div className="page-head">
           <div>
@@ -821,16 +874,12 @@ function App() {
                 <i style={{ width: `${levelInfo.currentXp}%` }} />
               </div>
             </div>
-            <div>
-              <small>Happiness {Math.floor(g.gameState.happiness)}</small>
-              <div className="bar">
-                <i style={{ width: `${Math.min(100, g.gameState.happiness)}%` }} />
-              </div>
-            </div>
           </div>
         </div>
+
         {g.gameState.jailUntil && <div className="alert jail">🔒 JAILED · {formatTime(timeLeft(g.gameState.jailUntil))} remaining</div>}
         {g.gameState.hospitalUntil && <div className="alert hospital">🏥 HOSPITAL · {formatTime(timeLeft(g.gameState.hospitalUntil))} remaining</div>}
+
         {g.currentScreen === "character" && <Character g={g} />}
         {g.currentScreen === "city" && <City g={g} />}
         {g.currentScreen === "crimes" && <Crimes g={g} />}
@@ -844,9 +893,10 @@ function App() {
         {g.currentScreen === "market" && <Market g={g} />}
         {g.currentScreen === "faction" && <Faction g={g} />}
         {g.currentScreen === "awards" && <Awards g={g} />}
+
         <section className="panel activity">
           <div className="panel-title">
-            <span>Activity</span>
+            <span>Activity Log</span>
             <small>Latest events</small>
           </div>
           {g.gameState.activities.slice(0, 10).map((a) => (
@@ -858,6 +908,7 @@ function App() {
           ))}
         </section>
       </main>
+
       {g.encounter && (
         <div className="modal-backdrop">
           <div className="modal">
@@ -1422,5 +1473,45 @@ function Awards({ g }: { g: ReturnType<typeof useRiftCity> }) {
     </>
   );
 }
+
+// INLINE RESOURCE BAR STYLES
+const styles: { [key: string]: React.CSSProperties } = {
+  resourcePanel: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
+    backgroundColor: '#1b1d22',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    margin: '12px 16px',
+    border: '1px solid #2d3139',
+  },
+  meterContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  meterHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '0.8rem',
+    fontWeight: '600',
+    color: '#a0a5b1',
+  },
+  meterTitle: {
+    fontWeight: 'bold',
+  },
+  track: {
+    width: '100%',
+    height: '8px',
+    backgroundColor: '#0f1013',
+    borderRadius: '4px',
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    transition: 'width 0.3s ease-in-out',
+  },
+};
 
 export default App;
