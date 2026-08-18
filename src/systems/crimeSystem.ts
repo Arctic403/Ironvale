@@ -11,6 +11,12 @@ export type Crime = {
 
   levelRequired: number;
 
+  /*
+   * Crimes consume Nerve.
+   *
+   * There is intentionally NO cooldownMinutes
+   * or cooldownUntil property.
+   */
   nerve: number;
 
   difficulty: number;
@@ -214,19 +220,20 @@ export function crimeUnlocked(
   crime: Crime,
   playerLevel: number
 ): boolean {
-  return playerLevel >= crime.levelRequired;
+  return (
+    playerLevel >=
+    crime.levelRequired
+  );
 }
 
 export function getCrimeStatBonus(
   stats: CrimeStats
 ): number {
   /*
-   * Crimes primarily reward a balanced character.
-   *
-   * We intentionally keep this small so stats
-   * help without completely replacing crime XP.
+   * Strength / Speed / Dexterity help
+   * without becoming more important than
+   * Crime Experience.
    */
-
   const average =
     (
       stats.strength +
@@ -236,7 +243,10 @@ export function getCrimeStatBonus(
 
   return Math.min(
     20,
-    Math.max(0, average - 1) * 1.5
+    Math.max(
+      0,
+      average - 1
+    ) * 1.5
   );
 }
 
@@ -246,14 +256,6 @@ export function crimeSuccessChance(
   intelligence: number = 1,
   statBonus: number = 0
 ): number {
-  /*
-   * Base chance comes from the crime.
-   *
-   * Crime experience gradually improves
-   * your chances, while character stats
-   * provide a smaller secondary bonus.
-   */
-
   const experienceBonus =
     Math.min(
       25,
@@ -263,7 +265,10 @@ export function crimeSuccessChance(
   const intelligenceBonus =
     Math.min(
       15,
-      Math.max(0, intelligence - 1) * 2
+      Math.max(
+        0,
+        intelligence - 1
+      ) * 2
     );
 
   const chance =
@@ -275,7 +280,10 @@ export function crimeSuccessChance(
 
   return Math.min(
     92,
-    Math.max(8, chance)
+    Math.max(
+      8,
+      chance
+    )
   );
 }
 
@@ -300,37 +308,28 @@ export function rollCrimeOutcome(
   const roll =
     Math.random() * 100;
 
-  /*
-   * First determine whether the crime
-   * succeeds.
-   */
-  if (roll < successChance) {
+  if (
+    roll <
+    successChance
+  ) {
     return "success";
   }
 
-  /*
-   * The more dangerous the crime,
-   * the greater the chance of being
-   * noticed.
-   *
-   * Failed crimes can therefore become:
-   *
-   * FAILED
-   * SPOOKED
-   * JAILED
-   */
-
   const remaining =
-    100 - successChance;
+    100 -
+    successChance;
 
   const normalized =
     remaining <= 0
       ? 0
-      : (roll - successChance) /
+      : (
+          roll -
+          successChance
+        ) /
         remaining;
 
   /*
-   * Low-risk crimes mostly just fail.
+   * Jail probability increases with risk.
    */
   const jailChance =
     Math.min(
@@ -338,6 +337,9 @@ export function rollCrimeOutcome(
       crime.risk / 100
     );
 
+  /*
+   * Spooked is more common than jail.
+   */
   const spookedChance =
     Math.min(
       0.35,
