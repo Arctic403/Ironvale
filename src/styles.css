@@ -21,7 +21,7 @@ body {
   min-height: 100vh;
 }
 
-/* --- TOPBAR --- */
+/* --- TOPBAR & VITALS --- */
 .topbar {
   height: 64px;
   position: fixed;
@@ -52,6 +52,30 @@ body {
   font-size: 13px;
 }
 
+.compact-vitals {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.compact-vitals button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.compact-vitals button:hover {
+  background: #1e2836;
+}
+
 /* --- FIXED & SCROLLABLE SIDEBAR --- */
 .sidebar {
   position: fixed;
@@ -65,7 +89,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  /* Scroll Fixes */
   max-height: calc(100vh - 64px);
   overflow-y: auto !important;
   overflow-x: hidden;
@@ -73,13 +96,14 @@ body {
   overscroll-behavior: contain;
 }
 
-/* Custom minimal scrollbar for sidebar */
 .sidebar::-webkit-scrollbar {
   width: 5px;
 }
+
 .sidebar::-webkit-scrollbar-track {
   background: #0e131a;
 }
+
 .sidebar::-webkit-scrollbar-thumb {
   background: #222c37;
   border-radius: 4px;
@@ -134,7 +158,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  align-items: end;
+  align-items: flex-end;
   margin-bottom: 20px;
 }
 
@@ -176,7 +200,7 @@ body {
   background: #6da7ff;
 }
 
-/* --- LAYOUT GRIDS --- */
+/* --- LAYOUT GRIDS & CARDS --- */
 .grid {
   display: grid;
   gap: 14px;
@@ -222,6 +246,9 @@ body {
 .card {
   padding: 17px;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .card:hover {
@@ -233,14 +260,39 @@ body {
 }
 
 .card h3 {
-  margin: 7px 0;
+  margin: 4px 0;
   font-size: 17px;
+  line-height: 1.3;
 }
 
 .card p {
   color: #98a4b1;
   line-height: 1.5;
   font-size: 13px;
+  margin: 0;
+}
+
+/* --- TARGET & COMBAT CARDS --- */
+.target-card .card-header-split {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.target-card h3 {
+  margin-top: 2px;
+}
+
+.status-badge {
+  background: #1d2836;
+  color: #8da2fb;
+  border: 1px solid #32435e;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
 }
 
 .card-top {
@@ -266,8 +318,40 @@ body {
   color: #9bc4ff;
 }
 
+/* --- DATA ROWS & KEY-VALUE LISTS --- */
+.data-list,
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.data-row,
+.rows p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1e2833;
+  padding: 8px 0;
+  margin: 0;
+  color: #8f9baa;
+  font-size: 13px;
+}
+
+.data-row span {
+  color: #8f9baa;
+}
+
+.data-row b,
+.rows b {
+  color: #e3e9ef;
+  font-weight: 600;
+}
+
+/* --- BUTTONS & ACTIONS --- */
 .action {
-  margin-top: 13px;
+  margin-top: auto;
   border: 1px solid #344456;
   background: #1b2a3b;
   color: #eaf3ff;
@@ -276,6 +360,7 @@ body {
   cursor: pointer;
   font-weight: 650;
   width: 100%;
+  transition: background 0.15s ease;
 }
 
 .action:hover {
@@ -301,6 +386,7 @@ body {
   flex: 1;
 }
 
+/* --- STATS & RESOURCES GRIDS --- */
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -348,69 +434,58 @@ body {
   color: #9aa3b2;
 }
 
-.rows p {
-  display: flex;
-  justify-content: space-between;
-  border-bottom: 1px solid #222c36;
-  padding: 9px 0;
-  margin: 0;
-  color: #8f9baa;
-  font-size: 13px;
-}
-
-.rows b {
-  color: #e3e9ef;
-}
-
 /* --- ACTIVITIES & ALERTS --- */
-.activity {
-  margin-top: 4px;
-}
-
-.activity-row {
-  display: grid;
-  grid-template-columns: 55px 85px 1fr;
+.activity-list {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: center;
-  border-top: 1px solid #202a34;
-  padding: 9px 0;
-  font-size: 12px;
 }
 
-.activity-row span {
+.activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #0d131a;
+  border-left: 3px solid #283747;
+}
+
+.activity-item .time {
   color: #687584;
+  font-size: 11px;
+  margin-right: 6px;
 }
 
-.activity-row b {
-  font-size: 9px;
-  color: #7e91a5;
+.activity-item .type-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #8da2fb;
 }
 
-.activity-row p {
-  margin: 0;
+.activity-item .desc {
+  margin: 2px 0 0;
+  font-size: 12px;
   color: #b5bec8;
 }
 
-.activity-row.success b {
-  color: #72d39a;
-}
+.activity-item.success { border-left-color: #4ade80; }
+.activity-item.success .type-tag { color: #4ade80; }
 
-.activity-row.failure b,
-.activity-row.jailed b {
-  color: #ef7777;
-}
+.activity-item.failure,
+.activity-item.jailed { border-left-color: #f87171; }
+.activity-item.failure .type-tag,
+.activity-item.jailed .type-tag { color: #f87171; }
 
-.activity-row.critical b {
-  color: #f4c86b;
-}
+.activity-item.critical { border-left-color: #fbbf24; }
+.activity-item.critical .type-tag { color: #fbbf24; }
 
-.activity-row.gym b {
-  color: #8db7ff;
-}
+.activity-item.gym { border-left-color: #60a5fa; }
+.activity-item.gym .type-tag { color: #60a5fa; }
 
-.activity-row.combat b {
-  color: #c49cff;
-}
+.activity-item.combat { border-left-color: #c084fc; }
+.activity-item.combat .type-tag { color: #c084fc; }
 
 .alert {
   border: 1px solid;
@@ -432,10 +507,11 @@ body {
   color: #a8e5f5;
 }
 
+/* --- GYM & COMBAT CONTAINERS --- */
 .gym-switch {
   display: flex;
   gap: 7px;
-  overflow: auto;
+  overflow-x: auto;
   padding-bottom: 12px;
 }
 
@@ -466,43 +542,39 @@ body {
   color: #657487;
 }
 
-.mini {
-  text-align: center;
-}
-
-.icon {
-  font-size: 26px;
-}
-
 .combat-box {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
 }
 
 .combat-box p {
   flex: 1;
   color: #a9b3bf;
+  margin: 0;
 }
 
-/* --- MODAL --- */
+/* --- MODAL OVERLAYS --- */
+.modal-overlay,
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  z-index: 30;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
   display: grid;
   place-items: center;
   padding: 20px;
 }
 
+.modal-card,
 .modal {
   width: min(520px, 100%);
   background: #111820;
   border: 1px solid #344353;
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 20px 70px #000;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.8);
 }
 
 .modal h2 {
@@ -528,13 +600,6 @@ body {
 
 .choice:hover {
   background: #22364d;
-}
-
-.modal .ghost {
-  margin-top: 8px;
-  width: 100%;
-  border: 0;
-  padding: 10px;
 }
 
 .bank {
@@ -588,7 +653,7 @@ body {
 @media (max-width: 720px) {
   .sidebar {
     width: 60px;
-    padding: 10px 4px 60px; /* Added bottom padding to guarantee clear access over mobile browser bars */
+    padding: 10px 4px 60px;
   }
 
   .sidebar .nav {
@@ -639,11 +704,8 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .activity-row {
-    grid-template-columns: 45px 65px 1fr;
-  }
-
   .combat-box {
-    display: block;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
