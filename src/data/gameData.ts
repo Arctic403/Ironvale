@@ -71,6 +71,7 @@ export type Property = {
   gymBonus: number;
 
   nerveBonus: number;
+  maxHappiness: number;
 };
 
 export const JOBS: Job[] = [
@@ -336,6 +337,7 @@ export const PROPERTIES: Property[] = [
     maxHealthBonus: 0,
     gymBonus: 0,
     nerveBonus: 0,
+    maxHappiness: 100,
   },
 
   {
@@ -347,6 +349,7 @@ export const PROPERTIES: Property[] = [
     maxHealthBonus: 5,
     gymBonus: 0,
     nerveBonus: 0,
+    maxHappiness: 110,
   },
 
   {
@@ -358,6 +361,7 @@ export const PROPERTIES: Property[] = [
     maxHealthBonus: 10,
     gymBonus: 0,
     nerveBonus: 0,
+    maxHappiness: 120,
   },
 
   {
@@ -369,6 +373,7 @@ export const PROPERTIES: Property[] = [
     maxHealthBonus: 20,
     gymBonus: 0,
     nerveBonus: 1,
+    maxHappiness: 135,
   },
 
   {
@@ -380,6 +385,7 @@ export const PROPERTIES: Property[] = [
     maxHealthBonus: 40,
     gymBonus: 0,
     nerveBonus: 2,
+    maxHappiness: 150,
   },
 ];
 
