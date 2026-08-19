@@ -1,22 +1,4 @@
-import { CombatStats } from "../systems/progressionSystem";
-
-export interface PlayerProfile {
-  id: string;
-  name: string;
-  level: number;
-  title: string;
-  status: "Online" | "Idle" | "Offline";
-  location: string;
-  health: number;
-  maxHealth: number;
-  stats: CombatStats;
-  weapon: string;
-  armor: string;
-  bounty: number;
-  cashReward: number;
-  xpReward: number;
-  faction: string;
-}
+import type { PlayerProfile } from "../systems/combat/combatTypes";
 
 export const PLAYER_PROFILES: PlayerProfile[] = [
   {
