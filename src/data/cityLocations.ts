@@ -1,7 +1,8 @@
 export type CityScreen =
   | "character"
   | "gym"
-  | "items"
+  | "inventory"
+  | "shops"
   | "jobs"
   | "education"
   | "crimes"
@@ -158,7 +159,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "Weapons, equipment, consumables, and everyday supplies.",
     district: "Commercial District",
-    screen: "items",
+    screen: "shops",
     x: "81%",
     y: "62%",
   },
