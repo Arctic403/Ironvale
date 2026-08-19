@@ -3493,3 +3493,733 @@ textarea:focus {
     font-size: 5px !important;
   }
 }
+/* ============================================================
+   RIFTCITY — CITY / MAP SYSTEM
+   Torn-style city navigation
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   CITY SCREEN
+------------------------------------------------------------ */
+
+.city-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.city-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.75fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* ------------------------------------------------------------
+   CITY MAP
+------------------------------------------------------------ */
+
+.city-map-card {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(17, 26, 35, 0.98),
+      rgba(9, 14, 20, 0.98)
+    );
+}
+
+.city-map-header {
+  position: relative;
+  z-index: 5;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 14px 16px;
+
+  border-bottom: 1px solid var(--border);
+  background: rgba(11, 16, 22, 0.94);
+}
+
+.city-map-header h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.city-map-header p {
+  margin: 3px 0 0;
+  font-size: 10px;
+}
+
+/*
+ * Main map surface.
+ *
+ * This is intentionally CSS-based so the map works immediately
+ * without requiring an external map API.
+ */
+.city-map {
+  position: relative;
+  min-height: 465px;
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      35deg,
+      transparent 46%,
+      rgba(255, 255, 255, 0.035) 47%,
+      rgba(255, 255, 255, 0.035) 49%,
+      transparent 50%
+    ),
+    linear-gradient(
+      145deg,
+      transparent 46%,
+      rgba(255, 255, 255, 0.025) 47%,
+      rgba(255, 255, 255, 0.025) 49%,
+      transparent 50%
+    ),
+    #0b1219;
+  background-size: 120px 120px;
+}
+
+/* Major roads */
+
+.city-road {
+  position: absolute;
+  z-index: 1;
+
+  background: rgba(75, 91, 108, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.025),
+    0 0 12px rgba(0, 0, 0, 0.25);
+}
+
+.city-road.horizontal {
+  left: 0;
+  right: 0;
+  height: 13px;
+}
+
+.city-road.vertical {
+  top: 0;
+  bottom: 0;
+  width: 13px;
+}
+
+.city-road.diagonal {
+  width: 140%;
+  height: 11px;
+  left: -20%;
+  transform: rotate(-24deg);
+  transform-origin: center;
+}
+
+/* Road markings */
+
+.city-road::after {
+  content: "";
+
+  position: absolute;
+  inset: 50% 0 auto;
+
+  height: 1px;
+
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.15) 0 18px,
+    transparent 18px 34px
+  );
+}
+
+/* ------------------------------------------------------------
+   MAP BLOCKS
+------------------------------------------------------------ */
+
+.city-block {
+  position: absolute;
+  z-index: 2;
+
+  border: 1px solid rgba(111, 130, 150, 0.12);
+  border-radius: 5px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(38, 52, 66, 0.42),
+      rgba(20, 30, 40, 0.5)
+    );
+}
+
+/* ------------------------------------------------------------
+   CITY LOCATION MARKERS
+------------------------------------------------------------ */
+
+.city-marker {
+  position: absolute;
+  z-index: 10;
+
+  width: 104px;
+  min-height: 72px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px;
+
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(17, 26, 35, 0.97),
+      rgba(11, 17, 24, 0.97)
+    );
+
+  color: var(--text);
+
+  cursor: pointer;
+
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.32);
+
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.city-marker:hover {
+  transform: translateY(-3px);
+
+  border-color: rgba(96, 165, 250, 0.65);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(25, 40, 55, 0.98),
+      rgba(13, 22, 31, 0.98)
+    );
+
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.42),
+    0 0 18px rgba(96, 165, 250, 0.08);
+}
+
+.city-marker.active {
+  border-color: var(--blue);
+
+  box-shadow:
+    0 0 0 2px rgba(96, 165, 250, 0.12),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.city-marker-icon {
+  width: 30px;
+  height: 30px;
+
+  display: grid;
+  place-items: center;
+
+  margin-bottom: 5px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+
+  background: rgba(255, 255, 255, 0.035);
+
+  font-size: 16px;
+}
+
+.city-marker-name {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 900;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.city-marker-type {
+  margin-top: 2px;
+
+  color: var(--muted);
+
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------
+   MAP LEGEND
+------------------------------------------------------------ */
+
+.city-map-legend {
+  position: absolute;
+  z-index: 20;
+  left: 14px;
+  bottom: 14px;
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+
+  padding: 8px;
+
+  border: 1px solid var(--border);
+  border-radius: 7px;
+
+  background: rgba(8, 12, 17, 0.88);
+  backdrop-filter: blur(8px);
+}
+
+.city-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+
+  color: var(--muted);
+
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.city-map-legend-dot {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+/* ------------------------------------------------------------
+   CITY LOCATION PANEL
+------------------------------------------------------------ */
+
+.city-location-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.city-location-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.city-location-title h2 {
+  margin: 0;
+
+  color: var(--text);
+
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+.city-location-description {
+  margin: 6px 0 0;
+
+  color: var(--muted);
+
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ------------------------------------------------------------
+   CITY BUILDINGS / SERVICES
+------------------------------------------------------------ */
+
+.city-services {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.city-service-card {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 13px;
+
+  border: 1px solid var(--border);
+  border-radius: 9px;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(17, 26, 35, 0.95),
+      rgba(12, 18, 25, 0.95)
+    );
+
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.city-service-card:hover {
+  transform: translateY(-2px);
+
+  border-color: var(--border-strong);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(21, 32, 43, 0.98),
+      rgba(14, 22, 30, 0.98)
+    );
+}
+
+.city-service-icon {
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  margin-bottom: 9px;
+
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+
+  background: rgba(255, 255, 255, 0.025);
+
+  font-size: 17px;
+}
+
+.city-service-card h3 {
+  margin: 0 0 4px;
+
+  color: var(--text);
+
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.city-service-card p {
+  margin-bottom: 12px;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.city-service-card .btn-primary {
+  width: 100%;
+  margin-top: auto;
+}
+
+/* ------------------------------------------------------------
+   SPECIAL LOCATION TYPES
+------------------------------------------------------------ */
+
+.city-service-card.bank {
+  border-color: rgba(250, 204, 21, 0.16);
+}
+
+.city-service-card.hospital {
+  border-color: rgba(248, 113, 113, 0.16);
+}
+
+.city-service-card.gym {
+  border-color: rgba(74, 222, 128, 0.16);
+}
+
+.city-service-card.store {
+  border-color: rgba(96, 165, 250, 0.16);
+}
+
+.city-service-card.police {
+  border-color: rgba(167, 139, 250, 0.16);
+}
+
+/* ------------------------------------------------------------
+   CITY QUICK ACTIONS
+------------------------------------------------------------ */
+
+.city-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.city-quick-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+
+  min-height: 54px;
+
+  padding: 9px 11px;
+
+  border: 1px solid var(--border);
+  border-radius: 8px;
+
+  background: var(--surface);
+
+  color: var(--text);
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.city-quick-action:hover {
+  transform: translateY(-1px);
+
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.city-quick-action-icon {
+  width: 28px;
+  height: 28px;
+
+  flex-shrink: 0;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 6px;
+
+  background: rgba(96, 165, 250, 0.07);
+
+  font-size: 14px;
+}
+
+.city-quick-action-text {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.city-quick-action-text strong {
+  color: var(--text);
+
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.city-quick-action-text span {
+  color: var(--muted);
+
+  font-size: 8px;
+}
+
+/* ------------------------------------------------------------
+   CURRENT LOCATION BADGE
+------------------------------------------------------------ */
+
+.city-current-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 5px 8px;
+
+  border: 1px solid rgba(74, 222, 128, 0.22);
+  border-radius: 5px;
+
+  background: rgba(74, 222, 128, 0.06);
+
+  color: var(--green);
+
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.city-current-badge::before {
+  content: "";
+
+  width: 6px;
+  height: 6px;
+
+  border-radius: 50%;
+
+  background: var(--green);
+
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+}
+
+/* ------------------------------------------------------------
+   CITY STAT STRIP
+------------------------------------------------------------ */
+
+.city-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.city-stat {
+  padding: 10px 12px;
+
+  border: 1px solid var(--border);
+  border-radius: 7px;
+
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.city-stat-label {
+  display: block;
+
+  margin-bottom: 2px;
+
+  color: var(--muted);
+
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.city-stat-value {
+  color: var(--text);
+
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* ------------------------------------------------------------
+   REMOVE / DE-EMPHASIZE OLD DISTRICT UI
+------------------------------------------------------------ */
+
+.district-actions {
+  display: none !important;
+}
+
+.district-card {
+  display: none !important;
+}
+
+.location-card .card-tag {
+  /* Prevent old district cards from visually dominating
+     the new city system if any legacy component remains. */
+  letter-spacing: 0.08em;
+}
+
+/* ------------------------------------------------------------
+   RESPONSIVE CITY
+------------------------------------------------------------ */
+
+@media (max-width: 1100px) {
+  .city-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .city-location-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .city-location-panel > .card:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 800px) {
+  .city-map-card {
+    min-height: 430px;
+  }
+
+  .city-map {
+    min-height: 375px;
+  }
+
+  .city-services {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .city-quick-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .city-stat-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .city-location-panel {
+    display: flex;
+  }
+
+  .city-map-card {
+    min-height: 390px;
+  }
+
+  .city-map {
+    min-height: 335px;
+  }
+
+  .city-marker {
+    width: 82px;
+    min-height: 61px;
+    padding: 6px;
+  }
+
+  .city-marker-icon {
+    width: 25px;
+    height: 25px;
+    margin-bottom: 3px;
+    font-size: 13px;
+  }
+
+  .city-marker-name {
+    font-size: 8px;
+  }
+
+  .city-marker-type {
+    font-size: 6px;
+  }
+
+  .city-services {
+    grid-template-columns: 1fr;
+  }
+
+  .city-quick-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .city-map-header {
+    padding: 11px 12px;
+  }
+
+  .city-map-header h2 {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 420px) {
+  .city-quick-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .city-stat-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+}
