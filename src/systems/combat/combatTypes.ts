@@ -1,4 +1,4 @@
-import type { DistanceZone } from "../../data/gameData";
+import type { DistanceZone } from "../../data/dataTypes";
 
 export type BodyPart =
   | "head"
@@ -45,6 +45,10 @@ export interface PlayerProfile {
   weapons?: WeaponOption[];
 
   equippedWeaponId?: string | null;
+  weapon?: string;
+  armor?: string;
+  bounty?: number;
+  faction?: string;
 
   cashReward?: number;
   xpReward?: number;

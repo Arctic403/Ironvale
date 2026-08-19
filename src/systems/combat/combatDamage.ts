@@ -1,4 +1,4 @@
-import type { DistanceZone } from "../../data/gameData";
+import type { DistanceZone } from "../../data/dataTypes";
 
 import type {
   BodyPart,
