@@ -1,30 +1,37 @@
+export type CityScreen =
+  | "character"
+  | "gym"
+  | "items"
+  | "jobs"
+  | "education"
+  | "crimes"
+  | "combat"
+  | "missions"
+  | "property"
+  | "market";
+
 export type CityLocation = {
   id: string;
   name: string;
   icon: string;
   description: string;
   district: string;
-  screen:
-    | "character"
-    | "gym"
-    | "items"
-    | "jobs"
-    | "education"
-    | "crimes"
-    | "combat"
-    | "missions"
-    | "property"
-    | "market";
+  screen?: CityScreen;
   x: string;
   y: string;
 };
 
 export const CITY_LOCATIONS: CityLocation[] = [
+  // =========================================================
+  // NORTHSIDE
+  // =========================================================
+
   {
     id: "hospital",
     name: "RiftCity Hospital",
     icon: "🏥",
-    description: "Medical treatment and recovery after serious injuries.",
+    description:
+      "Medical treatment and recovery after serious injuries.",
     district: "Medical District",
     screen: "character",
     x: "18%",
@@ -32,13 +39,25 @@ export const CITY_LOCATIONS: CityLocation[] = [
   },
 
   {
+    id: "police",
+    name: "RiftCity Police Department",
+    icon: "🚔",
+    description:
+      "Law enforcement, wanted records, and city security.",
+    district: "Northside",
+    x: "38%",
+    y: "12%",
+  },
+
+  {
     id: "bank",
     name: "RiftCity Bank",
     icon: "🏦",
-    description: "Store your cash safely and manage your bank balance.",
+    description:
+      "Store your cash safely and manage your bank balance.",
     district: "Financial District",
     screen: "character",
-    x: "38%",
+    x: "58%",
     y: "18%",
   },
 
@@ -46,29 +65,24 @@ export const CITY_LOCATIONS: CityLocation[] = [
     id: "university",
     name: "Rift University",
     icon: "🎓",
-    description: "Take courses and improve your character.",
+    description:
+      "Take courses and improve your character through education.",
     district: "University District",
     screen: "education",
     x: "74%",
     y: "18%",
   },
 
-  {
-    id: "property",
-    name: "RiftCity Homes",
-    icon: "🏠",
-    description: "Browse properties and purchase a better home.",
-    district: "Residential District",
-    screen: "property",
-    x: "19%",
-    y: "42%",
-  },
+  // =========================================================
+  // CENTRAL DISTRICT
+  // =========================================================
 
   {
     id: "park",
     name: "Central Park",
     icon: "🌳",
-    description: "The central green space of RiftCity.",
+    description:
+      "The central green space of RiftCity.",
     district: "Central District",
     screen: "character",
     x: "51%",
@@ -76,10 +90,23 @@ export const CITY_LOCATIONS: CityLocation[] = [
   },
 
   {
+    id: "property",
+    name: "RiftCity Homes",
+    icon: "🏠",
+    description:
+      "Browse properties and purchase a better home.",
+    district: "Residential District",
+    screen: "property",
+    x: "19%",
+    y: "42%",
+  },
+
+  {
     id: "jobs",
     name: "Employment Center",
     icon: "💼",
-    description: "Find work and build your career.",
+    description:
+      "Find work, build your career, and earn a living.",
     district: "Business District",
     screen: "jobs",
     x: "78%",
@@ -87,21 +114,11 @@ export const CITY_LOCATIONS: CityLocation[] = [
   },
 
   {
-    id: "gym",
-    name: "Rift Fitness",
-    icon: "🏋️",
-    description: "Train your physical combat statistics.",
-    district: "Industrial District",
-    screen: "gym",
-    x: "19%",
-    y: "65%",
-  },
-
-  {
     id: "downtown",
     name: "Downtown",
     icon: "📍",
-    description: "The heart of RiftCity.",
+    description:
+      "The heart of RiftCity, filled with businesses, people, and activity.",
     district: "Downtown",
     screen: "character",
     x: "52%",
@@ -109,10 +126,37 @@ export const CITY_LOCATIONS: CityLocation[] = [
   },
 
   {
+    id: "pharmacy",
+    name: "RiftCare Pharmacy",
+    icon: "💊",
+    description:
+      "Purchase medical supplies, recovery items, and other essentials.",
+    district: "Medical District",
+    x: "34%",
+    y: "48%",
+  },
+
+  {
+    id: "casino",
+    name: "The Rift Casino",
+    icon: "🎰",
+    description:
+      "A high-stakes entertainment venue where fortune can change quickly.",
+    district: "Entertainment District",
+    x: "68%",
+    y: "51%",
+  },
+
+  // =========================================================
+  // EAST MARKET
+  // =========================================================
+
+  {
     id: "shops",
     name: "RiftCity Shops",
     icon: "🛒",
-    description: "Weapons, equipment, consumables and supplies.",
+    description:
+      "Weapons, equipment, consumables, and everyday supplies.",
     district: "Commercial District",
     screen: "items",
     x: "81%",
@@ -120,10 +164,61 @@ export const CITY_LOCATIONS: CityLocation[] = [
   },
 
   {
+    id: "market",
+    name: "RiftCity Market",
+    icon: "📈",
+    description:
+      "Trade goods and commodities at constantly changing prices.",
+    district: "Market District",
+    screen: "market",
+    x: "82%",
+    y: "84%",
+  },
+
+  {
+    id: "black-market",
+    name: "The Black Market",
+    icon: "🕶️",
+    description:
+      "An underground marketplace dealing in restricted and hard-to-find goods.",
+    district: "East Market",
+    x: "91%",
+    y: "47%",
+  },
+
+  // =========================================================
+  // SOUTHSIDE
+  // =========================================================
+
+  {
+    id: "gym",
+    name: "Rift Fitness",
+    icon: "🏋️",
+    description:
+      "Train your physical combat statistics and become stronger.",
+    district: "Industrial District",
+    screen: "gym",
+    x: "19%",
+    y: "65%",
+  },
+
+  {
+    id: "jail",
+    name: "RiftCity Jail",
+    icon: "🔒",
+    description:
+      "The city's detention facility for criminals awaiting release.",
+    district: "Justice District",
+    x: "35%",
+    y: "72%",
+  },
+
+  {
     id: "crime",
     name: "The Underground",
     icon: "🕵️",
-    description: "Commit crimes and build criminal experience.",
+    description:
+      "Commit crimes, take risks, and build criminal experience.",
     district: "Underground District",
     screen: "crimes",
     x: "18%",
@@ -134,7 +229,8 @@ export const CITY_LOCATIONS: CityLocation[] = [
     id: "combat",
     name: "Combat District",
     icon: "⚔️",
-    description: "Challenge other players to combat.",
+    description:
+      "Challenge other players and prove yourself in combat.",
     district: "Combat District",
     screen: "combat",
     x: "51%",
@@ -142,13 +238,29 @@ export const CITY_LOCATIONS: CityLocation[] = [
   },
 
   {
-    id: "market",
-    name: "RiftCity Market",
-    icon: "📈",
-    description: "Trade commodities at dynamic prices.",
-    district: "Market District",
-    screen: "market",
-    x: "82%",
-    y: "84%",
+    id: "missions",
+    name: "Mission Headquarters",
+    icon: "🎯",
+    description:
+      "Accept missions, complete objectives, and earn rewards.",
+    district: "Operations District",
+    screen: "missions",
+    x: "67%",
+    y: "73%",
+  },
+
+  // =========================================================
+  // TRAVEL
+  // =========================================================
+
+  {
+    id: "airport",
+    name: "RiftCity International Airport",
+    icon: "✈️",
+    description:
+      "Travel to other cities and eventually connect RiftCity to the wider world.",
+    district: "Airport District",
+    x: "88%",
+    y: "15%",
   },
 ];
