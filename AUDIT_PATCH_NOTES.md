@@ -1,19 +1,31 @@
-# RiftCity baseline audit / patch
+# RiftCity V1 — Refactor Patch
 
-Baseline: RiftCityV1-main.zip supplied by user.
+This build keeps the original RiftCity prototype and refactors its foundation instead of replacing it.
 
-Preserved existing architecture and systems. Added:
-- Core resource visibility: health, energy, nerve, happiness in top status bar and Character page.
-- Resource persistence and offline regeneration remain intact.
-- Crime progression now uses crime experience thresholds rather than arbitrary player-level gates.
-- Jobs no longer have player-level UI/logic locks; roles are available through employment and pay according to role.
-- Education no longer blocks enrollment solely on player level.
-- Combat opponents are now persistent-style player profiles with name, level, status, location, health, faction, equipment, bounty and combat stats.
-- Combat selection is profile based instead of anonymous NPC archetypes.
-- Existing combat energy, hospital, win/loss, rewards and equipment interactions remain wired into the profile system.
-- Added src/data/playerProfiles.ts.
-- Existing market, faction, awards, daily reward, bank interest, property, gym, education, missions and city systems were preserved.
-- Added responsive core-resource grid styling.
+## Refactored
+- Split `src/data/gameData.ts` into `dataTypes.ts`, `jobs.ts`, `items.ts`, `missions.ts`, `education.ts`, and `properties.ts`; `gameData.ts` is now a compatibility barrel.
+- Renamed the malformed `src/    types/` directory to `src/types/`.
+- Split `gameCore.ts` into `saveSystem.ts`, `gameClock.ts`, `economy.ts`, and `world.ts`; `gameCore.ts` remains a compatibility barrel.
+- Extracted the recurring game clock into `src/systems/gameTickSystem.ts`.
+- Added explicit `lastHealthUpdate` and `lastMarketUpdate` save fields.
+- Added safe migration defaults for older saves.
+- Consolidated combat profile typing into `systems/combat/combatTypes.ts`; `data/playerProfiles.ts` is now the sole profile dataset.
+- Fixed broken `AppShell` imports from `./app/*` to the actual `./apps/*` directory and fixed its Navigation prop contract.
 
-Build note:
-Dependency installation could not complete in this environment because the npm registry/cache was unavailable, so a production Vite build could not be executed here. The source was inspected and patched directly against the supplied project rather than replacing it with a new application.
+## Job system
+- Removed player-level job locks.
+- Each company/job has 3 skills and 3 positions.
+- Skills gain +1 once per real 24 hours worked, including offline progress.
+- Skills are capped at 10 for V1.
+- Promotion automatically occurs at skill level 5 and 10.
+- Each position increases pay and grants small stat bonuses.
+- Skill levels also provide small stat bonuses.
+- Job skills and position tiers persist in localStorage saves.
+- Switching companies does not erase previous company progress.
+
+## Bug fix
+- Health regeneration now has its own timestamp instead of incorrectly using the energy regeneration timestamp.
+
+## Validation
+- TypeScript source validation was run. The remaining compiler errors in this environment are caused by missing installed npm packages (`react`, `react-dom`, Vite typings), not the refactored data/core/system modules.
+- `npm install` could not complete within the available environment, so a Vite production build could not be executed here.
