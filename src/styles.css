@@ -5706,3 +5706,5 @@ textarea:focus {
     font-size: 14px;
   }
 }
+
+.job-skills{margin:.75rem 0;display:grid;gap:.25rem}.job-skills .data-row{font-size:.88rem}
