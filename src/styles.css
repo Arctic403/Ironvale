@@ -2821,85 +2821,59 @@ textarea:focus {
 /* ============================================================
    END RIFTCITY STYLES
    ============================================================ */
-
 /* ============================================================
-   RIFTCITY COMBAT — NEW RESPONSIVE LAYOUT
-   Desktop:
-     LEFT  = combat log + actions
-     RIGHT = fighters / arena
-
-   Mobile:
-     1. fighters / arena
-     2. combat log
-     3. actions
+   RIFTCITY COMBAT — DESKTOP / MOBILE LAYOUT
    ============================================================ */
 
 .combat-main-grid {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  grid-template-areas: "controls arena";
+  grid-template-areas:
+    "log arena";
   gap: 16px;
   align-items: start;
 }
 
-/* ------------------------------------------------------------
-   RIGHT SIDE — FIGHTERS / ARENA
-   ------------------------------------------------------------ */
-
+/*
+ * IMPORTANT:
+ * Make the existing fight wrapper transparent to the grid.
+ * Its children become grid items while keeping the JSX intact.
+ */
 .combat-fight-column {
+  display: contents;
+}
+
+/* PLAYER VS PLAYER / ARENA */
+.combat-arena {
   grid-area: arena;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  width: 100%;
 }
 
-.combat-arena {
-  min-width: 0;
-}
-
-/* ------------------------------------------------------------
-   LEFT SIDE — LOG + ACTIONS
-   ------------------------------------------------------------ */
-
-/*
-   The existing fight column contains the arena and the action
-   section. On desktop we visually move the action section
-   before the arena using CSS grid placement.
-*/
-
-.combat-main-grid {
-  position: relative;
-}
-
-/* Existing combat log */
+/* COMBAT LOG */
 .combat-log,
 .combat-log-panel,
 .combat-history {
   grid-area: log;
 }
 
-/*
-   If the current log is a direct child of combat-main-grid,
-   this places it on the left.
-*/
-.combat-main-grid > .combat-log,
-.combat-main-grid > .combat-log-panel,
-.combat-main-grid > .combat-history {
-  grid-area: log;
-}
-
-/* Existing action/status area */
+/* ATTACK CONTROLS */
 .combat-actions,
 .combat-action-panel,
-.combat-controls,
-.combat-status {
-  min-width: 0;
+.combat-controls {
+  grid-column: 1;
+  width: 100%;
 }
 
-/* ------------------------------------------------------------
-   DESKTOP GRID
-   ------------------------------------------------------------ */
+/* Keep the turn/status message with the left controls */
+.combat-status-banner {
+  grid-column: 1;
+  width: 100%;
+}
+
+/* ============================================================
+   DESKTOP
+   ============================================================ */
 
 @media (min-width: 901px) {
   .combat-main-grid {
@@ -2909,53 +2883,28 @@ textarea:focus {
 
     grid-template-areas:
       "log arena"
-      "actions arena";
-  }
-
-  .combat-fight-column {
-    grid-area: arena;
-  }
-
-  /*
-     These selectors cover the common action/log class names
-     already used by the combat UI.
-  */
-  .combat-main-grid > .combat-log,
-  .combat-main-grid > .combat-log-panel,
-  .combat-main-grid > .combat-history {
-    grid-area: log;
-  }
-
-  .combat-main-grid > .combat-actions,
-  .combat-main-grid > .combat-action-panel,
-  .combat-main-grid > .combat-controls {
-    grid-area: actions;
-  }
-
-  /*
-     Keep the action controls compact and on the left.
-  */
-  .combat-actions,
-  .combat-action-panel,
-  .combat-controls {
-    width: 100%;
-  }
-
-  /*
-     Make the arena use the complete right-hand column.
-  */
-  .combat-fight-column {
-    height: 100%;
+      "actions arena"
+      "status arena";
   }
 
   .combat-arena {
-    width: 100%;
+    grid-area: arena;
+  }
+
+  .combat-actions,
+  .combat-action-panel,
+  .combat-controls {
+    grid-area: actions;
+  }
+
+  .combat-status-banner {
+    grid-area: status;
   }
 }
 
-/* ------------------------------------------------------------
+/* ============================================================
    MOBILE
-   ------------------------------------------------------------ */
+   ============================================================ */
 
 @media (max-width: 900px) {
   .combat-main-grid {
@@ -2964,53 +2913,45 @@ textarea:focus {
     gap: 14px;
   }
 
-  /*
-     Fighters first.
-  */
   .combat-fight-column {
+    display: contents;
+  }
+
+  /* 1 — PLAYER VS PLAYER */
+  .combat-arena {
     order: 1;
     width: 100%;
   }
 
-  /*
-     Log follows the fighters.
-  */
-  .combat-main-grid > .combat-log,
-  .combat-main-grid > .combat-log-panel,
-  .combat-main-grid > .combat-history {
+  /* 2 — COMBAT LOG */
+  .combat-log,
+  .combat-log-panel,
+  .combat-history {
     order: 2;
     width: 100%;
   }
 
-  /*
-     Controls go underneath the log.
-  */
-  .combat-main-grid > .combat-actions,
-  .combat-main-grid > .combat-action-panel,
-  .combat-main-grid > .combat-controls {
+  /* 3 — TURN STATUS */
+  .combat-status-banner {
     order: 3;
     width: 100%;
   }
-}
 
-/* ------------------------------------------------------------
-   SMALL PHONES
-   ------------------------------------------------------------ */
+  /* 4 — ATTACK BUTTONS */
+  .combat-actions,
+  .combat-action-panel,
+  .combat-controls {
+    order: 4;
+    width: 100%;
+  }
+}
 
 @media (max-width: 600px) {
   .combat-main-grid {
     gap: 10px;
   }
 
-  .combat-fight-column {
-    gap: 10px;
-  }
-
-  /*
-     Prevent the arena from becoming too cramped.
-  */
   .combat-arena {
-    width: 100%;
     overflow: hidden;
   }
 }
