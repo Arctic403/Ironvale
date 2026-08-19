@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 
+import { Panel, Button } from "../components/ui";
 import { InteractiveCombatView } from "./Combat";
 
 import {
@@ -44,91 +45,29 @@ import type { SaveData } from "../types/riftCity";
 type Game = ReturnType<typeof useRiftCity>;
 
 /* =========================================================
-   SHARED UI
-========================================================= */
-
-export function Panel({
-  title,
-  children,
-  className = "",
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`card ${className}`}>
-      <div className="card-header">
-        <h3>{title}</h3>
-      </div>
-
-      <div className="card-body">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-export function Button({
-  children,
-  onClick,
-  disabled = false,
-  className = "",
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      className={`btn-primary ${className}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
-
-/* =========================================================
    CHARACTER
 ========================================================= */
 
-export function Character({
-  g,
-}: {
-  g: Game;
-}) {
+export function Character({ g }: { g: Game }) {
   const [amount, setAmount] = useState("100");
 
   const n = Math.max(0, Number(amount) || 0);
 
   const happinessMax =
-    getProperty(g.gameState.ownedProperty)?.maxHappiness ??
-    100;
+    getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100;
 
   return (
     <div className="ui-grid two-col">
       <Panel title="Combat Stats">
         <div className="stats-list">
-          {Object.entries(g.gameState.stats).map(
-            ([key, value]) => (
-              <div
-                className="stat-row"
-                key={key}
-              >
-                <span className="stat-name">
-                  {key}
-                </span>
-
-                <strong className="stat-val">
-                  {(value as number).toFixed(2)}
-                </strong>
-              </div>
-            )
-          )}
+          {Object.entries(g.gameState.stats).map(([key, value]) => (
+            <div className="stat-row" key={key}>
+              <span className="stat-name">{key}</span>
+              <strong className="stat-val">
+                {(value as number).toFixed(2)}
+              </strong>
+            </div>
+          ))}
         </div>
       </Panel>
 
@@ -137,8 +76,7 @@ export function Character({
           <div className="data-row">
             <span>❤️ Health</span>
             <b>
-              {Math.floor(g.gameState.health)} /{" "}
-              {g.maxHealth}
+              {Math.floor(g.gameState.health)} / {g.maxHealth}
             </b>
           </div>
 
@@ -159,8 +97,7 @@ export function Character({
           <div className="data-row">
             <span>😊 Happiness</span>
             <b>
-              {Math.floor(g.gameState.happiness)} /{" "}
-              {happinessMax}
+              {Math.floor(g.gameState.happiness)} / {happinessMax}
             </b>
           </div>
         </div>
@@ -170,16 +107,12 @@ export function Character({
         <div className="data-list">
           <div className="data-row">
             <span>Crime Experience</span>
-            <b>
-              {g.gameState.crimeExperience}
-            </b>
+            <b>{g.gameState.crimeExperience}</b>
           </div>
 
           <div className="data-row">
             <span>Gym Experience</span>
-            <b>
-              {g.gameState.gymExperience}
-            </b>
+            <b>{g.gameState.gymExperience}</b>
           </div>
 
           <div className="data-row">
@@ -193,16 +126,13 @@ export function Character({
           <div className="data-row">
             <span>Fight Record</span>
             <b>
-              {g.gameState.fightsWon}W /{" "}
-              {g.gameState.fightsLost}L
+              {g.gameState.fightsWon}W / {g.gameState.fightsLost}L
             </b>
           </div>
 
           <div className="data-row">
             <span>Attacks</span>
-            <b>
-              {g.gameState.attacks}
-            </b>
+            <b>{g.gameState.attacks}</b>
           </div>
         </div>
       </Panel>
@@ -218,26 +148,20 @@ export function Character({
               type="number"
               min="0"
               value={amount}
-              onChange={(event) =>
-                setAmount(event.target.value)
-              }
+              onChange={(event) => setAmount(event.target.value)}
             />
 
             <div className="btn-group">
               <Button
                 disabled={n <= 0}
-                onClick={() =>
-                  g.bankDeposit(n)
-                }
+                onClick={() => g.bankDeposit(n)}
               >
                 Deposit
               </Button>
 
               <Button
                 disabled={n <= 0}
-                onClick={() =>
-                  g.bankWithdraw(n)
-                }
+                onClick={() => g.bankWithdraw(n)}
               >
                 Withdraw
               </Button>
@@ -249,21 +173,14 @@ export function Character({
   );
 }
 
-
 /* =========================================================
    CRIMES
 ========================================================= */
 
-export function Crimes({
-  g,
-}: {
-  g: Game;
-}) {
-  const incapacitated =
-    Boolean(
-      g.gameState.jailUntil ||
-      g.gameState.hospitalUntil
-    );
+export function Crimes({ g }: { g: Game }) {
+  const incapacitated = Boolean(
+    g.gameState.jailUntil || g.gameState.hospitalUntil
+  );
 
   return (
     <div className="ui-grid two-col">
@@ -272,9 +189,7 @@ export function Crimes({
           crime,
           g.gameState.crimeExperience,
           1,
-          getCrimeStatBonus(
-            g.gameState.stats
-          )
+          getCrimeStatBonus(g.gameState.stats)
         );
 
         const unlocked = crimeUnlocked(
@@ -282,13 +197,10 @@ export function Crimes({
           g.gameState.crimeExperience
         );
 
-        const enoughNerve =
-          g.gameState.nerve >= crime.nerve;
+        const enoughNerve = g.gameState.nerve >= crime.nerve;
 
         const canCommit =
-          unlocked &&
-          enoughNerve &&
-          !incapacitated;
+          unlocked && enoughNerve && !incapacitated;
 
         return (
           <div
@@ -318,9 +230,7 @@ export function Crimes({
                 className="bar-fill crime"
                 style={{
                   width: `${
-                    unlocked
-                      ? Math.min(100, chance)
-                      : 0
+                    unlocked ? Math.min(100, chance) : 0
                   }%`,
                 }}
               />
@@ -334,9 +244,7 @@ export function Crimes({
 
             <Button
               disabled={!canCommit}
-              onClick={() =>
-                g.commitCrime(crime)
-              }
+              onClick={() => g.commitCrime(crime)}
             >
               Commit Crime
             </Button>
@@ -351,11 +259,7 @@ export function Crimes({
    COMBAT
 ========================================================= */
 
-export function Combat({
-  g,
-}: {
-  g: Game;
-}) {
+export function Combat({ g }: { g: Game }) {
   if (g.combatOpponent) {
     const opponent = g.combatOpponent;
 
@@ -377,28 +281,17 @@ export function Combat({
           health: opponent.health,
           maxHealth: opponent.maxHealth,
           stats: opponent.stats,
-          weapons:
-            opponent.weapons ||
-            DEFAULT_WEAPONS,
-          cashReward:
-            opponent.cashReward,
-          xpReward:
-            opponent.level * 25,
+          weapons: opponent.weapons || DEFAULT_WEAPONS,
+          cashReward: opponent.cashReward,
+          xpReward: opponent.level * 25,
         }}
-        onFinish={(
-          outcome,
-          enemy,
-          finalPlayerHealth
-        ) => {
+        onFinish={(outcome, enemy, finalPlayerHealth) => {
           let cashEarned = 0;
 
-          const baseXp =
-            enemy.xpReward || 50;
-
+          const baseXp = enemy.xpReward || 50;
           let xpEarned = baseXp;
 
-          const isVictory =
-            outcome === "mug";
+          const isVictory = outcome === "mug";
 
           if (outcome === "mug") {
             cashEarned = Math.floor(
@@ -406,33 +299,22 @@ export function Combat({
                 (0.4 + Math.random() * 0.4)
             );
 
-            xpEarned = Math.floor(
-              baseXp * 0.25
-            );
+            xpEarned = Math.floor(baseXp * 0.25);
           } else if (outcome === "leave") {
-            xpEarned = Math.floor(
-              baseXp * 0.25
-            );
+            xpEarned = Math.floor(baseXp * 0.25);
           }
 
           g.setGameState((previous) => {
             const next: SaveData = {
               ...previous,
 
-              cash:
-                previous.cash +
-                cashEarned,
+              cash: previous.cash + cashEarned,
 
-              xp:
-                previous.xp +
-                xpEarned,
+              xp: previous.xp + xpEarned,
 
               health: Math.max(
                 1,
-                Math.min(
-                  g.maxHealth,
-                  finalPlayerHealth
-                )
+                Math.min(g.maxHealth, finalPlayerHealth)
               ),
 
               fightsWon: isVictory
@@ -449,9 +331,7 @@ export function Combat({
             return g.appendActivity(
               next,
               description,
-              isVictory
-                ? "combat"
-                : "system"
+              isVictory ? "combat" : "system"
             );
           });
 
@@ -459,31 +339,25 @@ export function Combat({
           g.setCombatStarted(false);
           g.setCurrentScreen("combat");
         }}
-        onDefeat={() =>
-          setGameStateForCombatDefeat(g)
-        }
+        onDefeat={() => setGameStateForCombatDefeat(g)}
       />
     );
   }
 
-  const incapacitated =
-    Boolean(
-      g.gameState.jailUntil ||
-      g.gameState.hospitalUntil
-    );
+  const incapacitated = Boolean(
+    g.gameState.jailUntil || g.gameState.hospitalUntil
+  );
 
-  const noEnergy =
-    g.gameState.energy < 10;
+  const noEnergy = g.gameState.energy < 10;
 
   return (
     <Panel title="Available Targets">
       <div className="ui-grid two-col">
         {PLAYER_PROFILES.map((opponent) => {
-          const winChance =
-            calculateWinChance(
-              g.gameState.stats,
-              opponent.stats
-            );
+          const winChance = calculateWinChance(
+            g.gameState.stats,
+            opponent.stats
+          );
 
           return (
             <div
@@ -503,45 +377,31 @@ export function Combat({
               <h3>{opponent.name}</h3>
 
               <p>
-                {opponent.title} ·{" "}
-                {opponent.location}
+                {opponent.title} · {opponent.location}
               </p>
 
               <div className="data-list">
                 <div className="data-row">
                   <span>Health</span>
-
                   <b>
-                    {opponent.health}/
-                    {opponent.maxHealth}
+                    {opponent.health}/{opponent.maxHealth}
                   </b>
                 </div>
 
                 <div className="data-row">
                   <span>Reward</span>
-
-                  <b>
-                    {money(
-                      opponent.cashReward
-                    )}
-                  </b>
+                  <b>{money(opponent.cashReward)}</b>
                 </div>
 
                 <div className="data-row">
                   <span>Win Chance</span>
-
                   <b>{winChance}%</b>
                 </div>
               </div>
 
               <Button
-                disabled={
-                  incapacitated ||
-                  noEnergy
-                }
-                onClick={() =>
-                  g.attack(opponent)
-                }
+                disabled={incapacitated || noEnergy}
+                onClick={() => g.attack(opponent)}
               >
                 {incapacitated
                   ? "Unavailable"
@@ -561,41 +421,24 @@ export function Combat({
    COMBAT DEFEAT
 ========================================================= */
 
-function setGameStateForCombatDefeat(
-  g: Game
-) {
+function setGameStateForCombatDefeat(g: Game) {
   const hospitalUntil =
-    Date.now() +
-    HOSPITAL_MINUTES * 60_000;
+    Date.now() + HOSPITAL_MINUTES * 60_000;
 
   g.setGameState((previous) => {
     const activity = {
-      id:
-        Date.now() +
-        Math.random(),
-
-      text:
-        "COMBAT LOSS: Knocked out and hospitalized.",
-
+      id: Date.now() + Math.random(),
+      text: "COMBAT LOSS: Knocked out and hospitalized.",
       type: "failure" as const,
-
       time: Date.now(),
     };
 
     return {
       ...previous,
-
       health: 0,
-
-      fightsLost:
-        previous.fightsLost + 1,
-
+      fightsLost: previous.fightsLost + 1,
       hospitalUntil,
-
-      activities: [
-        activity,
-        ...previous.activities,
-      ].slice(0, 60),
+      activities: [activity, ...previous.activities].slice(0, 60),
     };
   });
 
@@ -608,33 +451,25 @@ function setGameStateForCombatDefeat(
    GYM
 ========================================================= */
 
-export function GymView({
-  g,
-}: {
-  g: Game;
-}) {
+export function GymView({ g }: { g: Game }) {
   const availableGyms = GYMS.filter(
     (gym) => !gym.jailOnly
   );
 
-  const incapacitated =
-    Boolean(
-      g.gameState.jailUntil ||
-      g.gameState.hospitalUntil
-    );
+  const incapacitated = Boolean(
+    g.gameState.jailUntil || g.gameState.hospitalUntil
+  );
 
   return (
     <>
       <div className="gym-selector">
         {availableGyms.map((gym) => {
-          const unlocked =
-            gymUnlocked(
-              gym,
-              g.gameState.gymExperience
-            );
+          const unlocked = gymUnlocked(
+            gym,
+            g.gameState.gymExperience
+          );
 
-          const active =
-            g.gym.id === gym.id;
+          const active = g.gym.id === gym.id;
 
           return (
             <button
@@ -643,23 +478,14 @@ export function GymView({
               className={`gym-btn ${
                 active ? "active" : ""
               }`}
-              disabled={
-                !unlocked ||
-                incapacitated
-              }
-              onClick={() =>
-                g.buyGym(gym.id)
-              }
+              disabled={!unlocked || incapacitated}
+              onClick={() => g.buyGym(gym.id)}
             >
-              <span>
-                {gym.name}
-              </span>
+              <span>{gym.name}</span>
 
               <small>
                 {unlocked
-                  ? money(
-                      gym.membershipCost
-                    )
+                  ? money(gym.membershipCost)
                   : `EXP ${gym.gymExpRequired}`}
               </small>
             </button>
@@ -672,15 +498,13 @@ export function GymView({
       >
         <div className="ui-grid four-col">
           {TRAINING_STATS.map((stat) => {
-            const allowed =
-              canTrainStat(
-                g.gym,
-                stat.id
-              );
+            const allowed = canTrainStat(
+              g.gym,
+              stat.id
+            );
 
             const enoughEnergy =
-              g.gameState.energy >=
-              g.gym.energyCost;
+              g.gameState.energy >= g.gym.energyCost;
 
             const canTrain =
               allowed &&
@@ -698,15 +522,11 @@ export function GymView({
 
                 <h3>{stat.name}</h3>
 
-                <p>
-                  {stat.description}
-                </p>
+                <p>{stat.description}</p>
 
                 <Button
                   disabled={!canTrain}
-                  onClick={() =>
-                    g.train(stat.id)
-                  }
+                  onClick={() => g.train(stat.id)}
                 >
                   {!allowed
                     ? "Not Available"
@@ -729,17 +549,12 @@ export function GymView({
    JOBS
 ========================================================= */
 
-export function Jobs({
-  g,
-}: {
-  g: Game;
-}) {
+export function Jobs({ g }: { g: Game }) {
   return (
     <div className="ui-grid two-col">
       {JOBS.map((job) => {
         const current =
-          g.gameState.currentJob ===
-          job.id;
+          g.gameState.currentJob === job.id;
 
         return (
           <div
@@ -752,25 +567,16 @@ export function Jobs({
 
             <h3>{job.title}</h3>
 
-            <p>
-              {job.description}
-            </p>
+            <p>{job.description}</p>
 
             <div className="data-row">
-              <span>
-                Hourly Salary
-              </span>
-
-              <b>
-                {money(job.salary)}
-              </b>
+              <span>Hourly Salary</span>
+              <b>{money(job.salary)}</b>
             </div>
 
             <Button
               disabled={current}
-              onClick={() =>
-                g.joinJob(job.id)
-              }
+              onClick={() => g.joinJob(job.id)}
             >
               {current
                 ? "Current Position"
@@ -787,18 +593,12 @@ export function Jobs({
    ITEMS
 ========================================================= */
 
-export function Items({
-  g,
-}: {
-  g: Game;
-}) {
+export function Items({ g }: { g: Game }) {
   return (
     <div className="ui-grid three-col">
       {ITEMS.map((item) => {
         const owned =
-          g.gameState.inventory[
-            item.id
-          ] || 0;
+          g.gameState.inventory[item.id] || 0;
 
         const equippable =
           item.type === "weapon" ||
@@ -815,9 +615,7 @@ export function Items({
 
             <h3>{item.name}</h3>
 
-            <p>
-              {item.description}
-            </p>
+            <p>{item.description}</p>
 
             <strong className="item-price">
               {money(item.price)}
@@ -825,9 +623,7 @@ export function Items({
 
             <div className="btn-group">
               <Button
-                onClick={() =>
-                  g.buyItem(item.id)
-                }
+                onClick={() => g.buyItem(item.id)}
               >
                 Buy
               </Button>
@@ -842,9 +638,7 @@ export function Items({
                     }
                   }}
                 >
-                  {equippable
-                    ? "Equip"
-                    : "Use"}
+                  {equippable ? "Equip" : "Use"}
                 </Button>
               )}
             </div>
@@ -863,18 +657,11 @@ export function Items({
    MISSIONS
 ========================================================= */
 
-export function Missions({
-  g,
-}: {
-  g: Game;
-}) {
+export function Missions({ g }: { g: Game }) {
   return (
     <div className="ui-grid two-col">
       {MISSIONS.map((mission) => {
-        const progress =
-          g.missionProgress(
-            mission
-          );
+        const progress = g.missionProgress(mission);
 
         const completed =
           g.gameState.completedMissions.includes(
@@ -885,9 +672,7 @@ export function Missions({
           mission.target > 0
             ? Math.min(
                 100,
-                (progress /
-                  mission.target) *
-                  100
+                (progress / mission.target) * 100
               )
             : 100;
 
@@ -906,9 +691,7 @@ export function Missions({
 
             <h3>{mission.name}</h3>
 
-            <p>
-              {mission.description}
-            </p>
+            <p>{mission.description}</p>
 
             <div className="bar-track">
               <div
@@ -935,9 +718,7 @@ export function Missions({
             <Button
               disabled={!canClaim}
               onClick={() =>
-                g.claimMission(
-                  mission.id
-                )
+                g.claimMission(mission.id)
               }
             >
               {completed
@@ -957,41 +738,24 @@ export function Missions({
    EDUCATION
 ========================================================= */
 
-export function Education({
-  g,
-}: {
-  g: Game;
-}) {
+export function Education({ g }: { g: Game }) {
   return (
     <>
       <Panel title="Active Course Status">
         {g.education ? (
           <div className="course-active">
-            <h3>
-              {g.education.name}
-            </h3>
+            <h3>{g.education.name}</h3>
 
             <p>
-              Duration:{" "}
-              {
-                g.education
-                  .durationHours
-              }{" "}
-              hours
+              Duration: {g.education.durationHours} hours
             </p>
 
-            <Button
-              onClick={
-                g.finishEducation
-              }
-            >
+            <Button onClick={g.finishEducation}>
               Check Completion
             </Button>
           </div>
         ) : (
-          <p>
-            No course currently active.
-          </p>
+          <p>No course currently active.</p>
         )}
       </Panel>
 
@@ -1002,12 +766,10 @@ export function Education({
               course.id
             );
 
-          const active =
-            Boolean(g.education);
+          const active = Boolean(g.education);
 
           const affordable =
-            g.gameState.cash >=
-            course.cost;
+            g.gameState.cash >= course.cost;
 
           return (
             <div
@@ -1016,28 +778,17 @@ export function Education({
             >
               <h3>{course.name}</h3>
 
-              <p>
-                {course.description}
-              </p>
+              <p>{course.description}</p>
 
               <div className="data-list">
                 <div className="data-row">
                   <span>Cost</span>
-
-                  <b>
-                    {money(course.cost)}
-                  </b>
+                  <b>{money(course.cost)}</b>
                 </div>
 
                 <div className="data-row">
                   <span>Time</span>
-
-                  <b>
-                    {
-                      course.durationHours
-                    }
-                    h
-                  </b>
+                  <b>{course.durationHours}h</b>
                 </div>
               </div>
 
@@ -1048,9 +799,7 @@ export function Education({
                   !affordable
                 }
                 onClick={() =>
-                  g.startEducation(
-                    course.id
-                  )
+                  g.startEducation(course.id)
                 }
               >
                 {completed
@@ -1073,15 +822,10 @@ export function Education({
    PROPERTY
 ========================================================= */
 
-export function PropertyView({
-  g,
-}: {
-  g: Game;
-}) {
-  const currentProperty =
-    getProperty(
-      g.gameState.ownedProperty
-    );
+export function PropertyView({ g }: { g: Game }) {
+  const currentProperty = getProperty(
+    g.gameState.ownedProperty
+  );
 
   const currentPrice =
     currentProperty?.price || 0;
@@ -1090,16 +834,13 @@ export function PropertyView({
     <div className="ui-grid two-col">
       {PROPERTIES.map((property) => {
         const current =
-          g.gameState.ownedProperty ===
-          property.id;
+          g.gameState.ownedProperty === property.id;
 
         const cheaper =
-          property.price <
-          currentPrice;
+          property.price < currentPrice;
 
         const affordable =
-          g.gameState.cash >=
-          property.price;
+          g.gameState.cash >= property.price;
 
         const unavailable =
           cheaper ||
@@ -1119,50 +860,34 @@ export function PropertyView({
 
             <h3>{property.name}</h3>
 
-            <p>
-              {property.description}
-            </p>
+            <p>{property.description}</p>
 
             <div className="data-list">
               <div className="data-row">
                 <span>Price</span>
-
-                <b>
-                  {money(property.price)}
-                </b>
+                <b>{money(property.price)}</b>
               </div>
 
               <div className="data-row">
                 <span>Health Bonus</span>
-
-                <b>
-                  +{property.maxHealthBonus}
-                </b>
+                <b>+{property.maxHealthBonus}</b>
               </div>
 
               <div className="data-row">
                 <span>Nerve Bonus</span>
-
-                <b>
-                  +{property.nerveBonus}
-                </b>
+                <b>+{property.nerveBonus}</b>
               </div>
 
               <div className="data-row">
                 <span>Happiness</span>
-
-                <b>
-                  {property.maxHappiness}
-                </b>
+                <b>{property.maxHappiness}</b>
               </div>
             </div>
 
             <Button
               disabled={unavailable}
               onClick={() =>
-                g.buyProperty(
-                  property.id
-                )
+                g.buyProperty(property.id)
               }
             >
               {current
@@ -1184,11 +909,7 @@ export function PropertyView({
    MARKET
 ========================================================= */
 
-export function Market({
-  g,
-}: {
-  g: Game;
-}) {
+export function Market({ g }: { g: Game }) {
   const goods = Object.keys(
     g.gameState.market
   );
@@ -1201,8 +922,7 @@ export function Market({
             g.gameState.market[id];
 
           const owned =
-            g.gameState.inventory[id] ||
-            0;
+            g.gameState.inventory[id] || 0;
 
           return (
             <div
@@ -1213,13 +933,10 @@ export function Market({
                 COMMODITY
               </span>
 
-              <h3>
-                {id.toUpperCase()}
-              </h3>
+              <h3>{id.toUpperCase()}</h3>
 
               <p>
-                Unit Price:{" "}
-                {money(price)}
+                Unit Price: {money(price)}
               </p>
 
               <span className="item-count">
@@ -1229,14 +946,10 @@ export function Market({
               <div className="btn-group">
                 <Button
                   disabled={
-                    g.gameState.cash <
-                    price
+                    g.gameState.cash < price
                   }
                   onClick={() =>
-                    g.tradeMarket(
-                      id,
-                      true
-                    )
+                    g.tradeMarket(id, true)
                   }
                 >
                   Buy
@@ -1245,10 +958,7 @@ export function Market({
                 <Button
                   disabled={owned <= 0}
                   onClick={() =>
-                    g.tradeMarket(
-                      id,
-                      false
-                    )
+                    g.tradeMarket(id, false)
                   }
                 >
                   Sell
@@ -1266,11 +976,7 @@ export function Market({
    FACTIONS
 ========================================================= */
 
-export function Faction({
-  g,
-}: {
-  g: Game;
-}) {
+export function Faction({ g }: { g: Game }) {
   const factions = [
     "Iron Syndicate",
     "Rift Guard",
@@ -1289,15 +995,12 @@ export function Faction({
 
           const otherFaction =
             Boolean(currentFaction) &&
-            currentFaction !==
-              faction;
+            currentFaction !== faction;
 
           return (
             <div
               className={`card faction-card ${
-                otherFaction
-                  ? "disabled"
-                  : ""
+                otherFaction ? "disabled" : ""
               }`}
               key={faction}
             >
@@ -1315,9 +1018,7 @@ export function Faction({
                   member
                 }
                 onClick={() =>
-                  g.joinFaction(
-                    faction
-                  )
+                  g.joinFaction(faction)
                 }
               >
                 {member
@@ -1330,21 +1031,14 @@ export function Faction({
       </div>
 
       {currentFaction && (
-        <div
-          style={{
-            marginTop: "16px",
-          }}
-        >
+        <div style={{ marginTop: "16px" }}>
           <Button
             disabled={
               g.gameState.energy < 10
             }
-            onClick={
-              g.workFaction
-            }
+            onClick={g.workFaction}
           >
-            Complete Faction Work
-            (10 ⚡)
+            Complete Faction Work (10 ⚡)
           </Button>
         </div>
       )}
@@ -1356,37 +1050,28 @@ export function Faction({
    AWARDS
 ========================================================= */
 
-export function Awards({
-  g,
-}: {
-  g: Game;
-}) {
+export function Awards({ g }: { g: Game }) {
   const awards: [string, boolean][] = [
     [
       "First Crime",
       g.gameState.crimesCompleted >= 1,
     ],
-
     [
       "Ten Crimes",
       g.gameState.crimesCompleted >= 10,
     ],
-
     [
       "First Victory",
       g.gameState.fightsWon >= 1,
     ],
-
     [
       "Gym Rat",
       g.gameState.gymSessions >= 10,
     ],
-
     [
       "Five Figures",
       g.gameState.cash >= 100000,
     ],
-
     [
       "Level 10",
       g.level >= 10,
@@ -1422,18 +1107,15 @@ export function Awards({
                     : "Locked"}
                 </span>
 
-                {unlocked &&
-                  !claimed && (
-                    <Button
-                      onClick={() =>
-                        g.earnMerit(
-                          name
-                        )
-                      }
-                    >
-                      Claim Merit
-                    </Button>
-                  )}
+                {unlocked && !claimed && (
+                  <Button
+                    onClick={() =>
+                      g.earnMerit(name)
+                    }
+                  >
+                    Claim Merit
+                  </Button>
+                )}
               </div>
             );
           })}
@@ -1441,9 +1123,7 @@ export function Awards({
       </Panel>
 
       <Panel title="Daily Rewards">
-        <Button
-          onClick={g.claimDaily}
-        >
+        <Button onClick={g.claimDaily}>
           Claim Daily Bonus
         </Button>
       </Panel>
