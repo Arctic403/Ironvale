@@ -36,7 +36,7 @@ export function Combat({ g }: { g: Game }) {
           level: g.level,
           health: g.gameState.health,
           maxHealth: g.maxHealth,
-          stats: g.gameState.stats,
+          stats: g.effectiveStats,
           weapons: DEFAULT_WEAPONS,
         }}
         enemy={{
@@ -202,7 +202,7 @@ export function Combat({ g }: { g: Game }) {
 
                     <b>
                       {money(
-                        opponent.cashReward
+                        opponent.cashReward ?? 0
                       )}
                     </b>
                   </div>

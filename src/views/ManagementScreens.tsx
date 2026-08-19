@@ -182,20 +182,22 @@ export function Jobs({ g }: { g: Game }) {
 
             <p>{job.description}</p>
 
-            <div className="data-row">
-              <span>Hourly Salary</span>
-
-              <b>{money(job.salary)}</b>
-            </div>
-
-            <Button
-              disabled={current}
-              onClick={() => g.joinJob(job.id)}
-            >
-              {current
-                ? "Current Position"
-                : "Apply Now"}
-            </Button>
+            {(() => {
+              const position = current && g.jobPosition ? g.jobPosition : job.positions[0];
+              return (
+                <>
+                  <div className="data-row"><span>Current Pay</span><b>{money(position.salary)}/hr</b></div>
+                  <div className="data-row"><span>Position</span><b>{position.title}</b></div>
+                  <div className="job-skills">
+                    {job.skills.map((skill) => {
+                      const value = g.gameState.jobSkills[`${job.id}:${skill.id}`] ?? 0;
+                      return <div className="data-row" key={skill.id}><span>{skill.name}</span><b>{value}/10</b></div>;
+                    })}
+                  </div>
+                  <Button disabled={current} onClick={() => g.joinJob(job.id)}>{current ? "Current Position" : "Apply Now"}</Button>
+                </>
+              );
+            })()}
           </div>
         );
       })}
