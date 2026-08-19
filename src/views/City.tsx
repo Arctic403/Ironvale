@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { CITY_LOCATIONS, type CityLocation } from "../data/cityLocations";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button } from "../components/ui";
-import { money } from "../utils";
+import { money } from "../core/gameCore";
 import { MAX_ENERGY } from "../constants";
 
 type Game = ReturnType<typeof useRiftCity>;
