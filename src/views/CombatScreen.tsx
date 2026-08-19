@@ -36,8 +36,9 @@ export function Combat({ g }: { g: Game }) {
           level: g.level,
           health: g.gameState.health,
           maxHealth: g.maxHealth,
-          stats: g.effectiveStats,
+          stats: g.gameState.stats,
           weapons: DEFAULT_WEAPONS,
+          equippedWeaponId: g.gameState.equippedWeapon,
         }}
         enemy={{
           id: opponent.id,
@@ -54,6 +55,7 @@ export function Combat({ g }: { g: Game }) {
           xpReward:
             opponent.level * 25,
         }}
+        onStart={g.beginCombat}
         onFinish={(
           outcome,
           enemy,

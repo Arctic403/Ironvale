@@ -22,6 +22,8 @@ interface InteractiveCombatViewProps {
   player: DynamicFighter;
   enemy: DynamicFighter;
 
+  onStart?: () => boolean;
+
   onFinish: (
     outcome: FinishOutcome,
     enemy: DynamicFighter,
@@ -36,6 +38,7 @@ interface InteractiveCombatViewProps {
 export function InteractiveCombatView({
   player,
   enemy,
+  onStart,
   onFinish,
   onDefeat,
 }: InteractiveCombatViewProps) {
@@ -85,6 +88,9 @@ export function InteractiveCombatView({
 
   const mountedRef =
     useRef(true);
+
+  const combatStartedRef =
+    useRef(false);
 
   /*
    * ------------------------------------------------------------
@@ -270,6 +276,20 @@ export function InteractiveCombatView({
       processing
     ) {
       return;
+    }
+
+    // Start/charge the encounter exactly once, on the first real attack.
+    if (
+      !combatStartedRef.current &&
+      onStart
+    ) {
+      const started = onStart();
+
+      if (!started) {
+        return;
+      }
+
+      combatStartedRef.current = true;
     }
 
     let selectedWeapon =
