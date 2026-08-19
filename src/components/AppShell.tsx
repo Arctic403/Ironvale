@@ -23,17 +23,17 @@ import type {
 import {
   Navigation,
   getScreenTitle,
-} from "./app/Navigation";
+} from "./apps/Navigation";
 
-import { StatusBar } from "./app/StatusBar";
+import { StatusBar } from "./apps/StatusBar";
 
-import { ResourceModal } from "./app/ResourceModal";
+import { ResourceModal } from "./apps/ResourceModal";
 
-import { ScreenContent } from "./app/ScreenContent";
+import { ScreenContent } from "./apps/ScreenContent";
 
-import { ActivityLog } from "./app/ActivityLog";
+import { ActivityLog } from "./apps/ActivityLog";
 
-import { EncounterModal } from "./app/EncounterModal";
+import { EncounterModal } from "./apps/EncounterModal";
 
 function App() {
   const g = useRiftCity();
@@ -124,7 +124,7 @@ function App() {
     <div className="layout-root">
 
       {/* Navigation */}
-      <Navigation g={g} />
+      <Navigation currentScreen={g.currentScreen} onNavigate={g.setCurrentScreen} onExplore={() => g.setCurrentScreen("city")} onReset={g.resetGame} />
 
       <div className="main-wrapper">
 
