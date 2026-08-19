@@ -1,31 +1,38 @@
-# RiftCity V1 — Refactor Patch
+# RiftCity V1 Audit & Fine-Tune Patch
 
-This build keeps the original RiftCity prototype and refactors its foundation instead of replacing it.
+## Purpose
 
-## Refactored
-- Split `src/data/gameData.ts` into `dataTypes.ts`, `jobs.ts`, `items.ts`, `missions.ts`, `education.ts`, and `properties.ts`; `gameData.ts` is now a compatibility barrel.
-- Renamed the malformed `src/    types/` directory to `src/types/`.
-- Split `gameCore.ts` into `saveSystem.ts`, `gameClock.ts`, `economy.ts`, and `world.ts`; `gameCore.ts` remains a compatibility barrel.
-- Extracted the recurring game clock into `src/systems/gameTickSystem.ts`.
-- Added explicit `lastHealthUpdate` and `lastMarketUpdate` save fields.
-- Added safe migration defaults for older saves.
-- Consolidated combat profile typing into `systems/combat/combatTypes.ts`; `data/playerProfiles.ts` is now the sole profile dataset.
-- Fixed broken `AppShell` imports from `./app/*` to the actual `./apps/*` directory and fixed its Navigation prop contract.
+This patch audits the current RiftCity V1 foundation while keeping the playable scope focused on the home city.
+The city is a home hub, not the eventual world-travel map.
 
-## Job system
-- Removed player-level job locks.
-- Each company/job has 3 skills and 3 positions.
-- Skills gain +1 once per real 24 hours worked, including offline progress.
-- Skills are capped at 10 for V1.
-- Promotion automatically occurs at skill level 5 and 10.
-- Each position increases pay and grants small stat bonuses.
-- Skill levels also provide small stat bonuses.
-- Job skills and position tiers persist in localStorage saves.
-- Switching companies does not erase previous company progress.
+## Fixed
 
-## Bug fix
-- Health regeneration now has its own timestamp instead of incorrectly using the energy regeneration timestamp.
+- Restored a canonical `src/types/riftCity.ts` path and removed the malformed `src/    types/` path.
+- Kept all existing type imports pointed at the canonical path.
+- Removed the duplicate `money` import in `City.tsx`.
+- Reframed the City screen as a **Home City Hub** rather than local travel.
+- Clarified that future destination travel belongs to a separate World/Travel system.
+- Preserved the existing job skill/progression architecture.
+- Added an original RiftCity lore foundation and faction seeds.
+- Added a world-bible document establishing the setting, Rift mystery, and design rules.
+- Added README pointers to the lore foundation.
+
+## Design decisions
+
+### City
+RiftCity is the player's permanent home base. The city map is a UI/navigation surface for local services and activities.
+
+### World travel
+World travel is deliberately not implemented as city-to-city movement yet. The existing travel state primitive remains available for a future data-driven World/Travel system.
+
+### Lore
+The Rift is the long-term mystery. V1 should begin with everyday life—work, crime, training, money, property, education—and gradually expose the wider world.
+
+### Originality
+The project can take inspiration from the persistent browser-life/crime genre while maintaining original names, lore, characters, artwork, UI, dialogue, code, and worldbuilding.
 
 ## Validation
-- TypeScript source validation was run. The remaining compiler errors in this environment are caused by missing installed npm packages (`react`, `react-dom`, Vite typings), not the refactored data/core/system modules.
-- `npm install` could not complete within the available environment, so a Vite production build could not be executed here.
+
+A static relative-import audit was run across the TypeScript/TSX source and found no missing relative modules after the patch.
+
+A full production build could not be completed in this environment because dependency installation did not finish within the available execution window. The previous deployment reached 0 build errors after the AppShell path fix.

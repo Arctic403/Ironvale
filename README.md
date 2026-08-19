@@ -34,3 +34,7 @@ npm run dev
 ```
 
 Then open the Vite development URL.
+
+
+## World foundation
+See `RIFTCITY_WORLD_BIBLE.md` and `src/lore/` for the original RiftCity setting foundation.
