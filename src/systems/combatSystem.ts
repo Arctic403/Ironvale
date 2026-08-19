@@ -39,6 +39,9 @@ export interface PlayerProfile {
   health: number;
   maxHealth: number;
   stats: CombatStats;
+  title?: string;
+  status?: "Online" | "Idle" | "Offline";
+  location?: string;
 
   /*
    * Weapons the fighter ACTUALLY OWNS.
@@ -102,6 +105,13 @@ export const UNARMED_WEAPON: WeaponOption = {
   optimalZone: "Close",
   coverPenetration: 0,
 };
+
+export const DEFAULT_WEAPONS: WeaponOption[] = [
+  UNARMED_WEAPON,
+  { id: "knife", name: "Street Knife", type: "melee", baseDamage: 8, accuracy: 85, critChance: 10, optimalZone: "Close", coverPenetration: 0.1 },
+  { id: "bat", name: "Baseball Bat", type: "melee", baseDamage: 15, accuracy: 75, critChance: 8, optimalZone: "Close", coverPenetration: 0.2 },
+  { id: "pistol", name: "9mm Pistol", type: "primary", baseDamage: 35, accuracy: 70, critChance: 12, optimalZone: "Mid", coverPenetration: 0.4 },
+];
 
 /*
  * ============================================================
