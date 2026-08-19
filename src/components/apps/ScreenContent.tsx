@@ -1,5 +1,6 @@
 import React from "react";
 import type { useRiftCity } from "../../hooks/useRiftCity";
+
 import {
   Character,
   Crimes,
@@ -14,6 +15,7 @@ import {
   Faction,
   Awards,
 } from "../../views/GameScreens";
+
 import { City } from "../../views/City";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;
@@ -22,50 +24,34 @@ type ScreenContentProps = {
   g: RiftCityGame;
 };
 
+const SCREEN_COMPONENTS: Record<
+  string,
+  React.ComponentType<ScreenContentProps>
+> = {
+  character: Character,
+  city: City,
+  crimes: Crimes,
+  combat: Combat,
+  gym: GymView,
+  jobs: Jobs,
+  items: Items,
+  missions: Missions,
+  education: Education,
+  property: PropertyView,
+  market: Market,
+  faction: Faction,
+  awards: Awards,
+};
+
 export function ScreenContent({
   g,
 }: ScreenContentProps) {
-  switch (g.currentScreen) {
-    case "character":
-      return <Character g={g} />;
+  const Screen =
+    SCREEN_COMPONENTS[g.currentScreen];
 
-    case "city":
-      return <City g={g} />;
-
-    case "crimes":
-      return <Crimes g={g} />;
-
-    case "combat":
-      return <Combat g={g} />;
-
-    case "gym":
-      return <GymView g={g} />;
-
-    case "jobs":
-      return <Jobs g={g} />;
-
-    case "items":
-      return <Items g={g} />;
-
-    case "missions":
-      return <Missions g={g} />;
-
-    case "education":
-      return <Education g={g} />;
-
-    case "property":
-      return <PropertyView g={g} />;
-
-    case "market":
-      return <Market g={g} />;
-
-    case "faction":
-      return <Faction g={g} />;
-
-    case "awards":
-      return <Awards g={g} />;
-
-    default:
-      return null;
+  if (!Screen) {
+    return null;
   }
+
+  return <Screen g={g} />;
 }
