@@ -1,53 +1,28 @@
 import { useEffect, useState } from "react";
-
 import {
-  DynamicFighter,
-  TurnLog,
-  WeaponOption,
-  DEFAULT_WEAPONS,
-  executeCombatTurn,
-  calculateWinChance,
-} from "../systems/combatSystem";
-
-/*
- * ============================================================
- * RiftCity Combat Hook
- * ============================================================
- *
- * This hook owns the ACTIVE combat session.
- *
- * App.tsx should eventually become responsible for:
- *   - navigation
- *   - layout
- *   - screen rendering
- *
- * This hook is responsible for:
- *   - starting fights
- *   - tracking fighters
- *   - executing turns
- *   - combat logs
- *   - victory / defeat state
- *   - fleeing
- *
- * IMPORTANT:
- * SaveData / Screen / ActivityType / game helpers currently
- * live elsewhere in the existing RiftCity codebase.
- *
- * We are deliberately not duplicating those definitions here
- * until App.tsx has been fully extracted.
- * ============================================================
- */
-
+  CRIMES, Crime, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
+} from "../systems/crimeSystem";
+import { CombatStats, getLevel, getMaxHealth } from "../systems/progressionSystem";
+import {
+  ENERGY_REGEN_INTERVAL, MAX_ENERGY, NERVE_REGEN_INTERVAL, HAPPINESS_TICK,
+  HEALTH_REGEN_INTERVAL, JAIL_MINUTES, BANK_INTEREST_INTERVAL, DAILY_INTERVAL,
+  TRAVEL_COOLDOWN, TRAVEL_COST, MARKET_UPDATE_INTERVAL, JOB_PAY_INTERVAL,
+  loadSave, freshSave, money, formatTime, getLocationName, randomMarketPrice,
+  getAvailableEncounter, ENCOUNTERS, SAVE_KEY, DEFAULT_MARKET_PRICES,
+} from "../core/gameCore";
+import {
+  GYMS, TRAINING_STATS, TrainingStat, applyTraining, canTrainStat,
+  getGymExperienceGain, gymUnlocked,
+} from "../systems/gymSystem";
+import { PlayerProfile } from "../systems/combatSystem";
+import {
+  EDUCATION, ITEMS, JOBS, MISSIONS, PROPERTIES,
+  getItem, getJob, getProperty,
+} from "../data/gameData";
+import type { Screen, SaveData, ActivityType, Activity } from "../types/riftCity";
+import type { Encounter, EncounterChoice } from "../constants/encounters";
+import { PLAYER_PROFILES } from "../data/playerProfiles";
 export function useRiftCity() {
-  /*
-   * ------------------------------------------------------------
-   * EXISTING GAME STATE
-   * ------------------------------------------------------------
-   *
-   * These values are intentionally retained from the current
-   * RiftCity architecture.
-   */
-
   const [gameState, setGameState] = useState<SaveData>(() =>
     loadSave()
   );
@@ -55,44 +30,25 @@ export function useRiftCity() {
   const [currentScreen, setCurrentScreen] =
     useState<Screen>("character");
 
-  /*
-   * ------------------------------------------------------------
-   * COMBAT STATE
-   * ------------------------------------------------------------
-   */
+  const [encounter, setEncounter] =
+    useState<Encounter | null>(null);
 
-  const [playerFighter, setPlayerFighter] =
-    useState<DynamicFighter | null>(null);
+  const [combatOpponent, setCombatOpponent] =
+    useState<PlayerProfile | null>(null);
 
-  const [enemyFighter, setEnemyFighter] =
-    useState<DynamicFighter | null>(null);
+  const [combatStarted, setCombatStarted] =
+    useState(false);
 
-  const [combatLogs, setCombatLogs] =
-    useState<TurnLog[]>([]);
+  const [combatMessage, setCombatMessage] =
+    useState("Choose an opponent.");
 
-  const [combatStatus, setCombatStatus] =
-    useState<
-      "idle" |
-      "fighting" |
-      "won" |
-      "lost"
-    >("idle");
-
-  /*
-   * ------------------------------------------------------------
-   * DERIVED PLAYER DATA
-   * ------------------------------------------------------------
-   */
-
-  const level = getLevel(gameState.xp).level;
-
-  const property = getProperty(
-    gameState.ownedProperty
-  );
+  const property = getProperty(gameState.ownedProperty);
 
   const maxHealth = getMaxHealth(
     property?.maxHealthBonus ?? 0
   );
+
+  const level = getLevel(gameState.xp).level;
 
   const maxNerve =
     10 +
@@ -103,50 +59,61 @@ export function useRiftCity() {
     (property?.nerveBonus ?? 0);
 
   const gym =
-    GYMS.find(
-      (g) => g.id === gameState.activeGym
-    ) ?? GYMS[0];
+    GYMS.find((g) => g.id === gameState.activeGym) ??
+    GYMS[0];
 
-  const job = getJob(
-    gameState.currentJob
+  const job = getJob(gameState.currentJob);
+
+  const education =
+    EDUCATION.find(
+      (e) => e.id === gameState.educationActive
+    ) ?? null;
+
+  const travelLocked = Boolean(
+    gameState.travelCooldownUntil &&
+      gameState.travelCooldownUntil > Date.now()
   );
 
   /*
-   * ------------------------------------------------------------
-   * ACTIVITY LOG
-   * ------------------------------------------------------------
+   * Centralized activity writer.
+   *
+   * This avoids nested setState calls such as:
+   *
+   * setGameState(...)
+   *   -> log(...)
+   *      -> setGameState(...)
+   *
+   * React is happier. Humanity remains questionable.
    */
+  const appendActivity = (
+    state: SaveData,
+    text: string,
+    type: ActivityType = "system"
+  ): SaveData => {
+    const activity: Activity = {
+      id: Date.now() + Math.random(),
+      text,
+      type,
+      time: Date.now(),
+    };
+
+    return {
+      ...state,
+      activities: [
+        activity,
+        ...state.activities,
+      ].slice(0, 60),
+    };
+  };
 
   const log = (
     text: string,
     type: ActivityType = "system"
   ) => {
-    setGameState((state) => ({
-      ...state,
-
-      activities: [
-        {
-          id:
-            Date.now() +
-            Math.random(),
-
-          text,
-
-          type,
-
-          time: Date.now(),
-        },
-
-        ...state.activities,
-      ].slice(0, 60),
-    }));
+    setGameState((prev) =>
+      appendActivity(prev, text, type)
+    );
   };
-
-  /*
-   * ------------------------------------------------------------
-   * SAVE GAME
-   * ------------------------------------------------------------
-   */
 
   useEffect(() => {
     localStorage.setItem(
@@ -156,26 +123,13 @@ export function useRiftCity() {
   }, [gameState]);
 
   /*
-   * ------------------------------------------------------------
-   * MAIN GAME TICK
-   * ------------------------------------------------------------
-   *
-   * Handles:
-   *
-   *   Energy regeneration
-   *   Health regeneration
-   *   Hospital expiration
-   *
-   * This will eventually move into a dedicated
-   * progression/tick system.
-   * ------------------------------------------------------------
+   * Main game clock.
    */
-
   useEffect(() => {
-    const interval = window.setInterval(() => {
+    const id = window.setInterval(() => {
       const now = Date.now();
 
-      setGameState((previous) => {
+      setGameState((prev) => {
         let changed = false;
 
         const updates: Partial<SaveData> = {};
@@ -183,48 +137,112 @@ export function useRiftCity() {
         /*
          * ENERGY
          */
-
-        if (
-          previous.energy <
-          MAX_ENERGY
-        ) {
+        if (prev.energy < MAX_ENERGY) {
           const ticks = Math.floor(
-            (
-              now -
-              previous.lastEnergyUpdate
-            ) /
+            (now - prev.lastEnergyUpdate) /
               ENERGY_REGEN_INTERVAL
           );
 
           if (ticks > 0) {
             updates.energy = Math.min(
               MAX_ENERGY,
-              previous.energy + ticks
+              prev.energy + ticks
             );
 
             updates.lastEnergyUpdate =
-              previous.lastEnergyUpdate +
-              ticks *
-                ENERGY_REGEN_INTERVAL;
+              prev.lastEnergyUpdate +
+              ticks * ENERGY_REGEN_INTERVAL;
+
+            changed = true;
+          }
+        } else {
+          updates.lastEnergyUpdate = now;
+        }
+
+        /*
+         * NERVE
+         */
+        if (prev.nerve < maxNerve) {
+          const ticks = Math.floor(
+            (now - prev.lastNerveUpdate) /
+              NERVE_REGEN_INTERVAL
+          );
+
+          if (ticks > 0) {
+            updates.nerve = Math.min(
+              maxNerve,
+              prev.nerve + ticks
+            );
+
+            updates.lastNerveUpdate =
+              prev.lastNerveUpdate +
+              ticks * NERVE_REGEN_INTERVAL;
+
+            changed = true;
+          }
+        } else {
+          updates.lastNerveUpdate = now;
+        }
+
+        /*
+         * HAPPINESS
+         */
+        const maxHappiness =
+          property?.maxHappiness ?? 100;
+
+        if (prev.happiness < maxHappiness) {
+          const ticks = Math.floor(
+            (now - prev.lastHappinessUpdate) /
+              HAPPINESS_TICK
+          );
+
+          if (ticks > 0) {
+            updates.happiness = Math.min(
+              maxHappiness,
+              prev.happiness + ticks * 5
+            );
+
+            updates.lastHappinessUpdate =
+              prev.lastHappinessUpdate +
+              ticks * HAPPINESS_TICK;
+
+            changed = true;
+          }
+        } else {
+          updates.lastHappinessUpdate = now;
+        }
+
+        /*
+         * HEALTH
+         */
+        if (
+          prev.health < maxHealth &&
+          !prev.hospitalUntil &&
+          !prev.jailUntil
+        ) {
+          const ticks = Math.floor(
+            (now - prev.lastEnergyUpdate) /
+              HEALTH_REGEN_INTERVAL
+          );
+
+          if (ticks > 0) {
+            updates.health = Math.min(
+              maxHealth,
+              prev.health + ticks
+            );
 
             changed = true;
           }
         }
 
         /*
-         * HEALTH
+         * JAIL
          */
-
         if (
-          previous.health <
-            maxHealth &&
-          !previous.hospitalUntil &&
-          !previous.jailUntil
+          prev.jailUntil &&
+          now >= prev.jailUntil
         ) {
-          updates.health = Math.min(
-            maxHealth,
-            previous.health + 1
-          );
+          updates.jailUntil = null;
 
           changed = true;
         }
@@ -232,529 +250,1648 @@ export function useRiftCity() {
         /*
          * HOSPITAL
          */
-
         if (
-          previous.hospitalUntil &&
-          now >= previous.hospitalUntil
+          prev.hospitalUntil &&
+          now >= prev.hospitalUntil
         ) {
           updates.hospitalUntil = null;
-
-          updates.health =
-            maxHealth;
+          updates.health = maxHealth;
 
           changed = true;
         }
 
-        if (!changed) {
-          return previous;
+        /*
+         * BANK INTEREST
+         */
+        if (
+          prev.bank > 0 &&
+          now - prev.lastBankInterest >=
+            BANK_INTEREST_INTERVAL
+        ) {
+          const days = Math.floor(
+            (now - prev.lastBankInterest) /
+              BANK_INTEREST_INTERVAL
+          );
+
+          if (days > 0) {
+            const interest = Math.floor(
+              prev.bank * 0.01 * days
+            );
+
+            updates.bank =
+              prev.bank + interest;
+
+            updates.bankInterest =
+              prev.bankInterest + interest;
+
+            updates.lastBankInterest =
+              prev.lastBankInterest +
+              days * BANK_INTEREST_INTERVAL;
+
+            changed = true;
+          }
         }
 
-        return {
-          ...previous,
-          ...updates,
-        };
+        /*
+         * JOB PAYMENT
+         */
+        if (
+          prev.currentJob &&
+          now - prev.lastJobPayment >=
+            JOB_PAY_INTERVAL
+        ) {
+          const currentJob =
+            getJob(prev.currentJob);
+
+          if (currentJob) {
+            const ticks = Math.floor(
+              (now - prev.lastJobPayment) /
+                JOB_PAY_INTERVAL
+            );
+
+            if (ticks > 0) {
+              const earned =
+                currentJob.salary * ticks;
+
+              updates.cash =
+                (updates.cash ?? prev.cash) +
+                earned;
+
+              updates.lastJobPayment =
+                prev.lastJobPayment +
+                ticks * JOB_PAY_INTERVAL;
+
+              changed = true;
+            }
+          }
+        }
+
+        /*
+         * MARKET UPDATE
+         *
+         * Market prices move periodically instead of
+         * changing every time someone presses Buy/Sell.
+         */
+        const lastMarketUpdate =
+          typeof (
+            prev as SaveData & {
+              lastMarketUpdate?: number;
+            }
+          ).lastMarketUpdate === "number"
+            ? (
+                prev as SaveData & {
+                  lastMarketUpdate?: number;
+                }
+              ).lastMarketUpdate!
+            : now;
+
+        if (
+          now - lastMarketUpdate >=
+          MARKET_UPDATE_INTERVAL
+        ) {
+          const updatedMarket = {
+            ...prev.market,
+          };
+
+          Object.keys(DEFAULT_MARKET_PRICES).forEach(
+            (id) => {
+              const current =
+                updatedMarket[id] ??
+                DEFAULT_MARKET_PRICES[id];
+
+              updatedMarket[id] =
+                randomMarketPrice(current);
+            }
+          );
+
+          (
+            updates as Partial<
+              SaveData & {
+                lastMarketUpdate: number;
+              }
+            >
+          ).market = updatedMarket;
+
+          (
+            updates as Partial<
+              SaveData & {
+                lastMarketUpdate: number;
+              }
+            >
+          ).lastMarketUpdate = now;
+
+          changed = true;
+        }
+
+        return changed
+          ? {
+              ...prev,
+              ...updates,
+            }
+          : prev;
       });
     }, 1000);
 
     return () =>
-      window.clearInterval(interval);
-  }, [maxHealth]);
-
-  /*
-   * ------------------------------------------------------------
-   * BLOCKED STATE
-   * ------------------------------------------------------------
-   */
+      window.clearInterval(id);
+  }, [
+    maxNerve,
+    maxHealth,
+    property?.maxHappiness,
+  ]);
 
   const blocked = () =>
     Boolean(
       gameState.jailUntil ||
-      gameState.hospitalUntil
+        gameState.hospitalUntil
     );
 
   /*
-   * ============================================================
-   * START COMBAT
-   * ============================================================
+   * CRIME SYSTEM
    */
-
-  const startCombat = (
-    opponent: {
-      id: string;
-      name: string;
-      level: number;
-      stats: any;
-    }
-  ) => {
-    /*
-     * Cannot fight while jailed/hospitalized.
-     */
-
+  const commitCrime = (crime: Crime) => {
     if (blocked()) {
       log(
-        "Cannot fight while in hospital/jail."
+        gameState.jailUntil
+          ? "You are in jail."
+          : "You are in hospital.",
+        "failure"
       );
 
       return;
     }
-
-    /*
-     * Combat costs 10 energy.
-     */
-
-    if (gameState.energy < 10) {
-      log(
-        "Requires 10 Energy to start a fight."
-      );
-
-      return;
-    }
-
-    /*
-     * Consume combat energy.
-     */
-
-    setGameState((previous) => ({
-      ...previous,
-      energy:
-        previous.energy - 10,
-    }));
-
-    /*
-     * ----------------------------------------------------------
-     * PLAYER FIGHTER
-     * ----------------------------------------------------------
-     */
-
-    const player: DynamicFighter = {
-      id: "player",
-
-      name: gameState.name ?? "You",
-
-      level,
-
-      health: gameState.health,
-
-      maxHealth,
-
-      stats: gameState.stats,
-
-      weapons:
-        DEFAULT_WEAPONS,
-    };
-
-    /*
-     * ----------------------------------------------------------
-     * ENEMY FIGHTER
-     * ----------------------------------------------------------
-     */
-
-    const enemyMaxHealth =
-      100 +
-      opponent.level * 15;
-
-    const enemy: DynamicFighter = {
-      id: opponent.id,
-
-      name: opponent.name,
-
-      level: opponent.level,
-
-      health: enemyMaxHealth,
-
-      maxHealth:
-        enemyMaxHealth,
-
-      stats: opponent.stats,
-
-      weapons: [
-        DEFAULT_WEAPONS[1],
-        DEFAULT_WEAPONS[2],
-      ],
-
-      cashReward:
-        opponent.level * 45,
-
-      xpReward:
-        opponent.level * 20,
-    };
-
-    /*
-     * ----------------------------------------------------------
-     * INITIALIZE COMBAT
-     * ----------------------------------------------------------
-     */
-
-    setPlayerFighter(player);
-
-    setEnemyFighter(enemy);
-
-    setCombatLogs([]);
-
-    setCombatStatus(
-      "fighting"
-    );
-
-    setCurrentScreen(
-      "combat"
-    );
-  };
-
-  /*
-   * ============================================================
-   * PLAYER TURN
-   * ============================================================
-   */
-
-  const executePlayerTurn = (
-    selectedWeapon?: WeaponOption
-  ) => {
-    /*
-     * Validate active combat.
-     */
 
     if (
-      !playerFighter ||
-      !enemyFighter ||
-      combatStatus !==
-        "fighting"
+      !crimeUnlocked(
+        crime,
+        gameState.crimeExperience
+      )
     ) {
+      log(
+        "That crime is locked until your crime experience is high enough.",
+        "failure"
+      );
+
       return;
     }
 
-    /*
-     * ----------------------------------------------------------
-     * PLAYER ATTACKS
-     * ----------------------------------------------------------
-     */
+    if (gameState.nerve < crime.nerve) {
+      log("Not enough nerve.", "failure");
 
-    const playerTurn =
-      executeCombatTurn(
-        playerFighter,
-        enemyFighter,
-        selectedWeapon
-      );
+      return;
+    }
 
-    const updatedEnemy =
-      playerTurn.updatedDefender;
-
-    /*
-     * Record player's action.
-     */
-
-    setCombatLogs(
-      (previous) => [
-        playerTurn.log,
-        ...previous,
-      ].slice(0, 100)
-    );
-
-    /*
-     * ----------------------------------------------------------
-     * VICTORY
-     * ----------------------------------------------------------
-     */
-
-    if (
-      updatedEnemy.health <= 0
-    ) {
-      setEnemyFighter(
-        updatedEnemy
-      );
-
-      setCombatStatus(
-        "won"
-      );
-
-      const cashGained =
-        enemyFighter.cashReward ??
-        50;
-
-      const xpGained =
-        enemyFighter.xpReward ??
-        25;
-
-      log(
-        `Victory over ${enemyFighter.name}! Won ${money(
-          cashGained
-        )} and ${xpGained} XP.`,
-        "success"
-      );
-
-      setGameState(
-        (previous) => ({
-          ...previous,
-
-          cash:
-            previous.cash +
-            cashGained,
-
-          xp:
-            previous.xp +
-            xpGained,
-
-          fightsWon:
-            (previous.fightsWon ?? 0) +
+    setGameState((prev) => {
+      const chance = Math.max(
+        0,
+        Math.min(
+          100,
+          crimeSuccessChance(
+            crime,
+            prev.crimeExperience,
             1,
-        })
-      );
-
-      return;
-    }
-
-    /*
-     * ----------------------------------------------------------
-     * ENEMY COUNTER ATTACK
-     * ----------------------------------------------------------
-     */
-
-    const enemyTurn =
-      executeCombatTurn(
-        updatedEnemy,
-        playerFighter
-      );
-
-    const updatedPlayer =
-      enemyTurn.updatedDefender;
-
-    /*
-     * Update combat state.
-     */
-
-    setEnemyFighter(
-      updatedEnemy
-    );
-
-    setPlayerFighter(
-      updatedPlayer
-    );
-
-    /*
-     * Put enemy action above
-     * previous combat entries.
-     */
-
-    setCombatLogs(
-      (previous) => [
-        enemyTurn.log,
-        playerTurn.log,
-        ...previous,
-      ].slice(0, 100)
-    );
-
-    /*
-     * Keep global health synchronized
-     * with combat health.
-     */
-
-    setGameState(
-      (previous) => ({
-        ...previous,
-        health:
-          Math.max(
-            0,
-            updatedPlayer.health
-          ),
-      })
-    );
-
-    /*
-     * ----------------------------------------------------------
-     * DEFEAT
-     * ----------------------------------------------------------
-     */
-
-    if (
-      updatedPlayer.health <= 0
-    ) {
-      setCombatStatus(
-        "lost"
-      );
-
-      const hospitalTime =
-        15 * 60 * 1000;
-
-      log(
-        `Defeated by ${enemyFighter.name}! Sent to hospital.`,
-        "jailed"
-      );
-
-      setGameState(
-        (previous) => ({
-          ...previous,
-
-          health: 0,
-
-          hospitalUntil:
-            Date.now() +
-            hospitalTime,
-
-          fightsLost:
-            (previous.fightsLost ?? 0) +
-            1,
-        })
-      );
-    }
-  };
-
-  /*
-   * ============================================================
-   * FLEE
-   * ============================================================
-   */
-
-  const fleeCombat = () => {
-    if (
-      !playerFighter ||
-      !enemyFighter ||
-      combatStatus !==
-        "fighting"
-    ) {
-      return;
-    }
-
-    const chance =
-      calculateWinChance(
-        playerFighter.stats,
-        enemyFighter.stats
-      );
-
-    /*
-     * Flee receives a +20% modifier.
-     */
-
-    const fleeChance =
-      Math.min(
-        95,
-        Math.max(
-          5,
-          chance + 20
+            getCrimeStatBonus(prev.stats)
+          )
         )
       );
 
+      const roll = Math.random() * 100;
+
+      /*
+       * Explicit outcome bands.
+       *
+       * Critical success:
+       * 8% of the successful range.
+       *
+       * Critical failure:
+       * final 0.5% of the roll.
+       */
+      const criticalSuccessChance =
+        chance * 0.08;
+
+      let outcome:
+        | "critical"
+        | "success"
+        | "jailed"
+        | "critical-fail"
+        | "spooked";
+
+      if (
+        roll < criticalSuccessChance
+      ) {
+        outcome = "critical";
+      } else if (
+        roll < chance
+      ) {
+        outcome = "success";
+      } else if (
+        roll >= 99.5
+      ) {
+        outcome = "critical-fail";
+      } else if (
+        roll <
+        chance + crime.risk * 0.55
+      ) {
+        outcome = "jailed";
+      } else {
+        outcome = "spooked";
+      }
+
+      let next: SaveData = {
+        ...prev,
+
+        nerve: Math.max(
+          0,
+          prev.nerve - crime.nerve
+        ),
+      };
+
+      if (outcome === "critical") {
+        const reward = Math.floor(
+          randomReward(crime) * 1.75
+        );
+
+        next = {
+          ...next,
+          cash: prev.cash + reward,
+          xp: prev.xp + crime.xp * 2,
+          crimeExperience:
+            prev.crimeExperience +
+            crime.crimeExperience * 2,
+          crimesCompleted:
+            prev.crimesCompleted + 1,
+          crimesCritical:
+            prev.crimesCritical + 1,
+        };
+
+        return appendActivity(
+          next,
+          `CRITICAL SUCCESS: ${crime.name} paid ${money(
+            reward
+          )}.`,
+          "critical"
+        );
+      }
+
+      if (outcome === "success") {
+        const reward =
+          randomReward(crime);
+
+        next = {
+          ...next,
+          cash: prev.cash + reward,
+          xp: prev.xp + crime.xp,
+          crimeExperience:
+            prev.crimeExperience +
+            crime.crimeExperience,
+          crimesCompleted:
+            prev.crimesCompleted + 1,
+        };
+
+        return appendActivity(
+          next,
+          `SUCCESS: ${crime.name} paid ${money(
+            reward
+          )}.`,
+          "success"
+        );
+      }
+
+      if (outcome === "jailed") {
+        next = {
+          ...next,
+          crimesFailed:
+            prev.crimesFailed + 1,
+          timesJailed:
+            prev.timesJailed + 1,
+          jailUntil:
+            Date.now() +
+            JAIL_MINUTES * 60000,
+        };
+
+        return appendActivity(
+          next,
+          `FAILED: ${crime.name}. You were jailed.`,
+          "jailed"
+        );
+      }
+
+      if (
+        outcome === "critical-fail"
+      ) {
+        next = {
+          ...next,
+          crimesFailed:
+            prev.crimesFailed + 1,
+          health: Math.max(
+            1,
+            prev.health - 12
+          ),
+        };
+
+        return appendActivity(
+          next,
+          `CRITICAL FAIL: ${crime.name}. You escaped, barely.`,
+          "critical"
+        );
+      }
+
+      next = {
+        ...next,
+        crimesSpooked:
+          prev.crimesSpooked + 1,
+      };
+
+      return appendActivity(
+        next,
+        `SPOOKED: ${crime.name} failed without further consequences.`,
+        "spooked"
+      );
+    });
+  };
+
+  /*
+   * GYM
+   */
+  const train = (stat: TrainingStat) => {
+    if (blocked()) {
+      log(
+        "You cannot train right now.",
+        "failure"
+      );
+
+      return;
+    }
+
+    if (!canTrainStat(gym, stat)) {
+      log(
+        "This gym cannot train that stat.",
+        "failure"
+      );
+
+      return;
+    }
+
     if (
-      Math.random() * 100 <
-      fleeChance
+      gameState.energy <
+      gym.energyCost
     ) {
       log(
-        `Successfully fled from ${enemyFighter.name}.`,
+        `You need ${gym.energyCost} energy.`,
+        "failure"
+      );
+
+      return;
+    }
+
+    setGameState((prev) => {
+      const currentGym =
+        GYMS.find(
+          (g) => g.id === prev.activeGym
+        ) ?? GYMS[0];
+
+      const educationMultiplier =
+        prev.educationCompleted.some(
+          (id) =>
+            id === "fitness-basics" ||
+            id === "advanced-fitness"
+        )
+          ? 1.05
+          : 1;
+
+      const result = applyTraining(
+        prev.stats,
+        currentGym,
+        stat,
+        prev.happiness,
+        educationMultiplier
+      );
+
+      const next: SaveData = {
+        ...prev,
+
+        energy:
+          prev.energy -
+          currentGym.energyCost,
+
+        stats: result.stats,
+
+        gymExperience:
+          prev.gymExperience +
+          getGymExperienceGain(
+            currentGym.energyCost
+          ),
+
+        gymSessions:
+          prev.gymSessions + 1,
+
+        happiness: Math.max(
+          0,
+          prev.happiness -
+            currentGym.energyCost * 0.5
+        ),
+      };
+
+      return appendActivity(
+        next,
+        `TRAINED ${stat.toUpperCase()}: +${result.gain.toFixed(
+          2
+        )} gain.`,
+        "gym"
+      );
+    });
+  };
+
+  const buyGym = (id: string) =>
+    setGameState((prev) => {
+      const g = GYMS.find(
+        (x) => x.id === id
+      );
+
+      if (
+        !g ||
+        g.jailOnly ||
+        !gymUnlocked(
+          g,
+          prev.gymExperience
+        )
+      ) {
+        return prev;
+      }
+
+      if (
+        prev.gymMemberships.includes(id)
+      ) {
+        return {
+          ...prev,
+          activeGym: id,
+        };
+      }
+
+      if (
+        prev.cash <
+        g.membershipCost
+      ) {
+        return appendActivity(
+          prev,
+          "Not enough cash for membership.",
+          "failure"
+        );
+      }
+
+      const next: SaveData = {
+        ...prev,
+        cash:
+          prev.cash -
+          g.membershipCost,
+        gymMemberships: [
+          ...prev.gymMemberships,
+          id,
+        ],
+        activeGym: id,
+      };
+
+      return appendActivity(
+        next,
+        `Joined ${g.name}.`,
         "success"
       );
+    });
 
-      setCombatStatus(
-        "idle"
+  /*
+   * COMBAT
+   *
+   * This is now the only combat entry point.
+   */
+  const attack = (
+    opponent: PlayerProfile
+  ) => {
+    if (blocked()) {
+      log(
+        "You cannot attack right now.",
+        "failure"
       );
 
-      setPlayerFighter(
-        null
+      return;
+    }
+
+    if (combatOpponent) {
+      log(
+        "You are already in combat.",
+        "failure"
       );
 
-      setEnemyFighter(
-        null
-      );
+      return;
+    }
 
-      setCombatLogs([]);
-
-      setCurrentScreen(
-        "character"
+    if (gameState.energy < 10) {
+      log(
+        "You need at least 10 energy to attack.",
+        "failure"
       );
 
       return;
     }
 
     /*
-     * Failed escape.
+     * Do not deduct energy here.
      *
-     * Enemy gets a free attack.
+     * The combat screen is responsible for starting
+     * the actual encounter. This prevents paying for a
+     * fight that never happened.
      */
+    setCombatOpponent(opponent);
+    setCombatStarted(false);
 
-    log(
-      `Failed to escape! ${enemyFighter.name} hit you as you ran.`,
-      "failure"
+    setCombatMessage(
+      `Target acquired: ${opponent.name}.`
     );
 
-    executePlayerTurn();
+    setCurrentScreen("combat");
   };
 
   /*
-   * ============================================================
-   * EXIT / RESET COMBAT
-   * ============================================================
+   * Called by Combat when the actual fight begins.
    */
+  const beginCombat = () => {
+    if (!combatOpponent) {
+      return false;
+    }
 
-  const clearCombat = () => {
-    setPlayerFighter(
-      null
-    );
+    if (blocked()) {
+      log(
+        "You cannot begin combat right now.",
+        "failure"
+      );
 
-    setEnemyFighter(
-      null
-    );
+      return false;
+    }
 
-    setCombatLogs([]);
+    if (combatStarted) {
+      return true;
+    }
 
-    setCombatStatus(
-      "idle"
+    if (gameState.energy < 10) {
+      log(
+        "You need at least 10 energy to attack.",
+        "failure"
+      );
+
+      return false;
+    }
+
+    setGameState((prev) => ({
+      ...prev,
+      energy: Math.max(
+        0,
+        prev.energy - 10
+      ),
+      attacks: prev.attacks + 1,
+    }));
+
+    setCombatStarted(true);
+
+    return true;
+  };
+
+  /*
+   * Legacy compatibility function.
+   *
+   * Existing code that imports/calls resolveAttack won't
+   * break, but combat itself no longer uses this path.
+   */
+  const resolveAttack = () => {
+    if (!combatOpponent) {
+      return;
+    }
+
+    setCombatMessage(
+      `Combat with ${combatOpponent.name} is handled by the interactive combat system.`
     );
   };
 
   /*
-   * ============================================================
-   * PUBLIC API
-   * ============================================================
+   * ITEM SYSTEM
    */
+  const buyItem = (id: string) =>
+    setGameState((prev) => {
+      const item = getItem(id);
+
+      if (
+        !item ||
+        prev.cash < item.price
+      ) {
+        return appendActivity(
+          prev,
+          "Not enough cash.",
+          "failure"
+        );
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash -
+          item.price,
+
+        inventory: {
+          ...prev.inventory,
+
+          [id]:
+            (prev.inventory[id] || 0) +
+            1,
+        },
+      };
+
+      return appendActivity(
+        next,
+        `Bought ${item.name}.`,
+        "success"
+      );
+    });
+
+  const useItem = (id: string) =>
+    setGameState((prev) => {
+      const item = getItem(id);
+
+      const count =
+        prev.inventory[id] || 0;
+
+      if (!item || count <= 0) {
+        return prev;
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        inventory: {
+          ...prev.inventory,
+
+          [id]: count - 1,
+        },
+      };
+
+      if (item.type === "medical") {
+        next.health = Math.min(
+          maxHealth,
+          prev.health +
+            (item.effect || 0)
+        );
+      }
+
+      if (item.type === "energy") {
+        next.energy = Math.min(
+          MAX_ENERGY,
+          prev.energy +
+            (item.effect || 0)
+        );
+      }
+
+      if (item.type === "nerve") {
+        next.nerve = Math.min(
+          maxNerve,
+          prev.nerve +
+            (item.effect || 0)
+        );
+      }
+
+      return appendActivity(
+        next,
+        `Used ${item.name}.`,
+        "success"
+      );
+    });
+
+  const equip = (id: string) =>
+    setGameState((prev) => {
+      const item = getItem(id);
+
+      if (
+        !item ||
+        (prev.inventory[id] || 0) <= 0
+      ) {
+        return prev;
+      }
+
+      if (
+        item.type !== "weapon" &&
+        item.type !== "armor"
+      ) {
+        return prev;
+      }
+
+      return item.type === "weapon"
+        ? {
+            ...prev,
+            equippedWeapon: id,
+          }
+        : {
+            ...prev,
+            equippedArmor: id,
+          };
+    });
+
+  /*
+   * RANDOM ENCOUNTERS
+   */
+  const chooseEncounter = (
+    choice: EncounterChoice
+  ) => {
+    setGameState((prev) => {
+      const next: SaveData = {
+        ...prev,
+
+        cash: Math.max(
+          0,
+          prev.cash +
+            (choice.cash || 0)
+        ),
+
+        xp: Math.max(
+          0,
+          prev.xp +
+            (choice.xp || 0)
+        ),
+
+        health: Math.max(
+          1,
+          Math.min(
+            maxHealth,
+            prev.health +
+              (choice.health || 0)
+          )
+        ),
+
+        energy: Math.max(
+          0,
+          Math.min(
+            MAX_ENERGY,
+            prev.energy +
+              (choice.energy || 0)
+          )
+        ),
+
+        nerve: Math.max(
+          0,
+          Math.min(
+            maxNerve,
+            prev.nerve +
+              (choice.nerve || 0)
+          )
+        ),
+      };
+
+      return appendActivity(
+        next,
+        choice.text,
+        "system"
+      );
+    });
+
+    setEncounter(null);
+  };
+
+  const randomEncounter = () => {
+    if (blocked()) {
+      log(
+        "You cannot explore right now.",
+        "failure"
+      );
+
+      return;
+    }
+
+    setEncounter(
+      getAvailableEncounter(
+        gameState.currentLocation
+      )
+    );
+  };
+
+  /*
+   * TRAVEL
+   */
+  const travel = (id: string) =>
+    setGameState((prev) => {
+      if (
+        prev.currentLocation === id
+      ) {
+        return appendActivity(
+          prev,
+          `You are already in ${getLocationName(
+            id
+          )}.`,
+          "system"
+        );
+      }
+
+      if (
+        prev.cash < TRAVEL_COST
+      ) {
+        return appendActivity(
+          prev,
+          `Travel requires ${money(
+            TRAVEL_COST
+          )}.`,
+          "failure"
+        );
+      }
+
+      if (
+        prev.travelCooldownUntil &&
+        prev.travelCooldownUntil >
+          Date.now()
+      ) {
+        return appendActivity(
+          prev,
+          `Travel is on cooldown for ${formatTime(
+            prev.travelCooldownUntil -
+              Date.now()
+          )}.`,
+          "failure"
+        );
+      }
+
+      const locationName =
+        getLocationName(id);
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash -
+          TRAVEL_COST,
+
+        currentLocation: id,
+
+        travelCooldownUntil:
+          Date.now() +
+          TRAVEL_COOLDOWN,
+
+        locationsVisited:
+          prev.locationsVisited.includes(id)
+            ? prev.locationsVisited
+            : [
+                ...prev.locationsVisited,
+                id,
+              ],
+      };
+
+      return appendActivity(
+        next,
+        `Travelled to ${locationName}.`,
+        "system"
+      );
+    });
+
+  /*
+   * JOB SYSTEM
+   */
+  const joinJob = (id: string) =>
+    setGameState((prev) => {
+      const newJob = getJob(id);
+
+      if (!newJob) {
+        return prev;
+      }
+
+      /*
+       * Pay outstanding salary before changing jobs.
+       */
+      let next = {
+        ...prev,
+      };
+
+      if (prev.currentJob) {
+        const previousJob =
+          getJob(prev.currentJob);
+
+        if (previousJob) {
+          const now = Date.now();
+
+          const ticks = Math.floor(
+            (now -
+              prev.lastJobPayment) /
+              JOB_PAY_INTERVAL
+          );
+
+          if (ticks > 0) {
+            next.cash =
+              prev.cash +
+              previousJob.salary *
+                ticks;
+
+            next.lastJobPayment =
+              prev.lastJobPayment +
+              ticks *
+                JOB_PAY_INTERVAL;
+          }
+        }
+      }
+
+      if (
+        prev.currentJob === id
+      ) {
+        return appendActivity(
+          next,
+          `You are already employed as ${newJob.title}.`,
+          "job"
+        );
+      }
+
+      next.currentJob = id;
+      next.jobStartedAt = Date.now();
+      next.lastJobPayment = Date.now();
+
+      return appendActivity(
+        next,
+        `Started work as ${newJob.title}.`,
+        "job"
+      );
+    });
+
+  /*
+   * PROPERTY
+   */
+  const buyProperty = (id: string) =>
+    setGameState((prev) => {
+      const p = getProperty(id);
+
+      const currentProperty =
+        getProperty(
+          prev.ownedProperty
+        );
+
+      if (!p) {
+        return prev;
+      }
+
+      if (
+        p.price <
+        (currentProperty?.price || 0)
+      ) {
+        return appendActivity(
+          prev,
+          "You cannot downgrade your property.",
+          "failure"
+        );
+      }
+
+      if (
+        prev.cash < p.price
+      ) {
+        return appendActivity(
+          prev,
+          "Not enough cash.",
+          "failure"
+        );
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash -
+          p.price,
+
+        ownedProperty: id,
+
+        happiness: Math.min(
+          p.maxHappiness,
+          prev.happiness + 10
+        ),
+      };
+
+      return appendActivity(
+        next,
+        `Moved into ${p.name}.`,
+        "success"
+      );
+    });
+
+  /*
+   * BANK
+   */
+  const bankDeposit = (
+    amount: number
+  ) =>
+    setGameState((prev) => {
+      const n = Math.min(
+        prev.cash,
+        Math.max(0, amount)
+      );
+
+      if (n <= 0) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+
+        cash:
+          prev.cash - n,
+
+        bank:
+          prev.bank + n,
+      };
+    });
+
+  const bankWithdraw = (
+    amount: number
+  ) =>
+    setGameState((prev) => {
+      const n = Math.min(
+        prev.bank,
+        Math.max(0, amount)
+      );
+
+      if (n <= 0) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+
+        cash:
+          prev.cash + n,
+
+        bank:
+          prev.bank - n,
+      };
+    });
+
+  /*
+   * EDUCATION
+   */
+  const startEducation = (
+    id: string
+  ) =>
+    setGameState((prev) => {
+      const course =
+        EDUCATION.find(
+          (x) => x.id === id
+        );
+
+      if (
+        !course ||
+        prev.educationActive ||
+        prev.educationCompleted.includes(
+          id
+        ) ||
+        prev.cash < course.cost
+      ) {
+        return prev;
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash -
+          course.cost,
+
+        educationActive: id,
+
+        educationStartedAt:
+          Date.now(),
+      };
+
+      return appendActivity(
+        next,
+        `Started ${course.name}.`,
+        "system"
+      );
+    });
+
+  const finishEducation = () =>
+    setGameState((prev) => {
+      const course =
+        EDUCATION.find(
+          (x) =>
+            x.id ===
+            prev.educationActive
+        );
+
+      if (
+        !course ||
+        !prev.educationStartedAt ||
+        Date.now() -
+          prev.educationStartedAt <
+          course.durationHours *
+            3600000
+      ) {
+        return appendActivity(
+          prev,
+          "That course is not finished yet.",
+          "failure"
+        );
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        educationActive: null,
+
+        educationStartedAt: null,
+
+        educationCompleted: [
+          ...prev.educationCompleted,
+          course.id,
+        ],
+      };
+
+      return appendActivity(
+        next,
+        `Completed ${course.name}.`,
+        "success"
+      );
+    });
+
+  /*
+   * MISSIONS
+   */
+  const missionProgress = (
+    mission: (typeof MISSIONS)[number]
+  ) => {
+    switch (mission.requirement) {
+      case "crime":
+        return gameState.crimesCompleted;
+
+      case "combat":
+        return gameState.fightsWon;
+
+      case "gym":
+        return gameState.gymSessions;
+
+      default:
+        return gameState.cash;
+    }
+  };
+
+  const claimMission = (
+    id: string
+  ) =>
+    setGameState((prev) => {
+      const mission =
+        MISSIONS.find(
+          (x) => x.id === id
+        );
+
+      if (
+        !mission ||
+        prev.completedMissions.includes(
+          id
+        )
+      ) {
+        return prev;
+      }
+
+      let progress = 0;
+
+      switch (mission.requirement) {
+        case "crime":
+          progress =
+            prev.crimesCompleted;
+          break;
+
+        case "combat":
+          progress =
+            prev.fightsWon;
+          break;
+
+        case "gym":
+          progress =
+            prev.gymSessions;
+          break;
+
+        default:
+          progress =
+            prev.cash;
+      }
+
+      if (
+        progress <
+        mission.target
+      ) {
+        return appendActivity(
+          prev,
+          "Mission requirements have not been met.",
+          "failure"
+        );
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash +
+          mission.rewardCash,
+
+        xp:
+          prev.xp +
+          mission.rewardXp,
+
+        completedMissions: [
+          ...prev.completedMissions,
+          id,
+        ],
+      };
+
+      return appendActivity(
+        next,
+        `Mission complete: ${mission.name}.`,
+        "success"
+      );
+    });
+
+  /*
+   * DAILY REWARD
+   */
+  const claimDaily = () =>
+    setGameState((prev) => {
+      const now = Date.now();
+
+      if (
+        prev.lastDailyClaim &&
+        now - prev.lastDailyClaim <
+          DAILY_INTERVAL
+      ) {
+        return appendActivity(
+          prev,
+          "Daily reward is not ready yet.",
+          "failure"
+        );
+      }
+
+      const streak =
+        prev.lastDailyClaim &&
+        now -
+          prev.lastDailyClaim <
+          DAILY_INTERVAL * 2
+          ? prev.dailyStreak + 1
+          : 1;
+
+      const reward =
+        500 +
+        Math.min(
+          5000,
+          streak * 250
+        );
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash + reward,
+
+        merits:
+          prev.merits + 1,
+
+        points:
+          prev.points + 10,
+
+        dailyStreak: streak,
+
+        lastDailyClaim: now,
+      };
+
+      return appendActivity(
+        next,
+        `Daily reward claimed: ${money(
+          reward
+        )} and 1 merit point.`,
+        "success"
+      );
+    });
+
+  /*
+   * FACTIONS
+   */
+  const joinFaction = (
+    id: string
+  ) =>
+    setGameState((prev) => {
+      const cost =
+        prev.faction ? 0 : 500;
+
+      if (
+        prev.faction === id
+      ) {
+        return prev;
+      }
+
+      if (
+        prev.faction &&
+        prev.faction !== id
+      ) {
+        return appendActivity(
+          prev,
+          "You must leave your current faction before joining another.",
+          "failure"
+        );
+      }
+
+      if (
+        prev.cash < cost
+      ) {
+        return appendActivity(
+          prev,
+          "You need $500 to join a faction.",
+          "failure"
+        );
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash - cost,
+
+        faction: id,
+
+        factionReputation: 0,
+      };
+
+      return appendActivity(
+        next,
+        `Joined ${id}.`,
+        "success"
+      );
+    });
+
+  const workFaction = () =>
+    setGameState((prev) => {
+      if (!prev.faction) {
+        return appendActivity(
+          prev,
+          "Join a faction first.",
+          "failure"
+        );
+      }
+
+      if (prev.energy < 10) {
+        return appendActivity(
+          prev,
+          "You need 10 energy.",
+          "failure"
+        );
+      }
+
+      const gain =
+        5 +
+        Math.floor(
+          Math.random() * 10
+        );
+
+      const next: SaveData = {
+        ...prev,
+
+        energy:
+          prev.energy - 10,
+
+        factionReputation:
+          prev.factionReputation +
+          gain,
+
+        points:
+          prev.points + 2,
+      };
+
+      return appendActivity(
+        next,
+        `Faction work completed: +${gain} reputation.`,
+        "success"
+      );
+    });
+
+  /*
+   * MARKET
+   */
+  const tradeMarket = (
+    id: string,
+    buy: boolean
+  ) =>
+    setGameState((prev) => {
+      const basePrice =
+        DEFAULT_MARKET_PRICES[id] ??
+        100;
+
+      const price =
+        prev.market[id] ??
+        basePrice;
+
+      const owned =
+        prev.inventory[id] || 0;
+
+      if (buy) {
+        if (
+          prev.cash < price
+        ) {
+          return appendActivity(
+            prev,
+            "Not enough cash.",
+            "failure"
+          );
+        }
+
+        const next: SaveData = {
+          ...prev,
+
+          cash:
+            prev.cash - price,
+
+          inventory: {
+            ...prev.inventory,
+
+            [id]:
+              owned + 1,
+          },
+        };
+
+        return appendActivity(
+          next,
+          `Bought ${id} for ${money(
+            price
+          )}.`,
+          "success"
+        );
+      }
+
+      if (owned <= 0) {
+        return appendActivity(
+          prev,
+          `You don't own any ${id}.`,
+          "failure"
+        );
+      }
+
+      /*
+       * Sell at a slight market spread.
+       * No random price generation here.
+       */
+      const sellPrice = Math.max(
+        1,
+        Math.floor(price * 0.95)
+      );
+
+      const next: SaveData = {
+        ...prev,
+
+        cash:
+          prev.cash + sellPrice,
+
+        inventory: {
+          ...prev.inventory,
+
+          [id]:
+            owned - 1,
+        },
+      };
+
+      return appendActivity(
+        next,
+        `Sold ${id} for ${money(
+          sellPrice
+        )}.`,
+        "success"
+      );
+    });
+
+  /*
+   * ACHIEVEMENTS
+   */
+  const earnMerit = (
+    reason: string
+  ) =>
+    setGameState((prev) => {
+      if (
+        prev.achievements.includes(
+          reason
+        )
+      ) {
+        return prev;
+      }
+
+      const next: SaveData = {
+        ...prev,
+
+        achievements: [
+          ...prev.achievements,
+          reason,
+        ],
+
+        merits:
+          prev.merits + 1,
+      };
+
+      return appendActivity(
+        next,
+        `Achievement unlocked: ${reason}.`,
+        "critical"
+      );
+    });
+
+  /*
+   * Finish combat cleanly.
+   */
+  const finishCombat = () => {
+    setCombatOpponent(null);
+    setCombatStarted(false);
+    setCombatMessage(
+      "Choose an opponent."
+    );
+    setCurrentScreen("combat");
+  };
+
+  /*
+   * Reset
+   */
+  const resetGame = () => {
+    localStorage.removeItem(
+      SAVE_KEY
+    );
+
+    setGameState(freshSave());
+
+    setCombatOpponent(null);
+    setCombatStarted(false);
+    setEncounter(null);
+    setCurrentScreen("character");
+  };
 
   return {
-    /*
-     * Core state
-     */
-
     gameState,
-
     setGameState,
 
     currentScreen,
-
     setCurrentScreen,
 
     level,
 
     maxHealth,
-
     maxNerve,
 
     gym,
-
     job,
+    education,
 
-    /*
-     * Combat state
-     */
+    encounter,
+    setEncounter,
 
-    playerFighter,
+    combatOpponent,
+    setCombatOpponent,
 
-    enemyFighter,
+    combatStarted,
+    setCombatStarted,
 
-    combatLogs,
+    combatMessage,
 
-    combatStatus,
+    commitCrime,
 
-    /*
-     * Combat actions
-     */
+    train,
+    buyGym,
 
-    startCombat,
+    attack,
+    beginCombat,
+    resolveAttack,
+    finishCombat,
 
-    executePlayerTurn,
+    buyItem,
+    useItem,
+    equip,
 
-    fleeCombat,
+    randomEncounter,
+    chooseEncounter,
 
-    clearCombat,
+    travel,
+    joinJob,
 
-    /*
-     * Activity
-     */
+    buyProperty,
+
+    bankDeposit,
+    bankWithdraw,
+
+    startEducation,
+    finishEducation,
+
+    missionProgress,
+    claimMission,
+
+    claimDaily,
+
+    joinFaction,
+    workFaction,
+
+    tradeMarket,
+
+    earnMerit,
+
+    travelLocked,
 
     log,
+    appendActivity,
+
+    resetGame,
   };
 }
