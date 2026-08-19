@@ -7,9 +7,23 @@ import { getLevel } from "../systems/progressionSystem";
 import { getProperty } from "../data/gameData";
 import type { ActiveModal, Screen } from "../types/riftCity";
 import {
-  Panel, Button, Character, City, Crimes, Combat, GymView, Jobs, Items,
-  Missions, Education, PropertyView, Market, Faction, Awards,
+  Panel,
+  Button,
+  Character,
+  Crimes,
+  Combat,
+  GymView,
+  Jobs,
+  Items,
+  Missions,
+  Education,
+  PropertyView,
+  Market,
+  Faction,
+  Awards,
 } from "../views/GameScreens";
+
+import { City } from "../views/City";
 function App() {
   const g = useRiftCity();
 
