@@ -481,406 +481,162 @@ export function InteractiveCombatView({
 
   return (
     <div className="combat-container">
+
       {/* ======================================================
-          HEADER
+          UNIFIED COMBAT PANEL
           ====================================================== */}
 
-      <div className="combat-header card">
-        <div className="combat-header-content">
-          <div>
-            <span className="combat-live-badge">
-              <span className="combat-live-dot" />
-              LIVE COMBAT
-            </span>
+      <div className="combat-panel">
 
-            <h2 className="combat-title">
-              {pState.name}
+        {/* ======================================================
+            HEADER
+            ====================================================== */}
 
-              <span className="combat-vs">
-                VS
+        <div className="combat-header card">
+          <div className="combat-header-content">
+            <div>
+              <span className="combat-live-badge">
+                <span className="combat-live-dot" />
+                LIVE COMBAT
               </span>
 
-              {eState.name}
-            </h2>
-          </div>
+              <h2 className="combat-title">
+                {pState.name}
 
-          <div
-            className={`combat-turn-indicator ${
-              winner
-                ? winner ===
-                  "player"
-                  ? "combat-result-win"
-                  : "combat-result-loss"
-                : turn ===
-                  "player"
-                ? "combat-your-turn"
-                : "combat-enemy-turn"
-            }`}
-          >
-            {winner
-              ? winner ===
-                "player"
-                ? "COMBAT WON"
-                : "COMBAT LOST"
-              : turn ===
-                "player"
-              ? "YOUR TURN"
-              : "ENEMY TURN"}
-          </div>
-        </div>
-      </div>
-
-      {/* ======================================================
-          MAIN COMBAT GRID
-          
-          Desktop:
-            ┌─────────────────────┬─────────────┐
-            │ Arena + Actions     │ Combat Log  │
-            └─────────────────────┴─────────────┘
-
-          Mobile:
-            Arena
-            Actions
-            Log
-          ====================================================== */}
-
-      <div className="combat-main-grid">
-        {/* ====================================================
-            FIGHT SIDE
-            ==================================================== */}
-
-        <div className="combat-fight-column">
-          {/* ================================================
-              ARENA
-              ================================================ */}
-
-          <div className="combat-arena">
-            {/* PLAYER */}
-
-            <div
-              className={
-                playerFighterClass
-              }
-            >
-              <div className="combat-fighter-top">
-                <div>
-                  <div className="combat-fighter-label">
-                    YOU
-                  </div>
-
-                  <h3>
-                    {pState.name}
-                  </h3>
-                </div>
-
-                <span className="combat-level">
-                  LV{" "}
-                  {
-                    pState.level
-                  }
-                </span>
-              </div>
-
-              <div className="combat-avatar combat-avatar-player">
-                <span>
-                  🧍
+                <span className="combat-vs">
+                  VS
                 </span>
 
-                {impactTarget ===
-                  "player" && (
-                  <div className="combat-impact-text">
-                    {impactType ===
-                    "crit"
-                      ? "CRITICAL!"
-                      : impactType ===
-                        "miss"
-                      ? "MISS"
-                      : `-${
-                          combatLogs[0]
-                            ?.damage ??
-                          0
-                        }`}
-                  </div>
-                )}
-              </div>
-
-              <div className="combat-health-section">
-                <div className="combat-health-label">
-                  <span>
-                    ❤️ HEALTH
-                  </span>
-
-                  <strong>
-                    {Math.max(
-                      0,
-                      Math.floor(
-                        pState.health
-                      )
-                    )}{" "}
-                    /{" "}
-                    {
-                      pState.maxHealth
-                    }
-                  </strong>
-                </div>
-
-                <div className="combat-health-bar">
-                  <div
-                    className="combat-health-fill combat-health-player"
-                    style={{
-                      width: `${playerHealthPercent}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="combat-fighter-status">
-                <span>
-                  WEAPON
-                </span>
-
-                <strong>
-                  {equippedWeapon.icon ||
-                    "⚔️"}{" "}
-                  {
-                    equippedWeapon.name
-                  }
-                </strong>
-              </div>
+                {eState.name}
+              </h2>
             </div>
 
-            {/* CENTER */}
-
-            <div className="combat-center">
-              <div className="combat-center-line" />
-
-              <div className="combat-vs-badge">
-                VS
-              </div>
-
-              <div className="combat-center-line" />
-            </div>
-
-            {/* ENEMY */}
-
             <div
-              className={
-                enemyFighterClass
-              }
-            >
-              <div className="combat-fighter-top">
-                <div>
-                  <div className="combat-fighter-label enemy-label">
-                    OPPONENT
-                  </div>
-
-                  <h3>
-                    {eState.name}
-                  </h3>
-                </div>
-
-                <span className="combat-level">
-                  LV{" "}
-                  {
-                    eState.level
-                  }
-                </span>
-              </div>
-
-              <div className="combat-avatar combat-avatar-enemy">
-                <span>
-                  👤
-                </span>
-
-                {impactTarget ===
-                  "enemy" && (
-                  <div className="combat-impact-text">
-                    {impactType ===
-                    "crit"
-                      ? "CRITICAL!"
-                      : impactType ===
-                        "miss"
-                      ? "MISS"
-                      : `-${
-                          combatLogs[0]
-                            ?.damage ??
-                          0
-                        }`}
-                  </div>
-                )}
-              </div>
-
-              <div className="combat-health-section">
-                <div className="combat-health-label">
-                  <span>
-                    ❤️ HEALTH
-                  </span>
-
-                  <strong>
-                    {Math.max(
-                      0,
-                      Math.floor(
-                        eState.health
-                      )
-                    )}{" "}
-                    /{" "}
-                    {
-                      eState.maxHealth
-                    }
-                  </strong>
-                </div>
-
-                <div className="combat-health-bar">
-                  <div
-                    className="combat-health-fill combat-health-enemy"
-                    style={{
-                      width: `${enemyHealthPercent}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="combat-fighter-status">
-                <span>
-                  STATUS
-                </span>
-
-                <strong>
-                  {eState.health <=
-                  0
-                    ? "💀 Defeated"
-                    : eState.inCover
-                    ? "🛡️ In Cover"
-                    : "⚠️ Exposed"}
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          {/* ================================================
-              TURN STATUS
-              ================================================ */}
-
-          {!winner && (
-            <div
-              className={`combat-status-banner ${
-                turn === "player"
-                  ? "combat-status-player"
-                  : "combat-status-enemy"
+              className={`combat-turn-indicator ${
+                winner
+                  ? winner ===
+                    "player"
+                    ? "combat-result-win"
+                    : "combat-result-loss"
+                  : turn ===
+                    "player"
+                  ? "combat-your-turn"
+                  : "combat-enemy-turn"
               }`}
             >
-              <div className="combat-status-icon">
-                {turn ===
-                "player"
-                  ? "⚔️"
-                  : "👁️"}
-              </div>
-
-              <div>
-                <strong>
-                  {turn ===
+              {winner
+                ? winner ===
                   "player"
-                    ? "Your turn"
-                    : `${eState.name} is deciding...`}
-                </strong>
-
-                <span>
-                  {turn ===
+                  ? "COMBAT WON"
+                  : "COMBAT LOST"
+                : turn ===
                   "player"
-                    ? "Choose your attack."
-                    : "Prepare for the next attack."}
-                </span>
-              </div>
+                ? "YOUR TURN"
+                : "ENEMY TURN"}
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* ================================================
-              ATTACK ACTIONS
-              ================================================ */}
+        {/* ======================================================
+            MAIN COMBAT CONTENT
+            ====================================================== */}
 
-          {!winner &&
-            turn ===
-              "player" && (
-              <div className="combat-actions card">
-                <div className="combat-actions-header">
+        <div className="combat-main-grid">
+
+          {/* ====================================================
+              FIGHT SIDE
+              ==================================================== */}
+
+          <div className="combat-fight-column">
+
+            {/* ================================================
+                ARENA
+                ================================================ */}
+
+            <div className="combat-arena">
+
+              {/* PLAYER */}
+
+              <div
+                className={
+                  playerFighterClass
+                }
+              >
+                <div className="combat-fighter-top">
                   <div>
-                    <div className="combat-section-label">
-                      ATTACK
+                    <div className="combat-fighter-label">
+                      YOU
                     </div>
 
                     <h3>
-                      Choose your attack
+                      {pState.name}
                     </h3>
                   </div>
 
-                  <span className="combat-action-hint">
+                  <span className="combat-level">
+                    LV{" "}
                     {
-                      attackOptions.length
-                    }{" "}
-                    available
+                      pState.level
+                    }
                   </span>
                 </div>
 
-                <div className="combat-attack-grid">
-                  {attackOptions.map(
-                    (
-                      weapon
-                    ) => {
-                      const isUnarmed =
-                        weapon.id ===
-                        UNARMED_WEAPON.id;
+                <div className="combat-avatar combat-avatar-player">
+                  <span>
+                    🧍
+                  </span>
 
-                      return (
-                        <button
-                          key={
-                            weapon.id
-                          }
-                          type="button"
-                          className="combat-attack-button"
-                          disabled={
-                            processing
-                          }
-                          onClick={() =>
-                            handlePlayerAttack(
-                              weapon
-                            )
-                          }
-                        >
-                          <span className="combat-attack-icon">
-                            {weapon.icon ||
-                              (isUnarmed
-                                ? "👊"
-                                : "⚔️")}
-                          </span>
-
-                          <span className="combat-attack-info">
-                            <strong>
-                              {
-                                weapon.name
-                              }
-                            </strong>
-
-                            <small>
-                              {
-                                weapon.baseDamage
-                              }{" "}
-                              base damage
-                            </small>
-                          </span>
-
-                          <span className="combat-attack-arrow">
-                            →
-                          </span>
-                        </button>
-                      );
-                    }
+                  {impactTarget ===
+                    "player" && (
+                    <div className="combat-impact-text">
+                      {impactType ===
+                      "crit"
+                        ? "CRITICAL!"
+                        : impactType ===
+                          "miss"
+                        ? "MISS"
+                        : `-${
+                            combatLogs[0]
+                              ?.damage ??
+                            0
+                          }`}
+                    </div>
                   )}
                 </div>
 
-                <div className="combat-equipped">
+                <div className="combat-health-section">
+                  <div className="combat-health-label">
+                    <span>
+                      ❤️ HEALTH
+                    </span>
+
+                    <strong>
+                      {Math.max(
+                        0,
+                        Math.floor(
+                          pState.health
+                        )
+                      )}{" "}
+                      /{" "}
+                      {
+                        pState.maxHealth
+                      }
+                    </strong>
+                  </div>
+
+                  <div className="combat-health-bar">
+                    <div
+                      className="combat-health-fill combat-health-player"
+                      style={{
+                        width: `${playerHealthPercent}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="combat-fighter-status">
                   <span>
-                    Currently
-                    equipped
+                    WEAPON
                   </span>
 
                   <strong>
@@ -892,261 +648,506 @@ export function InteractiveCombatView({
                   </strong>
                 </div>
               </div>
+
+              {/* CENTER */}
+
+              <div className="combat-center">
+                <div className="combat-center-line" />
+
+                <div className="combat-vs-badge">
+                  VS
+                </div>
+
+                <div className="combat-center-line" />
+              </div>
+
+              {/* ENEMY */}
+
+              <div
+                className={
+                  enemyFighterClass
+                }
+              >
+                <div className="combat-fighter-top">
+                  <div>
+                    <div className="combat-fighter-label enemy-label">
+                      OPPONENT
+                    </div>
+
+                    <h3>
+                      {eState.name}
+                    </h3>
+                  </div>
+
+                  <span className="combat-level">
+                    LV{" "}
+                    {
+                      eState.level
+                    }
+                  </span>
+                </div>
+
+                <div className="combat-avatar combat-avatar-enemy">
+                  <span>
+                    👤
+                  </span>
+
+                  {impactTarget ===
+                    "enemy" && (
+                    <div className="combat-impact-text">
+                      {impactType ===
+                      "crit"
+                        ? "CRITICAL!"
+                        : impactType ===
+                          "miss"
+                        ? "MISS"
+                        : `-${
+                            combatLogs[0]
+                              ?.damage ??
+                            0
+                          }`}
+                    </div>
+                  )}
+                </div>
+
+                <div className="combat-health-section">
+                  <div className="combat-health-label">
+                    <span>
+                      ❤️ HEALTH
+                    </span>
+
+                    <strong>
+                      {Math.max(
+                        0,
+                        Math.floor(
+                          eState.health
+                        )
+                      )}{" "}
+                      /{" "}
+                      {
+                        eState.maxHealth
+                      }
+                    </strong>
+                  </div>
+
+                  <div className="combat-health-bar">
+                    <div
+                      className="combat-health-fill combat-health-enemy"
+                      style={{
+                        width: `${enemyHealthPercent}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="combat-fighter-status">
+                  <span>
+                    STATUS
+                  </span>
+
+                  <strong>
+                    {eState.health <=
+                    0
+                      ? "💀 Defeated"
+                      : eState.inCover
+                      ? "🛡️ In Cover"
+                      : "⚠️ Exposed"}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* ================================================
+                TURN STATUS
+                ================================================ */}
+
+            {!winner && (
+              <div
+                className={`combat-status-banner ${
+                  turn === "player"
+                    ? "combat-status-player"
+                    : "combat-status-enemy"
+                }`}
+              >
+                <div className="combat-status-icon">
+                  {turn ===
+                  "player"
+                    ? "⚔️"
+                    : "👁️"}
+                </div>
+
+                <div>
+                  <strong>
+                    {turn ===
+                    "player"
+                      ? "Your turn"
+                      : `${eState.name} is deciding...`}
+                  </strong>
+
+                  <span>
+                    {turn ===
+                    "player"
+                      ? "Choose your attack."
+                      : "Prepare for the next attack."}
+                  </span>
+                </div>
+              </div>
             )}
 
-          {/* ================================================
-              VICTORY
-              ================================================ */}
+            {/* ================================================
+                ATTACK ACTIONS
+                ================================================ */}
 
-          {winner ===
-            "player" && (
-            <div className="combat-result combat-result-victory">
-              <div className="combat-result-icon">
-                🏆
-              </div>
-
-              <div className="combat-result-label">
-                VICTORY
-              </div>
-
-              <h2>
-                {
-                  eState.name
-                }{" "}
-                has been
-                defeated.
-              </h2>
-
-              {!finishSelected ? (
-                <>
-                  <p>
-                    Choose
-                    what
-                    happens
-                    next.
-                  </p>
-
-                  <div className="combat-finish-grid">
-                    <button
-                      type="button"
-                      className="combat-finish-button combat-finish-leave"
-                      onClick={() =>
-                        handleFinish(
-                          "leave"
-                        )
-                      }
-                    >
-                      <span>
-                        🚶
-                      </span>
-
-                      <strong>
-                        Leave
-                      </strong>
-
-                      <small>
-                        Maximum
-                        XP
-                        bonus
-                      </small>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="combat-finish-button combat-finish-mug"
-                      onClick={() =>
-                        handleFinish(
-                          "mug"
-                        )
-                      }
-                    >
-                      <span>
-                        💵
-                      </span>
-
-                      <strong>
-                        Mug
-                      </strong>
-
-                      <small>
-                        Steal
-                        some
-                        cash
-                      </small>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="combat-finish-button combat-finish-hospitalize"
-                      onClick={() =>
-                        handleFinish(
-                          "hospitalize"
-                        )
-                      }
-                    >
-                      <span>
-                        🏥
-                      </span>
-
-                      <strong>
-                        Hospitalize
-                      </strong>
-
-                      <small>
-                        Longer
-                        hospital
-                        time
-                      </small>
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p>
-                  Resolving
-                  combat
-                  rewards...
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* ================================================
-              DEFEAT
-              ================================================ */}
-
-          {winner ===
-            "enemy" && (
-            <div className="combat-result combat-result-defeat">
-              <div className="combat-result-icon">
-                🏥
-              </div>
-
-              <div className="combat-result-label">
-                DEFEATED
-              </div>
-
-              <h2>
-                You were
-                knocked
-                out.
-              </h2>
-
-              <p>
-                You were
-                defeated
-                and sent
-                to the
-                hospital.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* ====================================================
-            COMBAT LOG
-            ==================================================== */}
-
-        <aside className="combat-log card">
-          <div className="combat-log-header">
-            <div>
-              <div className="combat-section-label">
-                BATTLE FEED
-              </div>
-
-              <h3>
-                Combat Log
-              </h3>
-            </div>
-
-            <span>
-              {
-                combatLogs.length
-              }{" "}
-              events
-            </span>
-          </div>
-
-          {combatLogs.length ===
-          0 ? (
-            <div className="combat-log-empty">
-              <span>
-                ⚔️
-              </span>
-
-              <p>
-                Combat has
-                not started
-                yet.
-              </p>
-            </div>
-          ) : (
-            <div className="combat-log-list">
-              {combatLogs.map(
-                (
-                  log,
-                  index
-                ) => (
-                  <div
-                    key={
-                      log.id
-                    }
-                    className={[
-                      "combat-log-entry",
-
-                      index ===
-                      0
-                        ? "combat-log-entry-new"
-                        : "",
-
-                      log.isCrit
-                        ? "combat-log-critical"
-                        : "",
-
-                      log.isMiss
-                        ? "combat-log-miss"
-                        : "",
-                    ]
-                      .filter(
-                        Boolean
-                      )
-                      .join(
-                        " "
-                      )}
-                  >
-                    <div className="combat-log-marker">
-                      {log.isCrit
-                        ? "💥"
-                        : log.isMiss
-                        ? "〰️"
-                        : "⚔️"}
-                    </div>
-
-                    <div className="combat-log-content">
-                      <div>
-                        {
-                          log.actionText
-                        }
+            {!winner &&
+              turn ===
+                "player" && (
+                <div className="combat-actions card">
+                  <div className="combat-actions-header">
+                    <div>
+                      <div className="combat-section-label">
+                        ATTACK
                       </div>
 
-                      {log.damage >
-                        0 && (
-                        <small>
-                          {
-                            log.damage
-                          }{" "}
-                          damage
-                          {log.hitPart
-                            ? ` · ${log.hitPart}`
-                            : ""}
-                        </small>
-                      )}
+                      <h3>
+                        Choose your attack
+                      </h3>
                     </div>
+
+                    <span className="combat-action-hint">
+                      {
+                        attackOptions.length
+                      }{" "}
+                      available
+                    </span>
                   </div>
-                )
+
+                  <div className="combat-attack-grid">
+                    {attackOptions.map(
+                      (
+                        weapon
+                      ) => {
+                        const isUnarmed =
+                          weapon.id ===
+                          UNARMED_WEAPON.id;
+
+                        return (
+                          <button
+                            key={
+                              weapon.id
+                            }
+                            type="button"
+                            className="combat-attack-button"
+                            disabled={
+                              processing
+                            }
+                            onClick={() =>
+                              handlePlayerAttack(
+                                weapon
+                              )
+                            }
+                          >
+                            <span className="combat-attack-icon">
+                              {weapon.icon ||
+                                (isUnarmed
+                                  ? "👊"
+                                  : "⚔️")}
+                            </span>
+
+                            <span className="combat-attack-info">
+                              <strong>
+                                {
+                                  weapon.name
+                                }
+                              </strong>
+
+                              <small>
+                                {
+                                  weapon.baseDamage
+                                }{" "}
+                                base damage
+                              </small>
+                            </span>
+
+                            <span className="combat-attack-arrow">
+                              →
+                            </span>
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  <div className="combat-equipped">
+                    <span>
+                      Currently
+                      equipped
+                    </span>
+
+                    <strong>
+                      {equippedWeapon.icon ||
+                        "⚔️"}{" "}
+                      {
+                        equippedWeapon.name
+                      }
+                    </strong>
+                  </div>
+                </div>
               )}
+
+            {/* ================================================
+                VICTORY
+                ================================================ */}
+
+            {winner ===
+              "player" && (
+              <div className="combat-result combat-result-victory">
+                <div className="combat-result-icon">
+                  🏆
+                </div>
+
+                <div className="combat-result-label">
+                  VICTORY
+                </div>
+
+                <h2>
+                  {
+                    eState.name
+                  }{" "}
+                  has been
+                  defeated.
+                </h2>
+
+                {!finishSelected ? (
+                  <>
+                    <p>
+                      Choose
+                      what
+                      happens
+                      next.
+                    </p>
+
+                    <div className="combat-finish-grid">
+                      <button
+                        type="button"
+                        className="combat-finish-button combat-finish-leave"
+                        onClick={() =>
+                          handleFinish(
+                            "leave"
+                          )
+                        }
+                      >
+                        <span>
+                          🚶
+                        </span>
+
+                        <strong>
+                          Leave
+                        </strong>
+
+                        <small>
+                          Maximum
+                          XP
+                          bonus
+                        </small>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="combat-finish-button combat-finish-mug"
+                        onClick={() =>
+                          handleFinish(
+                            "mug"
+                          )
+                        }
+                      >
+                        <span>
+                          💵
+                        </span>
+
+                        <strong>
+                          Mug
+                        </strong>
+
+                        <small>
+                          Steal
+                          some
+                          cash
+                        </small>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="combat-finish-button combat-finish-hospitalize"
+                        onClick={() =>
+                          handleFinish(
+                            "hospitalize"
+                          )
+                        }
+                      >
+                        <span>
+                          🏥
+                        </span>
+
+                        <strong>
+                          Hospitalize
+                        </strong>
+
+                        <small>
+                          Longer
+                          hospital
+                          time
+                        </small>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p>
+                    Resolving
+                    combat
+                    rewards...
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ================================================
+                DEFEAT
+                ================================================ */}
+
+            {winner ===
+              "enemy" && (
+              <div className="combat-result combat-result-defeat">
+                <div className="combat-result-icon">
+                  🏥
+                </div>
+
+                <div className="combat-result-label">
+                  DEFEATED
+                </div>
+
+                <h2>
+                  You were
+                  knocked
+                  out.
+                </h2>
+
+                <p>
+                  You were
+                  defeated
+                  and sent
+                  to the
+                  hospital.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ====================================================
+              COMBAT LOG
+              ==================================================== */}
+
+          <aside className="combat-log card">
+            <div className="combat-log-header">
+              <div>
+                <div className="combat-section-label">
+                  BATTLE FEED
+                </div>
+
+                <h3>
+                  Combat Log
+                </h3>
+              </div>
+
+              <span>
+                {
+                  combatLogs.length
+                }{" "}
+                events
+              </span>
             </div>
-          )}
-        </aside>
+
+            {combatLogs.length ===
+            0 ? (
+              <div className="combat-log-empty">
+                <span>
+                  ⚔️
+                </span>
+
+                <p>
+                  Combat has
+                  not started
+                  yet.
+                </p>
+              </div>
+            ) : (
+              <div className="combat-log-list">
+                {combatLogs.map(
+                  (
+                    log,
+                    index
+                  ) => (
+                    <div
+                      key={
+                        log.id
+                      }
+                      className={[
+                        "combat-log-entry",
+
+                        index ===
+                        0
+                          ? "combat-log-entry-new"
+                          : "",
+
+                        log.isCrit
+                          ? "combat-log-critical"
+                          : "",
+
+                        log.isMiss
+                          ? "combat-log-miss"
+                          : "",
+                      ]
+                        .filter(
+                          Boolean
+                        )
+                        .join(
+                          " "
+                        )}
+                    >
+                      <div className="combat-log-marker">
+                        {log.isCrit
+                          ? "💥"
+                          : log.isMiss
+                          ? "〰️"
+                          : "⚔️"}
+                      </div>
+
+                      <div className="combat-log-content">
+                        <div>
+                          {
+                            log.actionText
+                          }
+                        </div>
+
+                        {log.damage >
+                          0 && (
+                          <small>
+                            {
+                              log.damage
+                            }{" "}
+                            damage
+                            {log.hitPart
+                              ? ` · ${log.hitPart}`
+                              : ""}
+                          </small>
+                        )}
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </aside>
+        </div>
       </div>
     </div>
   );
