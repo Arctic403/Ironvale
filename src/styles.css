@@ -1,5 +1,1326 @@
 /* ============================================================
-   PHASE 1 — COMBAT VISUAL SYSTEM
+   RIFTCITY — COMPLETE UI SYSTEM
+   Dark game UI + responsive layout + combat system
+   ============================================================ */
+
+/* ============================================================
+   1. GLOBAL RESET / THEME
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #080c11;
+  --bg-2: #0b1016;
+  --surface: #0e151d;
+  --surface-2: #111a23;
+  --surface-3: #15202b;
+
+  --border: #26313d;
+  --border-light: #303d4b;
+  --border-strong: #3a4a5d;
+
+  --text: #e8edf3;
+  --text-soft: #b8c1cc;
+  --muted: #718095;
+  --muted-2: #596675;
+
+  --blue: #60a5fa;
+  --blue-strong: #6da7ff;
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #facc15;
+  --purple: #a78bfa;
+  --cyan: #67e8f9;
+
+  --sidebar-width: 230px;
+  --topbar-height: 68px;
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(
+      circle at 15% 0%,
+      rgba(96, 165, 250, 0.045),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 90% 20%,
+      rgba(167, 139, 250, 0.035),
+      transparent 28%
+    ),
+    var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.65);
+  outline-offset: 2px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+p {
+  color: var(--muted);
+}
+
+strong,
+b {
+  color: var(--text-soft);
+}
+
+::selection {
+  background: rgba(96, 165, 250, 0.25);
+}
+
+/* ============================================================
+   2. APP LAYOUT
+   ============================================================ */
+
+.layout-root {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: transparent;
+}
+
+.main-wrapper {
+  min-width: 0;
+  flex: 1;
+  margin-left: var(--sidebar-width);
+}
+
+.screen-container {
+  width: 100%;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ============================================================
+   3. NAVIGATION RAIL
+   ============================================================ */
+
+.nav-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 100;
+  width: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+  overflow-y: auto;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(17, 26, 35, 0.98),
+      rgba(8, 12, 17, 0.99)
+    );
+  border-right: 1px solid var(--border);
+  box-shadow: 10px 0 35px rgba(0, 0, 0, 0.2);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 20px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.brand::before {
+  content: "R";
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: 8px;
+  background: rgba(96, 165, 250, 0.08);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  border: 1px solid var(--border-light);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #8794a3;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.nav-item:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.055);
+}
+
+.nav-item.active,
+.nav-item[aria-current="page"] {
+  color: #dcecff;
+  background: rgba(96, 165, 250, 0.09);
+  border-color: rgba(96, 165, 250, 0.2);
+}
+
+.nav-item:active {
+  transform: scale(0.985);
+}
+
+.nav-icon {
+  width: 22px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+}
+
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nav-footer {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   4. TOP STATUS BAR
+   ============================================================ */
+
+.top-status-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8, 12, 17, 0.88);
+  backdrop-filter: blur(14px);
+}
+
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.xp-container {
+  min-width: 150px;
+  flex: 1;
+  max-width: 360px;
+}
+
+.xp-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.currency-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.currency-bar strong {
+  color: #dcecff;
+  font-size: 13px;
+}
+
+/* ============================================================
+   5. SCREEN HEADERS
+   ============================================================ */
+
+.screen-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.screen-header h1 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.screen-header p {
+  max-width: 700px;
+  margin: 7px 0 0;
+  font-size: 12px;
+}
+
+.location-tag {
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   6. CARDS / PANELS
+   ============================================================ */
+
+.card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(17, 26, 35, 0.98),
+      rgba(14, 21, 29, 0.98)
+    );
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.015);
+}
+
+.card:hover {
+  border-color: #304052;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.card-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.card-header-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 7px;
+  border: 1px solid #303c49;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #7f8d9c;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.card h3 {
+  color: var(--text);
+}
+
+.card p {
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   7. GRID SYSTEM
+   ============================================================ */
+
+.ui-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.ui-grid.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ui-grid.three-col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ui-grid.four-col {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* ============================================================
+   8. BUTTON SYSTEM
+   ============================================================ */
+
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-ghost {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.btn-primary {
+  border: 1px solid #3b526b;
+  background:
+    linear-gradient(
+      135deg,
+      #1b2b3c,
+      #152333
+    );
+  color: #eaf3ff;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #6da7ff;
+  background:
+    linear-gradient(
+      135deg,
+      #20364d,
+      #182a3d
+    );
+  box-shadow:
+    0 7px 20px rgba(0, 0, 0, 0.22),
+    0 0 16px rgba(96, 165, 250, 0.08);
+}
+
+.btn-secondary {
+  border: 1px solid #3a4653;
+  background: #151d26;
+  color: var(--text-soft);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: #536274;
+  background: #1b2530;
+}
+
+.btn-danger {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.btn-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+}
+
+.btn-primary:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.btn-danger:active:not(:disabled),
+.btn-ghost:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.42;
+  transform: none !important;
+}
+
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-group > button {
+  flex: 1 1 auto;
+}
+
+.button-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   9. DATA / STAT LISTS
+   ============================================================ */
+
+.data-list,
+.stats-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.data-row,
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #1b2530;
+}
+
+.data-row:last-child,
+.stat-row:last-child {
+  border-bottom: 0;
+}
+
+.data-row span,
+.stat-name {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.data-row b,
+.stat-val {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.stat-val {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   10. PROGRESS BARS
+   ============================================================ */
+
+.bar-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  margin: 10px 0 12px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #1d2732;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.bar-fill {
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  transition: width 0.35s ease;
+}
+
+.bar-fill.crime {
+  background: linear-gradient(90deg, #dc2626, #f87171);
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.18);
+}
+
+.bar-fill.mission {
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  box-shadow: 0 0 10px rgba(96, 165, 250, 0.18);
+}
+
+.bar-fill.xp {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+
+/* ============================================================
+   11. CHARACTER
+   ============================================================ */
+
+.bank-control {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bank-balance {
+  margin: 0;
+  color: #86efac;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group input,
+input[type="number"],
+input[type="text"],
+select,
+textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #303d4b;
+  border-radius: 7px;
+  outline: none;
+  background: #0b1219;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.input-group input:focus,
+input[type="number"]:focus,
+input[type="text"]:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(96, 165, 250, 0.55);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.08);
+}
+
+/* ============================================================
+   12. CITY / LOCATIONS
+   ============================================================ */
+
+.location-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  min-height: 190px;
+}
+
+.location-card h3 {
+  margin: 9px 0 5px;
+  font-size: 15px;
+}
+
+.location-card p {
+  flex: 1;
+  margin-bottom: 14px;
+}
+
+.location-card .btn-primary {
+  width: 100%;
+}
+
+/* ============================================================
+   13. CRIME
+   ============================================================ */
+
+.crime-card {
+  padding: 16px;
+}
+
+.crime-card h3 {
+  margin: 10px 0 5px;
+  font-size: 16px;
+}
+
+.crime-card p {
+  min-height: 38px;
+  margin-bottom: 8px;
+}
+
+.crime-card.disabled {
+  opacity: 0.55;
+}
+
+.chance-badge {
+  padding: 4px 7px;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 5px;
+  background: rgba(96, 165, 250, 0.06);
+  color: #8fbdff;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.crime-card .btn-primary {
+  width: 100%;
+}
+
+/* ============================================================
+   14. COMBAT TARGETS
+   ============================================================ */
+
+.target-card {
+  padding: 16px;
+}
+
+.target-card h3 {
+  margin: 10px 0 3px;
+  font-size: 16px;
+}
+
+.target-card > p {
+  margin-bottom: 12px;
+}
+
+.target-card .btn-primary {
+  width: 100%;
+}
+
+.status-badge {
+  padding: 4px 7px;
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  border-radius: 5px;
+  background: rgba(34, 197, 94, 0.06);
+  color: #86efac;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   15. GYM
+   ============================================================ */
+
+.gym-selector {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(170px, 1fr)
+  );
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.gym-btn {
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 12px;
+  border: 1px solid #2d3946;
+  border-radius: 8px;
+  background: #101820;
+  color: var(--text-soft);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.gym-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #45566a;
+  background: #151f29;
+}
+
+.gym-btn.active {
+  border-color: rgba(96, 165, 250, 0.55);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(96, 165, 250, 0.11),
+      rgba(96, 165, 250, 0.035)
+    );
+  color: #dcecff;
+  box-shadow:
+    0 0 0 1px rgba(96, 165, 250, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.gym-btn span {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.gym-btn small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.train-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.train-card h3 {
+  margin: 8px 0 4px;
+  font-size: 14px;
+}
+
+.train-card p {
+  flex: 1;
+  min-height: 52px;
+}
+
+.train-card .btn-primary {
+  width: 100%;
+}
+
+.train-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #303d4b;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 18px;
+}
+
+/* ============================================================
+   16. JOBS
+   ============================================================ */
+
+.job-card {
+  padding: 16px;
+}
+
+.job-card h3 {
+  margin: 9px 0 5px;
+  font-size: 16px;
+}
+
+.job-card .data-row {
+  margin: 10px 0;
+}
+
+.job-card .btn-primary {
+  width: 100%;
+}
+
+/* ============================================================
+   17. ITEMS
+   ============================================================ */
+
+.item-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.item-card h3 {
+  margin: 9px 0 5px;
+  font-size: 15px;
+}
+
+.item-card p {
+  flex: 1;
+}
+
+.item-price {
+  display: block;
+  margin: 7px 0 12px;
+  color: #86efac;
+  font-size: 15px;
+}
+
+.item-count {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted-2);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* ============================================================
+   18. MISSIONS
+   ============================================================ */
+
+.mission-card {
+  padding: 16px;
+}
+
+.mission-card h3 {
+  margin: 9px 0 5px;
+  font-size: 15px;
+}
+
+.mission-card .data-row {
+  margin-bottom: 10px;
+}
+
+.mission-card .btn-primary {
+  width: 100%;
+}
+
+/* ============================================================
+   19. EDUCATION
+   ============================================================ */
+
+.course-active {
+  padding: 14px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 9px;
+  background: rgba(96, 165, 250, 0.045);
+}
+
+.course-active h3 {
+  margin-bottom: 5px;
+}
+
+.course-active .btn-primary {
+  margin-top: 8px;
+}
+
+.course-card {
+  padding: 16px;
+}
+
+.course-card h3 {
+  margin-bottom: 5px;
+}
+
+.course-card .data-list {
+  margin: 10px 0;
+}
+
+.course-card .btn-primary {
+  width: 100%;
+}
+
+/* ============================================================
+   20. PROPERTY
+   ============================================================ */
+
+.property-card {
+  padding: 16px;
+}
+
+.property-card h3 {
+  margin: 9px 0 5px;
+}
+
+.property-card .data-list {
+  margin: 10px 0;
+}
+
+.property-card .btn-primary {
+  width: 100%;
+}
+
+.property-card.disabled {
+  opacity: 0.52;
+}
+
+/* ============================================================
+   21. MARKET
+   ============================================================ */
+
+.market-card {
+  padding: 16px;
+}
+
+.market-card h3 {
+  margin: 9px 0 3px;
+  font-size: 14px;
+}
+
+.market-card p {
+  margin-bottom: 8px;
+}
+
+.market-card .btn-group {
+  margin-top: 10px;
+}
+
+.market-card .btn-primary {
+  min-width: 0;
+}
+
+/* ============================================================
+   22. FACTIONS
+   ============================================================ */
+
+.faction-card {
+  padding: 16px;
+}
+
+.faction-card h3 {
+  margin-bottom: 6px;
+}
+
+.faction-card.disabled {
+  opacity: 0.45;
+}
+
+.faction-card .btn-primary {
+  width: 100%;
+}
+
+/* ============================================================
+   23. AWARDS
+   ============================================================ */
+
+.achievement-card {
+  min-height: 135px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.achievement-card h3 {
+  margin-bottom: 7px;
+  font-size: 14px;
+}
+
+.status-text {
+  display: block;
+  margin-bottom: auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.achievement-card.unlocked {
+  border-color: rgba(74, 222, 128, 0.25);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(34, 197, 94, 0.08),
+      transparent 45%
+    ),
+    var(--surface);
+}
+
+.achievement-card.unlocked .status-text {
+  color: #86efac;
+}
+
+.achievement-card.locked {
+  opacity: 0.62;
+}
+
+.achievement-card .btn-primary {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* ============================================================
+   24. ACTIVITY / FEED
+   ============================================================ */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.activity-card {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.activity-card p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.activity-card small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted-2);
+  font-size: 9px;
+}
+
+/* ============================================================
+   25. ALERTS / STATES
+   ============================================================ */
+
+.status-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.status-alert.warning {
+  border-color: rgba(250, 204, 21, 0.25);
+  background: rgba(250, 204, 21, 0.045);
+  color: #fde68a;
+}
+
+.status-alert.danger {
+  border-color: rgba(248, 113, 113, 0.25);
+  background: rgba(239, 68, 68, 0.045);
+  color: #fca5a5;
+}
+
+.status-alert.success {
+  border-color: rgba(74, 222, 128, 0.25);
+  background: rgba(34, 197, 94, 0.045);
+  color: #86efac;
+}
+
+/* ============================================================
+   26. MODALS
+   ============================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(7px);
+}
+
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      #121b24,
+      #0d141b
+    );
+  box-shadow:
+    0 25px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.015);
+}
+
+.modal-header {
+  padding: 17px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+
+.modal-body {
+  padding: 17px;
+}
+
+.modal-footer,
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 17px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-tag {
+  color: var(--blue);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+/* ============================================================
+   27. LEGACY COMPATIBILITY
+   Keeps older components working during migration.
+   ============================================================ */
+
+.grid {
+  display: grid;
+  gap: 14px;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.action {
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid #3b526b;
+  border-radius: 7px;
+  background: #192838;
+  color: #eaf3ff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.action:hover:not(:disabled) {
+  border-color: var(--blue);
+  background: #20364d;
+}
+
+.sidebar {
+  background: #0b1016;
+  border-right: 1px solid var(--border);
+}
+
+.content {
+  background: var(--bg);
+}
+
+/* ============================================================
+   28. COMBAT VISUAL SYSTEM
    ============================================================ */
 
 .combat-container {
@@ -8,10 +1329,6 @@
   flex-direction: column;
   gap: 14px;
 }
-
-/* ------------------------------------------------------------
-   HEADER
-   ------------------------------------------------------------ */
 
 .combat-header {
   position: relative;
@@ -108,20 +1425,12 @@
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
-/* ------------------------------------------------------------
-   ARENA
-   ------------------------------------------------------------ */
-
 .combat-arena {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr);
   align-items: stretch;
   gap: 10px;
 }
-
-/* ------------------------------------------------------------
-   FIGHTERS
-   ------------------------------------------------------------ */
 
 .combat-fighter {
   position: relative;
@@ -199,10 +1508,6 @@
   font-weight: 700;
 }
 
-/* ------------------------------------------------------------
-   AVATAR
-   ------------------------------------------------------------ */
-
 .combat-avatar {
   position: relative;
   width: 104px;
@@ -226,10 +1531,6 @@
 .combat-avatar-enemy {
   border-color: rgba(248, 113, 113, 0.25);
 }
-
-/* ------------------------------------------------------------
-   HEALTH
-   ------------------------------------------------------------ */
 
 .combat-health-section {
   margin-top: 8px;
@@ -273,26 +1574,14 @@
 }
 
 .combat-health-player {
-  background: linear-gradient(
-    90deg,
-    #16a34a,
-    #4ade80
-  );
+  background: linear-gradient(90deg, #16a34a, #4ade80);
   box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
 }
 
 .combat-health-enemy {
-  background: linear-gradient(
-    90deg,
-    #dc2626,
-    #f87171
-  );
+  background: linear-gradient(90deg, #dc2626, #f87171);
   box-shadow: 0 0 10px rgba(248, 113, 113, 0.2);
 }
-
-/* ------------------------------------------------------------
-   FIGHTER STATUS
-   ------------------------------------------------------------ */
 
 .combat-fighter-status {
   display: flex;
@@ -313,10 +1602,6 @@
   font-size: 10px;
   letter-spacing: 0;
 }
-
-/* ------------------------------------------------------------
-   CENTER VS
-   ------------------------------------------------------------ */
 
 .combat-center {
   display: flex;
@@ -352,10 +1637,6 @@
   letter-spacing: 0.08em;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
 }
-
-/* ------------------------------------------------------------
-   TURN BANNER
-   ------------------------------------------------------------ */
 
 .combat-status-banner {
   display: flex;
@@ -397,10 +1678,6 @@
   color: #718095;
   font-size: 11px;
 }
-
-/* ------------------------------------------------------------
-   ATTACK ACTIONS
-   ------------------------------------------------------------ */
 
 .combat-actions {
   padding: 16px;
@@ -451,11 +1728,7 @@
   overflow: hidden;
   border: 1px solid #344456;
   border-radius: 8px;
-  background: linear-gradient(
-    135deg,
-    #192533,
-    #14202c
-  );
+  background: linear-gradient(135deg, #192533, #14202c);
   color: #eaf3ff;
   cursor: pointer;
   text-align: left;
@@ -484,11 +1757,7 @@
 .combat-attack-button:hover:not(:disabled) {
   transform: translateY(-2px);
   border-color: #6da7ff;
-  background: linear-gradient(
-    135deg,
-    #1d3045,
-    #172638
-  );
+  background: linear-gradient(135deg, #1d3045, #172638);
   box-shadow:
     0 8px 25px rgba(0, 0, 0, 0.25),
     0 0 18px rgba(109, 167, 255, 0.08);
@@ -561,10 +1830,6 @@
   color: #d5dce4;
 }
 
-/* ------------------------------------------------------------
-   IMPACT ANIMATIONS
-   ------------------------------------------------------------ */
-
 .combat-impact-hit {
   animation: combat-hit 0.5s ease;
 }
@@ -623,10 +1888,6 @@
   color: #94a3b8;
 }
 
-/* ------------------------------------------------------------
-   DEFEATED STATE
-   ------------------------------------------------------------ */
-
 .combat-fighter-defeated {
   opacity: 0.58;
   filter: grayscale(0.55);
@@ -635,10 +1896,6 @@
 .combat-fighter-defeated .combat-avatar {
   transform: scale(0.94);
 }
-
-/* ------------------------------------------------------------
-   VICTORY / DEFEAT
-   ------------------------------------------------------------ */
 
 .combat-result {
   position: relative;
@@ -692,7 +1949,7 @@
 }
 
 .combat-result h2 {
-  margin: 5px 0 5px;
+  margin: 5px 0;
   font-size: 20px;
 }
 
@@ -701,10 +1958,6 @@
   color: #8794a3;
   font-size: 12px;
 }
-
-/* ------------------------------------------------------------
-   FINISH BUTTONS
-   ------------------------------------------------------------ */
 
 .combat-finish-grid {
   display: grid;
@@ -762,10 +2015,6 @@
   border-color: #f87171;
   background: rgba(239, 68, 68, 0.08);
 }
-
-/* ------------------------------------------------------------
-   COMBAT LOG
-   ------------------------------------------------------------ */
 
 .combat-log {
   padding: 15px;
@@ -855,9 +2104,9 @@
   font-size: 11px;
 }
 
-/* ------------------------------------------------------------
-   ANIMATIONS
-   ------------------------------------------------------------ */
+/* ============================================================
+   29. COMBAT ANIMATIONS
+   ============================================================ */
 
 @keyframes combat-live-pulse {
   0%,
@@ -1047,11 +2296,158 @@
   }
 }
 
-/* ------------------------------------------------------------
-   MOBILE COMBAT
-   ------------------------------------------------------------ */
+/* ============================================================
+   30. RESPONSIVE — TABLET
+   ============================================================ */
 
-@media (max-width: 720px) {
+@media (max-width: 1100px) {
+  .ui-grid.four-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ui-grid.three-col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nav-rail {
+    width: 200px;
+  }
+
+  .main-wrapper {
+    margin-left: 200px;
+  }
+}
+
+/* ============================================================
+   31. RESPONSIVE — MOBILE
+   ============================================================ */
+
+@media (max-width: 760px) {
+  :root {
+    --sidebar-width: 0px;
+    --topbar-height: 60px;
+  }
+
+  body {
+    font-size: 13px;
+  }
+
+  .layout-root {
+    display: block;
+  }
+
+  .nav-rail {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    height: 64px;
+    padding: 6px 8px;
+    flex-direction: row;
+    align-items: center;
+    border-right: 0;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(8, 12, 17, 0.96);
+    backdrop-filter: blur(15px);
+  }
+
+  .brand,
+  .nav-footer {
+    display: none;
+  }
+
+  .nav-list {
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .nav-item {
+    flex: 1 0 68px;
+    min-width: 68px;
+    min-height: 50px;
+    padding: 5px 6px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    text-align: center;
+  }
+
+  .nav-icon {
+    width: auto;
+    font-size: 15px;
+  }
+
+  .nav-label {
+    max-width: 68px;
+    font-size: 8px;
+  }
+
+  .main-wrapper {
+    width: 100%;
+    margin-left: 0;
+    padding-bottom: 72px;
+  }
+
+  .top-status-bar {
+    min-height: var(--topbar-height);
+    padding: 9px 13px;
+  }
+
+  .xp-container {
+    display: none;
+  }
+
+  .currency-bar {
+    margin-left: auto;
+  }
+
+  .screen-container {
+    padding: 16px 12px;
+  }
+
+  .screen-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+  }
+
+  .screen-header h1 {
+    font-size: 25px;
+  }
+
+  .ui-grid.two-col,
+  .ui-grid.three-col,
+  .ui-grid.four-col,
+  .grid.two,
+  .grid.three,
+  .grid.four {
+    grid-template-columns: 1fr;
+  }
+
+  .gym-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-body {
+    padding: 13px;
+  }
+
+  .card-header {
+    padding: 12px 13px;
+  }
+
   .combat-header-content {
     align-items: flex-start;
   }
@@ -1119,3 +2515,42 @@
     margin-left: 4px;
   }
 }
+
+/* ============================================================
+   32. VERY SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 420px) {
+  .screen-container {
+    padding: 12px 9px;
+  }
+
+  .gym-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .card-header-split {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .combat-header {
+    padding: 13px;
+  }
+
+  .combat-actions {
+    padding: 12px;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-ghost {
+    min-height: 36px;
+    padding: 7px 10px;
+  }
+}
+
+/* ============================================================
+   END RIFTCITY STYLES
+   ============================================================ */
