@@ -1,4 +1,3 @@
-import { CITY_LOCATIONS, type CityLocation, } from "../data/cityLocations";
 import React, { useState } from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 
