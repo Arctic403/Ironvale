@@ -272,11 +272,11 @@ export function City({ g }: { g: Game }) {
     CITY_LOCATIONS.find((location) => location.id === selectedId) ??
     null;
 
-  const goTo = (screen: CityLocation["screen"]) => {
-    if (!incapacitated) {
-      g.setCurrentScreen(screen);
-    }
-  };
+  const goTo = (screen?: CityLocation["screen"]) => {
+  if (!incapacitated && screen) {
+    g.setCurrentScreen(screen);
+  }
+};
 
   const clampZoom = (value: number) =>
     Math.min(1.65, Math.max(0.72, value));
