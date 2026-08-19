@@ -1,18 +1,53 @@
 import React, { useState } from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
+
 import { InteractiveCombatView } from "./Combat";
-import { CRIMES, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus } from "../systems/crimeSystem";
-import { DEFAULT_WEAPONS, calculateWinChance } from "../systems/combatSystem";
-import { GYMS, TRAINING_STATS, gymUnlocked, canTrainStat } from "../systems/gymSystem";
+
 import {
-  EDUCATION, ITEMS, JOBS, MISSIONS, PROPERTIES, getItem, getJob, getProperty,
+  CRIMES,
+  crimeSuccessChance,
+  crimeUnlocked,
+  getCrimeStatBonus,
+} from "../systems/crimeSystem";
+
+import {
+  DEFAULT_WEAPONS,
+  calculateWinChance,
+} from "../systems/combatSystem";
+
+import {
+  GYMS,
+  TRAINING_STATS,
+  gymUnlocked,
+  canTrainStat,
+} from "../systems/gymSystem";
+
+import {
+  EDUCATION,
+  ITEMS,
+  JOBS,
+  MISSIONS,
+  PROPERTIES,
+  getProperty,
 } from "../data/gameData";
+
 import { LOCATIONS } from "../constants/locations";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
-import { money, formatTime, getLocationName, MAX_ENERGY, HOSPITAL_MINUTES } from "../core/gameCore";
+
+import {
+  money,
+  MAX_ENERGY,
+  HOSPITAL_MINUTES,
+} from "../core/gameCore";
+
 import type { SaveData } from "../types/riftCity";
 
 type Game = ReturnType<typeof useRiftCity>;
+
+/* =========================================================
+   SHARED UI
+========================================================= */
+
 export function Panel({
   title,
   children,
@@ -23,9 +58,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={`card ${className}`}
-    >
+    <section className={`card ${className}`}>
       <div className="card-header">
         <h3>{title}</h3>
       </div>
@@ -50,6 +83,7 @@ export function Button({
 }) {
   return (
     <button
+      type="button"
       className={`btn-primary ${className}`}
       disabled={disabled}
       onClick={onClick}
@@ -59,113 +93,79 @@ export function Button({
   );
 }
 
+/* =========================================================
+   CHARACTER
+========================================================= */
+
 export function Character({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
-  const [amount, setAmount] =
-    useState("100");
+  const [amount, setAmount] = useState("100");
 
-  const n = Math.max(
-    0,
-    Number(amount) || 0
-  );
+  const n = Math.max(0, Number(amount) || 0);
+
+  const happinessMax =
+    getProperty(g.gameState.ownedProperty)?.maxHappiness ??
+    100;
 
   return (
     <div className="ui-grid two-col">
       <Panel title="Combat Stats">
         <div className="stats-list">
-          {Object.entries(
-            g.gameState.stats
-          ).map(([k, v]) => (
-            <div
-              className="stat-row"
-              key={k}
-            >
-              <span className="stat-name">
-                {k}
-              </span>
+          {Object.entries(g.gameState.stats).map(
+            ([key, value]) => (
+              <div
+                className="stat-row"
+                key={key}
+              >
+                <span className="stat-name">
+                  {key}
+                </span>
 
-              <strong className="stat-val">
-                {(
-                  v as number
-                ).toFixed(2)}
-              </strong>
-            </div>
-          ))}
+                <strong className="stat-val">
+                  {(value as number).toFixed(2)}
+                </strong>
+              </div>
+            )
+          )}
         </div>
       </Panel>
 
       <Panel title="Core Resources">
         <div className="data-list">
           <div className="data-row">
-            <span>
-              ❤️ Health
-            </span>
+            <span>❤️ Health</span>
 
             <b>
-              {Math.floor(
-                g.gameState
-                  .health
-              )}{" "}
-              /{" "}
-              {
-                g.maxHealth
-              }
+              {Math.floor(g.gameState.health)} /{" "}
+              {g.maxHealth}
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              ⚡ Energy
-            </span>
+            <span>⚡ Energy</span>
 
             <b>
-              {
-                g.gameState
-                  .energy
-              }{" "}
-              /{" "}
-              {MAX_ENERGY}
+              {g.gameState.energy} / {MAX_ENERGY}
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              🧠 Nerve
-            </span>
+            <span>🧠 Nerve</span>
 
             <b>
-              {
-                g.gameState
-                  .nerve
-              }{" "}
-              /{" "}
-              {
-                g.maxNerve
-              }
+              {g.gameState.nerve} / {g.maxNerve}
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              😊 Happiness
-            </span>
+            <span>😊 Happiness</span>
 
             <b>
-              {Math.floor(
-                g.gameState
-                  .happiness
-              )}{" "}
-              /{" "}
-              {getProperty(
-                g.gameState
-                  .ownedProperty
-              )?.maxHappiness ??
-                100}
+              {Math.floor(g.gameState.happiness)} /{" "}
+              {happinessMax}
             </b>
           </div>
         </div>
@@ -174,79 +174,44 @@ export function Character({
       <Panel title="Progress Overview">
         <div className="data-list">
           <div className="data-row">
-            <span>
-              Crime Experience
-            </span>
+            <span>Crime Experience</span>
 
             <b>
-              {
-                g.gameState
-                  .crimeExperience
-              }
+              {g.gameState.crimeExperience}
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              Gym Experience
-            </span>
+            <span>Gym Experience</span>
 
             <b>
-              {
-                g.gameState
-                  .gymExperience
-              }
+              {g.gameState.gymExperience}
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              Crimes Completed
-            </span>
+            <span>Crimes Completed</span>
 
             <b>
-              {
-                g.gameState
-                  .crimesCompleted
-              }{" "}
-              /{" "}
-              {
-                g.gameState
-                  .crimesFailed
-              }{" "}
-              failed
+              {g.gameState.crimesCompleted} /{" "}
+              {g.gameState.crimesFailed} failed
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              Fight Record
-            </span>
+            <span>Fight Record</span>
 
             <b>
-              {
-                g.gameState
-                  .fightsWon
-              }
-              W /{" "}
-              {
-                g.gameState
-                  .fightsLost
-              }
-              L
+              {g.gameState.fightsWon}W /{" "}
+              {g.gameState.fightsLost}L
             </b>
           </div>
 
           <div className="data-row">
-            <span>
-              Attacks
-            </span>
+            <span>Attacks</span>
 
             <b>
-              {
-                g.gameState
-                  .attacks
-              }
+              {g.gameState.attacks}
             </b>
           </div>
         </div>
@@ -255,10 +220,7 @@ export function Character({
       <Panel title="Bank Vault">
         <div className="bank-control">
           <h2 className="bank-balance">
-            {money(
-              g.gameState
-                .bank
-            )}
+            {money(g.gameState.bank)}
           </h2>
 
           <div className="input-group">
@@ -266,29 +228,25 @@ export function Character({
               type="number"
               min="0"
               value={amount}
-              onChange={(e) =>
-                setAmount(
-                  e.target.value
-                )
+              onChange={(event) =>
+                setAmount(event.target.value)
               }
             />
 
             <div className="btn-group">
               <Button
+                disabled={n <= 0}
                 onClick={() =>
-                  g.bankDeposit(
-                    n
-                  )
+                  g.bankDeposit(n)
                 }
               >
                 Deposit
               </Button>
 
               <Button
+                disabled={n <= 0}
                 onClick={() =>
-                  g.bankWithdraw(
-                    n
-                  )
+                  g.bankWithdraw(n)
                 }
               >
                 Withdraw
@@ -301,75 +259,80 @@ export function Character({
   );
 }
 
+/* =========================================================
+   CITY
+========================================================= */
+
 export function City({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
+  const incapacitated =
+    Boolean(
+      g.gameState.jailUntil ||
+      g.gameState.hospitalUntil
+    );
+
   return (
     <>
       <div className="ui-grid four-col">
         {LOCATIONS.map(
-          ([
-            id,
-            name,
-            desc,
-          ]) => (
-            <div
-              className="card location-card"
-              key={id}
-            >
-              <span className="card-tag">
-                DISTRICT
-              </span>
+          ([id, name, description]) => {
+            const current =
+              g.gameState.currentLocation === id;
 
-              <h3>{name}</h3>
-
-              <p>{desc}</p>
-
-              <Button
-                onClick={() =>
-                  g.travel(id)
-                }
+            return (
+              <div
+                className="card location-card"
+                key={id}
               >
-                {g.gameState
-                  .currentLocation ===
-                id
-                  ? "Current Location"
-                  : "Travel"}
-              </Button>
-            </div>
-          )
+                <span className="card-tag">
+                  DISTRICT
+                </span>
+
+                <h3>{name}</h3>
+
+                <p>{description}</p>
+
+                <Button
+                  disabled={current}
+                  onClick={() =>
+                    g.travel(id)
+                  }
+                >
+                  {current
+                    ? "Current Location"
+                    : "Travel"}
+                </Button>
+              </div>
+            );
+          }
         )}
       </div>
 
       <Panel title="District Actions">
         <div className="ui-grid three-col">
           <Button
-            onClick={
-              g.randomEncounter
-            }
+            disabled={incapacitated}
+            onClick={g.randomEncounter}
           >
             🎲 Explore Area
           </Button>
 
           <Button
+            disabled={incapacitated}
             onClick={() =>
-              g.setCurrentScreen(
-                "crimes"
-              )
+              g.setCurrentScreen("crimes")
             }
           >
             🕵️ Street Hustles
           </Button>
 
           <Button
+            disabled={incapacitated}
             onClick={() =>
-              g.setCurrentScreen(
-                "combat"
-              )
+              g.setCurrentScreen("combat")
             }
           >
             ⚔️ Arena Fights
@@ -380,65 +343,68 @@ export function City({
   );
 }
 
+/* =========================================================
+   CRIMES
+========================================================= */
+
 export function Crimes({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
+  const incapacitated =
+    Boolean(
+      g.gameState.jailUntil ||
+      g.gameState.hospitalUntil
+    );
+
   return (
     <div className="ui-grid two-col">
-      {CRIMES.map((c) => {
-        const chance =
-          crimeSuccessChance(
-            c,
-            g.gameState
-              .crimeExperience,
-            1,
-            getCrimeStatBonus(
-              g.gameState
-                .stats
-            )
-          );
+      {CRIMES.map((crime) => {
+        const chance = crimeSuccessChance(
+          crime,
+          g.gameState.crimeExperience,
+          1,
+          getCrimeStatBonus(
+            g.gameState.stats
+          )
+        );
 
-        const unlocked =
-          crimeUnlocked(
-            c,
-            g.gameState
-              .crimeExperience
-          );
+        const unlocked = crimeUnlocked(
+          crime,
+          g.gameState.crimeExperience
+        );
+
+        const enoughNerve =
+          g.gameState.nerve >= crime.nerve;
+
+        const canCommit =
+          unlocked &&
+          enoughNerve &&
+          !incapacitated;
 
         return (
           <div
             className={`card crime-card ${
-              unlocked
-                ? ""
-                : "disabled"
+              unlocked ? "" : "disabled"
             }`}
-            key={c.id}
+            key={crime.id}
           >
             <div className="card-header-split">
               <span className="card-tag">
-                NERVE {c.nerve}
+                NERVE {crime.nerve}
               </span>
 
               <span className="chance-badge">
                 {unlocked
-                  ? `${chance.toFixed(
-                      0
-                    )}% Success`
-                  : `Requires CE ${c.crimeExperienceRequired}`}
+                  ? `${chance.toFixed(0)}% Success`
+                  : `Requires CE ${crime.crimeExperienceRequired}`}
               </span>
             </div>
 
-            <h3>{c.name}</h3>
+            <h3>{crime.name}</h3>
 
-            <p>
-              {
-                c.description
-              }
-            </p>
+            <p>{crime.description}</p>
 
             <div className="bar-track">
               <div
@@ -446,27 +412,23 @@ export function Crimes({
                 style={{
                   width: `${
                     unlocked
-                      ? Math.min(
-                          100,
-                          chance
-                        )
+                      ? Math.min(100, chance)
                       : 0
                   }%`,
                 }}
               />
             </div>
 
+            {!enoughNerve && unlocked && (
+              <p className="status-text">
+                Requires {crime.nerve} nerve.
+              </p>
+            )}
+
             <Button
-              disabled={
-                !unlocked ||
-                g.gameState
-                  .nerve <
-                  c.nerve
-              }
+              disabled={!canCommit}
               onClick={() =>
-                g.commitCrime(
-                  c
-                )
+                g.commitCrime(crime)
               }
             >
               Commit Crime
@@ -478,400 +440,356 @@ export function Crimes({
   );
 }
 
+/* =========================================================
+   COMBAT
+========================================================= */
+
 export function Combat({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
   if (g.combatOpponent) {
+    const opponent = g.combatOpponent;
+
     return (
       <InteractiveCombatView
         player={{
           id: "player",
           name: "You",
           level: g.level,
-          health:
-            g.gameState
-              .health,
-          maxHealth:
-            g.maxHealth,
-          stats:
-            g.gameState
-              .stats,
-          weapons:
-            DEFAULT_WEAPONS,
+          health: g.gameState.health,
+          maxHealth: g.maxHealth,
+          stats: g.gameState.stats,
+          weapons: DEFAULT_WEAPONS,
         }}
         enemy={{
-          id:
-            g.combatOpponent
-              .id,
-
-          name:
-            g.combatOpponent
-              .name,
-
-          level:
-            g.combatOpponent
-              .level,
-
-          health:
-            g.combatOpponent
-              .health,
-
-          maxHealth:
-            g.combatOpponent
-              .maxHealth,
-
-          stats:
-            g.combatOpponent
-              .stats,
-
+          id: opponent.id,
+          name: opponent.name,
+          level: opponent.level,
+          health: opponent.health,
+          maxHealth: opponent.maxHealth,
+          stats: opponent.stats,
           weapons:
-            g.combatOpponent
-              .weapons ||
+            opponent.weapons ||
             DEFAULT_WEAPONS,
-
           cashReward:
-            g.combatOpponent
-              .cashReward,
-
+            opponent.cashReward,
           xpReward:
-            g.combatOpponent
-              .level * 25,
+            opponent.level * 25,
         }}
         onFinish={(
           outcome,
           enemy,
           finalPlayerHealth
         ) => {
-          /*
-           * If the combat component provides a real
-           * attack start callback in the future, this
-           * remains the point where the energy cost
-           * should occur.
-           *
-           * For the current component contract, attack()
-           * reserves the encounter and the actual fight
-           * resolution occurs here.
-           */
-
           let cashEarned = 0;
 
-          let xpEarned =
-            enemy.xpReward ||
-            50;
+          const baseXp =
+            enemy.xpReward || 50;
+
+          let xpEarned = baseXp;
 
           /*
-           * IMPORTANT:
+           * The combat UI currently uses:
            *
-           * "leave" is NOT a combat victory.
+           * mug   = successful victory
+           * leave = voluntarily ending encounter
+           *
+           * A leave must NEVER count as a win.
            */
           const isVictory =
             outcome === "mug";
 
-          if (
-            outcome === "mug"
-          ) {
-            cashEarned =
-              Math.floor(
-                (enemy.cashReward ||
-                  100) *
-                  (0.4 +
-                    Math.random() *
-                      0.4)
-              );
+          if (outcome === "mug") {
+            cashEarned = Math.floor(
+              (enemy.cashReward || 100) *
+                (0.4 + Math.random() * 0.4)
+            );
 
-            xpEarned =
-              Math.floor(
-                xpEarned * 0.25
-              );
-          } else if (
-            outcome === "leave"
-          ) {
-            /*
-             * Leaving gives a small participation XP reward,
-             * but does not alter the win/loss record.
-             */
-            xpEarned =
-              Math.floor(
-                xpEarned * 0.25
-              );
+            xpEarned = Math.floor(
+              baseXp * 0.25
+            );
+          } else if (outcome === "leave") {
+            xpEarned = Math.floor(
+              baseXp * 0.25
+            );
           }
 
-          g.setGameState(
-            (prev) => {
-              const next: SaveData =
-                {
-                  ...prev,
+          g.setGameState((previous) => {
+            const next: SaveData = {
+              ...previous,
 
-                  cash:
-                    prev.cash +
-                    cashEarned,
+              cash:
+                previous.cash +
+                cashEarned,
 
-                  xp:
-                    prev.xp +
-                    xpEarned,
+              xp:
+                previous.xp +
+                xpEarned,
 
-                  health:
-                    Math.max(
-                      1,
-                      Math.min(
-                        g.maxHealth,
-                        finalPlayerHealth
-                      )
-                    ),
+              health: Math.max(
+                1,
+                Math.min(
+                  g.maxHealth,
+                  finalPlayerHealth
+                )
+              ),
 
-                  fightsWon:
-                    isVictory
-                      ? prev.fightsWon +
-                        1
-                      : prev.fightsWon,
-                };
+              fightsWon: isVictory
+                ? previous.fightsWon + 1
+                : previous.fightsWon,
+            };
 
-              const description =
-                isVictory
-                  ? `COMBAT VICTORY: Defeated ${enemy.name}. Earned ${money(
-                      cashEarned
-                    )} and ${xpEarned} XP.`
-                  : `COMBAT ENDED: You left the encounter with ${xpEarned} XP.`;
+            const description = isVictory
+              ? `COMBAT VICTORY: Defeated ${enemy.name}. Earned ${money(
+                  cashEarned
+                )} and ${xpEarned} XP.`
+              : `COMBAT ENDED: You left the encounter with ${xpEarned} XP.`;
 
-              return g.appendActivity(
-                next,
-                description,
-                isVictory
-                  ? "combat"
-                  : "system"
-              );
-            }
-          );
+            return g.appendActivity(
+              next,
+              description,
+              isVictory
+                ? "combat"
+                : "system"
+            );
+          });
 
-          g.setCombatOpponent(
-            null
-          );
-
-          g.setCombatStarted(
-            false
-          );
-
-          g.setCurrentScreen(
-            "combat"
-          );
+          g.setCombatOpponent(null);
+          g.setCombatStarted(false);
+          g.setCurrentScreen("combat");
         }}
-        onDefeat={() => {
-          setGameStateForCombatDefeat(
-            g
-          );
-        }}
+        onDefeat={() =>
+          setGameStateForCombatDefeat(g)
+        }
       />
     );
   }
 
+  const incapacitated =
+    Boolean(
+      g.gameState.jailUntil ||
+      g.gameState.hospitalUntil
+    );
+
+  const noEnergy =
+    g.gameState.energy < 10;
+
   return (
     <Panel title="Available Targets">
       <div className="ui-grid two-col">
-        {PLAYER_PROFILES.map(
-          (o) => (
+        {PLAYER_PROFILES.map((opponent) => {
+          const winChance =
+            calculateWinChance(
+              g.gameState.stats,
+              opponent.stats
+            );
+
+          return (
             <div
               className="card target-card"
-              key={o.id}
+              key={opponent.id}
             >
               <div className="card-header-split">
                 <span className="card-tag">
-                  LV {o.level}
+                  LV {opponent.level}
                 </span>
 
                 <span className="status-badge">
-                  {o.status}
+                  {opponent.status}
                 </span>
               </div>
 
-              <h3>{o.name}</h3>
+              <h3>{opponent.name}</h3>
 
               <p>
-                {o.title} ·{" "}
-                {o.location}
+                {opponent.title} ·{" "}
+                {opponent.location}
               </p>
 
               <div className="data-list">
                 <div className="data-row">
-                  <span>
-                    Health
-                  </span>
+                  <span>Health</span>
 
                   <b>
-                    {o.health}/
-                    {
-                      o.maxHealth
-                    }
+                    {opponent.health}/
+                    {opponent.maxHealth}
                   </b>
                 </div>
 
                 <div className="data-row">
-                  <span>
-                    Reward
-                  </span>
+                  <span>Reward</span>
 
                   <b>
                     {money(
-                      o.cashReward
+                      opponent.cashReward
                     )}
                   </b>
                 </div>
 
                 <div className="data-row">
-                  <span>
-                    Win Chance
-                  </span>
+                  <span>Win Chance</span>
 
-                  <b>
-                    {calculateWinChance(
-                      g.gameState
-                        .stats,
-                      o.stats
-                    )}
-                    %
-                  </b>
+                  <b>{winChance}%</b>
                 </div>
               </div>
 
               <Button
-                onClick={() =>
-                  g.attack(o)
-                }
                 disabled={
-                  Boolean(
-                    g.gameState
-                      .jailUntil ||
-                      g.gameState
-                        .hospitalUntil
-                  ) ||
-                  g.gameState
-                    .energy < 10
+                  incapacitated ||
+                  noEnergy
+                }
+                onClick={() =>
+                  g.attack(opponent)
                 }
               >
-                Attack (10 ⚡)
+                {incapacitated
+                  ? "Unavailable"
+                  : noEnergy
+                  ? "Need 10 ⚡"
+                  : "Attack (10 ⚡)"}
               </Button>
             </div>
-          )
-        )}
+          );
+        })}
       </div>
     </Panel>
   );
 }
 
-/*
- * Separate helper keeps Combat readable while still using
- * the hook's existing state management.
- */
+/* =========================================================
+   COMBAT DEFEAT
+========================================================= */
+
 function setGameStateForCombatDefeat(
-  g: ReturnType<
-    typeof useRiftCity
-  >
+  g: Game
 ) {
-  g.setGameState(
-    (prev) => ({
-      ...prev,
+  const hospitalUntil =
+    Date.now() +
+    HOSPITAL_MINUTES * 60_000;
+
+  g.setGameState((previous) => {
+    const activity = {
+      id:
+        Date.now() +
+        Math.random(),
+
+      text:
+        "COMBAT LOSS: Knocked out and hospitalized.",
+
+      type: "failure" as const,
+
+      time: Date.now(),
+    };
+
+    return {
+      ...previous,
 
       health: 0,
 
       fightsLost:
-        prev.fightsLost + 1,
+        previous.fightsLost + 1,
 
-      hospitalUntil:
-        Date.now() +
-        HOSPITAL_MINUTES *
-          60000,
+      hospitalUntil,
 
       activities: [
-        {
-          id:
-            Date.now() +
-            Math.random(),
-
-          text:
-            "COMBAT LOSS: Knocked out and hospitalized.",
-
-          type: "failure" as const,
-
-          time: Date.now(),
-        },
-
-        ...prev.activities,
+        activity,
+        ...previous.activities,
       ].slice(0, 60),
-    })
-  );
+    };
+  });
 
-  g.setCombatOpponent(
-    null
-  );
-
-  g.setCombatStarted(
-    false
-  );
-
-  g.setCurrentScreen(
-    "city"
-  );
+  g.setCombatOpponent(null);
+  g.setCombatStarted(false);
+  g.setCurrentScreen("city");
 }
+
+/* =========================================================
+   GYM
+========================================================= */
 
 export function GymView({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
+  const availableGyms = GYMS.filter(
+    (gym) => !gym.jailOnly
+  );
+
+  const incapacitated =
+    Boolean(
+      g.gameState.jailUntil ||
+      g.gameState.hospitalUntil
+    );
+
   return (
     <>
       <div className="gym-selector">
-        {GYMS.filter(
-          (x) => !x.jailOnly
-        ).map((x) => (
-          <button
-            key={x.id}
-            className={`gym-btn ${
-              g.gym.id === x.id
-                ? "active"
-                : ""
-            }`}
-            disabled={
-              !gymUnlocked(
-                x,
-                g.gameState
-                  .gymExperience
-              )
-            }
-            onClick={() =>
-              g.buyGym(x.id)
-            }
-          >
-            <span>
-              {x.name}
-            </span>
+        {availableGyms.map((gym) => {
+          const unlocked =
+            gymUnlocked(
+              gym,
+              g.gameState
+                .gymExperience
+            );
 
-            <small>
-              {gymUnlocked(
-                x,
-                g.gameState
-                  .gymExperience
-              )
-                ? money(
-                    x.membershipCost
-                  )
-                : `EXP ${x.gymExpRequired}`}
-            </small>
-          </button>
-        ))}
+          const active =
+            g.gym.id === gym.id;
+
+          return (
+            <button
+              type="button"
+              key={gym.id}
+              className={`gym-btn ${
+                active ? "active" : ""
+              }`}
+              disabled={
+                !unlocked ||
+                incapacitated
+              }
+              onClick={() =>
+                g.buyGym(gym.id)
+              }
+            >
+              <span>
+                {gym.name}
+              </span>
+
+              <small>
+                {unlocked
+                  ? money(
+                      gym.membershipCost
+                    )
+                  : `EXP ${gym.gymExpRequired}`}
+              </small>
+            </button>
+          );
+        })}
       </div>
 
       <Panel
         title={`${g.gym.name} · (${g.gym.energyCost} Energy per set)`}
       >
         <div className="ui-grid four-col">
-          {TRAINING_STATS.map(
-            (stat) => (
+          {TRAINING_STATS.map((stat) => {
+            const allowed =
+              canTrainStat(
+                g.gym,
+                stat.id
+              );
+
+            const enoughEnergy =
+              g.gameState.energy >=
+              g.gym.energyCost;
+
+            const canTrain =
+              allowed &&
+              enoughEnergy &&
+              !incapacitated;
+
+            return (
               <div
                 className="card train-card"
                 key={stat.id}
@@ -880,281 +798,271 @@ export function GymView({
                   {stat.icon}
                 </span>
 
-                <h3>
-                  {stat.name}
-                </h3>
+                <h3>{stat.name}</h3>
 
                 <p>
-                  {
-                    stat.description
-                  }
+                  {stat.description}
                 </p>
 
                 <Button
-                  disabled={
-                    !canTrainStat(
-                      g.gym,
-                      stat.id
-                    ) ||
-                    g.gameState
-                      .energy <
-                      g.gym
-                        .energyCost
-                  }
+                  disabled={!canTrain}
                   onClick={() =>
-                    g.train(
-                      stat.id
-                    )
+                    g.train(stat.id)
                   }
                 >
-                  Train
+                  {!allowed
+                    ? "Not Available"
+                    : !enoughEnergy
+                    ? `Need ${g.gym.energyCost} ⚡`
+                    : incapacitated
+                    ? "Unavailable"
+                    : "Train"}
                 </Button>
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       </Panel>
     </>
   );
 }
 
+/* =========================================================
+   JOBS
+========================================================= */
+
 export function Jobs({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
   return (
     <div className="ui-grid two-col">
-      {JOBS.map((job) => (
-        <div
-          className="card job-card"
-          key={job.id}
-        >
-          <span className="card-tag">
-            {job.company}
-          </span>
+      {JOBS.map((job) => {
+        const current =
+          g.gameState.currentJob ===
+          job.id;
 
-          <h3>
-            {job.title}
-          </h3>
-
-          <p>
-            {job.description}
-          </p>
-
-          <div className="data-row">
-            <span>
-              Hourly Salary
+        return (
+          <div
+            className="card job-card"
+            key={job.id}
+          >
+            <span className="card-tag">
+              {job.company}
             </span>
 
-            <b>
-              {money(
-                job.salary
-              )}
-            </b>
-          </div>
+            <h3>{job.title}</h3>
 
-          <Button
-            onClick={() =>
-              g.joinJob(job.id)
-            }
-          >
-            {g.gameState
-              .currentJob ===
-            job.id
-              ? "Current Position"
-              : "Apply Now"}
-          </Button>
-        </div>
-      ))}
+            <p>
+              {job.description}
+            </p>
+
+            <div className="data-row">
+              <span>
+                Hourly Salary
+              </span>
+
+              <b>
+                {money(job.salary)}
+              </b>
+            </div>
+
+            <Button
+              disabled={current}
+              onClick={() =>
+                g.joinJob(job.id)
+              }
+            >
+              {current
+                ? "Current Position"
+                : "Apply Now"}
+            </Button>
+          </div>
+        );
+      })}
     </div>
   );
 }
+
+/* =========================================================
+   ITEMS
+========================================================= */
 
 export function Items({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
   return (
     <div className="ui-grid three-col">
-      {ITEMS.map((item) => (
-        <div
-          className="card item-card"
-          key={item.id}
-        >
-          <span className="card-tag">
-            {item.type.toUpperCase()}
-          </span>
+      {ITEMS.map((item) => {
+        const owned =
+          g.gameState.inventory[
+            item.id
+          ] || 0;
 
-          <h3>
-            {item.name}
-          </h3>
+        const equippable =
+          item.type === "weapon" ||
+          item.type === "armor";
 
-          <p>
-            {item.description}
-          </p>
+        return (
+          <div
+            className="card item-card"
+            key={item.id}
+          >
+            <span className="card-tag">
+              {item.type.toUpperCase()}
+            </span>
 
-          <strong className="item-price">
-            {money(item.price)}
-          </strong>
+            <h3>{item.name}</h3>
 
-          <div className="btn-group">
-            <Button
-              onClick={() =>
-                g.buyItem(
-                  item.id
-                )
-              }
-            >
-              Buy
-            </Button>
+            <p>
+              {item.description}
+            </p>
 
-            {(g.gameState
-              .inventory[
-              item.id
-            ] || 0) > 0 && (
+            <strong className="item-price">
+              {money(item.price)}
+            </strong>
+
+            <div className="btn-group">
               <Button
                 onClick={() =>
-                  item.type ===
-                    "weapon" ||
-                  item.type ===
-                    "armor"
-                    ? g.equip(
-                        item.id
-                      )
-                    : g.useItem(
-                        item.id
-                      )
+                  g.buyItem(item.id)
                 }
               >
-                {item.type ===
-                    "weapon" ||
-                  item.type ===
-                    "armor"
-                  ? "Equip"
-                  : "Use"}
+                Buy
               </Button>
-            )}
-          </div>
 
-          <span className="item-count">
-            Owned:{" "}
-            {g.gameState
-              .inventory[
-              item.id
-            ] || 0}
-          </span>
-        </div>
-      ))}
+              {owned > 0 && (
+                <Button
+                  onClick={() => {
+                    if (equippable) {
+                      g.equip(item.id);
+                    } else {
+                      g.useItem(item.id);
+                    }
+                  }}
+                >
+                  {equippable
+                    ? "Equip"
+                    : "Use"}
+                </Button>
+              )}
+            </div>
+
+            <span className="item-count">
+              Owned: {owned}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
+
+/* =========================================================
+   MISSIONS
+========================================================= */
 
 export function Missions({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
   return (
     <div className="ui-grid two-col">
-      {MISSIONS.map(
-        (mission) => {
-          const progress =
-            g.missionProgress(
-              mission
-            );
-
-          const done =
-            g.gameState
-              .completedMissions.includes(
-                mission.id
-              );
-
-          return (
-            <div
-              className="card mission-card"
-              key={mission.id}
-            >
-              <span className="card-tag">
-                MISSION
-              </span>
-
-              <h3>
-                {mission.name}
-              </h3>
-
-              <p>
-                {
-                  mission.description
-                }
-              </p>
-
-              <div className="bar-track">
-                <div
-                  className="bar-fill mission"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (progress /
-                        mission.target) *
-                        100
-                    )}%`,
-                  }}
-                />
-              </div>
-
-              <div className="data-row">
-                <span>
-                  Progress
-                </span>
-
-                <b>
-                  {Math.min(
-                    progress,
-                    mission.target
-                  ).toLocaleString()}{" "}
-                  /{" "}
-                  {mission.target.toLocaleString()}
-                </b>
-              </div>
-
-              <Button
-                disabled={
-                  done ||
-                  progress <
-                    mission.target
-                }
-                onClick={() =>
-                  g.claimMission(
-                    mission.id
-                  )
-                }
-              >
-                {done
-                  ? "Claimed"
-                  : "Claim Reward"}
-              </Button>
-            </div>
+      {MISSIONS.map((mission) => {
+        const progress =
+          g.missionProgress(
+            mission
           );
-        }
-      )}
+
+        const completed =
+          g.gameState.completedMissions.includes(
+            mission.id
+          );
+
+        const percent =
+          mission.target > 0
+            ? Math.min(
+                100,
+                (progress /
+                  mission.target) *
+                  100
+              )
+            : 100;
+
+        const canClaim =
+          !completed &&
+          progress >= mission.target;
+
+        return (
+          <div
+            className="card mission-card"
+            key={mission.id}
+          >
+            <span className="card-tag">
+              MISSION
+            </span>
+
+            <h3>{mission.name}</h3>
+
+            <p>
+              {mission.description}
+            </p>
+
+            <div className="bar-track">
+              <div
+                className="bar-fill mission"
+                style={{
+                  width: `${percent}%`,
+                }}
+              />
+            </div>
+
+            <div className="data-row">
+              <span>Progress</span>
+
+              <b>
+                {Math.min(
+                  progress,
+                  mission.target
+                ).toLocaleString()}{" "}
+                /{" "}
+                {mission.target.toLocaleString()}
+              </b>
+            </div>
+
+            <Button
+              disabled={!canClaim}
+              onClick={() =>
+                g.claimMission(
+                  mission.id
+                )
+              }
+            >
+              {completed
+                ? "Claimed"
+                : canClaim
+                ? "Claim Reward"
+                : "In Progress"}
+            </Button>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
+/* =========================================================
+   EDUCATION
+========================================================= */
+
 export function Education({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
   return (
     <>
@@ -1162,10 +1070,7 @@ export function Education({
         {g.education ? (
           <div className="course-active">
             <h3>
-              {
-                g.education
-                  .name
-              }
+              {g.education.name}
             </h3>
 
             <p>
@@ -1187,46 +1092,47 @@ export function Education({
           </div>
         ) : (
           <p>
-            No course currently
-            active.
+            No course currently active.
           </p>
         )}
       </Panel>
 
       <div className="ui-grid two-col">
-        {EDUCATION.map(
-          (course) => (
+        {EDUCATION.map((course) => {
+          const completed =
+            g.gameState.educationCompleted.includes(
+              course.id
+            );
+
+          const active =
+            Boolean(g.education);
+
+          const affordable =
+            g.gameState.cash >=
+            course.cost;
+
+          return (
             <div
               className="card course-card"
               key={course.id}
             >
-              <h3>
-                {course.name}
-              </h3>
+              <h3>{course.name}</h3>
 
               <p>
-                {
-                  course.description
-                }
+                {course.description}
               </p>
 
               <div className="data-list">
                 <div className="data-row">
-                  <span>
-                    Cost
-                  </span>
+                  <span>Cost</span>
 
                   <b>
-                    {money(
-                      course.cost
-                    )}
+                    {money(course.cost)}
                   </b>
                 </div>
 
                 <div className="data-row">
-                  <span>
-                    Time
-                  </span>
+                  <span>Time</span>
 
                   <b>
                     {
@@ -1239,16 +1145,9 @@ export function Education({
 
               <Button
                 disabled={
-                  g.gameState
-                    .educationCompleted.includes(
-                      course.id
-                    ) ||
-                  Boolean(
-                    g.education
-                  ) ||
-                  g.gameState
-                    .cash <
-                    course.cost
+                  completed ||
+                  active ||
+                  !affordable
                 }
                 onClick={() =>
                   g.startEducation(
@@ -1256,44 +1155,63 @@ export function Education({
                   )
                 }
               >
-                {g.gameState
-                  .educationCompleted.includes(
-                    course.id
-                  )
+                {completed
                   ? "Completed"
+                  : active
+                  ? "Course Active"
+                  : !affordable
+                  ? "Not Enough Cash"
                   : "Enroll"}
               </Button>
             </div>
-          )
-        )}
+          );
+        })}
       </div>
     </>
   );
 }
 
+/* =========================================================
+   PROPERTY
+========================================================= */
+
 export function PropertyView({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
-  const current =
+  const currentProperty =
     getProperty(
-      g.gameState
-        .ownedProperty
-    )?.price || 0;
+      g.gameState.ownedProperty
+    );
+
+  const currentPrice =
+    currentProperty?.price || 0;
 
   return (
     <div className="ui-grid two-col">
-      {PROPERTIES.map(
-        (property) => (
+      {PROPERTIES.map((property) => {
+        const current =
+          g.gameState.ownedProperty ===
+          property.id;
+
+        const cheaper =
+          property.price <
+          currentPrice;
+
+        const affordable =
+          g.gameState.cash >=
+          property.price;
+
+        const unavailable =
+          cheaper ||
+          current ||
+          !affordable;
+
+        return (
           <div
             className={`card property-card ${
-              property.price <
-              current
-                ? "disabled"
-                : ""
+              cheaper ? "disabled" : ""
             }`}
             key={property.id}
           >
@@ -1301,59 +1219,39 @@ export function PropertyView({
               REAL ESTATE
             </span>
 
-            <h3>
-              {property.name}
-            </h3>
+            <h3>{property.name}</h3>
 
             <p>
-              {
-                property.description
-              }
+              {property.description}
             </p>
 
             <div className="data-list">
               <div className="data-row">
-                <span>
-                  Price
-                </span>
+                <span>Price</span>
 
                 <b>
-                  {money(
-                    property.price
-                  )}
+                  {money(property.price)}
                 </b>
               </div>
 
               <div className="data-row">
-                <span>
-                  Health Bonus
-                </span>
+                <span>Health Bonus</span>
 
                 <b>
-                  +
-                  {
-                    property.maxHealthBonus
-                  }
+                  +{property.maxHealthBonus}
                 </b>
               </div>
 
               <div className="data-row">
-                <span>
-                  Nerve Bonus
-                </span>
+                <span>Nerve Bonus</span>
 
                 <b>
-                  +
-                  {
-                    property.nerveBonus
-                  }
+                  +{property.nerveBonus}
                 </b>
               </div>
 
               <div className="data-row">
-                <span>
-                  Happiness
-                </span>
+                <span>Happiness</span>
 
                 <b>
                   {property.maxHappiness}
@@ -1362,117 +1260,118 @@ export function PropertyView({
             </div>
 
             <Button
-              disabled={
-                property.price <
-                  current ||
-                g.gameState
-                  .cash <
-                  property.price
-              }
+              disabled={unavailable}
               onClick={() =>
                 g.buyProperty(
                   property.id
                 )
               }
             >
-              {g.gameState
-                .ownedProperty ===
-              property.id
+              {current
                 ? "Current Residence"
+                : cheaper
+                ? "Already Owned"
+                : !affordable
+                ? "Not Enough Cash"
                 : "Purchase"}
             </Button>
           </div>
-        )
-      )}
+        );
+      })}
     </div>
   );
 }
 
+/* =========================================================
+   MARKET
+========================================================= */
+
 export function Market({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
-  const goods =
-    Object.keys(
-      g.gameState.market
-    );
+  const goods = Object.keys(
+    g.gameState.market
+  );
 
   return (
     <Panel title="Dynamic Commodities Market">
       <div className="ui-grid four-col">
-        {goods.map((id) => (
-          <div
-            className="card market-card"
-            key={id}
-          >
-            <span className="card-tag">
-              COMMODITY
-            </span>
+        {goods.map((id) => {
+          const price =
+            g.gameState.market[id];
 
-            <h3>
-              {id.toUpperCase()}
-            </h3>
+          const owned =
+            g.gameState.inventory[id] ||
+            0;
 
-            <p>
-              Unit Price:{" "}
-              {money(
-                g.gameState
-                  .market[id]
-              )}
-            </p>
+          return (
+            <div
+              className="card market-card"
+              key={id}
+            >
+              <span className="card-tag">
+                COMMODITY
+              </span>
 
-            <span className="item-count">
-              Owned:{" "}
-              {g.gameState
-                .inventory[id] ||
-                0}
-            </span>
+              <h3>
+                {id.toUpperCase()}
+              </h3>
 
-            <div className="btn-group">
-              <Button
-                onClick={() =>
-                  g.tradeMarket(
-                    id,
-                    true
-                  )
-                }
-              >
-                Buy
-              </Button>
+              <p>
+                Unit Price:{" "}
+                {money(price)}
+              </p>
 
-              <Button
-                onClick={() =>
-                  g.tradeMarket(
-                    id,
-                    false
-                  )
-                }
-                disabled={
-                  !g.gameState
-                    .inventory[
-                    id
-                  ]
-                }
-              >
-                Sell
-              </Button>
+              <span className="item-count">
+                Owned: {owned}
+              </span>
+
+              <div className="btn-group">
+                <Button
+                  disabled={
+                    g.gameState.cash <
+                    price
+                  }
+                  onClick={() =>
+                    g.tradeMarket(
+                      id,
+                      true
+                    )
+                  }
+                >
+                  Buy
+                </Button>
+
+                <Button
+                  disabled={owned <= 0}
+                  onClick={() =>
+                    g.tradeMarket(
+                      id,
+                      false
+                    )
+                  }
+                >
+                  Sell
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Panel>
   );
 }
 
+/* =========================================================
+   FACTIONS
+========================================================= */
+
 export function Faction({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
   const factions = [
     "Iron Syndicate",
@@ -1480,44 +1379,42 @@ export function Faction({
     "Dock Union",
   ];
 
+  const currentFaction =
+    g.gameState.faction;
+
   return (
     <Panel title="Faction Headquarters">
       <div className="ui-grid three-col">
-        {factions.map(
-          (faction) => (
+        {factions.map((faction) => {
+          const member =
+            currentFaction === faction;
+
+          const otherFaction =
+            Boolean(currentFaction) &&
+            currentFaction !==
+              faction;
+
+          return (
             <div
               className={`card faction-card ${
-                g.gameState
-                  .faction &&
-                g.gameState
-                  .faction !==
-                  faction
+                otherFaction
                   ? "disabled"
                   : ""
               }`}
               key={faction}
             >
-              <h3>
-                {faction}
-              </h3>
+              <h3>{faction}</h3>
 
               <p>
-                {g.gameState
-                  .faction ===
-                faction
+                {member
                   ? `Reputation: ${g.gameState.factionReputation}`
                   : "Entry Fee: $500"}
               </p>
 
               <Button
                 disabled={
-                  Boolean(
-                    g.gameState
-                      .faction
-                  ) &&
-                  g.gameState
-                    .faction !==
-                    faction
+                  otherFaction ||
+                  member
                 }
                 onClick={() =>
                   g.joinFaction(
@@ -1525,26 +1422,25 @@ export function Faction({
                   )
                 }
               >
-                {g.gameState
-                  .faction ===
-                faction
+                {member
                   ? "Member"
                   : "Join Faction"}
               </Button>
             </div>
-          )
-        )}
+          );
+        })}
       </div>
 
-      {g.gameState
-        .faction && (
+      {currentFaction && (
         <div
           style={{
-            marginTop:
-              "16px",
+            marginTop: "16px",
           }}
         >
           <Button
+            disabled={
+              g.gameState.energy < 10
+            }
             onClick={
               g.workFaction
             }
@@ -1558,48 +1454,39 @@ export function Faction({
   );
 }
 
+/* =========================================================
+   AWARDS
+========================================================= */
+
 export function Awards({
   g,
 }: {
-  g: ReturnType<
-    typeof useRiftCity
-  >;
+  g: Game;
 }) {
-  const awards: [
-    string,
-    boolean
-  ][] = [
+  const awards: [string, boolean][] = [
     [
       "First Crime",
-      g.gameState
-        .crimesCompleted >=
-        1,
+      g.gameState.crimesCompleted >= 1,
     ],
 
     [
       "Ten Crimes",
-      g.gameState
-        .crimesCompleted >=
-        10,
+      g.gameState.crimesCompleted >= 10,
     ],
 
     [
       "First Victory",
-      g.gameState
-        .fightsWon >= 1,
+      g.gameState.fightsWon >= 1,
     ],
 
     [
       "Gym Rat",
-      g.gameState
-        .gymSessions >=
-        10,
+      g.gameState.gymSessions >= 10,
     ],
 
     [
       "Five Figures",
-      g.gameState
-        .cash >= 100000,
+      g.gameState.cash >= 100000,
     ],
 
     [
@@ -1612,31 +1499,33 @@ export function Awards({
     <>
       <Panel title="Milestones & Achievements">
         <div className="ui-grid three-col">
-          {awards.map(
-            ([name, done]) => (
+          {awards.map(([name, unlocked]) => {
+            const claimed =
+              g.gameState.achievements.includes(
+                name
+              );
+
+            return (
               <div
                 className={`card achievement-card ${
-                  done
+                  unlocked
                     ? "unlocked"
                     : "locked"
                 }`}
                 key={name}
               >
-                <h3>
-                  {name}
-                </h3>
+                <h3>{name}</h3>
 
                 <span className="status-text">
-                  {done
+                  {claimed
+                    ? "Claimed"
+                    : unlocked
                     ? "Unlocked"
                     : "Locked"}
                 </span>
 
-                {done &&
-                  !g.gameState
-                    .achievements.includes(
-                      name
-                    ) && (
+                {unlocked &&
+                  !claimed && (
                     <Button
                       onClick={() =>
                         g.earnMerit(
@@ -1648,16 +1537,14 @@ export function Awards({
                     </Button>
                   )}
               </div>
-            )
-          )}
+            );
+          })}
         </div>
       </Panel>
 
       <Panel title="Daily Rewards">
         <Button
-          onClick={
-            g.claimDaily
-          }
+          onClick={g.claimDaily}
         >
           Claim Daily Bonus
         </Button>
@@ -1665,4 +1552,3 @@ export function Awards({
     </>
   );
 }
-
