@@ -39,9 +39,14 @@ const NAV_ITEMS: NavigationItem[] = [
     icon: "💼",
   },
   {
-    id: "items",
-    label: "Items",
+    id: "inventory",
+    label: "Inventory",
     icon: "🎒",
+  },
+  {
+    id: "shops",
+    label: "Shops",
+    icon: "🛒",
   },
   {
     id: "missions",
