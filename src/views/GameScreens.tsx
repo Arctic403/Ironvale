@@ -6,7 +6,8 @@ import type { useRiftCity } from "../hooks/useRiftCity";
 export {
   Character,
   Jobs,
-  Items,
+  Inventory,
+  Shops,
   Missions,
   Education,
   PropertyView,
