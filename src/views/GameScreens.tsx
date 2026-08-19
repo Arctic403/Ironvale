@@ -1,9 +1,7 @@
 import type { useRiftCity } from "../hooks/useRiftCity";
 
 /*
- * Management screens live here:
- * Character, Jobs, Items, Missions, Education,
- * PropertyView, Market, Faction, Awards
+ * Management screens
  */
 export {
   Character,
@@ -18,10 +16,11 @@ export {
 } from "./ManagementScreens";
 
 /*
- * Activity screens live in their own modules.
+ * Activity screens
  */
 export { Crimes } from "./CrimeScreen";
 export { Combat } from "./CombatScreen";
 export { GymView } from "./GymScreen";
 
-export type Game = ReturnType<typeof useRiftCity>;
+export type Game =
+  ReturnType<typeof useRiftCity>;
