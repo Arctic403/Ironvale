@@ -3,7 +3,7 @@ import { CITY_LOCATIONS, type CityLocation } from "../data/cityLocations";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button } from "../components/ui";
 import { money } from "../core/gameCore";
-import { MAX_ENERGY } from "../constants";
+import { money, MAX_ENERGY } from "../core/gameCore";
 
 type Game = ReturnType<typeof useRiftCity>;
 
