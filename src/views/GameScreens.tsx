@@ -31,7 +31,6 @@ import {
   getProperty,
 } from "../data/gameData";
 
-import { LOCATIONS } from "../constants/locations";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
 
 import {
@@ -137,7 +136,6 @@ export function Character({
         <div className="data-list">
           <div className="data-row">
             <span>❤️ Health</span>
-
             <b>
               {Math.floor(g.gameState.health)} /{" "}
               {g.maxHealth}
@@ -146,7 +144,6 @@ export function Character({
 
           <div className="data-row">
             <span>⚡ Energy</span>
-
             <b>
               {g.gameState.energy} / {MAX_ENERGY}
             </b>
@@ -154,7 +151,6 @@ export function Character({
 
           <div className="data-row">
             <span>🧠 Nerve</span>
-
             <b>
               {g.gameState.nerve} / {g.maxNerve}
             </b>
@@ -162,7 +158,6 @@ export function Character({
 
           <div className="data-row">
             <span>😊 Happiness</span>
-
             <b>
               {Math.floor(g.gameState.happiness)} /{" "}
               {happinessMax}
@@ -175,7 +170,6 @@ export function Character({
         <div className="data-list">
           <div className="data-row">
             <span>Crime Experience</span>
-
             <b>
               {g.gameState.crimeExperience}
             </b>
@@ -183,7 +177,6 @@ export function Character({
 
           <div className="data-row">
             <span>Gym Experience</span>
-
             <b>
               {g.gameState.gymExperience}
             </b>
@@ -191,7 +184,6 @@ export function Character({
 
           <div className="data-row">
             <span>Crimes Completed</span>
-
             <b>
               {g.gameState.crimesCompleted} /{" "}
               {g.gameState.crimesFailed} failed
@@ -200,7 +192,6 @@ export function Character({
 
           <div className="data-row">
             <span>Fight Record</span>
-
             <b>
               {g.gameState.fightsWon}W /{" "}
               {g.gameState.fightsLost}L
@@ -209,7 +200,6 @@ export function Character({
 
           <div className="data-row">
             <span>Attacks</span>
-
             <b>
               {g.gameState.attacks}
             </b>
@@ -261,7 +251,140 @@ export function Character({
 
 /* =========================================================
    CITY
+   TORN-STYLE CITY HUB
 ========================================================= */
+
+type CityLocation = {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  screen:
+    | "character"
+    | "gym"
+    | "items"
+    | "jobs"
+    | "education"
+    | "crimes"
+    | "combat"
+    | "missions"
+    | "property"
+    | "market";
+  x: string;
+  y: string;
+};
+
+const CITY_LOCATIONS: CityLocation[] = [
+  {
+    id: "bank",
+    name: "RiftCity Bank",
+    icon: "🏦",
+    description:
+      "Store your cash safely and manage your bank balance.",
+    screen: "character",
+    x: "18%",
+    y: "24%",
+  },
+
+  {
+    id: "hospital",
+    name: "RiftCity Hospital",
+    icon: "🏥",
+    description:
+      "Medical treatment and recovery after serious injuries.",
+    screen: "character",
+    x: "72%",
+    y: "18%",
+  },
+
+  {
+    id: "gym",
+    name: "Rift Fitness",
+    icon: "🏋️",
+    description:
+      "Train your physical stats and become stronger.",
+    screen: "gym",
+    x: "30%",
+    y: "53%",
+  },
+
+  {
+    id: "shops",
+    name: "City Shops",
+    icon: "🛒",
+    description:
+      "Buy weapons, equipment, consumables and other items.",
+    screen: "items",
+    x: "67%",
+    y: "48%",
+  },
+
+  {
+    id: "jobs",
+    name: "Employment Center",
+    icon: "💼",
+    description:
+      "Find work and build your career.",
+    screen: "jobs",
+    x: "16%",
+    y: "72%",
+  },
+
+  {
+    id: "education",
+    name: "Rift University",
+    icon: "🎓",
+    description:
+      "Take courses to improve your character.",
+    screen: "education",
+    x: "82%",
+    y: "70%",
+  },
+
+  {
+    id: "crime",
+    name: "Underground",
+    icon: "🕵️",
+    description:
+      "Commit crimes and build your criminal experience.",
+    screen: "crimes",
+    x: "48%",
+    y: "82%",
+  },
+
+  {
+    id: "combat",
+    name: "Combat District",
+    icon: "⚔️",
+    description:
+      "Challenge other players to combat.",
+    screen: "combat",
+    x: "50%",
+    y: "26%",
+  },
+
+  {
+    id: "market",
+    name: "City Market",
+    icon: "📈",
+    description:
+      "Trade commodities at dynamic prices.",
+    screen: "market",
+    x: "84%",
+    y: "42%",
+  },
+
+  {
+    id: "property",
+    name: "Real Estate",
+    icon: "🏠",
+    description:
+      "Purchase a better home and improve your living situation.",
+    screen: "property",
+    x: "35%",
+    y: "86%",
+  },
+];
 
 export function City({
   g,
@@ -274,59 +397,557 @@ export function City({
       g.gameState.hospitalUntil
     );
 
+  const hospitalized =
+    Boolean(g.gameState.hospitalUntil);
+
+  const jailed =
+    Boolean(g.gameState.jailUntil);
+
+  const goTo = (
+    screen: CityLocation["screen"]
+  ) => {
+    if (incapacitated) {
+      return;
+    }
+
+    g.setCurrentScreen(screen);
+  };
+
   return (
-    <>
-      <div className="ui-grid four-col">
-        {LOCATIONS.map(
-          ([id, name, description]) => {
-            const current =
-              g.gameState.currentLocation === id;
+    <div className="city-page">
 
-            return (
-              <div
-                className="card location-card"
-                key={id}
-              >
-                <span className="card-tag">
-                  DISTRICT
-                </span>
+      {/* =====================================================
+          CITY HEADER
+      ===================================================== */}
 
-                <h3>{name}</h3>
+      <div className="city-header card">
+        <div>
+          <span className="card-tag">
+            RIFTCITY
+          </span>
 
-                <p>{description}</p>
+          <h2>
+            City
+          </h2>
 
-                <Button
-                  disabled={current}
-                  onClick={() =>
-                    g.travel(id)
-                  }
-                >
-                  {current
-                    ? "Current Location"
-                    : "Travel"}
-                </Button>
-              </div>
-            );
-          }
-        )}
+          <p>
+            Explore the city, manage your character,
+            work, train, shop and build your criminal empire.
+          </p>
+        </div>
+
+        <div className="city-status">
+          <div className="city-status-item">
+            <span>💵 Cash</span>
+            <strong>
+              {money(g.gameState.cash)}
+            </strong>
+          </div>
+
+          <div className="city-status-item">
+            <span>🏦 Bank</span>
+            <strong>
+              {money(g.gameState.bank)}
+            </strong>
+          </div>
+
+          <div className="city-status-item">
+            <span>⚡ Energy</span>
+            <strong>
+              {g.gameState.energy}/{MAX_ENERGY}
+            </strong>
+          </div>
+        </div>
       </div>
 
-      <Panel title="District Actions">
-        <div className="ui-grid three-col">
-          <Button
-            disabled={incapacitated}
-            onClick={g.randomEncounter}
-          >
-            🎲 Explore Area
-          </Button>
+      {/* =====================================================
+          INCAPACITATED NOTICE
+      ===================================================== */}
 
-          <Button
+      {incapacitated && (
+        <div
+          className={`city-incapacitated ${
+            hospitalized
+              ? "hospitalized"
+              : jailed
+              ? "jailed"
+              : ""
+          }`}
+        >
+          <span>
+            {hospitalized
+              ? "🏥"
+              : "🚔"}
+          </span>
+
+          <div>
+            <strong>
+              {hospitalized
+                ? "You are hospitalized"
+                : "You are in jail"}
+            </strong>
+
+            <p>
+              You cannot access city activities
+              until your current timer expires.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          CITY MAP
+      ===================================================== */}
+
+      <section className="city-map-panel card">
+
+        <div className="city-map-header">
+          <div>
+            <span className="card-tag">
+              CITY MAP
+            </span>
+
+            <h3>
+              RiftCity
+            </h3>
+          </div>
+
+          <span className="city-map-live">
+            ● LIVE CITY
+          </span>
+        </div>
+
+        <div className="riftcity-map">
+
+          {/* Roads */}
+
+          <div className="city-road city-road-horizontal city-road-1" />
+          <div className="city-road city-road-horizontal city-road-2" />
+          <div className="city-road city-road-horizontal city-road-3" />
+
+          <div className="city-road city-road-vertical city-road-v1" />
+          <div className="city-road city-road-vertical city-road-v2" />
+          <div className="city-road city-road-vertical city-road-v3" />
+
+          {/* Park */}
+
+          <div className="city-park">
+            <span>🌳</span>
+            <small>CENTRAL PARK</small>
+          </div>
+
+          {/* River */}
+
+          <div className="city-river">
+            <span>RIFT RIVER</span>
+          </div>
+
+          {/* Buildings */}
+
+          {CITY_LOCATIONS.map(
+            (location) => (
+              <button
+                key={location.id}
+                type="button"
+                className={`city-map-location city-map-location-${location.id}`}
+                style={{
+                  left: location.x,
+                  top: location.y,
+                }}
+                disabled={incapacitated}
+                onClick={() =>
+                  goTo(location.screen)
+                }
+              >
+                <span className="city-map-icon">
+                  {location.icon}
+                </span>
+
+                <span className="city-map-name">
+                  {location.name}
+                </span>
+              </button>
+            )
+          )}
+
+          {/* City center */}
+
+          <div className="city-center-marker">
+            <span>📍</span>
+            <strong>
+              RIFTCITY
+            </strong>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          CITY SERVICES
+      ===================================================== */}
+
+      <section className="city-services">
+
+        <div className="city-section-heading">
+          <div>
+            <span className="card-tag">
+              SERVICES
+            </span>
+
+            <h3>
+              What do you want to do?
+            </h3>
+          </div>
+        </div>
+
+        <div className="city-service-grid">
+
+          {/* BANK */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen(
+                "character"
+              )
+            }
+          >
+            <span className="city-service-icon">
+              🏦
+            </span>
+
+            <div>
+              <strong>
+                Bank
+              </strong>
+
+              <p>
+                Manage your bank account.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* HOSPITAL */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen(
+                "character"
+              )
+            }
+          >
+            <span className="city-service-icon">
+              🏥
+            </span>
+
+            <div>
+              <strong>
+                Hospital
+              </strong>
+
+              <p>
+                Medical treatment and recovery.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* GYM */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen("gym")
+            }
+          >
+            <span className="city-service-icon">
+              🏋️
+            </span>
+
+            <div>
+              <strong>
+                Gym
+              </strong>
+
+              <p>
+                Train your combat statistics.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* SHOPS */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen("items")
+            }
+          >
+            <span className="city-service-icon">
+              🛒
+            </span>
+
+            <div>
+              <strong>
+                Shops
+              </strong>
+
+              <p>
+                Buy weapons and equipment.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* JOBS */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen("jobs")
+            }
+          >
+            <span className="city-service-icon">
+              💼
+            </span>
+
+            <div>
+              <strong>
+                Jobs
+              </strong>
+
+              <p>
+                Find employment and earn money.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* EDUCATION */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen(
+                "education"
+              )
+            }
+          >
+            <span className="city-service-icon">
+              🎓
+            </span>
+
+            <div>
+              <strong>
+                University
+              </strong>
+
+              <p>
+                Study courses and improve yourself.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* CRIMES */}
+
+          <button
+            type="button"
+            className="city-service-card"
             disabled={incapacitated}
             onClick={() =>
               g.setCurrentScreen("crimes")
             }
           >
-            🕵️ Street Hustles
+            <span className="city-service-icon">
+              🕵️
+            </span>
+
+            <div>
+              <strong>
+                Underground
+              </strong>
+
+              <p>
+                Commit crimes and build experience.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* COMBAT */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen("combat")
+            }
+          >
+            <span className="city-service-icon">
+              ⚔️
+            </span>
+
+            <div>
+              <strong>
+                Combat
+              </strong>
+
+              <p>
+                Attack another player.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* MARKET */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen("market")
+            }
+          >
+            <span className="city-service-icon">
+              📈
+            </span>
+
+            <div>
+              <strong>
+                Market
+              </strong>
+
+              <p>
+                Buy and sell commodities.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* PROPERTY */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen(
+                "property"
+              )
+            }
+          >
+            <span className="city-service-icon">
+              🏠
+            </span>
+
+            <div>
+              <strong>
+                Real Estate
+              </strong>
+
+              <p>
+                Buy a better property.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+
+          {/* MISSIONS */}
+
+          <button
+            type="button"
+            className="city-service-card"
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen(
+                "missions"
+              )
+            }
+          >
+            <span className="city-service-icon">
+              📋
+            </span>
+
+            <div>
+              <strong>
+                Missions
+              </strong>
+
+              <p>
+                Complete objectives and collect rewards.
+              </p>
+            </div>
+
+            <span className="city-service-arrow">
+              →
+            </span>
+          </button>
+        </div>
+      </section>
+
+      {/* =====================================================
+          QUICK CITY ACTIONS
+      ===================================================== */}
+
+      <Panel title="Quick Actions">
+        <div className="ui-grid three-col">
+
+          <Button
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen(
+                "character"
+              )
+            }
+          >
+            👤 Character
           </Button>
 
           <Button
@@ -335,11 +956,21 @@ export function City({
               g.setCurrentScreen("combat")
             }
           >
-            ⚔️ Arena Fights
+            ⚔️ Find a Fight
           </Button>
+
+          <Button
+            disabled={incapacitated}
+            onClick={() =>
+              g.setCurrentScreen("crimes")
+            }
+          >
+            🕵️ Commit a Crime
+          </Button>
+
         </div>
       </Panel>
-    </>
+    </div>
   );
 }
 
@@ -490,14 +1121,6 @@ export function Combat({
 
           let xpEarned = baseXp;
 
-          /*
-           * The combat UI currently uses:
-           *
-           * mug   = successful victory
-           * leave = voluntarily ending encounter
-           *
-           * A leave must NEVER count as a win.
-           */
           const isVictory =
             outcome === "mug";
 
