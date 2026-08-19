@@ -251,7 +251,7 @@ export function Character({
 
 /* =========================================================
    CITY
-   RIFTCITY — TRUE CITY GRID
+   RIFTCITY — INTERACTIVE CITY MAP
 ========================================================= */
 
 type CityLocation = {
@@ -275,240 +275,210 @@ type CityLocation = {
   y: string;
 };
 
-/*
- * The city is intentionally arranged as a simple street grid.
- *
- * NORTH
- * ─────────────────────────────────
- * Hospital       Bank        University
- *
- * ─────────────────────────────────
- * Homes          Central Park      Jobs
- *
- * ─────────────────────────────────
- * Gym            Downtown          Shops
- *
- * ─────────────────────────────────
- * Underground    Combat            Market
- *
- * ─────────────────────────────────
- *             Rift River
- *
- * This makes navigation intuitive while still looking
- * like a real city rather than a collection of buttons.
- */
-
 const CITY_LOCATIONS: CityLocation[] = [
   {
     id: "hospital",
     name: "RiftCity Hospital",
     icon: "🏥",
-    description:
-      "Medical treatment and recovery after serious injuries.",
+    description: "Medical treatment and recovery after serious injuries.",
     district: "Medical District",
     screen: "character",
-    x: "17%",
-    y: "18%",
+    x: "18%",
+    y: "19%",
   },
-
   {
     id: "bank",
     name: "RiftCity Bank",
     icon: "🏦",
-    description:
-      "Store your cash safely and manage your bank balance.",
+    description: "Store your cash safely and manage your bank balance.",
     district: "Financial District",
     screen: "character",
-    x: "50%",
+    x: "38%",
     y: "18%",
   },
-
   {
     id: "university",
     name: "Rift University",
     icon: "🎓",
-    description:
-      "Take courses and improve your character.",
+    description: "Take courses and improve your character.",
     district: "University District",
     screen: "education",
-    x: "83%",
+    x: "74%",
     y: "18%",
   },
-
   {
     id: "property",
     name: "RiftCity Homes",
     icon: "🏠",
-    description:
-      "Browse properties and purchase a better home.",
+    description: "Browse properties and purchase a better home.",
     district: "Residential District",
     screen: "property",
-    x: "17%",
-    y: "39%",
+    x: "19%",
+    y: "42%",
   },
-
   {
     id: "park",
     name: "Central Park",
     icon: "🌳",
-    description:
-      "The central green space of RiftCity.",
+    description: "The central green space of RiftCity.",
     district: "Central District",
     screen: "character",
-    x: "50%",
+    x: "51%",
     y: "39%",
   },
-
   {
     id: "jobs",
     name: "Employment Center",
     icon: "💼",
-    description:
-      "Find work and build your career.",
+    description: "Find work and build your career.",
     district: "Business District",
     screen: "jobs",
-    x: "83%",
-    y: "39%",
+    x: "78%",
+    y: "40%",
   },
-
   {
     id: "gym",
     name: "Rift Fitness",
     icon: "🏋️",
-    description:
-      "Train your physical combat statistics.",
+    description: "Train your physical combat statistics.",
     district: "Industrial District",
     screen: "gym",
-    x: "17%",
-    y: "62%",
+    x: "19%",
+    y: "65%",
   },
-
   {
     id: "downtown",
     name: "Downtown",
     icon: "📍",
-    description:
-      "The heart of RiftCity.",
+    description: "The heart of RiftCity.",
     district: "Downtown",
     screen: "character",
-    x: "50%",
-    y: "62%",
+    x: "52%",
+    y: "57%",
   },
-
   {
     id: "shops",
     name: "RiftCity Shops",
     icon: "🛒",
-    description:
-      "Weapons, equipment, consumables and supplies.",
+    description: "Weapons, equipment, consumables and supplies.",
     district: "Commercial District",
     screen: "items",
-    x: "83%",
+    x: "81%",
     y: "62%",
   },
-
   {
     id: "crime",
     name: "The Underground",
     icon: "🕵️",
-    description:
-      "Commit crimes and build criminal experience.",
+    description: "Commit crimes and build criminal experience.",
     district: "Underground District",
     screen: "crimes",
-    x: "17%",
-    y: "82%",
+    x: "18%",
+    y: "84%",
   },
-
   {
     id: "combat",
     name: "Combat District",
     icon: "⚔️",
-    description:
-      "Challenge other players to combat.",
+    description: "Challenge other players to combat.",
     district: "Combat District",
     screen: "combat",
-    x: "50%",
+    x: "51%",
     y: "82%",
   },
-
   {
     id: "market",
     name: "RiftCity Market",
     icon: "📈",
-    description:
-      "Trade commodities at dynamic prices.",
+    description: "Trade commodities at dynamic prices.",
     district: "Market District",
     screen: "market",
-    x: "83%",
-    y: "82%",
+    x: "82%",
+    y: "84%",
   },
 ];
 
-export function City({
-  g,
-}: {
-  g: Game;
-}) {
-  const incapacitated =
-    Boolean(
-      g.gameState.jailUntil ||
-      g.gameState.hospitalUntil
-    );
+export function City({ g }: { g: Game }) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  const hospitalized =
-    Boolean(g.gameState.hospitalUntil);
+  const incapacitated = Boolean(
+    g.gameState.jailUntil || g.gameState.hospitalUntil
+  );
+  const hospitalized = Boolean(g.gameState.hospitalUntil);
+  const jailed = Boolean(g.gameState.jailUntil);
 
-  const jailed =
-    Boolean(g.gameState.jailUntil);
+  const selected =
+    CITY_LOCATIONS.find((location) => location.id === selectedId) ??
+    null;
 
-  const goTo = (
-    screen: CityLocation["screen"]
-  ) => {
-    if (incapacitated) {
-      return;
+  const goTo = (screen: CityLocation["screen"]) => {
+    if (!incapacitated) {
+      g.setCurrentScreen(screen);
     }
+  };
 
-    g.setCurrentScreen(screen);
+  const clampZoom = (value: number) =>
+    Math.min(1.65, Math.max(0.72, value));
+
+  const resetMap = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const zoomAtCenter = (delta: number) => {
+    setZoom((current) => clampZoom(current + delta));
+  };
+
+  const onPointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (event.button !== 0) return;
+    setDragging(true);
+    setDragStart({
+      x: event.clientX - pan.x,
+      y: event.clientY - pan.y,
+    });
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const onPointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!dragging) return;
+    setPan({
+      x: event.clientX - dragStart.x,
+      y: event.clientY - dragStart.y,
+    });
+  };
+
+  const stopDragging = () => setDragging(false);
+
+  const onWheel = (event: React.WheelEvent<SVGSVGElement>) => {
+    event.preventDefault();
+    zoomAtCenter(event.deltaY < 0 ? 0.08 : -0.08);
   };
 
   return (
     <div className="city-page">
-
-      {/* =====================================================
-          CITY HEADER
-      ===================================================== */}
-
       <div className="city-header card">
         <div>
-          <span className="card-tag">
-            RIFTCITY
-          </span>
-
-          <h2>
-            The City
-          </h2>
-
+          <span className="card-tag">RIFTCITY</span>
+          <h2>The City</h2>
           <p>
-            Navigate RiftCity by district. Every major
-            service has its own place in the city.
+            Explore the city, follow the roads, and tap a destination to
+            travel there.
           </p>
         </div>
 
         <div className="city-status">
           <div className="city-status-item">
             <span>💵 Cash</span>
-            <strong>
-              {money(g.gameState.cash)}
-            </strong>
+            <strong>{money(g.gameState.cash)}</strong>
           </div>
-
           <div className="city-status-item">
             <span>🏦 Bank</span>
-            <strong>
-              {money(g.gameState.bank)}
-            </strong>
+            <strong>{money(g.gameState.bank)}</strong>
           </div>
-
           <div className="city-status-item">
             <span>⚡ Energy</span>
             <strong>
@@ -518,854 +488,235 @@ export function City({
         </div>
       </div>
 
-      {/* =====================================================
-          INCAPACITATED NOTICE
-      ===================================================== */}
-
       {incapacitated && (
         <div
           className={`city-incapacitated ${
-            hospitalized
-              ? "hospitalized"
-              : jailed
-              ? "jailed"
-              : ""
+            hospitalized ? "hospitalized" : jailed ? "jailed" : ""
           }`}
         >
-          <span>
-            {hospitalized
-              ? "🏥"
-              : "🚔"}
-          </span>
-
+          <span>{hospitalized ? "🏥" : "🚔"}</span>
           <div>
             <strong>
-              {hospitalized
-                ? "You are hospitalized"
-                : "You are in jail"}
+              {hospitalized ? "You are hospitalized" : "You are in jail"}
             </strong>
-
             <p>
-              You cannot access city activities
-              until your current timer expires.
+              You cannot access city activities until your current timer
+              expires.
             </p>
           </div>
         </div>
       )}
 
-      {/* =====================================================
-          CITY MAP
-      ===================================================== */}
-
       <section className="city-map-panel card">
-
         <div className="city-map-header">
           <div>
-            <span className="card-tag">
-              CITY MAP
-            </span>
-
-            <h3>
-              RiftCity
-            </h3>
-
+            <span className="card-tag">CITY MAP</span>
+            <h3>RiftCity</h3>
             <p className="city-map-subtitle">
               Northside · Downtown · Southside
             </p>
           </div>
 
-          <span className="city-map-live">
-            ● LIVE CITY
-          </span>
+          <div className="city-map-tools">
+            <span className="city-map-live">● LIVE CITY</span>
+            <button
+              type="button"
+              className="city-map-tool"
+              onClick={() => zoomAtCenter(0.1)}
+              aria-label="Zoom in"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="city-map-tool"
+              onClick={() => zoomAtCenter(-0.1)}
+              aria-label="Zoom out"
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="city-map-tool city-map-reset"
+              onClick={resetMap}
+            >
+              Reset
+            </button>
+          </div>
         </div>
 
-        <div className="riftcity-map">
+        <div className={`riftcity-map interactive-map ${dragging ? "is-dragging" : ""}`}>
+          <svg
+            className="riftcity-map-svg"
+            viewBox="0 0 1000 700"
+            role="application"
+            aria-label="Interactive map of RiftCity"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={stopDragging}
+            onPointerCancel={stopDragging}
+            onWheel={onWheel}
+          >
+            <g
+              className="map-world"
+              transform={`translate(${500 + pan.x / 2} ${350 + pan.y / 2}) scale(${zoom}) translate(-500 -350)`}
+            >
+              <rect className="map-ground" x="0" y="0" width="1000" height="700" rx="28" />
 
-          {/* =================================================
-              WATER / RIVER
-          ================================================= */}
+              <path
+                className="map-river-shadow"
+                d="M-30 120 C160 70 210 190 330 165 C470 135 505 35 640 78 C785 124 770 248 1030 214 L1030 325 C820 355 760 270 630 288 C510 305 470 410 320 390 C185 372 150 285 -30 330 Z"
+              />
+              <path
+                className="map-river"
+                d="M-30 110 C160 60 210 180 330 155 C470 125 505 25 640 68 C785 114 770 238 1030 204 L1030 305 C820 345 760 260 630 278 C510 295 470 400 320 380 C185 362 150 275 -30 320 Z"
+              />
 
-          <div className="city-river">
-            <span>
-              RIFT RIVER
-            </span>
+              <g className="map-district-labels">
+                <text x="75" y="65">NORTHSIDE</text>
+                <text x="440" y="360">DOWNTOWN</text>
+                <text x="62" y="660">SOUTHSIDE</text>
+                <text x="820" y="365">EAST MARKET</text>
+              </g>
+
+              <g className="map-roads">
+                <path d="M40 210 C220 180 360 220 500 195 C650 170 810 185 960 145" />
+                <path d="M40 365 C205 345 330 355 465 340 C625 322 790 340 960 305" />
+                <path d="M55 525 C220 500 345 510 500 500 C670 488 805 505 950 470" />
+                <path d="M170 50 C150 180 180 300 210 430 C235 535 210 625 195 680" />
+                <path d="M505 40 C485 160 515 255 500 365 C485 480 520 575 505 675" />
+                <path d="M820 35 C790 160 815 260 800 360 C785 470 815 565 790 680" />
+                <path d="M300 80 C365 170 390 250 365 340 C345 420 370 515 425 610" />
+              </g>
+
+              <g className="map-road-labels">
+                <text x="95" y="194">RIVERSIDE AVE</text>
+                <text x="82" y="350">CENTRAL AVE</text>
+                <text x="85" y="492">SOUTH AVE</text>
+                <text x="180" y="110">NORTH ST</text>
+                <text x="512" y="110">MAIN ST</text>
+                <text x="826" y="110">EAST ST</text>
+              </g>
+
+              <g className="map-blocks">
+                <rect x="70" y="245" width="120" height="72" rx="10" />
+                <rect x="235" y="235" width="125" height="82" rx="10" />
+                <rect x="410" y="235" width="115" height="72" rx="10" />
+                <rect x="570" y="225" width="125" height="82" rx="10" />
+                <rect x="745" y="225" width="145" height="82" rx="10" />
+                <rect x="80" y="405" width="120" height="72" rx="10" />
+                <rect x="245" y="400" width="110" height="70" rx="10" />
+                <rect x="595" y="390" width="120" height="72" rx="10" />
+                <rect x="760" y="380" width="130" height="82" rx="10" />
+                <rect x="70" y="555" width="125" height="65" rx="10" />
+                <rect x="250" y="550" width="120" height="70" rx="10" />
+                <rect x="585" y="545" width="135" height="70" rx="10" />
+                <rect x="765" y="535" width="140" height="75" rx="10" />
+              </g>
+
+              <g className="map-park">
+                <ellipse cx="500" cy="135" rx="105" ry="52" />
+                <path d="M430 135 Q500 92 570 135 Q500 177 430 135Z" />
+                <text x="500" y="140">CENTRAL PARK</text>
+              </g>
+
+              <g className="map-bridge">
+                <rect x="425" y="172" width="150" height="30" rx="8" />
+                <line x1="445" y1="172" x2="445" y2="202" />
+                <line x1="475" y1="172" x2="475" y2="202" />
+                <line x1="505" y1="172" x2="505" y2="202" />
+                <line x1="535" y1="172" x2="535" y2="202" />
+                <line x1="565" y1="172" x2="565" y2="202" />
+              </g>
+
+              <g className="map-landmarks">
+                <circle cx="925" cy="90" r="18" />
+                <text x="925" y="95">⚓</text>
+                <circle cx="100" cy="600" r="18" />
+                <text x="100" y="605">🚉</text>
+              </g>
+
+              {CITY_LOCATIONS.map((location) => {
+                const x = (Number.parseFloat(location.x) / 100) * 1000;
+                const y = (Number.parseFloat(location.y) / 100) * 700;
+                const active = selectedId === location.id;
+
+                return (
+                  <g
+                    key={location.id}
+                    className={`map-location ${active ? "is-selected" : ""}`}
+                    transform={`translate(${x} ${y})`}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={() => setSelectedId(location.id)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={location.name}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedId(location.id);
+                      }
+                    }}
+                  >
+                    <circle className="map-location-halo" r="31" />
+                    <rect className="map-building" x="-29" y="-25" width="58" height="50" rx="10" />
+                    <text className="map-location-icon" x="0" y="7" textAnchor="middle">
+                      {location.icon}
+                    </text>
+                    <text className="map-location-label" x="0" y="43" textAnchor="middle">
+                      {location.name}
+                    </text>
+                    <circle className="map-location-dot" cx="24" cy="-22" r="5" />
+                  </g>
+                );
+              })}
+
+              <g className="player-marker" transform="translate(500 365)">
+                <circle className="player-pulse" r="25" />
+                <circle className="player-dot" r="9" />
+                <text x="0" y="-17" textAnchor="middle">YOU</text>
+              </g>
+
+              <g className="map-compass" transform="translate(925 610)">
+                <circle r="34" />
+                <text x="0" y="-14" textAnchor="middle">N</text>
+                <text x="0" y="22" textAnchor="middle">S</text>
+                <text x="-18" y="5" textAnchor="middle">W</text>
+                <text x="18" y="5" textAnchor="middle">E</text>
+              </g>
+            </g>
+          </svg>
+
+          <div className="map-drag-hint">
+            <span>✋</span> Drag to explore · Scroll or use + / − to zoom
           </div>
 
-          {/* =================================================
-              CITY BLOCKS
-          ================================================= */}
-
-          <div className="city-block city-block-1" />
-          <div className="city-block city-block-2" />
-          <div className="city-block city-block-3" />
-          <div className="city-block city-block-4" />
-          <div className="city-block city-block-5" />
-          <div className="city-block city-block-6" />
-          <div className="city-block city-block-7" />
-          <div className="city-block city-block-8" />
-          <div className="city-block city-block-9" />
-
-          {/* =================================================
-              ROADS
-          ================================================= */}
-
-          <div className="city-road city-road-horizontal city-road-1">
-            <span>1ST AVENUE</span>
-          </div>
-
-          <div className="city-road city-road-horizontal city-road-2">
-            <span>CENTRAL AVENUE</span>
-          </div>
-
-          <div className="city-road city-road-horizontal city-road-3">
-            <span>RIVERSIDE AVENUE</span>
-          </div>
-
-          <div className="city-road city-road-vertical city-road-v1">
-            <span>NORTH STREET</span>
-          </div>
-
-          <div className="city-road city-road-vertical city-road-v2">
-            <span>MAIN STREET</span>
-          </div>
-
-          <div className="city-road city-road-vertical city-road-v3">
-            <span>EAST STREET</span>
-          </div>
-
-          {/* =================================================
-              CENTRAL PARK
-          ================================================= */}
-
-          <div className="city-park">
-            <div className="city-park-trees">
-              🌳 🌲 🌳
-            </div>
-
-            <strong>
-              CENTRAL PARK
-            </strong>
-
-            <small>
-              RIFTCITY
-            </small>
-          </div>
-
-          {/* =================================================
-              BUILDINGS / LOCATIONS
-          ================================================= */}
-
-          {CITY_LOCATIONS.map(
-            (location) => (
+          {selected && (
+            <div className="map-location-panel">
               <button
-                key={location.id}
                 type="button"
-                className={`city-map-location city-map-location-${location.id}`}
-                style={{
-                  left: location.x,
-                  top: location.y,
-                }}
-                disabled={incapacitated}
-                onClick={() =>
-                  goTo(location.screen)
-                }
+                className="map-location-close"
+                onClick={() => setSelectedId(null)}
+                aria-label="Close location details"
               >
-                <span className="city-map-icon">
-                  {location.icon}
-                </span>
-
-                <span className="city-map-name">
-                  {location.name}
-                </span>
-
-                <span className="city-map-district">
-                  {location.district}
-                </span>
+                ×
               </button>
-            )
+              <div className="map-location-panel-icon">{selected.icon}</div>
+              <div className="map-location-panel-copy">
+                <span>{selected.district}</span>
+                <h4>{selected.name}</h4>
+                <p>{selected.description}</p>
+                <Button
+                  disabled={incapacitated}
+                  onClick={() => goTo(selected.screen)}
+                >
+                  Enter Location
+                </Button>
+              </div>
+            </div>
           )}
-
-          {/* =================================================
-              CITY CENTER
-          ================================================= */}
-
-          <div className="city-center-marker">
-            <span>📍</span>
-
-            <strong>
-              RIFTCITY
-            </strong>
-
-            <small>
-              DOWNTOWN
-            </small>
-          </div>
-
-          {/* =================================================
-              NORTH / SOUTH LABELS
-          ================================================= */}
-
-          <div className="city-map-direction city-map-north">
-            N
-          </div>
-
-          <div className="city-map-direction city-map-south">
-            S
-          </div>
-
-          <div className="city-map-direction city-map-west">
-            W
-          </div>
-
-          <div className="city-map-direction city-map-east">
-            E
-          </div>
-        </div>
-
-        {/* =================================================
-            MAP LEGEND
-        ================================================= */}
-
-        <div className="city-map-legend">
-
-          <div className="city-map-legend-item">
-            <span>🏦</span>
-            <small>Financial</small>
-          </div>
-
-          <div className="city-map-legend-item">
-            <span>🏥</span>
-            <small>Medical</small>
-          </div>
-
-          <div className="city-map-legend-item">
-            <span>🛒</span>
-            <small>Shopping</small>
-          </div>
-
-          <div className="city-map-legend-item">
-            <span>💼</span>
-            <small>Business</small>
-          </div>
-
-          <div className="city-map-legend-item">
-            <span>🏋️</span>
-            <small>Fitness</small>
-          </div>
-
-          <div className="city-map-legend-item">
-            <span>🕵️</span>
-            <small>Underground</small>
-          </div>
-
-          <div className="city-map-legend-item">
-            <span>⚔️</span>
-            <small>Combat</small>
-          </div>
-
         </div>
       </section>
-
-      {/* =====================================================
-          DISTRICTS
-      ===================================================== */}
-
-      <section className="city-districts">
-
-        <div className="city-section-heading">
-          <div>
-            <span className="card-tag">
-              DISTRICTS
-            </span>
-
-            <h3>
-              Explore RiftCity
-            </h3>
-          </div>
-        </div>
-
-        <div className="city-district-grid">
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("character")
-            }
-          >
-            <span className="city-district-icon">
-              🏦
-            </span>
-
-            <div>
-              <strong>
-                Financial District
-              </strong>
-
-              <p>
-                Bank and financial services.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("education")
-            }
-          >
-            <span className="city-district-icon">
-              🎓
-            </span>
-
-            <div>
-              <strong>
-                University District
-              </strong>
-
-              <p>
-                Education and training.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("items")
-            }
-          >
-            <span className="city-district-icon">
-              🛒
-            </span>
-
-            <div>
-              <strong>
-                Commercial District
-              </strong>
-
-              <p>
-                Shops, weapons and equipment.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("jobs")
-            }
-          >
-            <span className="city-district-icon">
-              💼
-            </span>
-
-            <div>
-              <strong>
-                Business District
-              </strong>
-
-              <p>
-                Employment and careers.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("gym")
-            }
-          >
-            <span className="city-district-icon">
-              🏋️
-            </span>
-
-            <div>
-              <strong>
-                Industrial District
-              </strong>
-
-              <p>
-                Fitness and physical training.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("combat")
-            }
-          >
-            <span className="city-district-icon">
-              ⚔️
-            </span>
-
-            <div>
-              <strong>
-                Combat District
-              </strong>
-
-              <p>
-                Find opponents and fight.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("crimes")
-            }
-          >
-            <span className="city-district-icon">
-              🕵️
-            </span>
-
-            <div>
-              <strong>
-                Underground District
-              </strong>
-
-              <p>
-                Crime and criminal activity.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-          <button
-            type="button"
-            className="city-district-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("market")
-            }
-          >
-            <span className="city-district-icon">
-              📈
-            </span>
-
-            <div>
-              <strong>
-                Market District
-              </strong>
-
-              <p>
-                Trade commodities and goods.
-              </p>
-            </div>
-
-            <span>→</span>
-          </button>
-
-        </div>
-      </section>
-
-      {/* =====================================================
-          CITY SERVICES
-      ===================================================== */}
-
-      <section className="city-services">
-
-        <div className="city-section-heading">
-          <div>
-            <span className="card-tag">
-              CITY SERVICES
-            </span>
-
-            <h3>
-              What do you want to do?
-            </h3>
-          </div>
-        </div>
-
-        <div className="city-service-grid">
-
-          {/* BANK */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("character")
-            }
-          >
-            <span className="city-service-icon">
-              🏦
-            </span>
-
-            <div>
-              <strong>
-                Bank
-              </strong>
-
-              <p>
-                Manage your bank account.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* HOSPITAL */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("character")
-            }
-          >
-            <span className="city-service-icon">
-              🏥
-            </span>
-
-            <div>
-              <strong>
-                Hospital
-              </strong>
-
-              <p>
-                Medical treatment and recovery.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* GYM */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("gym")
-            }
-          >
-            <span className="city-service-icon">
-              🏋️
-            </span>
-
-            <div>
-              <strong>
-                Gym
-              </strong>
-
-              <p>
-                Train your combat statistics.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* SHOPS */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("items")
-            }
-          >
-            <span className="city-service-icon">
-              🛒
-            </span>
-
-            <div>
-              <strong>
-                Shops
-              </strong>
-
-              <p>
-                Weapons, equipment and supplies.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* JOBS */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("jobs")
-            }
-          >
-            <span className="city-service-icon">
-              💼
-            </span>
-
-            <div>
-              <strong>
-                Jobs
-              </strong>
-
-              <p>
-                Find employment and earn money.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* EDUCATION */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("education")
-            }
-          >
-            <span className="city-service-icon">
-              🎓
-            </span>
-
-            <div>
-              <strong>
-                University
-              </strong>
-
-              <p>
-                Study courses and improve yourself.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* CRIMES */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("crimes")
-            }
-          >
-            <span className="city-service-icon">
-              🕵️
-            </span>
-
-            <div>
-              <strong>
-                Underground
-              </strong>
-
-              <p>
-                Commit crimes and build experience.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* COMBAT */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("combat")
-            }
-          >
-            <span className="city-service-icon">
-              ⚔️
-            </span>
-
-            <div>
-              <strong>
-                Combat
-              </strong>
-
-              <p>
-                Attack another player.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* MARKET */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("market")
-            }
-          >
-            <span className="city-service-icon">
-              📈
-            </span>
-
-            <div>
-              <strong>
-                Market
-              </strong>
-
-              <p>
-                Buy and sell commodities.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* PROPERTY */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("property")
-            }
-          >
-            <span className="city-service-icon">
-              🏠
-            </span>
-
-            <div>
-              <strong>
-                Real Estate
-              </strong>
-
-              <p>
-                Buy a better property.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-
-          {/* MISSIONS */}
-
-          <button
-            type="button"
-            className="city-service-card"
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("missions")
-            }
-          >
-            <span className="city-service-icon">
-              📋
-            </span>
-
-            <div>
-              <strong>
-                Missions
-              </strong>
-
-              <p>
-                Complete objectives and collect rewards.
-              </p>
-            </div>
-
-            <span className="city-service-arrow">
-              →
-            </span>
-          </button>
-        </div>
-      </section>
-
-      {/* =====================================================
-          QUICK ACTIONS
-      ===================================================== */}
-
-      <Panel title="Quick Actions">
-        <div className="ui-grid three-col">
-
-          <Button
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("character")
-            }
-          >
-            👤 Character
-          </Button>
-
-          <Button
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("combat")
-            }
-          >
-            ⚔️ Find a Fight
-          </Button>
-
-          <Button
-            disabled={incapacitated}
-            onClick={() =>
-              goTo("crimes")
-            }
-          >
-            🕵️ Commit a Crime
-          </Button>
-
-        </div>
-      </Panel>
     </div>
   );
 }
