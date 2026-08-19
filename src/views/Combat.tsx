@@ -40,6 +40,25 @@ export function InteractiveCombatView({
   const [processing, setProcessing] = useState(false);
   const [finishSelected, setFinishSelected] = useState(false);
 
+  /*
+   * ------------------------------------------------------------
+   * VISUAL COMBAT STATE
+   * ------------------------------------------------------------
+   *
+   * These states are purely presentation.
+   * They do NOT affect combat calculations.
+   */
+
+  const [impactTarget, setImpactTarget] = useState<
+    "player" | "enemy" | null
+  >(null);
+
+  const [impactType, setImpactType] = useState<
+    "hit" | "crit" | "miss" | null
+  >(null);
+
+  const [lastEventId, setLastEventId] = useState<string | null>(null);
+
   const enemyTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
@@ -66,13 +85,6 @@ export function InteractiveCombatView({
    * ------------------------------------------------------------
    * PLAYER EQUIPMENT
    * ------------------------------------------------------------
-   *
-   * Combat only exposes:
-   *
-   *   1. Unarmed
-   *   2. The weapon actually equipped
-   *
-   * Inventory ownership alone does not create attack buttons.
    */
 
   const equippedWeapon = useMemo(
@@ -95,7 +107,7 @@ export function InteractiveCombatView({
 
   /*
    * ------------------------------------------------------------
-   * HEALTH HELPERS
+   * HEALTH
    * ------------------------------------------------------------
    */
 
@@ -117,12 +129,58 @@ export function InteractiveCombatView({
 
   /*
    * ------------------------------------------------------------
+   * VISUAL IMPACT
+   * ------------------------------------------------------------
+   */
+
+  const triggerImpact = (
+    target: "player" | "enemy",
+    log: TurnLog
+  ) => {
+    if (!mountedRef.current) {
+      return;
+    }
+
+    const type = log.isCrit
+      ? "crit"
+      : log.isMiss
+      ? "miss"
+      : "hit";
+
+    setImpactTarget(null);
+    setImpactType(null);
+
+    /*
+     * Force a new animation cycle.
+     */
+    window.requestAnimationFrame(() => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setImpactTarget(target);
+      setImpactType(type);
+
+      window.setTimeout(() => {
+        if (!mountedRef.current) {
+          return;
+        }
+
+        setImpactTarget(null);
+        setImpactType(null);
+      }, 520);
+    });
+  };
+
+  /*
+   * ------------------------------------------------------------
    * LOGGING
    * ------------------------------------------------------------
    */
 
   const appendLog = (log: TurnLog) => {
     setCombatLogs((prev) => [log, ...prev].slice(0, 50));
+    setLastEventId(log.id);
   };
 
   /*
@@ -143,13 +201,6 @@ export function InteractiveCombatView({
     if (processing) {
       return;
     }
-
-    /*
-     * Validate the requested weapon against actual equipment.
-     *
-     * The combat system performs its own validation too, so this
-     * UI layer cannot accidentally create/use an arbitrary weapon.
-     */
 
     let selectedWeapon = UNARMED_WEAPON;
 
@@ -181,6 +232,11 @@ export function InteractiveCombatView({
     appendLog(playerResult.log);
 
     /*
+     * Visual feedback only.
+     */
+    triggerImpact("enemy", playerResult.log);
+
+    /*
      * Enemy defeated.
      */
 
@@ -192,9 +248,7 @@ export function InteractiveCombatView({
     }
 
     /*
-     * ----------------------------------------------------------
      * ENEMY TURN
-     * ----------------------------------------------------------
      */
 
     setTurn("enemy");
@@ -203,13 +257,6 @@ export function InteractiveCombatView({
       if (!mountedRef.current) {
         return;
       }
-
-      /*
-       * Enemy does not receive a weapon from the UI.
-       *
-       * executeCombatTurn resolves the enemy's own equipped
-       * weapon or falls back to Unarmed.
-       */
 
       const enemyResult = executeCombatTurn(
         updatedEnemy,
@@ -220,6 +267,11 @@ export function InteractiveCombatView({
 
       setPState(updatedPlayer);
       appendLog(enemyResult.log);
+
+      /*
+       * Visual feedback only.
+       */
+      triggerImpact("player", enemyResult.log);
 
       if (updatedPlayer.health <= 0) {
         setWinner("enemy");
@@ -262,60 +314,79 @@ export function InteractiveCombatView({
 
   /*
    * ------------------------------------------------------------
+   * FIGHTER VISUAL CLASSES
+   * ------------------------------------------------------------
+   */
+
+  const playerFighterClass = [
+    "combat-fighter",
+    "combat-fighter-player",
+    turn === "player" && !winner
+      ? "combat-fighter-active"
+      : "",
+    impactTarget === "player"
+      ? `combat-impact-${impactType}`
+      : "",
+    pState.health <= 0
+      ? "combat-fighter-defeated"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const enemyFighterClass = [
+    "combat-fighter",
+    "combat-fighter-enemy",
+    turn === "enemy" && !winner
+      ? "combat-fighter-active"
+      : "",
+    impactTarget === "enemy"
+      ? `combat-impact-${impactType}`
+      : "",
+    eState.health <= 0
+      ? "combat-fighter-defeated"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  /*
+   * ------------------------------------------------------------
    * RENDER
    * ------------------------------------------------------------
    */
 
   return (
-    <div
-      className="combat-container"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "16px",
-      }}
-    >
+    <div className="combat-container">
       {/* ======================================================
           COMBAT HEADER
           ====================================================== */}
 
-      <div
-        className="card"
-        style={{
-          padding: "14px 16px",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
+      <div className="combat-header card">
+        <div className="combat-header-content">
           <div>
-            <span
-              className="card-tag"
-              style={{
-                display: "inline-block",
-                marginBottom: "5px",
-              }}
-            >
+            <span className="combat-live-badge">
+              <span className="combat-live-dot" />
               LIVE COMBAT
             </span>
 
-            <h2 style={{ margin: 0 }}>
-              {pState.name} vs {eState.name}
+            <h2 className="combat-title">
+              {pState.name}
+              <span className="combat-vs">VS</span>
+              {eState.name}
             </h2>
           </div>
 
           <div
-            style={{
-              fontSize: "12px",
-              color: "#a1a1aa",
-              textAlign: "right",
-            }}
+            className={`combat-turn-indicator ${
+              winner
+                ? winner === "player"
+                  ? "combat-result-win"
+                  : "combat-result-loss"
+                : turn === "player"
+                ? "combat-your-turn"
+                : "combat-enemy-turn"
+            }`}
           >
             {winner
               ? winner === "player"
@@ -329,156 +400,149 @@ export function InteractiveCombatView({
       </div>
 
       {/* ======================================================
-          FIGHTER VITALS
+          FIGHT ARENA
           ====================================================== */}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "12px",
-        }}
-      >
+      <div className="combat-arena">
         {/* PLAYER */}
 
-        <div
-          className="card"
-          style={{
-            padding: "14px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "8px",
-              alignItems: "center",
-            }}
-          >
-            <h3 style={{ margin: 0 }}>
-              {pState.name}
-            </h3>
+        <div className={playerFighterClass}>
+          <div className="combat-fighter-top">
+            <div>
+              <div className="combat-fighter-label">
+                YOU
+              </div>
 
-            <span className="card-tag">
+              <h3>{pState.name}</h3>
+            </div>
+
+            <span className="combat-level">
               LV {pState.level}
             </span>
           </div>
 
-          <p
-            style={{
-              margin: "10px 0 6px",
-              fontSize: "13px",
-            }}
-          >
-            ❤️ Health{" "}
-            <strong>
-              {Math.max(0, Math.floor(pState.health))} /{" "}
-              {pState.maxHealth}
-            </strong>
-          </p>
+          <div className="combat-avatar combat-avatar-player">
+            <span>🧍</span>
 
-          <div
-            style={{
-              height: "9px",
-              background: "#27272a",
-              borderRadius: "5px",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${playerHealthPercent}%`,
-                height: "100%",
-                background: "#22c55e",
-                transition: "width 0.3s ease",
-              }}
-            />
+            {impactTarget === "player" && (
+              <div className="combat-impact-text">
+                {impactType === "crit"
+                  ? "CRITICAL!"
+                  : impactType === "miss"
+                  ? "MISS"
+                  : `-${combatLogs[0]?.damage ?? 0}`}
+              </div>
+            )}
           </div>
 
-          <div
-            style={{
-              marginTop: "10px",
-              fontSize: "12px",
-              color: "#a1a1aa",
-            }}
-          >
-            Equipped:{" "}
-            <strong style={{ color: "#f4f4f5" }}>
+          <div className="combat-health-section">
+            <div className="combat-health-label">
+              <span>❤️ HEALTH</span>
+
+              <strong>
+                {Math.max(
+                  0,
+                  Math.floor(pState.health)
+                )}{" "}
+                / {pState.maxHealth}
+              </strong>
+            </div>
+
+            <div className="combat-health-bar">
+              <div
+                className="combat-health-fill combat-health-player"
+                style={{
+                  width: `${playerHealthPercent}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="combat-fighter-status">
+            <span>WEAPON</span>
+
+            <strong>
+              {equippedWeapon.icon || "⚔️"}{" "}
               {equippedWeapon.name}
             </strong>
           </div>
         </div>
 
+        {/* CENTER VS */}
+
+        <div className="combat-center">
+          <div className="combat-center-line" />
+
+          <div className="combat-vs-badge">
+            VS
+          </div>
+
+          <div className="combat-center-line" />
+        </div>
+
         {/* ENEMY */}
 
-        <div
-          className="card"
-          style={{
-            padding: "14px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "8px",
-              alignItems: "center",
-            }}
-          >
-            <h3 style={{ margin: 0 }}>
-              {eState.name}
-            </h3>
+        <div className={enemyFighterClass}>
+          <div className="combat-fighter-top">
+            <div>
+              <div className="combat-fighter-label enemy-label">
+                OPPONENT
+              </div>
 
-            <span className="card-tag">
+              <h3>{eState.name}</h3>
+            </div>
+
+            <span className="combat-level">
               LV {eState.level}
             </span>
           </div>
 
-          <p
-            style={{
-              margin: "10px 0 6px",
-              fontSize: "13px",
-            }}
-          >
-            ❤️ Health{" "}
-            <strong>
-              {Math.max(0, Math.floor(eState.health))} /{" "}
-              {eState.maxHealth}
-            </strong>
-          </p>
+          <div className="combat-avatar combat-avatar-enemy">
+            <span>👤</span>
 
-          <div
-            style={{
-              height: "9px",
-              background: "#27272a",
-              borderRadius: "5px",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${enemyHealthPercent}%`,
-                height: "100%",
-                background: "#ef4444",
-                transition: "width 0.3s ease",
-              }}
-            />
+            {impactTarget === "enemy" && (
+              <div className="combat-impact-text">
+                {impactType === "crit"
+                  ? "CRITICAL!"
+                  : impactType === "miss"
+                  ? "MISS"
+                  : `-${combatLogs[0]?.damage ?? 0}`}
+              </div>
+            )}
           </div>
 
-          <div
-            style={{
-              marginTop: "10px",
-              fontSize: "12px",
-              color: "#a1a1aa",
-            }}
-          >
-            Status:{" "}
-            <strong style={{ color: "#f4f4f5" }}>
+          <div className="combat-health-section">
+            <div className="combat-health-label">
+              <span>❤️ HEALTH</span>
+
+              <strong>
+                {Math.max(
+                  0,
+                  Math.floor(eState.health)
+                )}{" "}
+                / {eState.maxHealth}
+              </strong>
+            </div>
+
+            <div className="combat-health-bar">
+              <div
+                className="combat-health-fill combat-health-enemy"
+                style={{
+                  width: `${enemyHealthPercent}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="combat-fighter-status">
+            <span>STATUS</span>
+
+            <strong>
               {eState.health <= 0
-                ? "Defeated"
+                ? "💀 Defeated"
                 : eState.inCover
-                ? "In Cover"
-                : "Exposed"}
+                ? "🛡️ In Cover"
+                : "⚠️ Exposed"}
             </strong>
           </div>
         </div>
@@ -490,21 +554,29 @@ export function InteractiveCombatView({
 
       {!winner && (
         <div
-          className="card"
-          style={{
-            padding: "12px 14px",
-            textAlign: "center",
-          }}
+          className={`combat-status-banner ${
+            turn === "player"
+              ? "combat-status-player"
+              : "combat-status-enemy"
+          }`}
         >
-          {turn === "player" ? (
+          <div className="combat-status-icon">
+            {turn === "player" ? "⚔️" : "👁️"}
+          </div>
+
+          <div>
             <strong>
-              ⚔️ Your turn. Choose your attack.
+              {turn === "player"
+                ? "Your turn"
+                : `${eState.name} is deciding...`}
             </strong>
-          ) : (
-            <span style={{ color: "#a1a1aa" }}>
-              {eState.name} is deciding what to do...
+
+            <span>
+              {turn === "player"
+                ? "Choose your attack."
+                : "Prepare for the next attack."}
             </span>
-          )}
+          </div>
         </div>
       )}
 
@@ -513,43 +585,22 @@ export function InteractiveCombatView({
           ====================================================== */}
 
       {!winner && turn === "player" && (
-        <div
-          className="card"
-          style={{
-            padding: "14px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "10px",
-              gap: "10px",
-            }}
-          >
-            <h3 style={{ margin: 0 }}>
-              Attack
-            </h3>
+        <div className="combat-actions card">
+          <div className="combat-actions-header">
+            <div>
+              <div className="combat-section-label">
+                ATTACK
+              </div>
 
-            <span
-              style={{
-                fontSize: "12px",
-                color: "#a1a1aa",
-              }}
-            >
-              Select weapon
+              <h3>Choose your attack</h3>
+            </div>
+
+            <span className="combat-action-hint">
+              {attackOptions.length} available
             </span>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: "8px",
-            }}
-          >
+          <div className="combat-attack-grid">
             {attackOptions.map((weapon) => {
               const isUnarmed =
                 weapon.id === UNARMED_WEAPON.id;
@@ -557,53 +608,38 @@ export function InteractiveCombatView({
               return (
                 <button
                   key={weapon.id}
-                  className="btn-primary"
+                  className="combat-attack-button"
                   disabled={processing}
                   onClick={() =>
                     handlePlayerAttack(weapon)
                   }
-                  style={{
-                    minHeight: "52px",
-                    opacity: processing ? 0.6 : 1,
-                  }}
                 >
-                  <span
-                    style={{
-                      display: "block",
-                      fontWeight: "bold",
-                    }}
-                  >
+                  <span className="combat-attack-icon">
                     {weapon.icon ||
-                      (isUnarmed ? "👊" : "⚔️")}{" "}
-                    {weapon.name}
+                      (isUnarmed ? "👊" : "⚔️")}
                   </span>
 
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: "11px",
-                      marginTop: "3px",
-                      opacity: 0.8,
-                    }}
-                  >
-                    {weapon.baseDamage} base damage
+                  <span className="combat-attack-info">
+                    <strong>{weapon.name}</strong>
+
+                    <small>
+                      {weapon.baseDamage} base damage
+                    </small>
+                  </span>
+
+                  <span className="combat-attack-arrow">
+                    →
                   </span>
                 </button>
               );
             })}
           </div>
 
-          <div
-            style={{
-              marginTop: "12px",
-              paddingTop: "10px",
-              borderTop: "1px solid #27272a",
-              fontSize: "12px",
-              color: "#a1a1aa",
-            }}
-          >
-            Equipped weapon:{" "}
-            <strong style={{ color: "#f4f4f5" }}>
+          <div className="combat-equipped">
+            <span>Currently equipped</span>
+
+            <strong>
+              {equippedWeapon.icon || "⚔️"}{" "}
               {equippedWeapon.name}
             </strong>
           </div>
@@ -615,132 +651,72 @@ export function InteractiveCombatView({
           ====================================================== */}
 
       {winner === "player" && (
-        <div
-          className="card"
-          style={{
-            padding: "18px",
-            border: "1px solid #22c55e",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "34px",
-              marginBottom: "4px",
-            }}
-          >
+        <div className="combat-result combat-result-victory">
+          <div className="combat-result-icon">
             🏆
           </div>
 
-          <h2
-            style={{
-              margin: "0 0 6px",
-              color: "#22c55e",
-            }}
-          >
+          <div className="combat-result-label">
             VICTORY
-          </h2>
+          </div>
 
-          <p
-            style={{
-              margin: "0 0 16px",
-              color: "#a1a1aa",
-            }}
-          >
-            {eState.name} has been defeated.
-          </p>
+          <h2>{eState.name} has been defeated.</h2>
 
           {!finishSelected ? (
             <>
-              <p
-                style={{
-                  fontSize: "13px",
-                  marginBottom: "10px",
-                }}
-              >
-                Choose what happens next:
+              <p>
+                Choose what happens next.
               </p>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(160px, 1fr))",
-                  gap: "8px",
-                }}
-              >
+              <div className="combat-finish-grid">
                 <button
-                  className="btn-primary"
+                  className="combat-finish-button combat-finish-leave"
                   onClick={() =>
                     handleFinish("leave")
                   }
                 >
-                  🚶 Leave
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: "11px",
-                      marginTop: "3px",
-                      opacity: 0.8,
-                    }}
-                  >
+                  <span>🚶</span>
+
+                  <strong>Leave</strong>
+
+                  <small>
                     Maximum XP bonus
-                  </span>
+                  </small>
                 </button>
 
                 <button
-                  className="btn-primary"
+                  className="combat-finish-button combat-finish-mug"
                   onClick={() =>
                     handleFinish("mug")
                   }
-                  style={{
-                    background: "#eab308",
-                    color: "#000",
-                  }}
                 >
-                  💵 Mug
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: "11px",
-                      marginTop: "3px",
-                      opacity: 0.75,
-                    }}
-                  >
+                  <span>💵</span>
+
+                  <strong>Mug</strong>
+
+                  <small>
                     Steal some cash
-                  </span>
+                  </small>
                 </button>
 
                 <button
-                  className="btn-primary"
+                  className="combat-finish-button combat-finish-hospitalize"
                   onClick={() =>
                     handleFinish("hospitalize")
                   }
-                  style={{
-                    background: "#dc2626",
-                  }}
                 >
-                  🏥 Hospitalize
-                  <span
-                    style={{
-                      display: "block",
-                      fontSize: "11px",
-                      marginTop: "3px",
-                      opacity: 0.8,
-                    }}
-                  >
+                  <span>🏥</span>
+
+                  <strong>Hospitalize</strong>
+
+                  <small>
                     Longer hospital time
-                  </span>
+                  </small>
                 </button>
               </div>
             </>
           ) : (
-            <p
-              style={{
-                margin: 0,
-                color: "#a1a1aa",
-              }}
-            >
+            <p>
               Resolving combat rewards...
             </p>
           )}
@@ -752,39 +728,19 @@ export function InteractiveCombatView({
           ====================================================== */}
 
       {winner === "enemy" && (
-        <div
-          className="card"
-          style={{
-            padding: "18px",
-            border: "1px solid #ef4444",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "34px",
-              marginBottom: "4px",
-            }}
-          >
+        <div className="combat-result combat-result-defeat">
+          <div className="combat-result-icon">
             🏥
           </div>
 
-          <h2
-            style={{
-              margin: "0 0 6px",
-              color: "#ef4444",
-            }}
-          >
+          <div className="combat-result-label">
             DEFEATED
-          </h2>
+          </div>
 
-          <p
-            style={{
-              margin: 0,
-              color: "#a1a1aa",
-            }}
-          >
-            You were knocked out and sent to the hospital.
+          <h2>You were knocked out.</h2>
+
+          <p>
+            You were defeated and sent to the hospital.
           </p>
         </div>
       )}
@@ -793,83 +749,74 @@ export function InteractiveCombatView({
           COMBAT LOG
           ====================================================== */}
 
-      <div
-        className="card"
-        style={{
-          padding: "14px",
-          maxHeight: "260px",
-          overflowY: "auto",
-          background: "#09090b",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "10px",
-          }}
-        >
-          <h3 style={{ margin: 0 }}>
-            Combat Log
-          </h3>
+      <div className="combat-log card">
+        <div className="combat-log-header">
+          <div>
+            <div className="combat-section-label">
+              BATTLE FEED
+            </div>
 
-          <span
-            style={{
-              fontSize: "11px",
-              color: "#71717a",
-            }}
-          >
+            <h3>Combat Log</h3>
+          </div>
+
+          <span>
             {combatLogs.length} events
           </span>
         </div>
 
         {combatLogs.length === 0 ? (
-          <div
-            style={{
-              color: "#71717a",
-              fontSize: "13px",
-              padding: "8px 0",
-            }}
-          >
-            Combat has not started yet.
+          <div className="combat-log-empty">
+            <span>⚔️</span>
+
+            <p>
+              Combat has not started yet.
+            </p>
           </div>
         ) : (
-          combatLogs.map((log) => (
-            <div
-              key={log.id}
-              style={{
-                padding: "8px 0",
-                borderBottom:
-                  "1px solid #18181b",
-                fontSize: "13px",
-                color: log.isCrit
-                  ? "#f59e0b"
-                  : log.isMiss
-                  ? "#71717a"
-                  : "#f4f4f5",
-              }}
-            >
-              <div>
-                {log.actionText}
-              </div>
-
-              {log.damage > 0 && (
-                <div
-                  style={{
-                    marginTop: "2px",
-                    fontSize: "11px",
-                    color: "#71717a",
-                  }}
-                >
-                  {log.damage} damage
-                  {log.hitPart
-                    ? ` · ${log.hitPart}`
-                    : ""}
+          <div className="combat-log-list">
+            {combatLogs.map((log, index) => (
+              <div
+                key={log.id}
+                className={[
+                  "combat-log-entry",
+                  index === 0
+                    ? "combat-log-entry-new"
+                    : "",
+                  log.isCrit
+                    ? "combat-log-critical"
+                    : "",
+                  log.isMiss
+                    ? "combat-log-miss"
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <div className="combat-log-marker">
+                  {log.isCrit
+                    ? "💥"
+                    : log.isMiss
+                    ? "〰️"
+                    : "⚔️"}
                 </div>
-              )}
-            </div>
-          ))
+
+                <div className="combat-log-content">
+                  <div>
+                    {log.actionText}
+                  </div>
+
+                  {log.damage > 0 && (
+                    <small>
+                      {log.damage} damage
+                      {log.hitPart
+                        ? ` · ${log.hitPart}`
+                        : ""}
+                    </small>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
