@@ -1,5 +1,5 @@
 export type Screen =
-  | "city" | "crimes" | "combat" | "gym" | "jobs" | "items"
+  | "city" | "crimes" | "combat" | "gym" | "jobs" | "inventory" | "shops"
   | "missions" | "education" | "property" | "character"
   | "market" | "faction" | "awards";
 
