@@ -4223,3 +4223,1036 @@ textarea:focus {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* ============================================================
+   RIFTCITY — CITY MAP V2 PATCH
+   Matches GameScreens.tsx:
+   .city-page / .city-header / .city-status
+   .city-map-panel / .riftcity-map / river / blocks / roads
+   .city-map-location-* / center marker / directions
+   districts / services / quick actions
+   ============================================================ */
+
+.city-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.city-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 20px;
+}
+
+.city-header h2 {
+  margin: 6px 0 4px;
+  color: var(--text);
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.city-header p {
+  max-width: 680px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.city-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.city-status-item {
+  min-width: 92px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.018);
+}
+
+.city-status-item span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.city-status-item strong {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.city-incapacitated {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 15px;
+  border: 1px solid rgba(250,204,21,.22);
+  border-radius: 9px;
+  background: rgba(250,204,21,.055);
+}
+
+.city-incapacitated > span {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  font-size: 17px;
+}
+
+.city-incapacitated strong {
+  display: block;
+  color: var(--yellow);
+  font-size: 11px;
+}
+
+.city-incapacitated p {
+  margin: 2px 0 0;
+  font-size: 9px;
+}
+
+.city-incapacitated.hospitalized {
+  border-color: rgba(248,113,113,.28);
+  background: rgba(248,113,113,.055);
+}
+
+.city-incapacitated.hospitalized strong {
+  color: #fca5a5;
+}
+
+.city-incapacitated.jailed {
+  border-color: rgba(167,139,250,.28);
+  background: rgba(167,139,250,.055);
+}
+
+.city-incapacitated.jailed strong {
+  color: #c4b5fd;
+}
+
+/* ------------------------------------------------------------
+   MAP PANEL
+------------------------------------------------------------ */
+
+.city-map-panel {
+  overflow: hidden;
+}
+
+.city-map-panel > .city-map-header {
+  min-height: 72px;
+  padding: 13px 16px;
+}
+
+.city-map-header h3 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+
+.city-map-subtitle {
+  margin: 3px 0 0 !important;
+  color: var(--muted);
+  font-size: 9px !important;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.city-map-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(74,222,128,.24);
+  border-radius: 6px;
+  background: rgba(74,222,128,.055);
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .09em;
+  white-space: nowrap;
+}
+
+.riftcity-map {
+  position: relative;
+  min-height: 590px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(96,165,250,.055), transparent 30%),
+    linear-gradient(180deg, #0d151d 0%, #091016 100%);
+}
+
+/* subtle urban texture */
+.riftcity-map::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .7;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,.014) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+/* river */
+.city-river {
+  position: absolute;
+  z-index: 1;
+  left: -8%;
+  right: -8%;
+  top: 86%;
+  height: 23%;
+  transform: rotate(-1.5deg);
+  border-top: 2px solid rgba(103,232,249,.20);
+  background:
+    repeating-linear-gradient(
+      175deg,
+      rgba(103,232,249,.10) 0 2px,
+      transparent 2px 18px
+    ),
+    linear-gradient(180deg, rgba(8,55,70,.75), rgba(5,31,42,.95));
+  box-shadow: inset 0 8px 22px rgba(0,0,0,.22);
+  pointer-events: none;
+}
+
+.city-river::before {
+  content: "";
+  position: absolute;
+  inset: 8px 0 auto;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(103,232,249,.25) 0 24px,
+    transparent 24px 52px
+  );
+}
+
+.city-river span {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) rotate(1.5deg);
+  color: rgba(165,243,252,.62);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .25em;
+  white-space: nowrap;
+}
+
+/* blocks */
+.riftcity-map > .city-block {
+  position: absolute;
+  z-index: 2;
+  border: 1px solid rgba(130,150,170,.11);
+  border-radius: 5px;
+  background:
+    linear-gradient(135deg, rgba(42,57,71,.42), rgba(18,28,38,.55));
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.018),
+    0 4px 12px rgba(0,0,0,.08);
+  pointer-events: none;
+}
+
+.city-block-1 { left: 3%; top: 5%; width: 24%; height: 16%; }
+.city-block-2 { left: 36%; top: 5%; width: 28%; height: 16%; }
+.city-block-3 { right: 3%; top: 5%; width: 24%; height: 16%; }
+.city-block-4 { left: 3%; top: 29%; width: 24%; height: 17%; }
+.city-block-5 { right: 3%; top: 29%; width: 24%; height: 17%; }
+.city-block-6 { left: 3%; top: 53%; width: 24%; height: 17%; }
+.city-block-7 { right: 3%; top: 53%; width: 24%; height: 17%; }
+.city-block-8 { left: 3%; top: 75%; width: 24%; height: 10%; }
+.city-block-9 { right: 3%; top: 75%; width: 24%; height: 10%; }
+
+/* roads */
+.riftcity-map > .city-road {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  background: rgba(84,101,119,.28);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.028),
+    0 0 12px rgba(0,0,0,.28);
+}
+
+.riftcity-map > .city-road-horizontal {
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.riftcity-map > .city-road-1 { top: 25%; }
+.riftcity-map > .city-road-2 { top: 49%; height: 19px; }
+.riftcity-map > .city-road-3 { top: 73%; }
+
+.riftcity-map > .city-road-vertical {
+  top: 0;
+  bottom: 0;
+  width: 16px;
+}
+
+.riftcity-map > .city-road-v1 { left: 33%; }
+.riftcity-map > .city-road-v2 { left: 50%; width: 19px; }
+.riftcity-map > .city-road-v3 { left: 67%; }
+
+.riftcity-map > .city-road::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255,255,255,.18) 0 18px,
+    transparent 18px 34px
+  );
+}
+
+.riftcity-map > .city-road-vertical::after {
+  inset: 0 auto 0 50%;
+  width: 1px;
+  height: auto;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255,255,255,.18) 0 18px,
+    transparent 18px 34px
+  );
+}
+
+.riftcity-map > .city-road span {
+  position: absolute;
+  z-index: 1;
+  color: rgba(190,202,214,.38);
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: .16em;
+  white-space: nowrap;
+}
+
+.riftcity-map > .city-road-horizontal span {
+  right: 8px;
+  top: -1px;
+}
+
+.riftcity-map > .city-road-vertical span {
+  left: 2px;
+  top: 8px;
+  writing-mode: vertical-rl;
+}
+
+/* park */
+.city-park {
+  position: absolute;
+  z-index: 5;
+  left: 37%;
+  top: 51.5%;
+  width: 26%;
+  height: 17%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(74,222,128,.22);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(74,222,128,.12), transparent 35%),
+    rgba(17,52,37,.60);
+  box-shadow:
+    inset 0 0 20px rgba(74,222,128,.04),
+    0 7px 20px rgba(0,0,0,.2);
+  pointer-events: none;
+}
+
+.city-park-trees {
+  margin-bottom: 3px;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+.city-park strong {
+  color: #bbf7d0;
+  font-size: 8px;
+  letter-spacing: .12em;
+}
+
+.city-park small {
+  margin-top: 2px;
+  color: rgba(187,247,208,.48);
+  font-size: 6px;
+  letter-spacing: .15em;
+}
+
+/* map locations */
+.city-map-location {
+  position: absolute;
+  z-index: 20;
+  width: clamp(105px, 11vw, 142px);
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 7px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(96,165,250,.27);
+  border-radius: 9px;
+  background:
+    linear-gradient(180deg, rgba(18,29,40,.97), rgba(9,16,23,.98));
+  color: var(--text);
+  cursor: pointer;
+  box-shadow:
+    0 8px 22px rgba(0,0,0,.38),
+    inset 0 1px rgba(255,255,255,.025);
+  transition:
+    transform .16s ease,
+    border-color .16s ease,
+    box-shadow .16s ease,
+    background .16s ease;
+}
+
+.city-map-location:hover:not(:disabled) {
+  transform: translate(-50%, calc(-50% - 4px));
+  border-color: rgba(96,165,250,.75);
+  background:
+    linear-gradient(180deg, rgba(26,43,59,.98), rgba(11,20,29,.99));
+  box-shadow:
+    0 14px 30px rgba(0,0,0,.48),
+    0 0 20px rgba(96,165,250,.09);
+}
+
+.city-map-location:active:not(:disabled) {
+  transform: translate(-50%, calc(-50% - 1px));
+}
+
+.city-map-location:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.city-map-icon {
+  width: 31px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 7px;
+  background: rgba(255,255,255,.035);
+  font-size: 16px;
+}
+
+.city-map-name {
+  max-width: 100%;
+  color: var(--text);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.city-map-district {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 6px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* location accents */
+.city-map-location-hospital {
+  border-color: rgba(248,113,113,.30);
+}
+.city-map-location-bank {
+  border-color: rgba(250,204,21,.30);
+}
+.city-map-location-university {
+  border-color: rgba(167,139,250,.30);
+}
+.city-map-location-jobs {
+  border-color: rgba(96,165,250,.30);
+}
+.city-map-location-gym {
+  border-color: rgba(74,222,128,.30);
+}
+.city-map-location-crime {
+  border-color: rgba(248,113,113,.30);
+}
+.city-map-location-combat {
+  border-color: rgba(248,113,113,.30);
+}
+.city-map-location-market {
+  border-color: rgba(103,232,249,.30);
+}
+
+/* center marker */
+.city-center-marker {
+  position: absolute;
+  z-index: 25;
+  left: 50%;
+  top: 59%;
+  width: 82px;
+  height: 82px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(96,165,250,.45);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(96,165,250,.15), rgba(8,15,22,.96) 68%);
+  box-shadow:
+    0 0 0 5px rgba(96,165,250,.045),
+    0 0 28px rgba(96,165,250,.10);
+  pointer-events: none;
+}
+
+.city-center-marker span {
+  font-size: 16px;
+}
+
+.city-center-marker strong {
+  color: #dbeafe;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.city-center-marker small {
+  margin-top: 2px;
+  color: var(--blue);
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+/* directions */
+.city-map-direction {
+  position: absolute;
+  z-index: 30;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 50%;
+  background: rgba(8,12,17,.76);
+  color: rgba(232,237,243,.65);
+  font-size: 7px;
+  font-weight: 900;
+  box-shadow: 0 4px 10px rgba(0,0,0,.2);
+  pointer-events: none;
+}
+
+.city-map-north { left: 50%; top: 9px; transform: translateX(-50%); }
+.city-map-south { left: 50%; bottom: 9px; transform: translateX(-50%); }
+.city-map-west { left: 9px; top: 50%; transform: translateY(-50%); }
+.city-map-east { right: 9px; top: 50%; transform: translateY(-50%); }
+
+/* legend */
+.city-map-panel > .city-map-legend {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  padding: 10px 13px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: rgba(8,12,17,.70);
+  backdrop-filter: blur(8px);
+}
+
+.city-map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.city-map-legend-item span {
+  font-size: 11px;
+}
+
+.city-map-legend-item small {
+  color: inherit;
+  font-size: inherit;
+}
+
+/* ------------------------------------------------------------
+   DISTRICTS
+------------------------------------------------------------ */
+
+.city-districts,
+.city-services {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.city-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 0;
+}
+
+.city-section-heading h3 {
+  margin: 5px 0 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -.025em;
+}
+
+.city-district-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.city-district-card {
+  min-width: 0;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(17,26,35,.96), rgba(12,18,25,.96));
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.city-district-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  background: linear-gradient(180deg, rgba(24,36,48,.98), rgba(13,21,29,.98));
+}
+
+.city-district-card > span:last-child {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.city-district-card:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.city-district-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  background: rgba(96,165,250,.055);
+  font-size: 16px;
+}
+
+.city-district-card strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city-district-card p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+/* ------------------------------------------------------------
+   SERVICES
+------------------------------------------------------------ */
+
+.city-service-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.city-service-grid .city-service-card {
+  width: 100%;
+  min-width: 0;
+  min-height: 84px;
+  display: grid;
+  grid-template-columns: 34px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(17,26,35,.96), rgba(12,18,25,.96));
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.city-service-grid .city-service-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(96,165,250,.35);
+  background: linear-gradient(180deg, rgba(23,35,48,.98), rgba(13,21,29,.98));
+}
+
+.city-service-grid .city-service-card:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.city-service-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  background: rgba(96,165,250,.055);
+  font-size: 16px;
+}
+
+.city-service-card > div {
+  min-width: 0;
+}
+
+.city-service-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.city-service-card p {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city-service-arrow {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* Quick Actions uses the existing Panel/ui-grid markup */
+.city-page > .card:last-child {
+  margin-bottom: 2px;
+}
+
+/* ------------------------------------------------------------
+   RESPONSIVE CITY V2
+------------------------------------------------------------ */
+
+@media (max-width: 1100px) {
+  .city-header {
+    grid-template-columns: 1fr;
+  }
+
+  .city-status {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .city-district-grid,
+  .city-service-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .riftcity-map {
+    min-height: 540px;
+  }
+}
+
+@media (max-width: 800px) {
+  .screen-container {
+    padding: 16px;
+  }
+
+  .city-header {
+    padding: 15px;
+  }
+
+  .city-district-grid,
+  .city-service-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .riftcity-map {
+    min-height: 500px;
+  }
+
+  .city-map-location {
+    width: 98px;
+    min-height: 70px;
+  }
+
+  .city-map-name {
+    font-size: 8px;
+  }
+
+  .city-map-district {
+    font-size: 5.5px;
+  }
+}
+
+@media (max-width: 600px) {
+  .city-page {
+    gap: 12px;
+  }
+
+  .city-header {
+    gap: 13px;
+    padding: 13px;
+  }
+
+  .city-header h2 {
+    font-size: 21px;
+  }
+
+  .city-header p {
+    font-size: 9px;
+  }
+
+  .city-status {
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 5px;
+  }
+
+  .city-status-item {
+    min-width: 0;
+    padding: 7px 6px;
+  }
+
+  .city-status-item span {
+    font-size: 6px;
+  }
+
+  .city-status-item strong {
+    font-size: 9px;
+  }
+
+  .city-incapacitated {
+    padding: 9px 10px;
+    gap: 9px;
+  }
+
+  .city-incapacitated > span {
+    width: 29px;
+    height: 29px;
+    flex-basis: 29px;
+    font-size: 14px;
+  }
+
+  .city-incapacitated p {
+    font-size: 7px;
+  }
+
+  .city-map-panel > .city-map-header {
+    min-height: 62px;
+    padding: 10px 11px;
+  }
+
+  .city-map-header h3 {
+    font-size: 13px;
+  }
+
+  .city-map-live {
+    padding: 5px 7px;
+    font-size: 6px;
+  }
+
+  .riftcity-map {
+    min-height: 410px;
+  }
+
+  .city-map-location {
+    width: 78px;
+    min-height: 58px;
+    padding: 5px 4px;
+    border-radius: 7px;
+  }
+
+  .city-map-icon {
+    width: 23px;
+    height: 23px;
+    font-size: 12px;
+  }
+
+  .city-map-name {
+    font-size: 6.5px;
+  }
+
+  .city-map-district {
+    display: none;
+  }
+
+  .city-park {
+    width: 25%;
+    height: 15%;
+  }
+
+  .city-park-trees {
+    font-size: 9px;
+  }
+
+  .city-park strong {
+    font-size: 5.5px;
+  }
+
+  .city-park small {
+    font-size: 4.5px;
+  }
+
+  .city-center-marker {
+    width: 58px;
+    height: 58px;
+  }
+
+  .city-center-marker span {
+    font-size: 11px;
+  }
+
+  .city-center-marker strong {
+    font-size: 5px;
+  }
+
+  .city-center-marker small {
+    font-size: 4px;
+  }
+
+  .city-map-direction {
+    width: 18px;
+    height: 18px;
+    font-size: 6px;
+  }
+
+  .city-map-legend {
+    gap: 5px 8px;
+    padding: 8px 10px !important;
+  }
+
+  .city-map-legend-item {
+    font-size: 6px;
+  }
+
+  .city-map-legend-item span {
+    font-size: 9px;
+  }
+
+  .city-district-grid,
+  .city-service-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  .city-district-card,
+  .city-service-grid .city-service-card {
+    min-height: 66px;
+    grid-template-columns: 27px minmax(0,1fr) auto;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .city-district-icon,
+  .city-service-icon {
+    width: 27px;
+    height: 27px;
+    font-size: 12px;
+  }
+
+  .city-district-card strong,
+  .city-service-card strong {
+    font-size: 8px;
+  }
+
+  .city-district-card p,
+  .city-service-card p {
+    font-size: 6px;
+  }
+
+  .city-district-card > span:last-child,
+  .city-service-arrow {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .city-status {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .city-status-item strong {
+    font-size: 8px;
+  }
+
+  .city-district-grid,
+  .city-service-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .riftcity-map {
+    min-height: 370px;
+  }
+
+  .city-map-location {
+    width: 72px;
+    min-height: 54px;
+  }
+
+  .city-map-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+
+  .city-map-name {
+    font-size: 6px;
+  }
+
+  .city-map-live {
+    display: none;
+  }
+}
