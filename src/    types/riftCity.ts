@@ -29,6 +29,7 @@ export type SaveData = {
   nerve: number;
   lastNerveUpdate: number;
   health: number;
+  lastHealthUpdate: number;
   crimeExperience: number;
   stats: CombatStats;
   gymExperience: number;
@@ -39,6 +40,9 @@ export type SaveData = {
   currentJob: string | null;
   jobStartedAt: number;
   lastJobPayment: number;
+  lastJobSkillUpdate: number;
+  jobSkills: Record<string, number>;
+  jobPositionTiers: Record<string, number>;
   jailUntil: number | null;
   hospitalUntil: number | null;
   inventory: Record<string, number>;
@@ -66,6 +70,7 @@ export type SaveData = {
   company: string | null;
   companyReputation: number;
   market: Record<string, number>;
+  lastMarketUpdate: number;
   lastDailyClaim: number | null;
   dailyStreak: number;
   achievements: string[];
