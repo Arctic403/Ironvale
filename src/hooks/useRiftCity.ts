@@ -1070,7 +1070,11 @@ export function useRiftCity() {
   };
 
   /*
-   * TRAVEL
+   * WORLD TRAVEL (FOUNDATION)
+   *
+   * Kept as a game-state primitive for the future world map.
+   * Local city navigation is handled by City.tsx and does not
+   * consume travel cooldown or travel cash.
    */
   const travel = (id: string) =>
     setGameState((prev) => {
