@@ -1,3 +1,7 @@
+import type { Game } from "./GameScreens";
+import React, { useState } from "react";
+import { CITY_LOCATIONS, type CityLocation } from "../data/cityLocations";
+import type { useRiftCity } from "../hooks/useRiftCity";
 /* =========================================================
    CITY
    RIFTCITY — INTERACTIVE CITY MAP
