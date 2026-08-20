@@ -11,15 +11,38 @@ type Game = ReturnType<typeof useRiftCity>;
    RIFTCITY — INTERACTIVE CITY MAP
 ========================================================= */
 
+type PointerPoint = {
+  x: number;
+  y: number;
+};
+
+type GestureState = {
+  mode: "idle" | "drag" | "pinch";
+  startX: number;
+  startY: number;
+  panX: number;
+  panY: number;
+  startZoom: number;
+  startDistance: number;
+  startMidX: number;
+  startMidY: number;
+  moved: boolean;
+};
+
 export function City({ g }: { g: Game }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+
   const mapRef = useRef<HTMLDivElement | null>(null);
-  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
-  const gestureRef = useRef({
-    mode: "idle" as "idle" | "drag" | "pinch",
+
+  const pointersRef = useRef(
+    new Map<number, PointerPoint>(),
+  );
+
+  const gestureRef = useRef<GestureState>({
+    mode: "idle",
     startX: 0,
     startY: 0,
     panX: 0,
@@ -31,143 +54,531 @@ export function City({ g }: { g: Game }) {
     moved: false,
   });
 
-  const clampZoom = (value: number) => Math.min(2, Math.max(1, value));
+  /* =========================================================
+     MAP CONSTANTS
+  ========================================================= */
 
-  const clampPan = (next: { x: number; y: number }, nextZoom: number) => {
-    // Pan is stored in SVG viewBox units, so it stays stable on every screen size.
-    const maxX = ((nextZoom - 1) * 1000) / 2;
-    const maxY = ((nextZoom - 1) * 700) / 2;
+  const MAP_WIDTH = 1000;
+  const MAP_HEIGHT = 700;
+
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 2.5;
+
+  /* =========================================================
+     ZOOM
+  ========================================================= */
+
+  const clampZoom = (value: number) => {
+    return Math.min(
+      MAX_ZOOM,
+      Math.max(MIN_ZOOM, value),
+    );
+  };
+
+  /* =========================================================
+     PAN
+     
+     Pan is stored in SVG viewBox units.
+
+     At 1x the map fills the viewport, so there is no
+     additional world outside the edges.
+
+     As zoom increases, the available pan grows.
+  ========================================================= */
+
+  const clampPan = (
+    next: { x: number; y: number },
+    nextZoom: number,
+  ) => {
+    const maxX =
+      ((nextZoom - 1) * MAP_WIDTH) / 2;
+
+    const maxY =
+      ((nextZoom - 1) * MAP_HEIGHT) / 2;
+
     return {
-      x: Math.max(-maxX, Math.min(maxX, next.x)),
-      y: Math.max(-maxY, Math.min(maxY, next.y)),
+      x: Math.max(
+        -maxX,
+        Math.min(maxX, next.x),
+      ),
+
+      y: Math.max(
+        -maxY,
+        Math.min(maxY, next.y),
+      ),
     };
   };
 
-  const svgPoint = (clientX: number, clientY: number) => {
-    const rect = mapRef.current?.getBoundingClientRect();
-    if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 };
+  /* =========================================================
+     SCREEN → SVG COORDINATES
+  ========================================================= */
+
+  const svgPoint = (
+    clientX: number,
+    clientY: number,
+  ): PointerPoint => {
+    const svg =
+      mapRef.current?.querySelector(
+        "svg",
+      ) as SVGSVGElement | null;
+
+    if (!svg) {
+      return { x: 0, y: 0 };
+    }
+
+    const rect =
+      svg.getBoundingClientRect();
+
+    if (
+      !rect.width ||
+      !rect.height
+    ) {
+      return { x: 0, y: 0 };
+    }
+
     return {
-      x: ((clientX - rect.left) / rect.width) * 1000,
-      y: ((clientY - rect.top) / rect.height) * 700,
+      x:
+        ((clientX - rect.left) /
+          rect.width) *
+        MAP_WIDTH,
+
+      y:
+        ((clientY - rect.top) /
+          rect.height) *
+        MAP_HEIGHT,
     };
   };
 
-  const incapacitated = Boolean(g.gameState.jailUntil || g.gameState.hospitalUntil);
-  const hospitalized = Boolean(g.gameState.hospitalUntil);
-  const jailed = Boolean(g.gameState.jailUntil);
-  const selected = CITY_LOCATIONS.find((location) => location.id === selectedId) ?? null;
+  /* =========================================================
+     GAME STATE
+  ========================================================= */
 
-  const goTo = (screen?: CityLocation["screen"]) => {
-    if (!incapacitated && screen) g.setCurrentScreen(screen);
+  const incapacitated = Boolean(
+    g.gameState.jailUntil ||
+      g.gameState.hospitalUntil,
+  );
+
+  const hospitalized = Boolean(
+    g.gameState.hospitalUntil,
+  );
+
+  const jailed = Boolean(
+    g.gameState.jailUntil,
+  );
+
+  const selected =
+    CITY_LOCATIONS.find(
+      (location) =>
+        location.id === selectedId,
+    ) ?? null;
+
+  const goTo = (
+    screen?: CityLocation["screen"],
+  ) => {
+    if (
+      !incapacitated &&
+      screen
+    ) {
+      g.setCurrentScreen(screen);
+    }
   };
+
+  /* =========================================================
+     MAP CONTROLS
+  ========================================================= */
 
   const resetMap = () => {
     setZoom(1);
-    setPan({ x: 0, y: 0 });
+    setPan({
+      x: 0,
+      y: 0,
+    });
+    setSelectedId(null);
+
+    gestureRef.current = {
+      mode: "idle",
+      startX: 0,
+      startY: 0,
+      panX: 0,
+      panY: 0,
+      startZoom: 1,
+      startDistance: 0,
+      startMidX: 0,
+      startMidY: 0,
+      moved: false,
+    };
+
+    pointersRef.current.clear();
+    setDragging(false);
   };
 
-  const zoomAtCenter = (delta: number) => {
-    setZoom((current) => {
-      const next = clampZoom(current + delta);
-      setPan((currentPan) => clampPan(currentPan, next));
-      return next;
+  const zoomAtCenter = (
+    delta: number,
+  ) => {
+    setZoom((currentZoom) => {
+      const nextZoom =
+        clampZoom(
+          currentZoom + delta,
+        );
+
+      setPan((currentPan) =>
+        clampPan(
+          currentPan,
+          nextZoom,
+        ),
+      );
+
+      return nextZoom;
     });
   };
 
-  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.preventDefault();
-    const point = svgPoint(event.clientX, event.clientY);
-    pointersRef.current.set(event.pointerId, point);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+  /* =========================================================
+     POINTER DOWN
+  ========================================================= */
 
-    const points = [...pointersRef.current.values()];
+  const onPointerDown = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    /*
+     * Only accept the primary mouse button.
+     * Touch and pen are always allowed.
+     */
+    if (
+      event.pointerType === "mouse" &&
+      event.button !== 0
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const point = svgPoint(
+      event.clientX,
+      event.clientY,
+    );
+
+    pointersRef.current.set(
+      event.pointerId,
+      point,
+    );
+
+    try {
+      event.currentTarget.setPointerCapture(
+        event.pointerId,
+      );
+    } catch {
+      /*
+       * iOS/Safari can occasionally reject
+       * pointer capture. The gesture can still
+       * continue without it.
+       */
+    }
+
+    const points = [
+      ...pointersRef.current.values(),
+    ];
+
+    /* ---------------------------------------------------------
+       SECOND FINGER = PINCH
+    --------------------------------------------------------- */
+
     if (points.length >= 2) {
       const [a, b] = points;
+
+      const distance = Math.max(
+        1,
+        Math.hypot(
+          b.x - a.x,
+          b.y - a.y,
+        ),
+      );
+
       gestureRef.current = {
-        ...gestureRef.current,
         mode: "pinch",
-        startZoom: zoom,
-        startDistance: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
-        startMidX: (a.x + b.x) / 2,
-        startMidY: (a.y + b.y) / 2,
+
+        startX: 0,
+        startY: 0,
+
         panX: pan.x,
         panY: pan.y,
+
+        startZoom: zoom,
+
+        startDistance: distance,
+
+        startMidX:
+          (a.x + b.x) / 2,
+
+        startMidY:
+          (a.y + b.y) / 2,
+
         moved: true,
       };
-    } else {
-      gestureRef.current = {
-        mode: "drag",
-        startX: point.x,
-        startY: point.y,
-        panX: pan.x,
-        panY: pan.y,
-        startZoom: zoom,
-        startDistance: 0,
-        startMidX: 0,
-        startMidY: 0,
-        moved: false,
-      };
+
+      setDragging(true);
+
+      return;
     }
+
+    /* ---------------------------------------------------------
+       FIRST FINGER = DRAG
+    --------------------------------------------------------- */
+
+    gestureRef.current = {
+      mode: "drag",
+
+      startX: point.x,
+      startY: point.y,
+
+      panX: pan.x,
+      panY: pan.y,
+
+      startZoom: zoom,
+
+      startDistance: 0,
+      startMidX: 0,
+      startMidY: 0,
+
+      moved: false,
+    };
+
     setDragging(true);
   };
 
-  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!pointersRef.current.has(event.pointerId)) return;
-    event.preventDefault();
-    pointersRef.current.set(event.pointerId, svgPoint(event.clientX, event.clientY));
-    const gesture = gestureRef.current;
-    const points = [...pointersRef.current.values()];
+  /* =========================================================
+     POINTER MOVE
+  ========================================================= */
 
-    if (points.length >= 2 && gesture.mode === "pinch") {
-      const [a, b] = points;
-      const distance = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-      const nextZoom = clampZoom(gesture.startZoom * (distance / gesture.startDistance));
-      const midX = (a.x + b.x) / 2;
-      const midY = (a.y + b.y) / 2;
-      setZoom(nextZoom);
-      setPan(clampPan({
-        x: gesture.panX + (midX - gesture.startMidX),
-        y: gesture.panY + (midY - gesture.startMidY),
-      }, nextZoom));
+  const onPointerMove = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    if (
+      !pointersRef.current.has(
+        event.pointerId,
+      )
+    ) {
       return;
     }
 
-    if (gesture.mode === "drag") {
-      const point = pointersRef.current.get(event.pointerId)!;
-      const dx = point.x - gesture.startX;
-      const dy = point.y - gesture.startY;
-      if (Math.abs(dx) + Math.abs(dy) > 5) gesture.moved = true;
-      setPan(clampPan({ x: gesture.panX + dx, y: gesture.panY + dy }, zoom));
+    event.preventDefault();
+
+    const point = svgPoint(
+      event.clientX,
+      event.clientY,
+    );
+
+    pointersRef.current.set(
+      event.pointerId,
+      point,
+    );
+
+    const gesture =
+      gestureRef.current;
+
+    const points = [
+      ...pointersRef.current.values(),
+    ];
+
+    /* ---------------------------------------------------------
+       PINCH / TWO-FINGER PAN
+    --------------------------------------------------------- */
+
+    if (
+      points.length >= 2 &&
+      gesture.mode === "pinch"
+    ) {
+      const [a, b] = points;
+
+      const distance = Math.max(
+        1,
+        Math.hypot(
+          b.x - a.x,
+          b.y - a.y,
+        ),
+      );
+
+      const nextZoom =
+        clampZoom(
+          gesture.startZoom *
+            (distance /
+              gesture.startDistance),
+        );
+
+      const midX =
+        (a.x + b.x) / 2;
+
+      const midY =
+        (a.y + b.y) / 2;
+
+      const nextPan =
+        clampPan(
+          {
+            x:
+              gesture.panX +
+              (midX -
+                gesture.startMidX),
+
+            y:
+              gesture.panY +
+              (midY -
+                gesture.startMidY),
+          },
+          nextZoom,
+        );
+
+      setZoom(nextZoom);
+      setPan(nextPan);
+
+      return;
+    }
+
+    /* ---------------------------------------------------------
+       ONE-FINGER DRAG
+    --------------------------------------------------------- */
+
+    if (
+      gesture.mode === "drag"
+    ) {
+      const currentPoint =
+        pointersRef.current.get(
+          event.pointerId,
+        );
+
+      if (!currentPoint) {
+        return;
+      }
+
+      const dx =
+        currentPoint.x -
+        gesture.startX;
+
+      const dy =
+        currentPoint.y -
+        gesture.startY;
+
+      /*
+       * Once movement exceeds a tiny threshold,
+       * this is definitely a drag and not a tap.
+       */
+      if (
+        Math.abs(dx) +
+          Math.abs(dy) >
+        5
+      ) {
+        gesture.moved = true;
+      }
+
+      const nextPan =
+        clampPan(
+          {
+            x:
+              gesture.panX + dx,
+
+            y:
+              gesture.panY + dy,
+          },
+          zoom,
+        );
+
+      setPan(nextPan);
     }
   };
 
-  const stopPointer = (event: React.PointerEvent<HTMLDivElement>) => {
-    pointersRef.current.delete(event.pointerId);
-    const points = [...pointersRef.current.values()];
+  /* =========================================================
+     POINTER UP / CANCEL
+  ========================================================= */
+
+  const stopPointer = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
+    pointersRef.current.delete(
+      event.pointerId,
+    );
+
+    try {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId,
+      );
+    } catch {
+      /*
+       * Pointer capture may already have
+       * been released by Safari.
+       */
+    }
+
+    const points = [
+      ...pointersRef.current.values(),
+    ];
+
+    /* ---------------------------------------------------------
+       PINCH → ONE FINGER DRAG
+    --------------------------------------------------------- */
+
     if (points.length === 1) {
       const point = points[0];
+
       gestureRef.current = {
-        ...gestureRef.current,
         mode: "drag",
+
         startX: point.x,
         startY: point.y,
+
         panX: pan.x,
         panY: pan.y,
+
+        startZoom: zoom,
+
+        startDistance: 0,
+        startMidX: 0,
+        startMidY: 0,
+
+        /*
+         * A pinch has already moved, so don't
+         * accidentally turn the remaining finger
+         * into a location click.
+         */
         moved: true,
       };
+
+      setDragging(true);
+
       return;
     }
+
+    /* ---------------------------------------------------------
+       ALL POINTERS RELEASED
+    --------------------------------------------------------- */
+
     if (points.length === 0) {
-      gestureRef.current.mode = "idle";
-      window.setTimeout(() => setDragging(false), 0);
+      gestureRef.current.mode =
+        "idle";
+
+      /*
+       * Delay slightly so the final click event
+       * can see gestureRef.current.moved.
+       */
+      window.setTimeout(() => {
+        setDragging(false);
+      }, 0);
     }
   };
 
-  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+  /* =========================================================
+     WHEEL ZOOM
+  ========================================================= */
+
+  const onWheel = (
+    event: React.WheelEvent<HTMLDivElement>,
+  ) => {
     event.preventDefault();
-    zoomAtCenter(event.deltaY < 0 ? 0.12 : -0.12);
+
+    zoomAtCenter(
+      event.deltaY < 0
+        ? 0.12
+        : -0.12,
+    );
   };
+
   return (
     <div className="city-page">
 
@@ -177,7 +588,9 @@ export function City({ g }: { g: Game }) {
 
       <div className="city-header card">
         <div>
-          <span className="card-tag">RIFTCITY</span>
+          <span className="card-tag">
+            RIFTCITY
+          </span>
 
           <h2>The City</h2>
 
@@ -191,6 +604,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="city-status-item">
             <span>💵 Cash</span>
+
             <strong>
               {money(g.gameState.cash)}
             </strong>
@@ -198,6 +612,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="city-status-item">
             <span>🏦 Bank</span>
+
             <strong>
               {money(g.gameState.bank)}
             </strong>
@@ -205,6 +620,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="city-status-item">
             <span>⚡ Energy</span>
+
             <strong>
               {g.gameState.energy}/{MAX_ENERGY}
             </strong>
@@ -228,7 +644,9 @@ export function City({ g }: { g: Game }) {
           }`}
         >
           <span>
-            {hospitalized ? "🏥" : "🚔"}
+            {hospitalized
+              ? "🏥"
+              : "🚔"}
           </span>
 
           <div>
@@ -275,7 +693,9 @@ export function City({ g }: { g: Game }) {
             <button
               type="button"
               className="city-map-tool"
-              onClick={() => zoomAtCenter(0.1)}
+              onClick={() =>
+                zoomAtCenter(0.1)
+              }
               aria-label="Zoom in"
             >
               +
@@ -284,7 +704,9 @@ export function City({ g }: { g: Game }) {
             <button
               type="button"
               className="city-map-tool"
-              onClick={() => zoomAtCenter(-0.1)}
+              onClick={() =>
+                zoomAtCenter(-0.1)
+              }
               aria-label="Zoom out"
             >
               −
@@ -308,12 +730,22 @@ export function City({ g }: { g: Game }) {
         <div
           ref={mapRef}
           className={`riftcity-map interactive-map ${
-            dragging ? "is-dragging" : ""
+            dragging
+              ? "is-dragging"
+              : ""
           }`}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={stopPointer}
-          onPointerCancel={stopPointer}
+          onPointerDown={
+            onPointerDown
+          }
+          onPointerMove={
+            onPointerMove
+          }
+          onPointerUp={
+            stopPointer
+          }
+          onPointerCancel={
+            stopPointer
+          }
           onWheel={onWheel}
         >
 
@@ -326,7 +758,11 @@ export function City({ g }: { g: Game }) {
 
             <g
               className="map-world"
-              transform={`translate(${500 + pan.x} ${350 + pan.y}) scale(${zoom}) translate(-500 -350)`}
+              transform={`translate(${
+                500 + pan.x
+              } ${
+                350 + pan.y
+              }) scale(${zoom}) translate(-500 -350)`}
             >
 
               {/* =================================================
@@ -438,23 +874,109 @@ export function City({ g }: { g: Game }) {
 
               <g className="map-blocks">
 
-                <rect x="70" y="245" width="120" height="72" rx="10" />
-                <rect x="235" y="235" width="125" height="82" rx="10" />
-                <rect x="410" y="235" width="115" height="72" rx="10" />
-                <rect x="570" y="225" width="125" height="82" rx="10" />
-                <rect x="745" y="225" width="145" height="82" rx="10" />
+                <rect
+                  x="70"
+                  y="245"
+                  width="120"
+                  height="72"
+                  rx="10"
+                />
 
-                <rect x="80" y="405" width="120" height="72" rx="10" />
-                <rect x="245" y="400" width="110" height="70" rx="10" />
+                <rect
+                  x="235"
+                  y="235"
+                  width="125"
+                  height="82"
+                  rx="10"
+                />
 
-                <rect x="595" y="390" width="120" height="72" rx="10" />
-                <rect x="760" y="380" width="130" height="82" rx="10" />
+                <rect
+                  x="410"
+                  y="235"
+                  width="115"
+                  height="72"
+                  rx="10"
+                />
 
-                <rect x="70" y="555" width="125" height="65" rx="10" />
-                <rect x="250" y="550" width="120" height="70" rx="10" />
+                <rect
+                  x="570"
+                  y="225"
+                  width="125"
+                  height="82"
+                  rx="10"
+                />
 
-                <rect x="585" y="545" width="135" height="70" rx="10" />
-                <rect x="765" y="535" width="140" height="75" rx="10" />
+                <rect
+                  x="745"
+                  y="225"
+                  width="145"
+                  height="82"
+                  rx="10"
+                />
+
+                <rect
+                  x="80"
+                  y="405"
+                  width="120"
+                  height="72"
+                  rx="10"
+                />
+
+                <rect
+                  x="245"
+                  y="400"
+                  width="110"
+                  height="70"
+                  rx="10"
+                />
+
+                <rect
+                  x="595"
+                  y="390"
+                  width="120"
+                  height="72"
+                  rx="10"
+                />
+
+                <rect
+                  x="760"
+                  y="380"
+                  width="130"
+                  height="82"
+                  rx="10"
+                />
+
+                <rect
+                  x="70"
+                  y="555"
+                  width="125"
+                  height="65"
+                  rx="10"
+                />
+
+                <rect
+                  x="250"
+                  y="550"
+                  width="120"
+                  height="70"
+                  rx="10"
+                />
+
+                <rect
+                  x="585"
+                  y="545"
+                  width="135"
+                  height="70"
+                  rx="10"
+                />
+
+                <rect
+                  x="765"
+                  y="535"
+                  width="140"
+                  height="75"
+                  rx="10"
+                />
 
               </g>
 
@@ -496,11 +1018,40 @@ export function City({ g }: { g: Game }) {
                   rx="8"
                 />
 
-                <line x1="445" y1="172" x2="445" y2="202" />
-                <line x1="475" y1="172" x2="475" y2="202" />
-                <line x1="505" y1="172" x2="505" y2="202" />
-                <line x1="535" y1="172" x2="535" y2="202" />
-                <line x1="565" y1="172" x2="565" y2="202" />
+                <line
+                  x1="445"
+                  y1="172"
+                  x2="445"
+                  y2="202"
+                />
+
+                <line
+                  x1="475"
+                  y1="172"
+                  x2="475"
+                  y2="202"
+                />
+
+                <line
+                  x1="505"
+                  y1="172"
+                  x2="505"
+                  y2="202"
+                />
+
+                <line
+                  x1="535"
+                  y1="172"
+                  x2="535"
+                  y2="202"
+                />
+
+                <line
+                  x1="565"
+                  y1="172"
+                  x2="565"
+                  y2="202"
+                />
 
               </g>
 
@@ -542,87 +1093,123 @@ export function City({ g }: { g: Game }) {
                   CITY LOCATIONS
               ================================================= */}
 
-              {CITY_LOCATIONS.map((location) => {
-                const x =
-                  (Number.parseFloat(location.x) / 100) *
-                  1000;
+              {CITY_LOCATIONS.map(
+                (location) => {
+                  const x =
+                    (Number.parseFloat(
+                      location.x,
+                    ) /
+                      100) *
+                    MAP_WIDTH;
 
-                const y =
-                  (Number.parseFloat(location.y) / 100) *
-                  700;
+                  const y =
+                    (Number.parseFloat(
+                      location.y,
+                    ) /
+                      100) *
+                    MAP_HEIGHT;
 
-                const active =
-                  selectedId === location.id;
+                  const active =
+                    selectedId ===
+                    location.id;
 
-                return (
-                  <g
-                    key={location.id}
-                    className={`map-location ${
-                      active ? "is-selected" : ""
-                    }`}
-                    transform={`translate(${x} ${y})`}
-                    onPointerDown={(event) =>
-                      event.stopPropagation()
-                    }
-                    onClick={() => {
-                      if (!dragRef.current.moved) setSelectedId(location.id);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={location.name}
-                    onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" ||
-                        event.key === " "
-                      ) {
-                        event.preventDefault();
-                        setSelectedId(location.id);
+                  return (
+                    <g
+                      key={
+                        location.id
                       }
-                    }}
-                  >
+                      className={`map-location ${
+                        active
+                          ? "is-selected"
+                          : ""
+                      }`}
+                      transform={`translate(${x} ${y})`}
+                      onClick={() => {
+                        /*
+                         * IMPORTANT:
+                         * A location can be tapped,
+                         * but dragging across it must
+                         * NOT select it.
+                         */
+                        if (
+                          !gestureRef.current
+                            .moved
+                        ) {
+                          setSelectedId(
+                            location.id,
+                          );
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={
+                        location.name
+                      }
+                      onKeyDown={(
+                        event,
+                      ) => {
+                        if (
+                          event.key ===
+                            "Enter" ||
+                          event.key ===
+                            " "
+                        ) {
+                          event.preventDefault();
 
-                    <circle
-                      className="map-location-halo"
-                      r="31"
-                    />
-
-                    <rect
-                      className="map-building"
-                      x="-29"
-                      y="-25"
-                      width="58"
-                      height="50"
-                      rx="10"
-                    />
-
-                    <text
-                      className="map-location-icon"
-                      x="0"
-                      y="7"
-                      textAnchor="middle"
+                          setSelectedId(
+                            location.id,
+                          );
+                        }
+                      }}
                     >
-                      {location.icon}
-                    </text>
 
-                    <text
-                      className="map-location-label"
-                      x="0"
-                      y="43"
-                      textAnchor="middle"
-                    >
-                      {location.name}
-                    </text>
+                      <circle
+                        className="map-location-halo"
+                        r="31"
+                      />
 
-                    <circle
-                      className="map-location-dot"
-                      cx="24"
-                      cy="-22"
-                      r="5"
-                    />
+                      <rect
+                        className="map-building"
+                        x="-29"
+                        y="-25"
+                        width="58"
+                        height="50"
+                        rx="10"
+                      />
 
-                  </g>
-                );
-              })}
+                      <text
+                        className="map-location-icon"
+                        x="0"
+                        y="7"
+                        textAnchor="middle"
+                      >
+                        {
+                          location.icon
+                        }
+                      </text>
+
+                      <text
+                        className="map-location-label"
+                        x="0"
+                        y="43"
+                        textAnchor="middle"
+                      >
+                        {
+                          location.name
+                        }
+                      </text>
+
+                      <circle
+                        className="map-location-dot"
+                        cx="24"
+                        cy="-22"
+                        r="5"
+                      />
+
+                    </g>
+                  );
+                },
+              )}
 
               {/* =================================================
                   PLAYER MARKER
@@ -720,34 +1307,48 @@ export function City({ g }: { g: Game }) {
               <button
                 type="button"
                 className="map-location-close"
-                onClick={() => setSelectedId(null)}
+                onClick={() =>
+                  setSelectedId(null)
+                }
                 aria-label="Close location details"
               >
                 ×
               </button>
 
               <div className="map-location-panel-icon">
-                {selected.icon}
+                {
+                  selected.icon
+                }
               </div>
 
               <div className="map-location-panel-copy">
 
                 <span>
-                  {selected.district}
+                  {
+                    selected.district
+                  }
                 </span>
 
                 <h4>
-                  {selected.name}
+                  {
+                    selected.name
+                  }
                 </h4>
 
                 <p>
-                  {selected.description}
+                  {
+                    selected.description
+                  }
                 </p>
 
                 <Button
-                  disabled={incapacitated}
+                  disabled={
+                    incapacitated
+                  }
                   onClick={() =>
-                    goTo(selected.screen)
+                    goTo(
+                      selected.screen,
+                    )
                   }
                 >
                   Enter Location
