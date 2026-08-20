@@ -18,6 +18,8 @@ export type Item = {
   contraband?:boolean;
   dropChance?:number;
   specialEffect?:string;
+  crimeTool?:boolean;
+  productionSupply?:boolean;
 };
 export type Mission = { id:string; name:string; description:string; requirement:"crime"|"combat"|"gym"|"cash"|"travel"|"faction"|"job"|"heat"; target:number; rewardCash:number; rewardXp:number; chapter?:number; prerequisite?:string; rewardMerits?:number; rewardPoints?:number };
 export type EducationCourse = { id:string; name:string; description:string; cost:number; durationHours:number; levelRequired:number; bonus:"crime"|"gym"|"combat"|"energy"|"nerve"; bonusAmount:number };

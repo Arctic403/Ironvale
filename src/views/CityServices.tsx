@@ -4,6 +4,9 @@ import { Button, Panel } from "../components/ui";
 import { ITEMS } from "../data/gameData";
 import { formatTime, money, timeLeft } from "../core/gameCore";
 import { BANK_INVESTMENT_TIERS, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE, checkingProtectedCap, savingsProtectedCap } from "../data/banking";
+import { BLACK_MARKET_STATS } from "../systems/auctionSystem";
+import { CRIME_TOOLS } from "../systems/crimeTools";
+import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
 
 type Game = ReturnType<typeof useRiftCity>;
 
@@ -144,6 +147,7 @@ export function BlackMarket({ g }: { g: Game }) {
   const [price, setPrice] = useState("500");
   const [quantity, setQuantity] = useState("1");
   const [query, setQuery] = useState("");
+  const now = useNow();
 
   const ownListable = ITEMS.filter((item) => (g.gameState.inventory[item.id] || 0) > 0);
   const listings = [...g.gameState.auctionListings, ...g.seededAuctionListings.filter((listing) => !g.gameState.auctionRemovedListingIds.includes(listing.id))]
@@ -157,28 +161,34 @@ export function BlackMarket({ g }: { g: Game }) {
   const selectedOwned = itemId ? (g.gameState.inventory[itemId] || 0) : 0;
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
   const unitPrice = Math.max(1, Math.floor(Number(price) || 1));
+  const visibleListings = listings.slice(0, query ? 80 : 45);
 
   return (
     <div className="city-service-page black-market-v2">
-      <Panel title="Black Market Exchange">
+      <Panel title="Black Market Exchange · BETA">
         <div className="service-hero">
           <span>🕶️</span>
           <div>
-            <h2>Player Listings</h2>
-            <p>Underground items are traded by players, not sold by a duplicate NPC weapon shop.</p>
+            <h2>Underground Exchange</h2>
+            <p>Simulated city-scale trading now runs beside player listings. NPC activity is beta economy data and can later be replaced by live multiplayer listings.</p>
           </div>
         </div>
 
+        <div className="black-market-stats">
+          <div><span>24h Trades</span><strong>{BLACK_MARKET_STATS.trades24h.toLocaleString()}</strong></div>
+          <div><span>24h Volume</span><strong>{money(BLACK_MARKET_STATS.volume24h)}</strong></div>
+          <div><span>Active Traders</span><strong>{BLACK_MARKET_STATS.traders.toLocaleString()}</strong></div>
+          <div><span>Listings</span><strong>{BLACK_MARKET_STATS.activeListings.toLocaleString()}</strong></div>
+          <div><span>Production Attention</span><strong>{g.gameState.productionAttention}/100</strong></div>
+        </div>
+
         <div className="black-market-toolbar">
-          <label>
-            <span>Search listings</span>
-            <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Item or seller" />
-          </label>
+          <label><span>Search listings</span><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Item or seller" /></label>
           <div className="black-market-balance"><span>Cash</span><strong>{money(g.gameState.cash)}</strong></div>
         </div>
 
         <div className="auction-listings">
-          {listings.map((listing) => {
+          {visibleListings.map((listing) => {
             const item = ITEMS.find((x) => x.id === listing.itemId);
             if (!item) return null;
             const mine = listing.seller === "You";
@@ -187,43 +197,55 @@ export function BlackMarket({ g }: { g: Game }) {
               <article className="auction-listing" key={listing.id}>
                 <div className="auction-item-copy">
                   <span className={`rarity-pill ${(item.rarity || "Common").toLowerCase()}`}>{item.rarity || "Common"}</span>
-                  <h3>{item.name}</h3>
-                  <p>{item.description}</p>
+                  <h3>{item.name}</h3><p>{item.description}</p>
                   <small>Seller: <b>{listing.seller}</b> · Qty {listing.quantity}{item.contraband ? " · CONTRABAND" : ""}</small>
                 </div>
                 <div className="auction-listing-action">
-                  <strong>{money(listing.price)} ea.</strong>
-                  <small>{money(total)} total</small>
-                  {mine ? (
-                    <Button onClick={() => g.cancelAuctionListing(listing.id)}>Cancel Listing</Button>
-                  ) : (
-                    <Button disabled={g.gameState.cash < total} onClick={() => g.buyAuctionListing(listing.id)}>
-                      {g.gameState.cash < total ? "Not Enough Cash" : "Buy Listing"}
-                    </Button>
-                  )}
+                  <strong>{money(listing.price)} ea.</strong><small>{money(total)} total</small>
+                  {mine ? <Button onClick={() => g.cancelAuctionListing(listing.id)}>Cancel Listing</Button> : <Button disabled={g.gameState.cash < total} onClick={() => g.buyAuctionListing(listing.id)}>{g.gameState.cash < total ? "Not Enough Cash" : "Buy Listing"}</Button>}
                 </div>
               </article>
             );
           })}
         </div>
+        {listings.length>visibleListings.length&&<p className="status-text">Showing {visibleListings.length} of {listings.length} matching listings. Search to narrow the exchange.</p>}
+      </Panel>
+
+      <Panel title="Crime Tools · One Attempt Each">
+        <p>Optional consumables improve selected crime odds, rewards, escape chance, or Heat. Each tool is consumed when the crime attempt begins.</p>
+        <div className="service-item-grid">
+          {CRIME_TOOLS.map(tool=><div className="service-item" key={tool.id}><div><b>{tool.icon} {tool.name}</b><small>{tool.description}</small><small>Recommended: {tool.recommendedFor.map(x=>x.replace(/-/g," ")).join(", ")}</small></div><div><b>{money(tool.price)}</b><small>Owned {g.gameState.inventory[tool.id]||0}</small><Button disabled={g.gameState.cash<tool.price} onClick={()=>g.buyBlackMarketItem(tool.id)}>Buy</Button></div></div>)}
+        </div>
+      </Panel>
+
+      <Panel title="Production Supplies · BETA">
+        <p>These are fictional abstract game resources, not real-world manufacturing ingredients.</p>
+        <div className="service-item-grid">{PRODUCTION_SUPPLIES.map(supply=><div className="service-item" key={supply.id}><div><b>{supply.name}</b><small>{supply.description}</small></div><div><b>{money(supply.price)}</b><small>Owned {g.gameState.inventory[supply.id]||0}</small><Button disabled={g.gameState.cash<supply.price} onClick={()=>g.buyBlackMarketItem(supply.id)}>Buy</Button></div></div>)}</div>
+      </Panel>
+
+      <Panel title="Contraband Production · BETA TEST BALANCE">
+        <div className="production-warning"><strong>Temporary beta tuning</strong><span>Setup prices are cheap and timers are 30–75 seconds for testing. Production raises Heat and a separate Attention score; repeated batches can trigger a raid, seizure, charges, and jail.</span></div>
+        <div className="production-facilities">
+          {PRODUCTION_FACILITIES.map(f=>{const owned=g.gameState.productionFacilities.includes(f.id);const unlocked=g.gameState.crimeExperience>=f.requiredCrimeExperience;return <article className={`production-card ${owned?"owned":""}`} key={f.id}><span>{f.icon}</span><div><h3>{f.name}</h3><p>{f.description}</p><small>CE {f.requiredCrimeExperience} · {f.capacity} active slot{f.capacity===1?"":"s"} · Heat shielding {f.heatShield}</small></div><div><strong>{owned?"OWNED":money(f.setupCost)}</strong>{!owned&&<Button disabled={!unlocked||g.gameState.cash<f.setupCost} onClick={()=>g.buyProductionFacility(f.id)}>{!unlocked?`Needs CE ${f.requiredCrimeExperience}`:"Set Up"}</Button>}</div></article>})}
+        </div>
+
+        <div className="production-recipes">
+          {PRODUCTION_RECIPES.map(r=>{const product=ITEMS.find(i=>i.id===r.productId);const capable=canFacilityRun(g.gameState.productionFacilities,r.facilityId);const unlocked=g.gameState.crimeExperience>=r.requiredCrimeExperience;const hasInputs=Object.entries(r.inputs).every(([id,n])=>(g.gameState.inventory[id]||0)>=n);return <article className="production-card recipe" key={r.id}><div><h3>{r.name}</h3><p>{r.description}</p><small>{Object.entries(r.inputs).map(([id,n])=>`${n}× ${ITEMS.find(i=>i.id===id)?.name??id}`).join(" · ")}</small><small>Output {r.output}× {product?.name} · {Math.round(r.durationMs/1000)}s · +{r.heat} base Heat · +{r.attention} Attention</small></div><Button disabled={!capable||!unlocked||!hasInputs} onClick={()=>g.startProduction(r.id)}>{!unlocked?`Needs CE ${r.requiredCrimeExperience}`:!capable?"Need Better Setup":!hasInputs?"Missing Supplies":"Start Batch"}</Button></article>})}
+        </div>
+
+        {g.gameState.activeProductions.length>0&&<div className="active-production-list"><h3>Active / Finished Batches</h3>{g.gameState.activeProductions.map(job=>{const recipe=PRODUCTION_RECIPES.find(r=>r.id===job.recipeId);const done=job.finishesAt<=now;return <div className="data-row" key={job.id}><span>{recipe?.name??job.recipeId}</span><b>{done?"Ready":formatTime(Math.ceil((job.finishesAt-now)/1000))}</b><Button disabled={!done} onClick={()=>g.claimProduction(job.id)}>{done?"Collect":"Cooking"}</Button></div>})}</div>}
+        <div className="data-list"><div className="data-row"><span>Production Attention</span><b>{g.gameState.productionAttention}/100</b></div><div className="data-row"><span>Batches Started</span><b>{g.gameState.productionBatches}</b></div><div className="data-row"><span>Raids</span><b>{g.gameState.productionRaids}</b></div></div>
       </Panel>
 
       <Panel title="List an Item">
-        <p>Listings are stored locally for now, but this UI is structured so the seller and listing data can later come from the multiplayer server.</p>
+        <p>Your listings use the same structure as the simulated exchange so the UI can transition to multiplayer-backed sellers later.</p>
         <div className="auction-create-grid">
           <label><span>Item</span><select value={itemId} onChange={(e)=>setItemId(e.target.value)}><option value="">Choose an item</option>{ownListable.map((item)=><option key={item.id} value={item.id}>{item.name} ({g.gameState.inventory[item.id]})</option>)}</select></label>
           <label><span>Quantity</span><input type="number" min="1" max={Math.max(1,selectedOwned)} value={quantity} onChange={(e)=>setQuantity(e.target.value)} /></label>
           <label><span>Price each</span><input type="number" min="1" value={price} onChange={(e)=>setPrice(e.target.value)} /></label>
         </div>
-        <div className="data-list">
-          <div className="data-row"><span>Owned</span><b>{selectedOwned}</b></div>
-          <div className="data-row"><span>Listing total</span><b>{money(unitPrice * qty)}</b></div>
-          <div className="data-row"><span>Listing fee</span><b>{money(Math.max(25,Math.floor(unitPrice*qty*.03)))}</b></div>
-        </div>
-        <div className="btn-group">
-          <Button disabled={!itemId || selectedOwned < qty} onClick={() => g.createAuctionListing(itemId, unitPrice, qty)}>Create Listing</Button>
-          <BackToCity g={g} />
-        </div>
+        <div className="data-list"><div className="data-row"><span>Owned</span><b>{selectedOwned}</b></div><div className="data-row"><span>Listing total</span><b>{money(unitPrice * qty)}</b></div><div className="data-row"><span>Listing fee</span><b>{money(Math.max(25,Math.floor(unitPrice*qty*.03)))}</b></div></div>
+        <div className="btn-group"><Button disabled={!itemId || selectedOwned < qty} onClick={() => g.createAuctionListing(itemId, unitPrice, qty)}>Create Listing</Button><BackToCity g={g} /></div>
       </Panel>
     </div>
   );

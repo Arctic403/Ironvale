@@ -5,19 +5,21 @@ import {
   CRIMES, Crime, CrimeRunModifiers, applyCrimeEventOption, crimeSuccessChance, crimeUnlocked,
   getCrimeStatBonus, crimeMasteryLevel, emptyCrimeRunModifiers, generateCrimeEvents,
 } from "../systems/crimeSystem";
+import { getCrimeTool, recommendedCrimeTools } from "../systems/crimeTools";
 
 type Game = ReturnType<typeof useRiftCity>;
-type ActiveRun={crime:Crime;choiceId:string;events:ReturnType<typeof generateCrimeEvents>;stage:number;mods:CrimeRunModifiers};
+type ActiveRun={crime:Crime;choiceId:string;toolId:string|null;events:ReturnType<typeof generateCrimeEvents>;stage:number;mods:CrimeRunModifiers};
 
 export function Crimes({ g }: { g: Game }) {
   const [choices, setChoices] = useState<Record<string,string>>({});
   const [run,setRun]=useState<ActiveRun|null>(null);
+  const [tools,setTools]=useState<Record<string,string>>({});
   const incapacitated = Boolean(g.gameState.jailUntil || g.gameState.hospitalUntil);
 
-  const beginCrime=(crime:Crime,choiceId:string)=>{
+  const beginCrime=(crime:Crime,choiceId:string,toolId:string|null)=>{
     const mastery=crimeMasteryLevel(g.gameState.crimeMastery[crime.id]??0);
     const events=generateCrimeEvents(crime,mastery);
-    setRun({crime,choiceId,events,stage:0,mods:emptyCrimeRunModifiers()});
+    setRun({crime,choiceId,toolId,events,stage:0,mods:emptyCrimeRunModifiers()});
   };
 
   const chooseEvent=(option:ActiveRun["events"][number]["options"][number])=>{
@@ -25,7 +27,7 @@ export function Crimes({ g }: { g: Game }) {
     const mods=applyCrimeEventOption(run.mods,option);
     const nextStage=run.stage+1;
     if(nextStage>=run.events.length){
-      g.commitCrime(run.crime,run.choiceId,mods);
+      g.commitCrime(run.crime,run.choiceId,mods,run.toolId);
       setRun(null);
       return;
     }
@@ -37,8 +39,8 @@ export function Crimes({ g }: { g: Game }) {
     if(!run)return 0;
     const masteryXp=g.gameState.crimeMastery[run.crime.id]??0;
     const selected=run.crime.choices.find(x=>x.id===run.choiceId)??run.crime.choices[1]??run.crime.choices[0];
-    return Math.max(2,Math.min(97,crimeSuccessChance(run.crime,g.gameState.crimeExperience,1,getCrimeStatBonus(g.combatStats)+(g.gameState.meritUpgrades["crime-edge"]??0)*2+((g.gameState.npcReputation.mara??0)>=25?2:0)+(g.gameState.currentLocation==="crime"?2:0)-Math.floor(g.gameState.heat/25),masteryXp,selected)+run.mods.chanceModifier));
-  },[run,g.gameState.crimeExperience,g.gameState.crimeMastery,g.gameState.meritUpgrades,g.gameState.npcReputation,g.gameState.currentLocation,g.gameState.heat,g.combatStats]);
+    const tool=getCrimeTool(run.toolId); const toolBonus=tool&&(g.gameState.inventory[tool.id]||0)>0?(tool.modifiers.chanceModifier??0):0; return Math.max(2,Math.min(97,crimeSuccessChance(run.crime,g.gameState.crimeExperience,1,getCrimeStatBonus(g.combatStats)+(g.gameState.meritUpgrades["crime-edge"]??0)*2+((g.gameState.npcReputation.mara??0)>=25?2:0)+(g.gameState.currentLocation==="crime"?2:0)-Math.floor(g.gameState.heat/25),masteryXp,selected)+run.mods.chanceModifier+toolBonus));
+  },[run,g.gameState.crimeExperience,g.gameState.crimeMastery,g.gameState.meritUpgrades,g.gameState.npcReputation,g.gameState.currentLocation,g.gameState.heat,g.gameState.inventory,g.combatStats]);
 
   return (
     <div className="crime-screen-v2">
@@ -98,9 +100,13 @@ export function Crimes({ g }: { g: Game }) {
         {CRIMES.map((crime) => {
           const selectedChoiceId = choices[crime.id] ?? "balanced";
           const selectedChoice = crime.choices.find((choice) => choice.id === selectedChoiceId) ?? crime.choices[1] ?? crime.choices[0];
+          const recommendedTools = recommendedCrimeTools(crime.id);
+          const selectedToolId = tools[crime.id] || "";
+          const selectedTool = getCrimeTool(selectedToolId);
+          const selectedToolOwned = selectedTool ? (g.gameState.inventory[selectedTool.id] || 0) : 0;
           const masteryXp = g.gameState.crimeMastery[crime.id] ?? 0;
           const masteryLevel = crimeMasteryLevel(masteryXp);
-          const chance = crimeSuccessChance(crime,g.gameState.crimeExperience,1,getCrimeStatBonus(g.combatStats)+(g.gameState.meritUpgrades["crime-edge"]??0)*2+((g.gameState.npcReputation.mara??0)>=25?2:0)+(g.gameState.currentLocation==="crime"?2:0)-Math.floor(g.gameState.heat/25),masteryXp,selectedChoice);
+          const chance = Math.min(97, crimeSuccessChance(crime,g.gameState.crimeExperience,1,getCrimeStatBonus(g.combatStats)+(g.gameState.meritUpgrades["crime-edge"]??0)*2+((g.gameState.npcReputation.mara??0)>=25?2:0)+(g.gameState.currentLocation==="crime"?2:0)-Math.floor(g.gameState.heat/25),masteryXp,selectedChoice) + (selectedTool && selectedToolOwned>0 ? (selectedTool.modifiers.chanceModifier??0) : 0));
           const unlocked = crimeUnlocked(crime, g.gameState.crimeExperience);
           const enoughNerve = g.gameState.nerve >= crime.nerve;
           const hasIntel = !crime.requiredIntel || g.gameState.crimeIntel.includes(crime.requiredIntel);
@@ -114,9 +120,10 @@ export function Crimes({ g }: { g: Game }) {
               <div className="crime-meta-row"><span>🔥 {crime.nerve} Nerve</span><span>💵 ${crime.minReward}–${crime.maxReward}</span><span>⚠ Risk {crime.risk}</span><span>🎁 Item drops</span></div>
               <div className="crime-mastery-line"><span>Mastery XP {masteryXp}</span><div className="bar-track compact"><div className="bar-fill crime" style={{width:`${masteryPercent}%`}} /></div></div>
               {unlocked && <div className="crime-choice-grid">{crime.choices.map((choice) => <button type="button" key={choice.id} className={`crime-choice ${choice.id === selectedChoiceId ? "active" : ""}`} onClick={() => setChoices((prev) => ({...prev,[crime.id]:choice.id}))}><strong>{choice.label}</strong><small>{choice.description}</small><span>{choice.chanceModifier >= 0 ? "+" : ""}{choice.chanceModifier}% chance · ×{choice.rewardMultiplier.toFixed(2)} payout</span></button>)}</div>}
+              {unlocked && recommendedTools.length>0 && <div className="crime-tool-picker"><label><span>Recommended one-use tool</span><select value={selectedToolId} onChange={(e)=>setTools(prev=>({...prev,[crime.id]:e.target.value}))}><option value="">No tool</option>{recommendedTools.map(tool=><option key={tool.id} value={tool.id} disabled={(g.gameState.inventory[tool.id]||0)<=0}>{tool.name} · owned {g.gameState.inventory[tool.id]||0} · {(tool.modifiers.chanceModifier??0)>=0?"+":""}{tool.modifiers.chanceModifier??0}%</option>)}</select></label>{selectedTool&&<small>{selectedTool.description} {selectedToolOwned>0?"Consumed when this attempt runs.":"Buy it at the Black Market first."}</small>}</div>}
               {crime.requiredIntel && unlocked && !hasIntel && <p className="status-text">Requires intel: {crime.requiredIntel.replace(/-/g," ")}</p>}
               {!enoughNerve && unlocked && <p className="status-text">Requires {crime.nerve} nerve.</p>}
-              <Button disabled={!canCommit} onClick={() => beginCrime(crime,selectedChoiceId)}>{unlocked ? `Begin · ${selectedChoice.label}` : "Locked"}</Button>
+              <Button disabled={!canCommit} onClick={() => beginCrime(crime,selectedChoiceId,selectedToolOwned>0?selectedToolId:null)}>{unlocked ? `Begin · ${selectedChoice.label}${selectedToolOwned>0&&selectedTool ? ` + ${selectedTool.name}` : ""}` : "Locked"}</Button>
             </article>
           );
         })}

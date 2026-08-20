@@ -24,7 +24,9 @@ import {
 import type { Screen, SaveData, ActivityType, Activity, AuctionListing } from "../types/riftCity";
 import type { Encounter, EncounterChoice } from "../constants/encounters";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
-import { SEEDED_LISTINGS, listingFee } from "../systems/auctionSystem";
+import { ALL_NPC_LISTINGS, listingFee } from "../systems/auctionSystem";
+import { getCrimeTool } from "../systems/crimeTools";
+import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
 import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES, WORLD_EVENTS, getFaction, getFactionRank, challengeProgress } from "../data/expansion";
 export function useRiftCity() {
   const [gameState, setGameState] = useState<SaveData>(() =>
@@ -211,14 +213,31 @@ export function useRiftCity() {
   /*
    * CRIME SYSTEM
    */
-  const commitCrime = (crime: Crime, choiceId = "balanced", run?: CrimeRunModifiers) => {
+  const commitCrime = (crime: Crime, choiceId = "balanced", run?: CrimeRunModifiers, crimeToolId?: string | null) => {
     if (blocked()) { log("You cannot commit crimes right now.", "failure"); return; }
     if (!crimeUnlocked(crime, gameState.crimeExperience)) { log("That crime is locked until your crime experience is high enough.", "failure"); return; }
     if (gameState.nerve < crime.nerve) { log("Not enough nerve.", "failure"); return; }
     if (crime.requiredIntel && !gameState.crimeIntel.includes(crime.requiredIntel)) { log("You are missing the intel needed to attempt this crime chain step.", "failure"); return; }
 
     const selectedChoice = crime.choices.find((choice) => choice.id === choiceId) ?? crime.choices[1] ?? crime.choices[0];
-    const runMod: CrimeRunModifiers = run ?? { chanceModifier:0,rewardMultiplier:1,heatModifier:0,arrestModifier:0,injuryChance:0,bountyChance:0,bountyMultiplier:1,lootMultiplier:1,masteryMultiplier:1,extraXpMultiplier:1,riskLabel:"BASE",story:[] };
+    const baseRun: CrimeRunModifiers = run ?? { chanceModifier:0,rewardMultiplier:1,heatModifier:0,arrestModifier:0,injuryChance:0,bountyChance:0,bountyMultiplier:1,lootMultiplier:1,masteryMultiplier:1,extraXpMultiplier:1,riskLabel:"BASE",story:[] };
+    const selectedTool = getCrimeTool(crimeToolId);
+    const toolUsable = Boolean(selectedTool && (gameState.inventory[selectedTool.id] || 0) > 0);
+    const tm = toolUsable ? selectedTool!.modifiers : {};
+    const runMod: CrimeRunModifiers = {
+      ...baseRun,
+      chanceModifier: baseRun.chanceModifier + (tm.chanceModifier ?? 0),
+      rewardMultiplier: baseRun.rewardMultiplier * (tm.rewardMultiplier ?? 1),
+      heatModifier: baseRun.heatModifier + (tm.heatModifier ?? 0),
+      arrestModifier: baseRun.arrestModifier + (tm.arrestModifier ?? 0),
+      injuryChance: baseRun.injuryChance + (tm.injuryChance ?? 0),
+      bountyChance: baseRun.bountyChance + (tm.bountyChance ?? 0),
+      bountyMultiplier: baseRun.bountyMultiplier * (tm.bountyMultiplier ?? 1),
+      lootMultiplier: baseRun.lootMultiplier * (tm.lootMultiplier ?? 1),
+      masteryMultiplier: baseRun.masteryMultiplier * (tm.masteryMultiplier ?? 1),
+      extraXpMultiplier: baseRun.extraXpMultiplier * (tm.extraXpMultiplier ?? 1),
+      story: toolUsable ? [...baseRun.story, `${selectedTool!.name} used for this attempt.`] : baseRun.story,
+    };
 
     setGameState((prev) => {
       const masteryXp = prev.crimeMastery[crime.id] ?? 0;
@@ -244,7 +263,9 @@ export function useRiftCity() {
       else outcome = "spooked";
 
       const masteryGain = Math.max(1, Math.round(crime.crimeExperience * selectedChoice.masteryMultiplier * runMod.masteryMultiplier));
-      let next: SaveData = { ...prev, nerve: Math.max(0, prev.nerve - crime.nerve), crimeMastery: { ...prev.crimeMastery, [crime.id]: masteryXp + masteryGain } };
+      let nextInventory = prev.inventory;
+      if (toolUsable && selectedTool) nextInventory = { ...prev.inventory, [selectedTool.id]: Math.max(0, (prev.inventory[selectedTool.id] || 0) - 1) };
+      let next: SaveData = { ...prev, inventory: nextInventory, nerve: Math.max(0, prev.nerve - crime.nerve), crimeMastery: { ...prev.crimeMastery, [crime.id]: masteryXp + masteryGain } };
 
       const maybeDropLoot = (state: SaveData, critical: boolean) => {
         // Every successful crime can produce ordinary finds. Rare item definitions still control the true jackpot rates.
@@ -668,7 +689,7 @@ export function useRiftCity() {
 
   const buyAuctionListing = (listingId: string) =>
     setGameState((prev) => {
-      const all = [...prev.auctionListings, ...SEEDED_LISTINGS.filter((x) => !prev.auctionRemovedListingIds.includes(x.id))];
+      const all = [...prev.auctionListings, ...ALL_NPC_LISTINGS.filter((x) => !prev.auctionRemovedListingIds.includes(x.id))];
       const listing = all.find((x) => x.id === listingId);
       if (!listing || listing.seller === "You") return prev;
       const total = listing.price * listing.quantity;
@@ -679,10 +700,64 @@ export function useRiftCity() {
         cash: prev.cash - total,
         inventory: { ...prev.inventory, [listing.itemId]: (prev.inventory[listing.itemId] || 0) + listing.quantity },
         auctionListings: nextListings,
-        auctionRemovedListingIds: listing.id.startsWith("seed-") ? [...prev.auctionRemovedListingIds, listing.id] : prev.auctionRemovedListingIds,
+        auctionRemovedListingIds: listing.seller !== "You" ? [...prev.auctionRemovedListingIds, listing.id] : prev.auctionRemovedListingIds,
       };
       return appendActivity(next, `Bought ${listing.quantity}× ${getItem(listing.itemId)?.name ?? listing.itemId} from ${listing.seller} for ${money(total)}.`, "success");
     });
+
+  const buyBlackMarketItem = (itemId: string, quantity = 1) => setGameState((prev) => {
+    const item = getItem(itemId);
+    const qty = Math.max(1, Math.floor(quantity));
+    if (!item || item.store !== "blackmarket") return prev;
+    const cost = Math.max(1, item.price) * qty;
+    if (prev.cash < cost) return appendActivity(prev, "Not enough cash.", "failure");
+    const next = { ...prev, cash: prev.cash - cost, inventory: { ...prev.inventory, [itemId]: (prev.inventory[itemId] || 0) + qty } };
+    return appendActivity(next, `Bought ${qty}× ${item.name} from an underground supplier.`, "success");
+  });
+
+  const buyProductionFacility = (facilityId: string) => setGameState((prev) => {
+    const facility = PRODUCTION_FACILITIES.find(x => x.id === facilityId);
+    if (!facility || prev.productionFacilities.includes(facilityId)) return prev;
+    if (prev.crimeExperience < facility.requiredCrimeExperience) return appendActivity(prev, `You need ${facility.requiredCrimeExperience} crime experience for that setup.`, "failure");
+    if (prev.cash < facility.setupCost) return appendActivity(prev, "Not enough cash for that production setup.", "failure");
+    const next = { ...prev, cash: prev.cash - facility.setupCost, productionFacilities: [...prev.productionFacilities, facilityId] };
+    return appendActivity(next, `${facility.name} established. Production risk is now tied to your Heat and attention.`, "success");
+  });
+
+  const startProduction = (recipeId: string) => setGameState((prev) => {
+    const recipe = PRODUCTION_RECIPES.find(x => x.id === recipeId);
+    if (!recipe) return prev;
+    if (prev.crimeExperience < recipe.requiredCrimeExperience) return appendActivity(prev, "Your crime operation is not experienced enough for that batch.", "failure");
+    if (!canFacilityRun(prev.productionFacilities, recipe.facilityId)) return appendActivity(prev, "You do not own a capable production setup.", "failure");
+    const facility = PRODUCTION_FACILITIES.filter(f => prev.productionFacilities.includes(f.id)).sort((a,b)=>b.capacity-a.capacity)[0];
+    const activeCount = prev.activeProductions.filter(x=>x.finishesAt>Date.now()).length;
+    if (!facility || activeCount >= facility.capacity) return appendActivity(prev, "All production slots are busy.", "failure");
+    for (const [id, qty] of Object.entries(recipe.inputs)) if ((prev.inventory[id] || 0) < qty) return appendActivity(prev, `Missing production supplies for ${recipe.name}.`, "failure");
+    const inventory = { ...prev.inventory };
+    for (const [id, qty] of Object.entries(recipe.inputs)) inventory[id] = Math.max(0, (inventory[id] || 0) - qty);
+    const now = Date.now();
+    const attention = Math.min(100, prev.productionAttention + recipe.attention);
+    const heatGain = Math.max(1, recipe.heat - (facility.heatShield || 0));
+    const raidChance = Math.max(0, (attention - 35) * .0025 + Math.max(0, prev.heat - 50) * .0015);
+    if (Math.random() < raidChance) {
+      const seized = Object.fromEntries(Object.entries(inventory).map(([id,qty]) => [id, getItem(id)?.contraband ? 0 : qty]));
+      const sentence = 45 * 1000 + Math.min(120000, attention * 1000);
+      const next: SaveData = { ...prev, inventory: seized, heat: Math.max(15, prev.heat - 10), productionAttention: Math.max(10, attention - 25), productionRaids: prev.productionRaids + 1, timesJailed: prev.timesJailed + 1, jailUntil: now + sentence, jailStartedAt: now, jailReason: "Production raid", jailSentenceMs: sentence, activeCharges: [...prev.activeCharges, "Illegal production"], currentLocation: "jail" };
+      return appendActivity(next, "Your production site was raided. Contraband was seized and you were arrested.", "jailed");
+    }
+    const job = { id:`batch-${now}-${Math.random()}`, recipeId, startedAt:now, finishesAt:now+recipe.durationMs, quantity:recipe.output };
+    const next = { ...prev, inventory, heat: Math.min(100, prev.heat + heatGain), productionAttention: attention, activeProductions: [...prev.activeProductions, job], productionBatches: prev.productionBatches + 1 };
+    return appendActivity(next, `${recipe.name} started. Production attention is now ${attention}/100.`, "system");
+  });
+
+  const claimProduction = (productionId: string) => setGameState((prev) => {
+    const job = prev.activeProductions.find(x => x.id === productionId);
+    if (!job || job.finishesAt > Date.now()) return prev;
+    const recipe = PRODUCTION_RECIPES.find(x => x.id === job.recipeId);
+    if (!recipe) return { ...prev, activeProductions: prev.activeProductions.filter(x=>x.id!==productionId) };
+    const next = { ...prev, inventory: { ...prev.inventory, [recipe.productId]: (prev.inventory[recipe.productId] || 0) + job.quantity }, activeProductions: prev.activeProductions.filter(x=>x.id!==productionId) };
+    return appendActivity(next, `${recipe.name} finished: ${job.quantity} units moved into your inventory.`, "success");
+  });
 
   /*
    * RANDOM ENCOUNTERS
@@ -1598,7 +1673,7 @@ export function useRiftCity() {
     if (prev.heat <= 0) return prev;
     if (prev.energy < 5) return appendActivity(prev, "You need 5 energy to lay low.", "failure");
     const reduction = 10 + (prev.npcReputation.torres >= 25 ? 5 : 0) + (prev.currentLocation === "police" ? 5 : 0);
-    const next = { ...prev, energy: prev.energy - 5, heat: Math.max(0, prev.heat - reduction) };
+    const next = { ...prev, energy: prev.energy - 5, heat: Math.max(0, prev.heat - reduction), productionAttention: Math.max(0, prev.productionAttention - 8) };
     return appendActivity(next, `You laid low and reduced your Heat by ${reduction}.`, "system");
   });
 
@@ -1714,7 +1789,11 @@ export function useRiftCity() {
     createAuctionListing,
     cancelAuctionListing,
     buyAuctionListing,
-    seededAuctionListings: SEEDED_LISTINGS,
+    buyBlackMarketItem,
+    buyProductionFacility,
+    startProduction,
+    claimProduction,
+    seededAuctionListings: ALL_NPC_LISTINGS,
 
     randomEncounter,
     chooseEncounter,

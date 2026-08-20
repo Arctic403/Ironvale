@@ -25,6 +25,8 @@ export type AuctionListing = {
   createdAt: number;
 };
 
+export type ActiveProduction = { id:string; recipeId:string; startedAt:number; finishesAt:number; quantity:number; };
+
 import type { CombatStats } from "../systems/progressionSystem";
 
 export type BankTransaction = { id: string; type: string; amount: number; time: number; note: string; };
@@ -80,6 +82,11 @@ export type SaveData = {
   inventory: Record<string, number>;
   auctionListings: AuctionListing[];
   auctionRemovedListingIds: string[];
+  productionFacilities: string[];
+  activeProductions: ActiveProduction[];
+  productionAttention: number;
+  productionBatches: number;
+  productionRaids: number;
   equippedWeapon: string | null;
   equippedArmor: string | null;
   ownedProperty: string;
