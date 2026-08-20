@@ -1,10 +1,7 @@
 import React from "react";
 import type { ActiveModal } from "../../types/riftCity";
 import type { useRiftCity } from "../../hooks/useRiftCity";
-import {
-  MAX_ENERGY,
-  money,
-} from "../../core/gameCore";
+import { money } from "../../core/gameCore";
 import { getLevel } from "../../systems/progressionSystem";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;

@@ -1,4 +1,120 @@
 import type { SaveData } from "../types/riftCity";
-import { getJob,getJobPosition,getJobSkillLevel } from "../data/jobs";
-import { BANK_INTEREST_INTERVAL,DEFAULT_MARKET_PRICES,ENERGY_REGEN_INTERVAL,HAPPINESS_TICK,HEALTH_REGEN_INTERVAL,JOB_PAY_INTERVAL,JOB_SKILL_INTERVAL,MARKET_UPDATE_INTERVAL,MAX_ENERGY,NERVE_REGEN_INTERVAL,randomMarketPrice } from "../core/gameCore";
-export const tickGameState=(prev:SaveData,now:number,ctx:{maxHealth:number;maxNerve:number;maxHappiness:number}):SaveData=>{let changed=false;const u:Partial<SaveData>={};if(prev.energy<MAX_ENERGY){const n=Math.floor((now-prev.lastEnergyUpdate)/ENERGY_REGEN_INTERVAL);if(n){u.energy=Math.min(MAX_ENERGY,prev.energy+n);u.lastEnergyUpdate=prev.lastEnergyUpdate+n*ENERGY_REGEN_INTERVAL;changed=true}}else u.lastEnergyUpdate=now;if(prev.nerve<ctx.maxNerve){const n=Math.floor((now-prev.lastNerveUpdate)/NERVE_REGEN_INTERVAL);if(n){u.nerve=Math.min(ctx.maxNerve,prev.nerve+n);u.lastNerveUpdate=prev.lastNerveUpdate+n*NERVE_REGEN_INTERVAL;changed=true}}else u.lastNerveUpdate=now;if(prev.happiness<ctx.maxHappiness){const n=Math.floor((now-prev.lastHappinessUpdate)/HAPPINESS_TICK);if(n){u.happiness=Math.min(ctx.maxHappiness,prev.happiness+n*5);u.lastHappinessUpdate=prev.lastHappinessUpdate+n*HAPPINESS_TICK;changed=true}}else u.lastHappinessUpdate=now;if(prev.health<ctx.maxHealth&&!prev.hospitalUntil&&!prev.jailUntil){const n=Math.floor((now-prev.lastHealthUpdate)/HEALTH_REGEN_INTERVAL);if(n){u.health=Math.min(ctx.maxHealth,prev.health+n);u.lastHealthUpdate=prev.lastHealthUpdate+n*HEALTH_REGEN_INTERVAL;changed=true}}else if(prev.health>=ctx.maxHealth)u.lastHealthUpdate=now;if(prev.jailUntil&&now>=prev.jailUntil){u.jailUntil=null;changed=true}if(prev.hospitalUntil&&now>=prev.hospitalUntil){u.hospitalUntil=null;u.health=ctx.maxHealth;u.lastHealthUpdate=now;changed=true}if(prev.bank>0&&now-prev.lastBankInterest>=BANK_INTEREST_INTERVAL){const n=Math.floor((now-prev.lastBankInterest)/BANK_INTEREST_INTERVAL);const interest=Math.floor(prev.bank*.01*n);u.bank=prev.bank+interest;u.bankInterest=prev.bankInterest+interest;u.lastBankInterest=prev.lastBankInterest+n*BANK_INTEREST_INTERVAL;changed=true}if(prev.currentJob&&now-prev.lastJobPayment>=JOB_PAY_INTERVAL){const job=getJob(prev.currentJob);if(job){const n=Math.floor((now-prev.lastJobPayment)/JOB_PAY_INTERVAL);const pos=getJobPosition(job,prev.jobSkills);u.cash=(u.cash??prev.cash)+pos.salary*n;u.lastJobPayment=prev.lastJobPayment+n*JOB_PAY_INTERVAL;changed=true}}if(prev.currentJob&&now-prev.lastJobSkillUpdate>=JOB_SKILL_INTERVAL){const job=getJob(prev.currentJob);if(job){const days=Math.floor((now-prev.lastJobSkillUpdate)/JOB_SKILL_INTERVAL);const skills={...prev.jobSkills};for(const skill of job.skills){const k=`${job.id}:${skill.id}`;skills[k]=Math.min(10,(skills[k]??0)+days)}u.jobSkills=skills;u.lastJobSkillUpdate=prev.lastJobSkillUpdate+days*JOB_SKILL_INTERVAL;const max=Math.max(...job.skills.map(s=>getJobSkillLevel(skills,job,s.id)));u.jobPositionTiers={...prev.jobPositionTiers,[job.id]:( [...job.positions].reverse().find(x=>max>=x.requiredSkillLevel)??job.positions[0]).tier};changed=true}}if(now-prev.lastMarketUpdate>=MARKET_UPDATE_INTERVAL){const market={...prev.market};for(const id of Object.keys(DEFAULT_MARKET_PRICES))market[id]=randomMarketPrice(market[id]??DEFAULT_MARKET_PRICES[id]);u.market=market;u.lastMarketUpdate=now;changed=true}return changed?{...prev,...u}:prev};
+import { getJob, getJobPosition, getJobSkillLevel } from "../data/jobs";
+import {
+  BANK_INTEREST_INTERVAL, DEFAULT_MARKET_PRICES, ENERGY_REGEN_INTERVAL,
+  HAPPINESS_TICK, HEALTH_REGEN_INTERVAL, JOB_PAY_INTERVAL, JOB_SKILL_INTERVAL,
+  MARKET_UPDATE_INTERVAL, NERVE_REGEN_INTERVAL, randomMarketPrice,
+} from "../core/gameCore";
+
+export const tickGameState = (
+  prev: SaveData,
+  now: number,
+  ctx: { maxHealth: number; maxNerve: number; maxHappiness: number; maxEnergy: number },
+): SaveData => {
+  let changed = false;
+  const u: Partial<SaveData> = {};
+
+  if (prev.energy < ctx.maxEnergy) {
+    const n = Math.floor((now - prev.lastEnergyUpdate) / ENERGY_REGEN_INTERVAL);
+    if (n) {
+      u.energy = Math.min(ctx.maxEnergy, prev.energy + n);
+      u.lastEnergyUpdate = prev.lastEnergyUpdate + n * ENERGY_REGEN_INTERVAL;
+      changed = true;
+    }
+  } else if (prev.lastEnergyUpdate !== now) u.lastEnergyUpdate = now;
+
+  if (prev.nerve < ctx.maxNerve) {
+    const n = Math.floor((now - prev.lastNerveUpdate) / NERVE_REGEN_INTERVAL);
+    if (n) {
+      u.nerve = Math.min(ctx.maxNerve, prev.nerve + n);
+      u.lastNerveUpdate = prev.lastNerveUpdate + n * NERVE_REGEN_INTERVAL;
+      changed = true;
+    }
+  } else if (prev.lastNerveUpdate !== now) u.lastNerveUpdate = now;
+
+  if (prev.happiness < ctx.maxHappiness) {
+    const n = Math.floor((now - prev.lastHappinessUpdate) / HAPPINESS_TICK);
+    if (n) {
+      u.happiness = Math.min(ctx.maxHappiness, prev.happiness + n * 5);
+      u.lastHappinessUpdate = prev.lastHappinessUpdate + n * HAPPINESS_TICK;
+      changed = true;
+    }
+  } else if (prev.lastHappinessUpdate !== now) u.lastHappinessUpdate = now;
+
+  if (prev.health < ctx.maxHealth && !prev.hospitalUntil && !prev.jailUntil) {
+    const medicalRank = prev.propertyUpgrades["medical-room"] ?? 0;
+    const n = Math.floor((now - prev.lastHealthUpdate) / HEALTH_REGEN_INTERVAL);
+    if (n) {
+      u.health = Math.min(ctx.maxHealth, prev.health + n * (1 + medicalRank));
+      u.lastHealthUpdate = prev.lastHealthUpdate + n * HEALTH_REGEN_INTERVAL;
+      changed = true;
+    }
+  } else if (prev.health >= ctx.maxHealth) u.lastHealthUpdate = now;
+
+  if (prev.jailUntil && now >= prev.jailUntil) { u.jailUntil = null; changed = true; }
+  if (prev.hospitalUntil && now >= prev.hospitalUntil) {
+    u.hospitalUntil = null; u.health = ctx.maxHealth; u.lastHealthUpdate = now; changed = true;
+  }
+
+  if (prev.bank > 0 && now - prev.lastBankInterest >= BANK_INTEREST_INTERVAL) {
+    const n = Math.floor((now - prev.lastBankInterest) / BANK_INTEREST_INTERVAL);
+    const rate = 0.01 + (prev.meritUpgrades.banker ?? 0) * 0.002;
+    const interest = Math.floor(prev.bank * rate * n);
+    u.bank = prev.bank + interest;
+    u.bankInterest = prev.bankInterest + interest;
+    u.lastBankInterest = prev.lastBankInterest + n * BANK_INTEREST_INTERVAL;
+    changed = true;
+  }
+
+  if (prev.currentJob && now - prev.lastJobPayment >= JOB_PAY_INTERVAL) {
+    const job = getJob(prev.currentJob);
+    if (job) {
+      const n = Math.floor((now - prev.lastJobPayment) / JOB_PAY_INTERVAL);
+      const pos = getJobPosition(job, prev.jobSkills);
+      u.cash = (u.cash ?? prev.cash) + pos.salary * n;
+      u.lastJobPayment = prev.lastJobPayment + n * JOB_PAY_INTERVAL;
+      changed = true;
+    }
+  }
+
+  if (prev.currentJob && now - prev.lastJobSkillUpdate >= JOB_SKILL_INTERVAL) {
+    const job = getJob(prev.currentJob);
+    if (job) {
+      const days = Math.floor((now - prev.lastJobSkillUpdate) / JOB_SKILL_INTERVAL);
+      const skills = { ...prev.jobSkills };
+      for (const skill of job.skills) {
+        const k = `${job.id}:${skill.id}`;
+        skills[k] = Math.min(10, (skills[k] ?? 0) + days);
+      }
+      u.jobSkills = skills;
+      u.lastJobSkillUpdate = prev.lastJobSkillUpdate + days * JOB_SKILL_INTERVAL;
+      const max = Math.max(...job.skills.map((s) => getJobSkillLevel(skills, job, s.id)));
+      u.jobPositionTiers = {
+        ...prev.jobPositionTiers,
+        [job.id]: ([...job.positions].reverse().find((x) => max >= x.requiredSkillLevel) ?? job.positions[0]).tier,
+      };
+      changed = true;
+    }
+  }
+
+  if (now - prev.lastMarketUpdate >= MARKET_UPDATE_INTERVAL) {
+    const market = { ...prev.market };
+    const history = { ...prev.marketHistory };
+    for (const id of Object.keys(DEFAULT_MARKET_PRICES)) {
+      market[id] = randomMarketPrice(market[id] ?? DEFAULT_MARKET_PRICES[id]);
+      history[id] = [...(history[id] ?? []), market[id]].slice(-12);
+    }
+    u.market = market;
+    u.marketHistory = history;
+    u.lastMarketUpdate = now;
+    changed = true;
+  }
+
+  if (prev.worldEventUntil && now >= prev.worldEventUntil) {
+    u.activeWorldEvent = null;
+    u.worldEventUntil = null;
+    changed = true;
+  }
+
+  return changed ? { ...prev, ...u } : prev;
+};

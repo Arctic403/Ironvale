@@ -78,6 +78,11 @@ const NAV_ITEMS: NavigationItem[] = [
     label: "Awards",
     icon: "🏆",
   },
+  {
+    id: "progression",
+    label: "Progression",
+    icon: "🧬",
+  },
 ];
 
 type NavigationProps = {
@@ -99,7 +104,7 @@ export function Navigation({
         <h2>RIFTCITY</h2>
 
         <span className="badge">
-          v2.1
+          v2.5
         </span>
       </div>
 

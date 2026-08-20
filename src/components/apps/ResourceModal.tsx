@@ -2,7 +2,6 @@ import React from "react";
 import type { ActiveModal } from "../../types/riftCity";
 import type { useRiftCity } from "../../hooks/useRiftCity";
 import {
-  MAX_ENERGY,
   formatTime,
 } from "../../core/gameCore";
 
@@ -64,11 +63,11 @@ export function ResourceModal({
             <h2>⚡ Energy</h2>
 
             <ResourceValue>
-              {g.gameState.energy} / {MAX_ENERGY}
+              {g.gameState.energy} / {g.maxEnergy}
             </ResourceValue>
 
             <ResourceDescription>
-              {g.gameState.energy >= MAX_ENERGY
+              {g.gameState.energy >= g.maxEnergy
                 ? "Fully charged"
                 : `Next +1 tick in: ${formatTime(
                     energyNextTick

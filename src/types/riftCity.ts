@@ -1,7 +1,7 @@
 export type Screen =
   | "city" | "crimes" | "combat" | "gym" | "jobs" | "inventory" | "shops"
   | "missions" | "education" | "property" | "character"
-  | "market" | "faction" | "awards";
+  | "market" | "faction" | "awards" | "progression";
 
 export type ActivityType =
   | "success" | "failure" | "critical" | "spooked" | "jailed"
@@ -74,6 +74,20 @@ export type SaveData = {
   lastDailyClaim: number | null;
   dailyStreak: number;
   achievements: string[];
+  heat: number;
+  crimeIntel: string[];
+  meritUpgrades: Record<string, number>;
+  propertyUpgrades: Record<string, number>;
+  factionLeftAt: number | null;
+  factionRewardsClaimed: string[];
+  npcReputation: Record<string, number>;
+  challengeBaselines: Record<string, number>;
+  challengesClaimed: string[];
+  jobActions: number;
+  marketHistory: Record<string, number[]>;
+  activeWorldEvent: string | null;
+  worldEventUntil: number | null;
+  lastWorldEventRefresh: number;
   activities: Activity[];
 };
 

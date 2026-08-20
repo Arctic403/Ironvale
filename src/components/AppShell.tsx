@@ -7,7 +7,6 @@ import { useRiftCity } from "../hooks/useRiftCity";
 
 import {
   ENERGY_REGEN_INTERVAL,
-  MAX_ENERGY,
   NERVE_REGEN_INTERVAL,
   HAPPINESS_TICK,
   formatTime,
@@ -64,9 +63,11 @@ function App() {
       g.gameState.ownedProperty
     )?.maxHappiness ?? 100;
 
+  const effectiveMaxHappy = maxHappy + (g.gameState.propertyUpgrades["bedroom"] ?? 0) * 10;
+
   const energyNextTick =
     g.gameState.energy >=
-    MAX_ENERGY
+    g.maxEnergy
       ? 0
       : Math.max(
           0,
@@ -100,7 +101,7 @@ function App() {
 
   const happyNextTick =
     g.gameState.happiness >=
-    maxHappy
+    effectiveMaxHappy
       ? 0
       : Math.max(
           0,
@@ -155,7 +156,7 @@ function App() {
             happyNextTick
           }
           maxHappy={
-            maxHappy
+            effectiveMaxHappy
           }
         />
 

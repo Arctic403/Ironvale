@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { tickGameState } from "../systems/gameTickSystem";
-import { getJobPosition } from "../data/jobs";
+import { getJobPosition, getJobStatBonuses } from "../data/jobs";
 import {
   CRIMES, Crime, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
 } from "../systems/crimeSystem";
@@ -24,6 +24,7 @@ import {
 import type { Screen, SaveData, ActivityType, Activity } from "../types/riftCity";
 import type { Encounter, EncounterChoice } from "../constants/encounters";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
+import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES, WORLD_EVENTS, getFaction, getFactionRank, challengeProgress } from "../data/expansion";
 export function useRiftCity() {
   const [gameState, setGameState] = useState<SaveData>(() =>
     loadSave()
@@ -47,8 +48,10 @@ export function useRiftCity() {
   const property = getProperty(gameState.ownedProperty);
 
   const maxHealth = getMaxHealth(
-    property?.maxHealthBonus ?? 0
+    (property?.maxHealthBonus ?? 0) + (gameState.propertyUpgrades["medical-room"] ?? 0) * 5
   );
+
+  const maxEnergy = MAX_ENERGY + (gameState.meritUpgrades["energy-cap"] ?? 0) * 5;
 
   const level = getLevel(gameState.xp).level;
 
@@ -58,7 +61,8 @@ export function useRiftCity() {
       50,
       Math.floor(gameState.crimeExperience / 100) * 5
     ) +
-    (property?.nerveBonus ?? 0);
+    (property?.nerveBonus ?? 0) +
+    (gameState.meritUpgrades["nerve-cap"] ?? 0);
 
   const gym =
     GYMS.find((g) => g.id === gameState.activeGym) ??
@@ -69,6 +73,14 @@ export function useRiftCity() {
   const jobPosition = job
     ? getJobPosition(job, gameState.jobSkills)
     : undefined;
+
+  const jobBonuses = getJobStatBonuses(job, gameState.jobSkills);
+  const combatStats: CombatStats = {
+    strength: gameState.stats.strength + (jobBonuses.strength ?? 0),
+    defense: gameState.stats.defense + (jobBonuses.defense ?? 0),
+    speed: gameState.stats.speed + (jobBonuses.speed ?? 0),
+    dexterity: gameState.stats.dexterity + (jobBonuses.dexterity ?? 0),
+  };
 
   const education =
     EDUCATION.find(
@@ -142,19 +154,20 @@ export function useRiftCity() {
   useEffect(() => {
     const id = window.setInterval(() => {
       const now = Date.now();
-      const maxHappiness = property?.maxHappiness ?? 100;
+      const maxHappiness = (property?.maxHappiness ?? 100) + (gameState.propertyUpgrades["bedroom"] ?? 0) * 10;
 
       setGameState((prev) =>
         tickGameState(prev, now, {
           maxHealth,
           maxNerve,
           maxHappiness,
+          maxEnergy,
         })
       );
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [maxNerve, maxHealth, property?.maxHappiness]);
+  }, [maxNerve, maxHealth, maxEnergy, property?.maxHappiness, gameState.propertyUpgrades]);
 
   const blocked = () =>
     Boolean(
@@ -197,6 +210,11 @@ export function useRiftCity() {
       return;
     }
 
+    if (crime.requiredIntel && !gameState.crimeIntel.includes(crime.requiredIntel)) {
+      log("You are missing the intel needed to attempt this crime chain step.", "failure");
+      return;
+    }
+
     setGameState((prev) => {
       const chance = Math.max(
         0,
@@ -206,7 +224,7 @@ export function useRiftCity() {
             crime,
             prev.crimeExperience,
             1,
-            getCrimeStatBonus(prev.stats)
+            getCrimeStatBonus((() => { const j=getJob(prev.currentJob); const b=getJobStatBonuses(j, prev.jobSkills); return { strength: prev.stats.strength+(b.strength??0), defense: prev.stats.defense+(b.defense??0), speed: prev.stats.speed+(b.speed??0), dexterity: prev.stats.dexterity+(b.dexterity??0) }; })()) + (prev.meritUpgrades["crime-edge"] ?? 0) * 2 + (prev.npcReputation.mara >= 25 ? 2 : 0) + (prev.currentLocation === "crime" ? 2 : 0) - Math.floor(prev.heat / 25)
           )
         )
       );
@@ -278,6 +296,8 @@ export function useRiftCity() {
             prev.crimesCompleted + 1,
           crimesCritical:
             prev.crimesCritical + 1,
+          crimeIntel: crime.grantsIntel && !prev.crimeIntel.includes(crime.grantsIntel) ? [...prev.crimeIntel, crime.grantsIntel] : prev.crimeIntel,
+          heat: Math.min(100, prev.heat + Math.max(1, Math.ceil(crime.risk / 8) + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
         };
 
         return appendActivity(
@@ -302,6 +322,8 @@ export function useRiftCity() {
             crime.crimeExperience,
           crimesCompleted:
             prev.crimesCompleted + 1,
+          crimeIntel: crime.grantsIntel && !prev.crimeIntel.includes(crime.grantsIntel) ? [...prev.crimeIntel, crime.grantsIntel] : prev.crimeIntel,
+          heat: Math.min(100, prev.heat + Math.max(1, Math.ceil(crime.risk / 10) + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
         };
 
         return appendActivity(
@@ -323,6 +345,7 @@ export function useRiftCity() {
           jailUntil:
             Date.now() +
             JAIL_MINUTES * 60000,
+          heat: Math.max(0, prev.heat - 15),
         };
 
         return appendActivity(
@@ -415,12 +438,17 @@ export function useRiftCity() {
           ? 1.05
           : 1;
 
+      const eventMultiplier = prev.activeWorldEvent === "gym-rush" ? 1.1 : 1;
+      const meritMultiplier = 1 + (prev.meritUpgrades["gym-focus"] ?? 0) * 0.03;
+      const homeGymMultiplier = 1 + (prev.propertyUpgrades["home-gym"] ?? 0) * 0.02;
+      const contactMultiplier = prev.npcReputation.dax >= 25 ? 1.05 : 1;
+      const locationMultiplier = prev.currentLocation === "gym" ? 1.03 : 1;
       const result = applyTraining(
         prev.stats,
         currentGym,
         stat,
         prev.happiness,
-        educationMultiplier
+        educationMultiplier * eventMultiplier * meritMultiplier * homeGymMultiplier * contactMultiplier * locationMultiplier
       );
 
       const next: SaveData = {
@@ -698,7 +726,7 @@ export function useRiftCity() {
 
       if (item.type === "energy") {
         next.energy = Math.min(
-          MAX_ENERGY,
+          maxEnergy,
           prev.energy +
             (item.effect || 0)
         );
@@ -782,7 +810,7 @@ export function useRiftCity() {
         energy: Math.max(
           0,
           Math.min(
-            MAX_ENERGY,
+            maxEnergy,
             prev.energy +
               (choice.energy || 0)
           )
@@ -824,6 +852,15 @@ export function useRiftCity() {
       )
     );
   };
+
+  const visitLocation = (id: string) =>
+    setGameState((prev) => ({
+      ...prev,
+      currentLocation: id,
+      locationsVisited: prev.locationsVisited.includes(id)
+        ? prev.locationsVisited
+        : [...prev.locationsVisited, id],
+    }));
 
   /*
    * WORLD TRAVEL (FOUNDATION)
@@ -1188,6 +1225,10 @@ export function useRiftCity() {
 
       case "gym":
         return gameState.gymSessions;
+      case "travel": return gameState.locationsVisited.length;
+      case "faction": return gameState.factionReputation;
+      case "job": return gameState.jobActions;
+      case "heat": return gameState.heat;
 
       default:
         return gameState.cash;
@@ -1212,6 +1253,10 @@ export function useRiftCity() {
         return prev;
       }
 
+      if (mission.prerequisite && !prev.completedMissions.includes(mission.prerequisite)) {
+        return appendActivity(prev, "Complete the previous mission in this chain first.", "failure");
+      }
+
       let progress = 0;
 
       switch (mission.requirement) {
@@ -1229,6 +1274,10 @@ export function useRiftCity() {
           progress =
             prev.gymSessions;
           break;
+        case "travel": progress = prev.locationsVisited.length; break;
+        case "faction": progress = prev.factionReputation; break;
+        case "job": progress = prev.jobActions; break;
+        case "heat": progress = prev.heat; break;
 
         default:
           progress =
@@ -1256,6 +1305,8 @@ export function useRiftCity() {
         xp:
           prev.xp +
           mission.rewardXp,
+        merits: prev.merits + (mission.rewardMerits ?? 0),
+        points: prev.points + (mission.rewardPoints ?? 0),
 
         completedMissions: [
           ...prev.completedMissions,
@@ -1357,6 +1408,10 @@ export function useRiftCity() {
         );
       }
 
+      if (prev.factionLeftAt && Date.now() - prev.factionLeftAt < 15 * 60 * 1000) {
+        return appendActivity(prev, "Faction rejoin cooldown is still active.", "failure");
+      }
+
       if (
         prev.cash < cost
       ) {
@@ -1430,98 +1485,215 @@ export function useRiftCity() {
       );
     });
 
+
+  const runFactionMission = () =>
+    setGameState((prev) => {
+      if (!prev.faction) return appendActivity(prev, "Join a faction first.", "failure");
+      if (prev.energy < 15) return appendActivity(prev, "You need 15 energy for a faction mission.", "failure");
+
+      const gain = 18 + Math.floor(Math.random() * 13);
+      let next: SaveData = {
+        ...prev,
+        energy: prev.energy - 15,
+        factionReputation: prev.factionReputation + gain,
+        points: prev.points + 5,
+      };
+
+      if (prev.faction === "Iron Syndicate") {
+        const payout = 700 + Math.floor(Math.random() * 501);
+        next.cash += payout;
+        next.heat = Math.min(100, next.heat + 8);
+        return appendActivity(next, `Syndicate contract completed: ${money(payout)}, +${gain} reputation, +8 Heat.`, "success");
+      }
+
+      if (prev.faction === "Rift Guard") {
+        next.cash += 550;
+        next.heat = Math.max(0, next.heat - 12);
+        return appendActivity(next, `Guard patrol completed: ${money(550)}, +${gain} reputation, -12 Heat.`, "success");
+      }
+
+      const commodities = Object.keys(DEFAULT_MARKET_PRICES);
+      const item = commodities[Math.floor(Math.random() * commodities.length)];
+      next.inventory = { ...prev.inventory, [item]: (prev.inventory[item] || 0) + 2 };
+      next.cash += 450;
+      return appendActivity(next, `Union cargo run completed: ${money(450)}, 2 ${item}, +${gain} reputation.`, "success");
+    });
+
   /*
    * MARKET
    */
   const tradeMarket = (
     id: string,
-    buy: boolean
+    buy: boolean,
+    quantity = 1
   ) =>
     setGameState((prev) => {
-      const basePrice =
-        DEFAULT_MARKET_PRICES[id] ??
-        100;
-
-      const price =
-        prev.market[id] ??
-        basePrice;
-
-      const owned =
-        prev.inventory[id] || 0;
+      const qty = Math.max(1, Math.floor(quantity));
+      const basePrice = DEFAULT_MARKET_PRICES[id] ?? 100;
+      const price = prev.market[id] ?? basePrice;
+      const owned = prev.inventory[id] || 0;
 
       if (buy) {
-        if (
-          prev.cash < price
-        ) {
-          return appendActivity(
-            prev,
-            "Not enough cash.",
-            "failure"
-          );
-        }
-
+        const total = price * qty;
+        if (prev.cash < total) return appendActivity(prev, "Not enough cash.", "failure");
         const next: SaveData = {
           ...prev,
-
-          cash:
-            prev.cash - price,
-
-          inventory: {
-            ...prev.inventory,
-
-            [id]:
-              owned + 1,
-          },
+          cash: prev.cash - total,
+          inventory: { ...prev.inventory, [id]: owned + qty },
+          points: prev.points + (prev.activeWorldEvent === "dock-strike" ? qty : 0),
         };
-
-        return appendActivity(
-          next,
-          `Bought ${id} for ${money(
-            price
-          )}.`,
-          "success"
-        );
+        return appendActivity(next, `Bought ${qty} ${id} for ${money(total)}.`, "success");
       }
 
-      if (owned <= 0) {
-        return appendActivity(
-          prev,
-          `You don't own any ${id}.`,
-          "failure"
-        );
-      }
-
-      /*
-       * Sell at a slight market spread.
-       * No random price generation here.
-       */
-      const sellPrice = Math.max(
-        1,
-        Math.floor(price * 0.95)
-      );
-
+      if (owned < qty) return appendActivity(prev, `You only own ${owned} ${id}.`, "failure");
+      const brokerSpread = prev.npcReputation.lena >= 25 ? 0.98 : 0.95;
+      const sellPrice = Math.max(1, Math.floor(price * brokerSpread));
+      const total = sellPrice * qty;
       const next: SaveData = {
         ...prev,
-
-        cash:
-          prev.cash + sellPrice,
-
-        inventory: {
-          ...prev.inventory,
-
-          [id]:
-            owned - 1,
-        },
+        cash: prev.cash + total,
+        inventory: { ...prev.inventory, [id]: owned - qty },
+        points: prev.points + (prev.activeWorldEvent === "dock-strike" ? qty : 0),
       };
-
-      return appendActivity(
-        next,
-        `Sold ${id} for ${money(
-          sellPrice
-        )}.`,
-        "success"
-      );
+      return appendActivity(next, `Sold ${qty} ${id} for ${money(total)}.`, "success");
     });
+
+
+  /*
+   * PROGRESSION EXPANSION
+   */
+  const quitJob = () => setGameState((prev) => {
+    if (!prev.currentJob) return prev;
+    const old = getJob(prev.currentJob);
+    const next = { ...prev, currentJob: null };
+    return appendActivity(next, `Left ${old?.company ?? "your job"}.`, "job");
+  });
+
+  const workShift = () => setGameState((prev) => {
+    if (!prev.currentJob) return appendActivity(prev, "Get a job before working a shift.", "failure");
+    if (prev.energy < 8) return appendActivity(prev, "You need 8 energy for a work shift.", "failure");
+    const activeJob = getJob(prev.currentJob);
+    if (!activeJob) return prev;
+    const position = getJobPosition(activeJob, prev.jobSkills);
+    const eventBoost = prev.activeWorldEvent === "hiring-boom" ? 1.25 : 1;
+    const contactBoost = prev.npcReputation.brick >= 25 ? 1.1 : 1;
+    const locationBoost = prev.currentLocation === "jobs" ? 1.1 : 1;
+    const workplaceRoll = Math.random();
+    const workplaceBonus = workplaceRoll < 0.12 ? 1.5 : workplaceRoll > 0.94 ? 0.75 : 1;
+    const payout = Math.floor(position.salary * 0.35 * eventBoost * contactBoost * locationBoost * workplaceBonus);
+    const skillBoost = 0.35 * (1 + (prev.meritUpgrades["job-drive"] ?? 0) * 0.1) * (workplaceRoll < 0.12 ? 1.25 : 1);
+    const skills = { ...prev.jobSkills };
+    for (const skill of activeJob.skills) {
+      const key = `${activeJob.id}:${skill.id}`;
+      skills[key] = Math.min(10, Number(((skills[key] ?? 0) + skillBoost).toFixed(2)));
+    }
+    const next: SaveData = { ...prev, cash: prev.cash + payout, energy: prev.energy - 8, jobSkills: skills, jobActions: prev.jobActions + 1 };
+    const eventText = workplaceRoll < 0.12 ? " A surprise rush earned you a bonus." : workplaceRoll > 0.94 ? " A rough shift cut the payout." : "";
+    return appendActivity(next, `Worked a shift for ${money(payout)}.${eventText}`, "job");
+  });
+
+  const buyPropertyUpgrade = (id: string) => setGameState((prev) => {
+    const upgrade = PROPERTY_UPGRADES.find((x) => x.id === id);
+    if (!upgrade) return prev;
+    const rank = prev.propertyUpgrades[id] ?? 0;
+    if (rank >= upgrade.maxRank) return prev;
+    const cost = upgrade.basePrice * (rank + 1);
+    if (prev.cash < cost) return appendActivity(prev, "Not enough cash for that property upgrade.", "failure");
+    const next = { ...prev, cash: prev.cash - cost, propertyUpgrades: { ...prev.propertyUpgrades, [id]: rank + 1 } };
+    return appendActivity(next, `${upgrade.name} upgraded to rank ${rank + 1}.`, "success");
+  });
+
+  const leaveFaction = () => setGameState((prev) => {
+    if (!prev.faction) return prev;
+    const name = prev.faction;
+    const next = { ...prev, faction: null, factionReputation: Math.floor(prev.factionReputation * 0.75), factionLeftAt: Date.now() };
+    return appendActivity(next, `Left ${name}. Some reputation was lost.`, "system");
+  });
+
+  const buyFactionReward = (rewardId: string) => setGameState((prev) => {
+    const faction = getFaction(prev.faction);
+    if (!faction) return prev;
+    const reward = faction.rewards.find((x) => x.id === rewardId);
+    if (!reward || prev.factionRewardsClaimed.includes(rewardId)) return prev;
+    if (prev.factionReputation < reward.reputation || prev.points < reward.points) return appendActivity(prev, "You do not meet that faction reward requirement.", "failure");
+    const inventory = { ...prev.inventory };
+    if (reward.itemId) inventory[reward.itemId] = (inventory[reward.itemId] || 0) + 1;
+    let heat = prev.heat;
+    if (reward.id === "guard-clearance") heat = Math.max(0, heat - 30);
+    const next: SaveData = { ...prev, points: prev.points - reward.points, cash: prev.cash + (reward.cash ?? 0), inventory, heat, factionRewardsClaimed: [...prev.factionRewardsClaimed, rewardId] };
+    return appendActivity(next, `Faction reward claimed: ${reward.name}.`, "critical");
+  });
+
+  const buyMeritUpgrade = (id: string) => setGameState((prev) => {
+    const upgrade = MERIT_UPGRADES.find((x) => x.id === id);
+    if (!upgrade) return prev;
+    const rank = prev.meritUpgrades[id] ?? 0;
+    if (rank >= upgrade.maxRank) return prev;
+    const cost = upgrade.baseCost + rank;
+    if (prev.merits < cost) return appendActivity(prev, `You need ${cost} merits.`, "failure");
+    const next = { ...prev, merits: prev.merits - cost, meritUpgrades: { ...prev.meritUpgrades, [id]: rank + 1 } };
+    return appendActivity(next, `${upgrade.name} upgraded to rank ${rank + 1}.`, "critical");
+  });
+
+  const challengePeriod = (id: string) => {
+    const d = new Date();
+    if (id.startsWith("daily")) return d.toISOString().slice(0, 10);
+    const first = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((d.getTime() - first.getTime()) / 86400000) + first.getUTCDay() + 1) / 7);
+    return `${d.getUTCFullYear()}-W${week}`;
+  };
+  const challengeClaimKey = (id: string) => `${id}:${challengePeriod(id)}`;
+
+  const getChallengeProgress = (challenge: (typeof DAILY_CHALLENGES)[number] | (typeof WEEKLY_CHALLENGES)[number]) => {
+    const raw = challengeProgress(challenge.metric, gameState);
+    const baseline = gameState.challengeBaselines[challenge.id] ?? 0;
+    return Math.max(0, raw - baseline);
+  };
+
+  const isChallengeClaimed = (id: string) => gameState.challengesClaimed.includes(challengeClaimKey(id));
+
+  const claimChallenge = (id: string) => setGameState((prev) => {
+    const challenge = [...DAILY_CHALLENGES, ...WEEKLY_CHALLENGES].find((x) => x.id === id);
+    const claimKey = challengeClaimKey(id);
+    if (!challenge || prev.challengesClaimed.includes(claimKey)) return prev;
+    const raw = challengeProgress(challenge.metric, prev);
+    const baseline = prev.challengeBaselines[id] ?? 0;
+    if (raw - baseline < challenge.target) return appendActivity(prev, "Challenge is still in progress.", "failure");
+    const next: SaveData = {
+      ...prev,
+      cash: prev.cash + challenge.rewardCash,
+      points: prev.points + challenge.rewardPoints,
+      merits: prev.merits + (challenge.rewardMerits ?? 0),
+      challengesClaimed: [...prev.challengesClaimed.slice(-60), claimKey],
+      challengeBaselines: { ...prev.challengeBaselines, [id]: raw },
+    };
+    return appendActivity(next, `Challenge complete: ${challenge.name}.`, "critical");
+  });
+
+  const npcInteract = (npcId: string, positive = true) => setGameState((prev) => {
+    if (prev.energy < 3) return appendActivity(prev, "You need 3 energy to spend time building contacts.", "failure");
+    const current = prev.npcReputation[npcId] ?? 0;
+    const change = positive ? 5 : -5;
+    const next = { ...prev, energy: prev.energy - 3, npcReputation: { ...prev.npcReputation, [npcId]: Math.max(-100, Math.min(100, current + change)) } };
+    return appendActivity(next, positive ? "Contact relationship improved." : "You pushed that contact away.", "system");
+  });
+
+  const refreshWorldEvent = () => setGameState((prev) => {
+    const now = Date.now();
+    if (prev.activeWorldEvent && prev.worldEventUntil && prev.worldEventUntil > now) return appendActivity(prev, "A world event is already active.", "failure");
+    if (now - prev.lastWorldEventRefresh < 10 * 60 * 1000) return appendActivity(prev, "World event scanner is on cooldown.", "failure");
+    const event = WORLD_EVENTS[Math.floor(Math.random() * WORLD_EVENTS.length)];
+    const next = { ...prev, activeWorldEvent: event.id, worldEventUntil: now + event.durationMinutes * 60000, lastWorldEventRefresh: now };
+    return appendActivity(next, `WORLD EVENT: ${event.name} — ${event.description}`, "critical");
+  });
+
+  const coolHeat = () => setGameState((prev) => {
+    if (prev.heat <= 0) return prev;
+    if (prev.energy < 5) return appendActivity(prev, "You need 5 energy to lay low.", "failure");
+    const reduction = 10 + (prev.npcReputation.torres >= 25 ? 5 : 0) + (prev.currentLocation === "police" ? 5 : 0);
+    const next = { ...prev, energy: prev.energy - 5, heat: Math.max(0, prev.heat - reduction) };
+    return appendActivity(next, `You laid low and reduced your Heat by ${reduction}.`, "system");
+  });
 
   /*
    * ACHIEVEMENTS
@@ -1598,10 +1770,12 @@ export function useRiftCity() {
 
     maxHealth,
     maxNerve,
+    maxEnergy,
 
     gym,
     job,
     jobPosition,
+    combatStats,
     education,
 
     encounter,
@@ -1633,9 +1807,13 @@ export function useRiftCity() {
     chooseEncounter,
 
     travel,
+    visitLocation,
     joinJob,
+    quitJob,
+    workShift,
 
     buyProperty,
+    buyPropertyUpgrade,
 
     bankDeposit,
     bankWithdraw,
@@ -1650,8 +1828,19 @@ export function useRiftCity() {
 
     joinFaction,
     workFaction,
+    runFactionMission,
+    leaveFaction,
+    buyFactionReward,
 
     tradeMarket,
+
+    buyMeritUpgrade,
+    getChallengeProgress,
+    isChallengeClaimed,
+    claimChallenge,
+    npcInteract,
+    refreshWorldEvent,
+    coolHeat,
 
     earnMerit,
 

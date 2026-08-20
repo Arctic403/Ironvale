@@ -15,6 +15,7 @@ import {
   Market,
   Faction,
   Awards,
+  Progression,
 } from "../../views/GameScreens";
 
 import { City } from "../../views/City";
@@ -43,6 +44,7 @@ const SCREEN_COMPONENTS: Record<
   market: Market,
   faction: Faction,
   awards: Awards,
+  progression: Progression,
 };
 
 export function ScreenContent({

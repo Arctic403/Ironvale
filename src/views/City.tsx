@@ -1,8 +1,9 @@
 import React, { useRef, useState } from "react";
 import { CITY_LOCATIONS, type CityLocation } from "../data/cityLocations";
+import { LOCATION_TRAITS } from "../data/expansion";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button } from "../components/ui";
-import { money, MAX_ENERGY } from "../core/gameCore";
+import { money } from "../core/gameCore";
 
 type Game = ReturnType<typeof useRiftCity>;
 
@@ -172,15 +173,10 @@ export function City({ g }: { g: Game }) {
         location.id === selectedId,
     ) ?? null;
 
-  const goTo = (
-    screen?: CityLocation["screen"],
-  ) => {
-    if (
-      !incapacitated &&
-      screen
-    ) {
-      g.setCurrentScreen(screen);
-    }
+  const goTo = (location: CityLocation) => {
+    if (incapacitated) return;
+    g.visitLocation(location.id);
+    if (location.screen) g.setCurrentScreen(location.screen);
   };
 
   /* =========================================================
@@ -622,7 +618,7 @@ export function City({ g }: { g: Game }) {
             <span>⚡ Energy</span>
 
             <strong>
-              {g.gameState.energy}/{MAX_ENERGY}
+              {g.gameState.energy}/{g.maxEnergy}
             </strong>
           </div>
 
@@ -1335,20 +1331,17 @@ export function City({ g }: { g: Game }) {
                   }
                 </h4>
 
-                <p>
-                  {
-                    selected.description
-                  }
-                </p>
+                <p>{selected.description}</p>
+                {LOCATION_TRAITS[selected.id] && (
+                  <p className="status-text"><b>Local Effect:</b> {LOCATION_TRAITS[selected.id]}</p>
+                )}
 
                 <Button
                   disabled={
                     incapacitated
                   }
                   onClick={() =>
-                    goTo(
-                      selected.screen,
-                    )
+                    goTo(selected)
                   }
                 >
                   Enter Location

@@ -36,7 +36,7 @@ export function Combat({ g }: { g: Game }) {
           level: g.level,
           health: g.gameState.health,
           maxHealth: g.maxHealth,
-          stats: g.gameState.stats,
+          stats: g.combatStats,
           weapons: DEFAULT_WEAPONS,
           equippedWeaponId: g.gameState.equippedWeapon,
         }}
@@ -157,7 +157,7 @@ export function Combat({ g }: { g: Game }) {
           (opponent) => {
             const winChance =
               calculateWinChance(
-                g.gameState.stats,
+                g.combatStats,
                 opponent.stats
               );
 

@@ -29,9 +29,11 @@ export function Crimes({ g }: { g: Game }) {
           crime,
           g.gameState.crimeExperience,
           1,
-          getCrimeStatBonus(
-            g.gameState.stats
-          )
+          getCrimeStatBonus(g.combatStats) +
+            (g.gameState.meritUpgrades["crime-edge"] ?? 0) * 2 +
+            ((g.gameState.npcReputation.mara ?? 0) >= 25 ? 2 : 0) +
+            (g.gameState.currentLocation === "crime" ? 2 : 0) -
+            Math.floor(g.gameState.heat / 25)
         );
 
         const unlocked = crimeUnlocked(
@@ -43,8 +45,11 @@ export function Crimes({ g }: { g: Game }) {
           g.gameState.nerve >=
           crime.nerve;
 
+        const hasIntel = !crime.requiredIntel || g.gameState.crimeIntel.includes(crime.requiredIntel);
+
         const canCommit =
           unlocked &&
+          hasIntel &&
           enoughNerve &&
           !incapacitated;
 
@@ -88,6 +93,14 @@ export function Crimes({ g }: { g: Game }) {
                 }}
               />
             </div>
+
+            {crime.requiredIntel && unlocked && !hasIntel && (
+              <p className="status-text">Chain requirement: {crime.requiredIntel.replace(/-/g, " ")}</p>
+            )}
+
+            {crime.grantsIntel && unlocked && (
+              <p className="status-text">Can reveal: {crime.grantsIntel.replace(/-/g, " ")}</p>
+            )}
 
             {!enoughNerve &&
               unlocked && (
