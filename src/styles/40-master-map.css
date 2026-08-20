@@ -16,14 +16,74 @@
 .district-location-choice:hover,.district-location-choice:focus{border-color:rgba(80,190,255,.5);background:rgba(80,190,255,.08)}
 .district-location-choice small{opacity:.7}
 
+/* The popup is intentionally a sibling of the interactive map now. This keeps
+   the map's pointer handlers and overflow clipping from swallowing popup taps. */
+.city-map-panel{position:relative}
+.master-map-popup{pointer-events:auto;touch-action:pan-y;user-select:text;-webkit-user-select:text}
+.master-map-popup *{pointer-events:auto}
+
+.city-map-back-top{display:none}
+
 @media (max-width:700px){
-  .riftcity-map.interactive-map{overflow:hidden;aspect-ratio:4/3;min-height:0}
+  /* One finger scrolls the page. Map zoom is still available from +/- controls,
+     and the JS keeps a two-pointer path for pinch attempts. */
+  .riftcity-map.interactive-map{overflow:hidden;aspect-ratio:4/3;min-height:0;touch-action:pan-y}
+  .riftcity-map-svg{width:100%;height:100%;display:block;touch-action:pan-y}
   .master-map-svg{width:100%;height:100%;display:block}
   .master-district-hotspot:hover{stroke:transparent;fill:transparent}
-  .master-map-popup.map-location-panel{position:fixed!important;left:max(10px,env(safe-area-inset-left))!important;right:max(10px,env(safe-area-inset-right))!important;bottom:max(70px,calc(env(safe-area-inset-bottom) + 70px))!important;top:auto!important;width:auto!important;max-width:none!important;max-height:min(62dvh,520px)!important;overflow:auto!important;z-index:10050!important;margin:0!important;border-radius:16px!important;padding:14px!important;box-shadow:0 18px 60px rgba(0,0,0,.65)!important}
-  .master-map-popup .map-location-panel-copy{min-width:0;padding-bottom:2px}
-  .master-map-popup .map-location-panel-copy .btn-primary{position:sticky;bottom:0;z-index:2;width:100%;margin-top:10px;min-height:48px;box-shadow:0 -8px 18px rgba(0,0,0,.32)}
-  .master-map-popup .map-location-close{position:sticky;top:0;margin-left:auto;z-index:3}
-  .district-location-list{max-height:32dvh;overflow:auto}
-  .map-drag-hint{font-size:10px;padding:5px 8px}
+
+  /* Fixed mobile bottom sheet: always inside the visible viewport, above nav/map. */
+  .master-map-popup.map-location-panel{
+    position:fixed!important;
+    left:12px!important;
+    right:12px!important;
+    bottom:max(76px,calc(env(safe-area-inset-bottom) + 76px))!important;
+    top:auto!important;
+    width:auto!important;
+    max-width:none!important;
+    max-height:min(68dvh,560px)!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    z-index:2147483000!important;
+    margin:0!important;
+    border-radius:16px!important;
+    padding:14px!important;
+    box-sizing:border-box!important;
+    pointer-events:auto!important;
+    touch-action:pan-y!important;
+    animation:none!important;
+    transform:none!important;
+    isolation:isolate;
+    box-shadow:0 18px 60px rgba(0,0,0,.7)!important;
+  }
+  .master-map-popup .map-location-panel-copy{min-width:0;width:100%;padding-bottom:2px}
+  .master-map-popup .map-location-panel-copy .btn-primary{position:sticky;bottom:0;z-index:2;width:100%;margin-top:10px;min-height:50px;box-shadow:0 -8px 18px rgba(0,0,0,.32)}
+  .master-map-popup .map-location-close{position:absolute;top:8px;right:8px;z-index:4;touch-action:manipulation}
+  .district-location-list{max-height:36dvh;overflow-y:auto;overscroll-behavior:contain}
+  .map-drag-hint{font-size:10px;padding:5px 8px;pointer-events:none}
+
+  /* Escape hatch for long pages: remains reachable even if the map occupies the
+     entire visible screen. Kept above bottom navigation but below open popups. */
+  .city-map-back-top{
+    display:block;
+    position:fixed;
+    right:12px;
+    bottom:max(18px,calc(env(safe-area-inset-bottom) + 18px));
+    z-index:10020;
+    min-height:42px;
+    padding:9px 12px;
+    border:1px solid var(--border-light);
+    border-radius:999px;
+    background:rgba(12,18,24,.96);
+    color:var(--text);
+    font:inherit;
+    font-size:12px;
+    font-weight:800;
+    cursor:pointer;
+    box-shadow:0 8px 24px rgba(0,0,0,.42);
+    touch-action:manipulation;
+  }
+}
+@media (max-width:700px){
+  .riftcity-map.interactive-map,.riftcity-map-svg{touch-action:pan-y!important}
 }

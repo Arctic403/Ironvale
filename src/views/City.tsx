@@ -359,7 +359,12 @@ export function City({ g }: { g: Game }) {
       return;
     }
 
-    event.preventDefault();
+    // On touch screens, keep one-finger vertical scrolling available.
+    // Mouse/pen still use the custom drag system; two-finger touch can still
+    // transition into the pinch path when a second pointer arrives.
+    if (event.pointerType !== "touch") {
+      event.preventDefault();
+    }
 
     const point = svgPoint(
       event.clientX,
@@ -372,9 +377,11 @@ export function City({ g }: { g: Game }) {
     );
 
     try {
-      event.currentTarget.setPointerCapture(
-        event.pointerId,
-      );
+      if (event.pointerType !== "touch") {
+        event.currentTarget.setPointerCapture(
+          event.pointerId,
+        );
+      }
     } catch {
       /*
        * iOS/Safari can occasionally reject
@@ -466,6 +473,12 @@ export function City({ g }: { g: Game }) {
         event.pointerId,
       )
     ) {
+      return;
+    }
+
+    // A single finger is reserved for normal page scrolling on mobile.
+    // This prevents the map from trapping the user at the bottom of the page.
+    if (event.pointerType === "touch" && pointersRef.current.size === 1) {
       return;
     }
 
@@ -965,7 +978,10 @@ export function City({ g }: { g: Game }) {
             Tap a map location or district · Drag to explore · Pinch / + / − to zoom
           </div>
 
-          {/* ===================================================
+
+        </div>
+
+        {/* ===================================================
               LOCATION PANEL
           =================================================== */}
 
@@ -1044,8 +1060,17 @@ export function City({ g }: { g: Game }) {
             </div>
           )}
 
-        </div>
+
       </section>
+
+      <button
+        type="button"
+        className="city-map-back-top"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        aria-label="Back to city menu"
+      >
+        ↑ City Menu
+      </button>
     </div>
   );
 }
