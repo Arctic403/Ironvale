@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CITY_LOCATIONS, type CityLocation } from "../data/cityLocations";
 import { LOCATION_TRAITS } from "../data/expansion";
 import type { useRiftCity } from "../hooks/useRiftCity";
@@ -35,6 +35,40 @@ export function City({ g }: { g: Game }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = window.sessionStorage.getItem("riftcity-map-view");
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as {
+        selectedId?: string | null;
+        zoom?: number;
+        pan?: { x?: number; y?: number };
+      };
+      if (typeof parsed.zoom === "number") {
+        setZoom(parsed.zoom);
+      }
+      if (parsed.pan && typeof parsed.pan.x === "number" && typeof parsed.pan.y === "number") {
+        setPan({ x: parsed.pan.x, y: parsed.pan.y });
+      }
+      if (typeof parsed.selectedId === "string" || parsed.selectedId === null) {
+        setSelectedId(parsed.selectedId ?? null);
+      }
+    } catch {
+      /* ignore map view restore failures */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        "riftcity-map-view",
+        JSON.stringify({ selectedId, zoom, pan }),
+      );
+    } catch {
+      /* ignore map view save failures */
+    }
+  }, [selectedId, zoom, pan]);
 
   const mapRef = useRef<HTMLDivElement | null>(null);
 
@@ -173,6 +207,16 @@ export function City({ g }: { g: Game }) {
         location.id === selectedId,
     ) ?? null;
 
+  const currentLocation =
+    CITY_LOCATIONS.find(
+      (location) =>
+        location.id === g.gameState.currentLocation,
+    ) ?? null;
+
+  const quickAccess = CITY_LOCATIONS.filter((location) =>
+    ["bank", "downtown", "shops", "missions", "hospital", "jail"].includes(location.id),
+  );
+
   const canEnterLocation = (location: CityLocation) =>
     !incapacitated ||
     (jailed && location.id === "jail") ||
@@ -185,6 +229,10 @@ export function City({ g }: { g: Game }) {
       g.setCurrentScreen(location.screen);
     }
   };
+
+  useEffect(() => {
+    setSelectedId((current) => current ?? g.gameState.currentLocation);
+  }, [g.gameState.currentLocation]);
 
   /* =========================================================
      MAP CONTROLS
@@ -589,47 +637,52 @@ export function City({ g }: { g: Game }) {
           CITY HEADER
       ===================================================== */}
 
-      <div className="city-header card">
+      <div className="city-header card city-overview-card">
         <div>
-          <span className="card-tag">
-            RIFTCITY
-          </span>
+          <span className="card-tag">RIFTCITY HUB</span>
 
           <h2>The City</h2>
 
           <p>
-            Explore the city, follow the roads, and tap a
-            destination to travel there.
+            Jump into any district, use the quick access shortcuts, or tap a marker for more details.
           </p>
         </div>
 
-        <div className="city-status">
-
+        <div className="city-status compact">
           <div className="city-status-item">
-            <span>💵 Cash</span>
-
-            <strong>
-              {money(g.gameState.cash)}
-            </strong>
+            <span>Current District</span>
+            <strong>{currentLocation?.district ?? "Unknown"}</strong>
           </div>
 
           <div className="city-status-item">
-            <span>🏦 Bank</span>
-
-            <strong>
-              {money(g.gameState.bank)}
-            </strong>
+            <span>Visited</span>
+            <strong>{g.gameState.locationsVisited.length}/{CITY_LOCATIONS.length}</strong>
           </div>
 
           <div className="city-status-item">
-            <span>⚡ Energy</span>
-
-            <strong>
-              {g.gameState.energy}/{g.maxEnergy}
-            </strong>
+            <span>Heat Level</span>
+            <strong>{g.gameState.heat ?? 0}</strong>
           </div>
-
         </div>
+      </div>
+
+      <div className="city-quickbar">
+        {quickAccess.map((location) => (
+          <button
+            key={location.id}
+            type="button"
+            className={`city-quick-access ${g.gameState.currentLocation === location.id ? "active" : ""}`}
+            disabled={!canEnterLocation(location)}
+            onClick={() => {
+              setSelectedId(location.id);
+              goTo(location);
+            }}
+          >
+            <span>{location.icon}</span>
+            <strong>{location.name}</strong>
+            <small>{location.district}</small>
+          </button>
+        ))}
       </div>
 
       {/* =====================================================
@@ -686,17 +739,17 @@ export function City({ g }: { g: Game }) {
               CITY MAP
             </span>
 
-            <h3>RiftCity</h3>
+            <h3>RiftCity Tactical Map</h3>
 
             <p className="city-map-subtitle">
-              Northside · Downtown · Southside
+              Select a district, inspect a location, and enter instantly
             </p>
           </div>
 
           <div className="city-map-tools">
 
             <span className="city-map-live">
-              ● LIVE CITY
+              ● TACTICAL VIEW
             </span>
 
             <button
@@ -1064,38 +1117,11 @@ export function City({ g }: { g: Game }) {
 
               </g>
 
-              {/* =================================================
-                  LANDMARKS
-              ================================================= */}
-
               <g className="map-landmarks">
-
-                <circle
-                  cx="925"
-                  cy="90"
-                  r="18"
-                />
-
-                <text
-                  x="925"
-                  y="95"
-                >
-                  ⚓
-                </text>
-
-                <circle
-                  cx="100"
-                  cy="600"
-                  r="18"
-                />
-
-                <text
-                  x="100"
-                  y="605"
-                >
-                  🚉
-                </text>
-
+                <circle cx="918" cy="95" r="18" />
+                <text x="918" y="100">DOCKS</text>
+                <circle cx="108" cy="595" r="18" />
+                <text x="108" y="600">RAIL</text>
               </g>
 
               {/* =================================================
@@ -1210,35 +1236,6 @@ export function City({ g }: { g: Game }) {
                   );
                 },
               )}
-
-              {/* =================================================
-                  PLAYER MARKER
-              ================================================= */}
-
-              <g
-                className="player-marker"
-                transform="translate(500 365)"
-              >
-
-                <circle
-                  className="player-pulse"
-                  r="25"
-                />
-
-                <circle
-                  className="player-dot"
-                  r="9"
-                />
-
-                <text
-                  x="0"
-                  y="-17"
-                  textAnchor="middle"
-                >
-                  YOU
-                </text>
-
-              </g>
 
               {/* =================================================
                   COMPASS
