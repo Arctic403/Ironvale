@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { CITY_LOCATIONS, type CityLocation } from "../data/cityLocations";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button } from "../components/ui";
-import { money } from "../core/gameCore";
 import { money, MAX_ENERGY } from "../core/gameCore";
 
 type Game = ReturnType<typeof useRiftCity>;
@@ -17,26 +16,50 @@ export function City({ g }: { g: Game }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef({
+    mode: "idle" as "idle" | "drag" | "pinch",
+    startX: 0,
+    startY: 0,
+    panX: 0,
+    panY: 0,
+    startZoom: 1,
+    startDistance: 0,
+    startMidX: 0,
+    startMidY: 0,
+    moved: false,
+  });
 
-  const incapacitated = Boolean(
-    g.gameState.jailUntil || g.gameState.hospitalUntil
-  );
+  const clampZoom = (value: number) => Math.min(2, Math.max(1, value));
 
-  const hospitalized = Boolean(g.gameState.hospitalUntil);
-  const jailed = Boolean(g.gameState.jailUntil);
-
-  const selected =
-    CITY_LOCATIONS.find((location) => location.id === selectedId) ?? null;
-
-  const goTo = (screen?: CityLocation["screen"]) => {
-    if (!incapacitated && screen) {
-      g.setCurrentScreen(screen);
-    }
+  const clampPan = (next: { x: number; y: number }, nextZoom: number) => {
+    // Pan is stored in SVG viewBox units, so it stays stable on every screen size.
+    const maxX = ((nextZoom - 1) * 1000) / 2;
+    const maxY = ((nextZoom - 1) * 700) / 2;
+    return {
+      x: Math.max(-maxX, Math.min(maxX, next.x)),
+      y: Math.max(-maxY, Math.min(maxY, next.y)),
+    };
   };
 
-  const clampZoom = (value: number) =>
-    Math.min(1.65, Math.max(0.72, value));
+  const svgPoint = (clientX: number, clientY: number) => {
+    const rect = mapRef.current?.getBoundingClientRect();
+    if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 };
+    return {
+      x: ((clientX - rect.left) / rect.width) * 1000,
+      y: ((clientY - rect.top) / rect.height) * 700,
+    };
+  };
+
+  const incapacitated = Boolean(g.gameState.jailUntil || g.gameState.hospitalUntil);
+  const hospitalized = Boolean(g.gameState.hospitalUntil);
+  const jailed = Boolean(g.gameState.jailUntil);
+  const selected = CITY_LOCATIONS.find((location) => location.id === selectedId) ?? null;
+
+  const goTo = (screen?: CityLocation["screen"]) => {
+    if (!incapacitated && screen) g.setCurrentScreen(screen);
+  };
 
   const resetMap = () => {
     setZoom(1);
@@ -44,49 +67,107 @@ export function City({ g }: { g: Game }) {
   };
 
   const zoomAtCenter = (delta: number) => {
-    setZoom((current) => clampZoom(current + delta));
-  };
-
-  const onPointerDown = (
-    event: React.PointerEvent<SVGSVGElement>
-  ) => {
-    if (event.button !== 0) return;
-
-    setDragging(true);
-
-    setDragStart({
-      x: event.clientX - pan.x,
-      y: event.clientY - pan.y,
-    });
-
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-  };
-
-  const onPointerMove = (
-    event: React.PointerEvent<SVGSVGElement>
-  ) => {
-    if (!dragging) return;
-
-    setPan({
-      x: event.clientX - dragStart.x,
-      y: event.clientY - dragStart.y,
+    setZoom((current) => {
+      const next = clampZoom(current + delta);
+      setPan((currentPan) => clampPan(currentPan, next));
+      return next;
     });
   };
 
-  const stopDragging = () => {
-    setDragging(false);
-  };
-
-  const onWheel = (
-    event: React.WheelEvent<SVGSVGElement>
-  ) => {
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
+    const point = svgPoint(event.clientX, event.clientY);
+    pointersRef.current.set(event.pointerId, point);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
 
-    zoomAtCenter(
-      event.deltaY < 0 ? 0.08 : -0.08
-    );
+    const points = [...pointersRef.current.values()];
+    if (points.length >= 2) {
+      const [a, b] = points;
+      gestureRef.current = {
+        ...gestureRef.current,
+        mode: "pinch",
+        startZoom: zoom,
+        startDistance: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+        startMidX: (a.x + b.x) / 2,
+        startMidY: (a.y + b.y) / 2,
+        panX: pan.x,
+        panY: pan.y,
+        moved: true,
+      };
+    } else {
+      gestureRef.current = {
+        mode: "drag",
+        startX: point.x,
+        startY: point.y,
+        panX: pan.x,
+        panY: pan.y,
+        startZoom: zoom,
+        startDistance: 0,
+        startMidX: 0,
+        startMidY: 0,
+        moved: false,
+      };
+    }
+    setDragging(true);
   };
 
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    event.preventDefault();
+    pointersRef.current.set(event.pointerId, svgPoint(event.clientX, event.clientY));
+    const gesture = gestureRef.current;
+    const points = [...pointersRef.current.values()];
+
+    if (points.length >= 2 && gesture.mode === "pinch") {
+      const [a, b] = points;
+      const distance = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+      const nextZoom = clampZoom(gesture.startZoom * (distance / gesture.startDistance));
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      setZoom(nextZoom);
+      setPan(clampPan({
+        x: gesture.panX + (midX - gesture.startMidX),
+        y: gesture.panY + (midY - gesture.startMidY),
+      }, nextZoom));
+      return;
+    }
+
+    if (gesture.mode === "drag") {
+      const point = pointersRef.current.get(event.pointerId)!;
+      const dx = point.x - gesture.startX;
+      const dy = point.y - gesture.startY;
+      if (Math.abs(dx) + Math.abs(dy) > 5) gesture.moved = true;
+      setPan(clampPan({ x: gesture.panX + dx, y: gesture.panY + dy }, zoom));
+    }
+  };
+
+  const stopPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId);
+    const points = [...pointersRef.current.values()];
+    if (points.length === 1) {
+      const point = points[0];
+      gestureRef.current = {
+        ...gestureRef.current,
+        mode: "drag",
+        startX: point.x,
+        startY: point.y,
+        panX: pan.x,
+        panY: pan.y,
+        moved: true,
+      };
+      return;
+    }
+    if (points.length === 0) {
+      gestureRef.current.mode = "idle";
+      window.setTimeout(() => setDragging(false), 0);
+    }
+  };
+
+  const onWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    zoomAtCenter(event.deltaY < 0 ? 0.12 : -0.12);
+  };
   return (
     <div className="city-page">
 
@@ -225,9 +306,15 @@ export function City({ g }: { g: Game }) {
         =================================================== */}
 
         <div
+          ref={mapRef}
           className={`riftcity-map interactive-map ${
             dragging ? "is-dragging" : ""
           }`}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={stopPointer}
+          onPointerCancel={stopPointer}
+          onWheel={onWheel}
         >
 
           <svg
@@ -235,20 +322,11 @@ export function City({ g }: { g: Game }) {
             viewBox="0 0 1000 700"
             role="application"
             aria-label="Interactive map of RiftCity"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={stopDragging}
-            onPointerCancel={stopDragging}
-            onWheel={onWheel}
           >
 
             <g
               className="map-world"
-              transform={`translate(${
-                500 + pan.x / 2
-              } ${
-                350 + pan.y / 2
-              }) scale(${zoom}) translate(-500 -350)`}
+              transform={`translate(${500 + pan.x} ${350 + pan.y}) scale(${zoom}) translate(-500 -350)`}
             >
 
               {/* =================================================
@@ -486,9 +564,9 @@ export function City({ g }: { g: Game }) {
                     onPointerDown={(event) =>
                       event.stopPropagation()
                     }
-                    onClick={() =>
-                      setSelectedId(location.id)
-                    }
+                    onClick={() => {
+                      if (!dragRef.current.moved) setSelectedId(location.id);
+                    }}
                     role="button"
                     tabIndex={0}
                     aria-label={location.name}
