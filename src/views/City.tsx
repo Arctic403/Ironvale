@@ -4,8 +4,62 @@ import { LOCATION_TRAITS } from "../data/expansion";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button } from "../components/ui";
 import { money } from "../core/gameCore";
+import masterMapImage from "../assets/riftcity-master-map.jpeg";
 
 type Game = ReturnType<typeof useRiftCity>;
+
+type MasterMapLocation = CityLocation & { future?: boolean };
+
+const MASTER_MAP_POSITIONS: Record<string, { x: number; y: number }> = {
+  hospital: { x: 10.6, y: 18.9 }, police: { x: 28.0, y: 17.0 }, bank: { x: 40.7, y: 17.5 },
+  university: { x: 52.3, y: 17.3 }, airport: { x: 66.3, y: 18.9 }, park: { x: 36.6, y: 32.2 },
+  property: { x: 21.5, y: 35.3 }, jobs: { x: 54.1, y: 33.4 }, downtown: { x: 33.1, y: 48.9 },
+  pharmacy: { x: 8.1, y: 35.2 }, casino: { x: 48.1, y: 46.9 }, shops: { x: 61.9, y: 49.9 },
+  "black-market": { x: 70.9, y: 44.5 }, market: { x: 66.3, y: 65.3 }, gym: { x: 9.3, y: 48.8 },
+  jail: { x: 6.3, y: 60.9 }, crime: { x: 5.9, y: 73.5 }, combat: { x: 28.5, y: 71.3 },
+  missions: { x: 46.0, y: 70.9 },
+};
+
+const FUTURE_MAP_LOCATIONS: MasterMapLocation[] = [
+  { id: "chop-shop", name: "Chop Shop / Auto Garage", icon: "🚗", description: "Vehicle work, parts, repairs, customization, and future underground auto activity.", district: "Industrial District", x: "20.5%", y: "53.9%", future: true },
+  { id: "courthouse", name: "Courthouse", icon: "⚖️", description: "Future legal cases, fines, warrants, hearings, and justice-system gameplay.", district: "Justice District", x: "22.2%", y: "58.9%", future: true },
+  { id: "company-plaza", name: "Player Company Plaza", icon: "🏢", description: "Future headquarters for player-owned companies, hiring, management, and business competition.", district: "Business District", x: "27.6%", y: "59.0%", future: true },
+  { id: "transit", name: "Transit Station", icon: "🚆", description: "Future city transit and regional travel connections.", district: "Downtown", x: "34.2%", y: "58.9%", future: true },
+  { id: "safehouse", name: "Safehouse Block", icon: "🔐", description: "Future private safehouses, stash storage, protection, and criminal utility.", district: "Downtown", x: "39.7%", y: "58.9%", future: true },
+  { id: "luxury-mall", name: "Luxury Mall", icon: "💎", description: "Future premium shopping, rare goods, fashion, collectibles, and high-end services.", district: "Commercial District", x: "45.7%", y: "58.9%", future: true },
+  { id: "pawn-loan", name: "Pawn & Loan", icon: "💵", description: "Future pawn sales, loans, valuables, and quick-cash services.", district: "Commercial District", x: "50.5%", y: "58.9%", future: true },
+  { id: "nightlife", name: "Nightlife Strip", icon: "🍸", description: "Future clubs, social events, nightlife jobs, encounters, and entertainment.", district: "Entertainment District", x: "55.3%", y: "58.9%", future: true },
+  { id: "harbor", name: "Harbor Docks / Dock Union Port", icon: "⚓", description: "Future cargo, smuggling, logistics, faction work, shipping, and trade routes.", district: "Harbor District", x: "15.9%", y: "81.7%", future: true },
+  { id: "warehouses", name: "Warehouse District", icon: "🏭", description: "Future storage, logistics, company inventory, cargo contracts, and crime opportunities.", district: "Warehouse District", x: "36.5%", y: "81.8%", future: true },
+  { id: "iron-hq", name: "Iron Syndicate HQ", icon: "☠️", description: "Future headquarters and deeper progression for the Iron Syndicate.", district: "Faction Row", x: "51.1%", y: "82.2%", future: true },
+  { id: "guard-hq", name: "Rift Guard Barracks", icon: "🛡️", description: "Future headquarters and deeper progression for the Rift Guard.", district: "Faction Row", x: "56.1%", y: "82.2%", future: true },
+  { id: "dock-union-hq", name: "Dock Union Hall", icon: "⚓", description: "Future headquarters and deeper progression for the Dock Union.", district: "Faction Row", x: "61.2%", y: "82.2%", future: true },
+];
+
+const MASTER_DISTRICTS = [
+  { name: "Medical District", x: 1, y: 10, w: 20, h: 31 },
+  { name: "Northside", x: 22, y: 9, w: 12, h: 20 },
+  { name: "Financial District", x: 34, y: 9, w: 13, h: 20 },
+  { name: "University District", x: 47, y: 9, w: 12, h: 20 },
+  { name: "Airport District", x: 59, y: 8, w: 17, h: 28 },
+  { name: "Central District", x: 27, y: 24, w: 20, h: 18 },
+  { name: "Residential District", x: 14, y: 27, w: 15, h: 18 },
+  { name: "Business District", x: 48, y: 26, w: 15, h: 18 },
+  { name: "Downtown", x: 25, y: 41, w: 18, h: 19 },
+  { name: "Entertainment District", x: 42, y: 40, w: 15, h: 18 },
+  { name: "Commercial District", x: 56, y: 40, w: 14, h: 20 },
+  { name: "East Market", x: 68, y: 34, w: 8, h: 22 },
+  { name: "Industrial District", x: 1, y: 42, w: 22, h: 17 },
+  { name: "Justice District", x: 1, y: 56, w: 18, h: 14 },
+  { name: "Underground District", x: 1, y: 68, w: 17, h: 16 },
+  { name: "Combat District", x: 22, y: 66, w: 20, h: 15 },
+  { name: "Operations District", x: 41, y: 65, w: 20, h: 15 },
+  { name: "Market District", x: 60, y: 56, w: 16, h: 18 },
+  { name: "Harbor District", x: 7, y: 78, w: 21, h: 17 },
+  { name: "Warehouse District", x: 29, y: 78, w: 16, h: 17 },
+  { name: "Faction Row", x: 46, y: 77, w: 21, h: 18 },
+];
+
 
 /* =========================================================
    CITY
@@ -32,6 +86,7 @@ type GestureState = {
 
 export function City({ g }: { g: Game }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -94,7 +149,7 @@ export function City({ g }: { g: Game }) {
   ========================================================= */
 
   const MAP_WIDTH = 1000;
-  const MAP_HEIGHT = 700;
+  const MAP_HEIGHT = 750;
 
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 2.5;
@@ -201,10 +256,11 @@ export function City({ g }: { g: Game }) {
     g.gameState.jailUntil,
   );
 
+  const allMapLocations: MasterMapLocation[] = [...CITY_LOCATIONS, ...FUTURE_MAP_LOCATIONS];
+
   const selected =
-    CITY_LOCATIONS.find(
-      (location) =>
-        location.id === selectedId,
+    allMapLocations.find(
+      (location) => location.id === selectedId,
     ) ?? null;
 
   const currentLocation =
@@ -232,6 +288,7 @@ export function City({ g }: { g: Game }) {
 
   useEffect(() => {
     setSelectedId((current) => current ?? g.gameState.currentLocation);
+    setSelectedDistrict(null);
   }, [g.gameState.currentLocation]);
 
   /* =========================================================
@@ -245,6 +302,7 @@ export function City({ g }: { g: Game }) {
       y: 0,
     });
     setSelectedId(null);
+    setSelectedDistrict(null);
 
     gestureRef.current = {
       mode: "idle",
@@ -812,476 +870,89 @@ export function City({ g }: { g: Game }) {
         >
 
           <svg
-            className="riftcity-map-svg"
-            viewBox="0 0 1000 700"
+            className="riftcity-map-svg master-map-svg"
+            viewBox="0 0 1000 750"
             role="application"
-            aria-label="Interactive map of RiftCity"
+            aria-label="Interactive RiftCity master map"
           >
-
             <g
-              className="map-world"
-              transform={`translate(${
-                500 + pan.x
-              } ${
-                350 + pan.y
-              }) scale(${zoom}) translate(-500 -350)`}
+              className="map-world master-map-world"
+              transform={`translate(${500 + pan.x} ${375 + pan.y}) scale(${zoom}) translate(-500 -375)`}
             >
-
-              {/* =================================================
-                  MAP GROUND
-              ================================================= */}
-
-              <rect
-                className="map-ground"
+              <image
+                href={masterMapImage}
                 x="0"
                 y="0"
                 width="1000"
-                height="700"
-                rx="28"
+                height="750"
+                preserveAspectRatio="xMidYMid meet"
+                className="master-map-image"
               />
 
-              {/* =================================================
-                  RIVER
-              ================================================= */}
-
-              <path
-                className="map-river-shadow"
-                d="M-30 120 C160 70 210 190 330 165 C470 135 505 35 640 78 C785 124 770 248 1030 214 L1030 325 C820 355 760 270 630 288 C510 305 470 410 320 390 C185 372 150 285 -30 330 Z"
-              />
-
-              <path
-                className="map-river"
-                d="M-30 110 C160 60 210 180 330 155 C470 125 505 25 640 68 C785 114 770 238 1030 204 L1030 305 C820 345 760 260 630 278 C510 295 470 400 320 380 C185 362 150 275 -30 320 Z"
-              />
-
-              {/* =================================================
-                  DISTRICTS
-              ================================================= */}
-
-              <g className="map-district-labels">
-                <text x="75" y="65">
-                  NORTHSIDE
-                </text>
-
-                <text x="440" y="360">
-                  DOWNTOWN
-                </text>
-
-                <text x="62" y="660">
-                  SOUTHSIDE
-                </text>
-
-                <text x="820" y="365">
-                  EAST MARKET
-                </text>
-              </g>
-
-              {/* =================================================
-                  ROADS
-              ================================================= */}
-
-              <g className="map-roads">
-
-                <path d="M40 210 C220 180 360 220 500 195 C650 170 810 185 960 145" />
-
-                <path d="M40 365 C205 345 330 355 465 340 C625 322 790 340 960 305" />
-
-                <path d="M55 525 C220 500 345 510 500 500 C670 488 805 505 950 470" />
-
-                <path d="M170 50 C150 180 180 300 210 430 C235 535 210 625 195 680" />
-
-                <path d="M505 40 C485 160 515 255 500 365 C485 480 520 575 505 675" />
-
-                <path d="M820 35 C790 160 815 260 800 360 C785 470 815 565 790 680" />
-
-                <path d="M300 80 C365 170 390 250 365 340 C345 420 370 515 425 610" />
-
-              </g>
-
-              {/* =================================================
-                  ROAD LABELS
-              ================================================= */}
-
-              <g className="map-road-labels">
-
-                <text x="95" y="194">
-                  RIVERSIDE AVE
-                </text>
-
-                <text x="82" y="350">
-                  CENTRAL AVE
-                </text>
-
-                <text x="85" y="492">
-                  SOUTH AVE
-                </text>
-
-                <text x="180" y="110">
-                  NORTH ST
-                </text>
-
-                <text x="512" y="110">
-                  MAIN ST
-                </text>
-
-                <text x="826" y="110">
-                  EAST ST
-                </text>
-
-              </g>
-
-              {/* =================================================
-                  CITY BLOCKS
-              ================================================= */}
-
-              <g className="map-blocks">
-
+              {MASTER_DISTRICTS.map((district) => (
                 <rect
-                  x="70"
-                  y="245"
-                  width="120"
-                  height="72"
-                  rx="10"
+                  key={district.name}
+                  className="master-district-hotspot"
+                  x={(district.x / 100) * MAP_WIDTH}
+                  y={(district.y / 100) * MAP_HEIGHT}
+                  width={(district.w / 100) * MAP_WIDTH}
+                  height={(district.h / 100) * MAP_HEIGHT}
+                  rx="18"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${district.name}`}
+                  onClick={() => {
+                    if (!gestureRef.current.moved) {
+                      setSelectedId(null);
+                      setSelectedDistrict(district.name);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedId(null);
+                      setSelectedDistrict(district.name);
+                    }
+                  }}
                 />
+              ))}
 
-                <rect
-                  x="235"
-                  y="235"
-                  width="125"
-                  height="82"
-                  rx="10"
-                />
+              {allMapLocations.map((location) => {
+                const configured = MASTER_MAP_POSITIONS[location.id];
+                const xPercent = configured?.x ?? Number.parseFloat(location.x);
+                const yPercent = configured?.y ?? Number.parseFloat(location.y);
+                const x = (xPercent / 100) * MAP_WIDTH;
+                const y = (yPercent / 100) * MAP_HEIGHT;
+                const active = selectedId === location.id;
+                const isCurrent = !location.future && g.gameState.currentLocation === location.id;
 
-                <rect
-                  x="410"
-                  y="235"
-                  width="115"
-                  height="72"
-                  rx="10"
-                />
-
-                <rect
-                  x="570"
-                  y="225"
-                  width="125"
-                  height="82"
-                  rx="10"
-                />
-
-                <rect
-                  x="745"
-                  y="225"
-                  width="145"
-                  height="82"
-                  rx="10"
-                />
-
-                <rect
-                  x="80"
-                  y="405"
-                  width="120"
-                  height="72"
-                  rx="10"
-                />
-
-                <rect
-                  x="245"
-                  y="400"
-                  width="110"
-                  height="70"
-                  rx="10"
-                />
-
-                <rect
-                  x="595"
-                  y="390"
-                  width="120"
-                  height="72"
-                  rx="10"
-                />
-
-                <rect
-                  x="760"
-                  y="380"
-                  width="130"
-                  height="82"
-                  rx="10"
-                />
-
-                <rect
-                  x="70"
-                  y="555"
-                  width="125"
-                  height="65"
-                  rx="10"
-                />
-
-                <rect
-                  x="250"
-                  y="550"
-                  width="120"
-                  height="70"
-                  rx="10"
-                />
-
-                <rect
-                  x="585"
-                  y="545"
-                  width="135"
-                  height="70"
-                  rx="10"
-                />
-
-                <rect
-                  x="765"
-                  y="535"
-                  width="140"
-                  height="75"
-                  rx="10"
-                />
-
-              </g>
-
-              {/* =================================================
-                  CENTRAL PARK
-              ================================================= */}
-
-              <g className="map-park">
-
-                <ellipse
-                  cx="500"
-                  cy="135"
-                  rx="105"
-                  ry="52"
-                />
-
-                <path d="M430 135 Q500 92 570 135 Q500 177 430 135Z" />
-
-                <text
-                  x="500"
-                  y="140"
-                >
-                  CENTRAL PARK
-                </text>
-
-              </g>
-
-              {/* =================================================
-                  BRIDGE
-              ================================================= */}
-
-              <g className="map-bridge">
-
-                <rect
-                  x="425"
-                  y="172"
-                  width="150"
-                  height="30"
-                  rx="8"
-                />
-
-                <line
-                  x1="445"
-                  y1="172"
-                  x2="445"
-                  y2="202"
-                />
-
-                <line
-                  x1="475"
-                  y1="172"
-                  x2="475"
-                  y2="202"
-                />
-
-                <line
-                  x1="505"
-                  y1="172"
-                  x2="505"
-                  y2="202"
-                />
-
-                <line
-                  x1="535"
-                  y1="172"
-                  x2="535"
-                  y2="202"
-                />
-
-                <line
-                  x1="565"
-                  y1="172"
-                  x2="565"
-                  y2="202"
-                />
-
-              </g>
-
-              <g className="map-landmarks">
-                <circle cx="918" cy="95" r="18" />
-                <text x="918" y="100">DOCKS</text>
-                <circle cx="108" cy="595" r="18" />
-                <text x="108" y="600">RAIL</text>
-              </g>
-
-              {/* =================================================
-                  CITY LOCATIONS
-              ================================================= */}
-
-              {CITY_LOCATIONS.map(
-                (location) => {
-                  const x =
-                    (Number.parseFloat(
-                      location.x,
-                    ) /
-                      100) *
-                    MAP_WIDTH;
-
-                  const y =
-                    (Number.parseFloat(
-                      location.y,
-                    ) /
-                      100) *
-                    MAP_HEIGHT;
-
-                  const active = selectedId === location.id;
-                  const isCurrent = g.gameState.currentLocation === location.id;
-                  const isVisited = g.gameState.locationsVisited.includes(location.id);
-
-                  return (
-                    <g
-                      key={location.id}
-                      className={`map-location ${
-                        active ? "is-selected" : ""
-                      } ${isCurrent ? "is-current" : ""} ${isVisited ? "is-visited" : ""}`}
-                      transform={`translate(${x} ${y})`}
-                      onClick={() => {
-                        /*
-                         * IMPORTANT:
-                         * A location can be tapped,
-                         * but dragging across it must
-                         * NOT select it.
-                         */
-                        if (
-                          !gestureRef.current
-                            .moved
-                        ) {
-                          setSelectedId(
-                            location.id,
-                          );
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={
-                        location.name
+                return (
+                  <g
+                    key={location.id}
+                    className={`master-map-location ${active ? "is-selected" : ""} ${isCurrent ? "is-current" : ""} ${location.future ? "is-future" : ""}`}
+                    transform={`translate(${x} ${y})`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${location.name}${location.future ? ", future expansion" : ""}`}
+                    onClick={() => {
+                      if (!gestureRef.current.moved) {
+                        setSelectedDistrict(null);
+                        setSelectedId(location.id);
                       }
-                      onKeyDown={(
-                        event,
-                      ) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          goTo(location);
-                        } else if (event.key === " ") {
-                          event.preventDefault();
-                          setSelectedId(location.id);
-                        }
-                      }}
-                    >
-
-                      <circle
-                        className="map-location-halo"
-                        r="31"
-                      />
-
-                      <rect
-                        className="map-building"
-                        x="-29"
-                        y="-25"
-                        width="58"
-                        height="50"
-                        rx="10"
-                      />
-
-                      <text
-                        className="map-location-icon"
-                        x="0"
-                        y="7"
-                        textAnchor="middle"
-                      >
-                        {
-                          location.icon
-                        }
-                      </text>
-
-                      <text
-                        className="map-location-label"
-                        x="0"
-                        y="43"
-                        textAnchor="middle"
-                      >
-                        {
-                          location.name
-                        }
-                      </text>
-
-                      <circle
-                        className="map-location-dot"
-                        cx="24"
-                        cy="-22"
-                        r="5"
-                      />
-
-                    </g>
-                  );
-                },
-              )}
-
-              {/* =================================================
-                  COMPASS
-              ================================================= */}
-
-              <g
-                className="map-compass"
-                transform="translate(925 610)"
-              >
-
-                <circle r="34" />
-
-                <text
-                  x="0"
-                  y="-14"
-                  textAnchor="middle"
-                >
-                  N
-                </text>
-
-                <text
-                  x="0"
-                  y="22"
-                  textAnchor="middle"
-                >
-                  S
-                </text>
-
-                <text
-                  x="-18"
-                  y="5"
-                  textAnchor="middle"
-                >
-                  W
-                </text>
-
-                <text
-                  x="18"
-                  y="5"
-                  textAnchor="middle"
-                >
-                  E
-                </text>
-
-              </g>
-
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedDistrict(null);
+                        setSelectedId(location.id);
+                      }
+                    }}
+                  >
+                    <circle className="master-map-hit-target" r={location.future ? 22 : 27} />
+                    {(active || isCurrent) && <circle className="master-map-selection-ring" r={location.future ? 23 : 29} />}
+                  </g>
+                );
+              })}
             </g>
           </svg>
 
@@ -1291,7 +962,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="map-drag-hint">
             <span>✋</span>
-            Drag to explore · Scroll or use + / − to zoom
+            Tap a map location or district · Drag to explore · Pinch / + / − to zoom
           </div>
 
           {/* ===================================================
@@ -1299,58 +970,76 @@ export function City({ g }: { g: Game }) {
           =================================================== */}
 
           {selected && (
-            <div className="map-location-panel">
-
+            <div className={`map-location-panel master-map-popup ${selected.future ? "future" : "live"}`}>
               <button
                 type="button"
                 className="map-location-close"
-                onClick={() =>
-                  setSelectedId(null)
-                }
+                onClick={() => setSelectedId(null)}
                 aria-label="Close location details"
-              >
-                ×
-              </button>
+              >×</button>
 
-              <div className="map-location-panel-icon">
-                {
-                  selected.icon
-                }
-              </div>
-
+              <div className="map-location-panel-icon">{selected.icon}</div>
               <div className="map-location-panel-copy">
-
-                <span>
-                  {
-                    selected.district
-                  }
-                </span>
-
-                <h4>
-                  {
-                    selected.name
-                  }
-                </h4>
-
+                <span>{selected.future ? "FUTURE EXPANSION · " : "LIVE NOW · "}{selected.district}</span>
+                <h4>{selected.name}</h4>
                 <p>{selected.description}</p>
-                <div className="map-location-status-row">
-                  {g.gameState.currentLocation === selected.id && <span className="map-status-chip current">YOU ARE HERE</span>}
-                  {g.gameState.locationsVisited.includes(selected.id) && <span className="map-status-chip">VISITED</span>}
-                  {!g.gameState.locationsVisited.includes(selected.id) && <span className="map-status-chip new">NEW</span>}
-                </div>
-                {LOCATION_TRAITS[selected.id] && (
+
+                {!selected.future && (
+                  <div className="map-location-status-row">
+                    {g.gameState.currentLocation === selected.id && <span className="map-status-chip current">YOU ARE HERE</span>}
+                    {g.gameState.locationsVisited.includes(selected.id) && <span className="map-status-chip">VISITED</span>}
+                    {!g.gameState.locationsVisited.includes(selected.id) && <span className="map-status-chip new">NEW</span>}
+                  </div>
+                )}
+
+                {!selected.future && LOCATION_TRAITS[selected.id] && (
                   <p className="status-text"><b>Local Effect:</b> {LOCATION_TRAITS[selected.id]}</p>
                 )}
 
-                <Button
-                  disabled={!canEnterLocation(selected)}
-                  onClick={() =>
-                    goTo(selected)
-                  }
-                >
-                  Enter Location
-                </Button>
+                {selected.future ? (
+                  <div className="master-map-coming-soon">COMING SOON · Reserved in the city map for a future system.</div>
+                ) : (
+                  <Button
+                    disabled={!canEnterLocation(selected)}
+                    onClick={() => goTo(selected)}
+                  >
+                    Enter Location
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
 
+          {selectedDistrict && !selected && (
+            <div className="map-location-panel master-map-popup district-popup">
+              <button
+                type="button"
+                className="map-location-close"
+                onClick={() => setSelectedDistrict(null)}
+                aria-label="Close district details"
+              >×</button>
+              <div className="map-location-panel-icon">🏙️</div>
+              <div className="map-location-panel-copy">
+                <span>DISTRICT</span>
+                <h4>{selectedDistrict}</h4>
+                <p>Select a location inside this district.</p>
+                <div className="district-location-list">
+                  {allMapLocations.filter((location) => location.district === selectedDistrict).map((location) => (
+                    <button
+                      key={location.id}
+                      type="button"
+                      className="district-location-choice"
+                      onClick={() => {
+                        setSelectedDistrict(null);
+                        setSelectedId(location.id);
+                      }}
+                    >
+                      <span>{location.icon}</span>
+                      <strong>{location.name}</strong>
+                      <small>{location.future ? "Future" : "Live"}</small>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
