@@ -14,6 +14,7 @@ import {
 
 import { money, formatTime } from "../core/gameCore";
 import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES, FACTIONS, NPCS, WORLD_EVENTS, getFactionRank } from "../data/expansion";
+import { rentalGrossPerHour, rentalUpkeepPerHour } from "../data/wealthRisk";
 
 type Game = ReturnType<typeof useRiftCity>;
 
@@ -502,7 +503,10 @@ export function Education({ g }: { g: Game }) {
 export function PropertyView({ g }: { g: Game }) {
   const currentProperty=getProperty(g.gameState.ownedProperty);
   const currentPrice=currentProperty?.price||0;
+  const rentalValue=Object.entries(g.gameState.propertyHoldings).reduce((sum,[id,count])=>sum+((getProperty(id)?.price||0)*(Number(count)||0)),0);
+  const hourlyNet=Object.entries(g.gameState.propertyHoldings).reduce((sum,[id,count])=>{const p=getProperty(id); if(!p||!g.gameState.propertyRentalEnabled[id]) return sum; return sum+Math.max(0,rentalGrossPerHour(p.price)-rentalUpkeepPerHour(p.price))*(Number(count)||0)},0);
   return <>
+    <Panel title="Rental Portfolio · Passive Income With Risk"><div className="data-list"><div className="data-row"><span>Portfolio Value</span><b>{money(rentalValue)}</b></div><div className="data-row"><span>Net Rent / Hour</span><b>{money(hourlyNet)}</b></div><div className="data-row"><span>Lifetime Rent Earned</span><b>{money(g.gameState.propertyRentEarned)}</b></div><div className="data-row"><span>Property Losses</span><b>{money(g.gameState.propertyLosses)}</b></div><div className="data-row"><span>Heat Risk</span><b>{g.gameState.heat}/100</b></div></div><p>Rental units pay into checking after upkeep. Large portfolios and high Heat can trigger damage, raids, freezes, or unit seizure, so property income is never completely passive-safe.</p></Panel>
     <Panel title="Residence Upgrades">
       <div className="ui-grid three-col">{PROPERTY_UPGRADES.map((upgrade)=>{
         const rank=g.gameState.propertyUpgrades[upgrade.id]??0;
@@ -512,7 +516,7 @@ export function PropertyView({ g }: { g: Game }) {
     </Panel>
     <div className="ui-grid two-col">{PROPERTIES.map((property)=>{
       const current=g.gameState.ownedProperty===property.id; const cheaper=property.price<currentPrice; const affordable=g.gameState.cash>=property.price;
-      return <div className={`card property-card ${cheaper?"disabled":""}`} key={property.id}><span className="card-tag">REAL ESTATE</span><h3>{property.name}</h3><p>{property.description}</p><div className="data-list"><div className="data-row"><span>Price</span><b>{money(property.price)}</b></div><div className="data-row"><span>Health Bonus</span><b>+{property.maxHealthBonus}</b></div><div className="data-row"><span>Nerve Bonus</span><b>+{property.nerveBonus}</b></div><div className="data-row"><span>Happiness</span><b>{property.maxHappiness}</b></div></div><Button disabled={cheaper||current||!affordable} onClick={()=>g.buyProperty(property.id)}>{current?"Current Residence":cheaper?"Already Surpassed":!affordable?"Not Enough Cash":"Purchase"}</Button></div>;
+      return <div className={`card property-card ${cheaper?"disabled":""}`} key={property.id}><span className="card-tag">REAL ESTATE</span><h3>{property.name}</h3><p>{property.description}</p><div className="data-list"><div className="data-row"><span>Price</span><b>{money(property.price)}</b></div><div className="data-row"><span>Health Bonus</span><b>+{property.maxHealthBonus}</b></div><div className="data-row"><span>Nerve Bonus</span><b>+{property.nerveBonus}</b></div><div className="data-row"><span>Happiness</span><b>{property.maxHappiness}</b></div></div><Button disabled={cheaper||current||!affordable} onClick={()=>g.buyProperty(property.id)}>{current?"Current Residence":cheaper?"Already Surpassed":!affordable?"Not Enough Cash":"Purchase"}</Button>{property.price>0&&<div className="data-list"><div className="data-row"><span>Rental Units</span><b>{g.gameState.propertyHoldings[property.id]||0}</b></div><div className="data-row"><span>Gross / Unit / Hr</span><b>{money(rentalGrossPerHour(property.price))}</b></div><div className="data-row"><span>Upkeep / Unit / Hr</span><b>{money(rentalUpkeepPerHour(property.price))}</b></div><div className="btn-group"><Button disabled={g.gameState.cash<property.price} onClick={()=>g.buyRentalProperty(property.id)}>Buy Rental Unit</Button><Button disabled={!(g.gameState.propertyHoldings[property.id]>0)} onClick={()=>g.togglePropertyRental(property.id)}>{g.gameState.propertyRentalEnabled[property.id]?"Pause Renting":"Rent Units Out"}</Button></div></div>}</div>;
     })}</div>
   </>;
 }

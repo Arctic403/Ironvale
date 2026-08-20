@@ -7,6 +7,7 @@ import { BANK_INVESTMENT_TIERS, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_
 import { BLACK_MARKET_STATS } from "../systems/auctionSystem";
 import { CRIME_TOOLS } from "../systems/crimeTools";
 import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
+import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
 
 type Game = ReturnType<typeof useRiftCity>;
 
@@ -27,11 +28,14 @@ export function Bank({ g }: { g: Game }) {
   const now = useNow();
   const [amount, setAmount] = useState("100");
   const [investAmount, setInvestAmount] = useState("500");
+  const [offshoreAmount, setOffshoreAmount] = useState("1000");
   const n = Math.max(0, Math.floor(Number(amount) || 0));
   const invN = Math.max(0, Math.floor(Number(investAmount) || 0));
+  const offshoreN = Math.max(0, Math.floor(Number(offshoreAmount) || 0));
   const tiers = BANK_INVESTMENT_TIERS;
   const unlocked = (t: typeof tiers[number]) => g.gameState.bankLifetimeDeposits >= t.unlockDeposit && now - g.gameState.bankOpenedAt >= t.unlockMs;
   const transferSavings = (direction:"toSavings"|"toChecking") => g.setGameState(prev => {
+    if (prev.bankFrozenUntil && prev.bankFrozenUntil > Date.now()) return g.appendActivity(prev, "Domestic accounts are frozen.", "failure");
     const source = direction === "toSavings" ? prev.bank : prev.bankSavings;
     const move = Math.min(source, n);
     if (move <= 0) return prev;
@@ -42,6 +46,7 @@ export function Bank({ g }: { g: Game }) {
     return { ...prev, bank, bankSavings, bankLosses:prev.bankLosses+fee, bankHistory:[...prev.bankHistory, bank + bankSavings].slice(-40), bankTransactions:[{id:`transfer-${Date.now()}`,type:"transfer",amount:direction === "toSavings" ? move : credited,time:Date.now(),note:direction === "toSavings" ? "Checking → Savings" : `Savings → Checking (${money(fee)} early-access fee)`},...prev.bankTransactions].slice(0,60) };
   });
   const startInvestment = (tier: typeof tiers[number]) => g.setGameState(prev => {
+    if (prev.bankFrozenUntil && prev.bankFrozenUntil > Date.now()) return g.appendActivity(prev, "Domestic accounts are frozen.", "failure");
     if (!unlocked(tier)) return prev;
     const committed = prev.bankInvestments.filter(x => x.tierId === tier.id).reduce((sum,x)=>sum+x.principal,0);
     const availableCap = Math.max(0, tier.cap - committed);
@@ -50,7 +55,9 @@ export function Bank({ g }: { g: Game }) {
     const startedAt = Date.now();
     return { ...prev, bank:prev.bank-principal, bankInvestments:[...prev.bankInvestments,{id:`inv-${startedAt}-${tier.id}`,tierId:tier.id,principal,rate:tier.targetRate,startedAt,maturesAt:startedAt+tier.term}], bankHistory:[...prev.bankHistory, prev.bank - principal + prev.bankSavings].slice(-40), bankTransactions:[{id:`inv-${startedAt}`,type:"investment",amount:-principal,time:startedAt,note:`Started ${tier.name}`},...prev.bankTransactions].slice(0,60) };
   });
-  const total = g.gameState.bank + g.gameState.bankSavings + g.gameState.bankInvestments.reduce((sum,x)=>sum+x.principal,0);
+  const total = g.gameState.bank + g.gameState.bankSavings + g.gameState.bankInvestments.reduce((sum,x)=>sum+x.principal,0) + g.gameState.offshoreBalance;
+  const offshoreTier = getOffshoreTier(g.gameState.offshoreTier);
+  const bankFrozen = Boolean(g.gameState.bankFrozenUntil && g.gameState.bankFrozenUntil > now);
   const checkingCap = checkingProtectedCap(g.gameState.bankLifetimeDeposits);
   const savingsCap = savingsProtectedCap(g.gameState.bankLifetimeDeposits);
   const checkingExposed = Math.max(0, g.gameState.bank - checkingCap);
@@ -60,13 +67,14 @@ export function Bank({ g }: { g: Game }) {
   const points = history.map((v,i)=>`${(i/(history.length-1))*100},${42-((v-min)/Math.max(1,max-min))*36}`).join(" ");
   return (
     <div className="city-service-page bank-v2">
-      <section className="bank-hero"><div><small>RIFTCITY FINANCIAL</small><h2>{money(total)}</h2><p>Total managed balance · protection reduces risk, it does not erase it</p></div><div className="bank-account-pills"><span>Checking <b>{money(g.gameState.bank)}</b></span><span>Savings <b>{money(g.gameState.bankSavings)}</b></span><span>Invested <b>{money(g.gameState.bankInvestments.reduce((s,x)=>s+x.principal,0))}</b></span></div></section>
-      <div className="bank-risk-grid"><div><small>CASH ON HAND</small><b>Highest exposure</b><span>Crime failures and arrests can cost carried cash.</span></div><div><small>CHECKING</small><b>{checkingExposed ? `${money(checkingExposed)} exposed` : "Within protected allowance"}</b><span>Allowance: {money(checkingCap)} · excess can be hit by fraud/seizure events.</span></div><div><small>SAVINGS</small><b>{savingsExposed ? `${money(savingsExposed)} exposed` : "Within protected allowance"}</b><span>Allowance: {money(savingsCap)} · 2% early-access fee.</span></div><div><small>INVESTMENTS</small><b>Market risk</b><span>Returns can finish above or below principal depending on tier.</span></div></div>
+      <section className="bank-hero"><div><small>RIFTCITY FINANCIAL</small><h2>{money(total)}</h2><p>Total managed balance · every storage option trades access, fees, limits, and risk</p></div><div className="bank-account-pills"><span>Checking <b>{money(g.gameState.bank)}</b></span><span>Savings <b>{money(g.gameState.bankSavings)}</b></span><span>Invested <b>{money(g.gameState.bankInvestments.reduce((s,x)=>s+x.principal,0))}</b></span><span>Offshore <b>{money(g.gameState.offshoreBalance)}</b></span></div></section>
+      <div className="bank-risk-grid"><div><small>CASH ON HAND</small><b>Highest exposure</b><span>Crime failures and arrests can cost carried cash.</span></div><div><small>CHECKING</small><b>{checkingExposed ? `${money(checkingExposed)} exposed` : "Within protected allowance"}</b><span>Allowance: {money(checkingCap)} · excess can be hit by fraud/seizure events.</span></div><div><small>SAVINGS</small><b>{savingsExposed ? `${money(savingsExposed)} exposed` : "Within protected allowance"}</b><span>Allowance: {money(savingsCap)} · 2% early-access fee.</span></div><div><small>INVESTMENTS</small><b>Market risk</b><span>Returns can finish above or below principal depending on tier.</span></div><div><small>OFFSHORE</small><b>{offshoreTier ? `${money(g.gameState.offshoreBalance)} / ${money(offshoreTier.cap)}` : "Locked"}</b><span>Highest protection · fees + caps · a successful hostile hack steals only a small % then activates protection.</span></div></div>
       <div className="ui-grid two-col">
-        <Panel title="Accounts">
+        <Panel title={`Accounts${bankFrozen ? " · FROZEN" : ""}`}>
+          {bankFrozen && <div className="production-warning"><strong>Domestic account freeze</strong><span>Transfers, deposits, and withdrawals are blocked for {formatTime((g.gameState.bankFrozenUntil || now)-now)}. Offshore funds remain separate.</span></div>}
           <div className="input-group"><input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)}/><div className="btn-group"><Button disabled={n<=0} onClick={()=>g.bankDeposit(n)}>Deposit Cash</Button><Button disabled={n<=0} onClick={()=>g.bankWithdraw(n)}>Withdraw</Button></div></div>
           <div className="btn-group"><Button disabled={n<=0||g.gameState.bank<n} onClick={()=>transferSavings("toSavings")}>Move to Savings</Button><Button disabled={n<=0||g.gameState.bankSavings<n} onClick={()=>transferSavings("toChecking")}>Move to Checking</Button></div>
-          <div className="data-list"><div className="data-row"><span>Checking daily interest</span><b>1.0% + perks</b></div><div className="data-row"><span>Savings daily interest</span><b>1.5% + perks</b></div><div className="data-row"><span>Lifetime deposits</span><b>{money(g.gameState.bankLifetimeDeposits)}</b></div><div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div><div className="data-row"><span>Financial losses</span><b>{money(g.gameState.bankLosses)}</b></div><div className="data-row"><span>Heat exposure</span><b>{g.gameState.heat}/100</b></div></div>
+          <div className="data-list"><div className="data-row"><span>Checking daily interest</span><b>1.0% + perks</b></div><div className="data-row"><span>Savings daily interest</span><b>1.5% + perks</b></div><div className="data-row"><span>Lifetime deposits</span><b>{money(g.gameState.bankLifetimeDeposits)}</b></div><div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div><div className="data-row"><span>Financial losses</span><b>{money(g.gameState.bankLosses)}</b></div><div className="data-row"><span>Bank seizures</span><b>{g.gameState.bankSeizures}</b></div><div className="data-row"><span>Heat exposure</span><b>{g.gameState.heat}/100</b></div></div>
         </Panel>
         <Panel title="Balance Graph">
           <div className="bank-chart"><svg viewBox="0 0 100 44" preserveAspectRatio="none"><polyline points={points}/></svg><div><span>{money(min)}</span><b>{money(history.at(-1) || 0)}</b><span>{money(max)}</span></div></div>
@@ -78,6 +86,12 @@ export function Bank({ g }: { g: Game }) {
         <div className="investment-tier-grid">{tiers.map(t=>{const open=unlocked(t); const committed=g.gameState.bankInvestments.filter(x=>x.tierId===t.id).reduce((sum,x)=>sum+x.principal,0); return <div key={t.id} className={`investment-tier ${open?"open":"locked"}`}><small>{open?"UNLOCKED":"LOCKED"}</small><h3>{t.name}</h3><div><span>Cap</span><b>{money(t.cap)}</b></div><div><span>Term</span><b>{formatTime(t.term)}</b></div><div><span>Target return</span><b>{Math.round(t.targetRate*100)}%</b></div><div><span>Possible range</span><b>{Math.round(t.minRate*100)}% to +{Math.round(t.maxRate*100)}%</b></div><div><span>Risk</span><b>{t.riskLabel}</b></div><div><span>Committed</span><b>{money(committed)}</b></div>{!open&&<p>Requires {money(t.unlockDeposit)} lifetime deposits + {formatTime(t.unlockMs)} account age.</p>}<Button disabled={!open||invN<=0||g.gameState.bank<=0||committed>=t.cap} onClick={()=>startInvestment(t)}>Invest</Button></div>})}</div>
         {g.gameState.bankInvestments.length>0&&<div className="active-investments"><h3>Active Investments</h3>{g.gameState.bankInvestments.map(inv=>{const t=tiers.find(x=>x.id===inv.tierId); return <div key={inv.id}><span>{t?.name||inv.tierId}</span><b>{money(inv.principal)} · target {money(Math.floor(inv.principal*(1+inv.rate)))}</b><small>{now>=inv.maturesAt?"Maturing now":`${formatTime(inv.maturesAt-now)} remaining`}</small></div>})}</div>}
       </Panel>
+      <Panel title="Offshore Network · High Protection / High Friction">
+        <p>Offshore storage is the closest thing to safe cash: strict caps and routing fees apply. Future multiplayer hacks can only steal the configured percentage, then the account enters a protected window so the same player cannot be farmed repeatedly.</p>
+        <div className="investment-tier-grid">{OFFSHORE_TIERS.map((tier,idx)=>{const currentIndex=OFFSHORE_TIERS.findIndex(t=>t.id===g.gameState.offshoreTier); const netWorth=g.gameState.cash+g.gameState.bank+g.gameState.bankSavings+g.gameState.offshoreBalance; const available=netWorth>=tier.unlockNetWorth && idx<=currentIndex+1; const active=tier.id===g.gameState.offshoreTier; return <div key={tier.id} className={`investment-tier ${active?"open":available?"open":"locked"}`}><small>{active?"ACTIVE":available?"AVAILABLE":"LOCKED"}</small><h3>{tier.name}</h3><div><span>Cap</span><b>{money(tier.cap)}</b></div><div><span>Deposit fee</span><b>{Math.round(tier.depositFeeRate*100)}%</b></div><div><span>Withdraw fee</span><b>{Math.round(tier.withdrawFeeRate*100)}%</b></div><div><span>Hack exposure</span><b>{(tier.hackLossMin*100).toFixed(1)}–{(tier.hackLossMax*100).toFixed(1)}%</b></div><div><span>Protection after breach</span><b>{formatTime(tier.protectionMs)}</b></div><div><span>Unlock net worth</span><b>{money(tier.unlockNetWorth)}</b></div><Button disabled={active||!available||idx<=currentIndex} onClick={()=>g.unlockOffshoreTier(tier.id)}>{active?"Active":"Unlock Tier"}</Button></div>})}</div>
+        {offshoreTier && <><div className="input-group"><input type="number" min="0" value={offshoreAmount} onChange={e=>setOffshoreAmount(e.target.value)}/><div className="btn-group"><Button disabled={offshoreN<=0||g.gameState.cash<=0} onClick={()=>g.offshoreDeposit(offshoreN)}>Route Offshore</Button><Button disabled={offshoreN<=0||g.gameState.offshoreBalance<=0} onClick={()=>g.offshoreWithdraw(offshoreN)}>Withdraw Offshore</Button></div></div><div className="data-list"><div className="data-row"><span>Offshore balance</span><b>{money(g.gameState.offshoreBalance)}</b></div><div className="data-row"><span>Current cap</span><b>{money(offshoreTier.cap)}</b></div><div className="data-row"><span>Fees / hack losses</span><b>{money(g.gameState.offshoreLosses)}</b></div><div className="data-row"><span>Breach protection</span><b>{g.gameState.offshoreProtectedUntil && g.gameState.offshoreProtectedUntil>now ? formatTime(g.gameState.offshoreProtectedUntil-now) : "Not active"}</b></div></div></>}
+      </Panel>
+
       <Panel title="Recent Banking Activity"><div className="bank-ledger">{g.gameState.bankTransactions.length?g.gameState.bankTransactions.slice(0,8).map(tx=><div key={tx.id}><span>{tx.note}</span><b className={tx.amount>=0?"positive":"negative"}>{tx.amount>=0?"+":""}{money(tx.amount)}</b><small>{new Date(tx.time).toLocaleString()}</small></div>):<p>No transactions yet.</p>}</div><BackToCity g={g}/></Panel>
     </div>
   );

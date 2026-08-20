@@ -46,6 +46,13 @@ export type SaveData = {
   bankInvestments: BankInvestment[];
   bankRiskLastCheck: number;
   bankLosses: number;
+  bankFrozenUntil: number | null;
+  bankSeizures: number;
+  offshoreBalance: number;
+  offshoreTier: string | null;
+  offshoreProtectedUntil: number | null;
+  offshoreRiskLastCheck: number;
+  offshoreLosses: number;
   merits: number;
   points: number;
   energy: number;
@@ -90,6 +97,12 @@ export type SaveData = {
   equippedWeapon: string | null;
   equippedArmor: string | null;
   ownedProperty: string;
+  propertyHoldings: Record<string, number>;
+  propertyRentalEnabled: Record<string, boolean>;
+  propertyRentEarned: number;
+  propertyLosses: number;
+  propertyLastRentAt: number;
+  propertyRiskLastCheck: number;
   educationCompleted: string[];
   educationActive: string | null;
   educationStartedAt: number | null;

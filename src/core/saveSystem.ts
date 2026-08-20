@@ -4,7 +4,7 @@ import type { SaveData } from "../types/riftCity";
 export function freshSave(): SaveData {
   const now = Date.now();
   return {
-    cash: 1000, bank: 0, xp: 0, bankInterest: 0, lastBankInterest: now, bankSavings: 0, bankLifetimeDeposits: 0, bankOpenedAt: now, bankHistory: [0], bankTransactions: [], bankInvestments: [], bankRiskLastCheck: now, bankLosses: 0,
+    cash: 1000, bank: 0, xp: 0, bankInterest: 0, lastBankInterest: now, bankSavings: 0, bankLifetimeDeposits: 0, bankOpenedAt: now, bankHistory: [0], bankTransactions: [], bankInvestments: [], bankRiskLastCheck: now, bankLosses: 0, bankFrozenUntil: null, bankSeizures: 0, offshoreBalance: 0, offshoreTier: null, offshoreProtectedUntil: null, offshoreRiskLastCheck: now, offshoreLosses: 0,
     merits: 0, points: 0, energy: 100, lastEnergyUpdate: now,
     nerve: 10, lastNerveUpdate: now, health: 100, lastHealthUpdate: now,
     crimeExperience: 0, crimeMastery: {}, stats: { strength: 5, defense: 5, speed: 5, dexterity: 5 },
@@ -13,7 +13,7 @@ export function freshSave(): SaveData {
     currentJob: null, jobStartedAt: now, lastJobPayment: now, lastJobSkillUpdate: now,
     jobSkills: {}, jobPositionTiers: {}, jailUntil: null, jailStartedAt: null, jailReason: null, jailSentenceMs: null,
     hospitalUntil: null, hospitalStartedAt: null, hospitalReason: null, hospitalDurationMs: null,
-    inventory: {}, auctionListings: [], auctionRemovedListingIds: [], productionFacilities: [], activeProductions: [], productionAttention: 0, productionBatches: 0, productionRaids: 0, equippedWeapon: null, equippedArmor: null, ownedProperty: "shack",
+    inventory: {}, auctionListings: [], auctionRemovedListingIds: [], productionFacilities: [], activeProductions: [], productionAttention: 0, productionBatches: 0, productionRaids: 0, equippedWeapon: null, equippedArmor: null, ownedProperty: "shack", propertyHoldings: {}, propertyRentalEnabled: {}, propertyRentEarned: 0, propertyLosses: 0, propertyLastRentAt: now, propertyRiskLastCheck: now,
     educationCompleted: [], educationActive: null, educationStartedAt: null,
     completedMissions: [], crimesCompleted: 0, crimesFailed: 0, crimesSpooked: 0,
     crimesCritical: 0, timesJailed: 0, fightsWon: 0, fightsLost: 0, gymSessions: 0,
@@ -97,6 +97,19 @@ export function loadSave(): SaveData {
       bankInvestments: Array.isArray(parsed.bankInvestments) ? parsed.bankInvestments : [],
       bankRiskLastCheck: typeof parsed.bankRiskLastCheck === "number" ? parsed.bankRiskLastCheck : base.bankRiskLastCheck,
       bankLosses: Math.max(0, Number(parsed.bankLosses) || 0),
+      bankFrozenUntil: typeof parsed.bankFrozenUntil === "number" ? parsed.bankFrozenUntil : null,
+      bankSeizures: Math.max(0, Number(parsed.bankSeizures) || 0),
+      offshoreBalance: Math.max(0, Number(parsed.offshoreBalance) || 0),
+      offshoreTier: typeof parsed.offshoreTier === "string" ? parsed.offshoreTier : null,
+      offshoreProtectedUntil: typeof parsed.offshoreProtectedUntil === "number" ? parsed.offshoreProtectedUntil : null,
+      offshoreRiskLastCheck: typeof parsed.offshoreRiskLastCheck === "number" ? parsed.offshoreRiskLastCheck : base.offshoreRiskLastCheck,
+      offshoreLosses: Math.max(0, Number(parsed.offshoreLosses) || 0),
+      propertyHoldings: { ...(parsed.propertyHoldings || {}) },
+      propertyRentalEnabled: { ...(parsed.propertyRentalEnabled || {}) },
+      propertyRentEarned: Math.max(0, Number(parsed.propertyRentEarned) || 0),
+      propertyLosses: Math.max(0, Number(parsed.propertyLosses) || 0),
+      propertyLastRentAt: typeof parsed.propertyLastRentAt === "number" ? parsed.propertyLastRentAt : base.propertyLastRentAt,
+      propertyRiskLastCheck: typeof parsed.propertyRiskLastCheck === "number" ? parsed.propertyRiskLastCheck : base.propertyRiskLastCheck,
       nightclubReputation: Math.max(0, Number(parsed.nightclubReputation) || 0),
       nightclubVisits: Math.max(0, Number(parsed.nightclubVisits) || 0),
     };

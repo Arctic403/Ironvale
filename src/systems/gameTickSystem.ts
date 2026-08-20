@@ -1,6 +1,8 @@
 import type { SaveData } from "../types/riftCity";
 import { checkingProtectedCap, savingsProtectedCap, investmentRealizedRate } from "../data/banking";
 import { getJob, getJobPosition, getJobSkillLevel } from "../data/jobs";
+import { PROPERTIES } from "../data/properties";
+import { BANK_FREEZE_MS, OFFSHORE_RISK_INTERVAL, PROPERTY_RENT_INTERVAL, PROPERTY_RISK_INTERVAL, getOffshoreTier, rentalGrossPerHour, rentalUpkeepPerHour } from "../data/wealthRisk";
 import {
   BANK_INTEREST_INTERVAL, DEFAULT_MARKET_PRICES, ENERGY_REGEN_INTERVAL,
   HAPPINESS_TICK, HEALTH_REGEN_INTERVAL, JOB_PAY_INTERVAL, JOB_SKILL_INTERVAL,
@@ -119,7 +121,12 @@ export const tickGameState = (
         const loss = Math.min(checking, Math.max(1, Math.floor(checkingExposed * (0.03 + Math.random() * 0.05))));
         checking -= loss;
         losses += loss;
-        tx.unshift({ id:`risk-checking-${now}-${i}`, type:"risk", amount:-loss, time:now, note:"Checking exposure loss (fraud / seizure event)" });
+        const eventName = Math.random() < .5 ? "account hack" : "financial seizure";
+        tx.unshift({ id:`risk-checking-${now}-${i}`, type:"risk", amount:-loss, time:now, note:`Checking ${eventName}` });
+        if (Math.random() < .28 + heatFactor*.35) {
+          u.bankFrozenUntil = Math.max(u.bankFrozenUntil ?? prev.bankFrozenUntil ?? 0, now + BANK_FREEZE_MS);
+        }
+        if (eventName === "financial seizure") u.bankSeizures = (u.bankSeizures ?? prev.bankSeizures) + 1;
         riskChanged = true;
       }
 
@@ -141,6 +148,104 @@ export const tickGameState = (
       u.bankTransactions = tx.slice(0,60);
       u.bankHistory = [...(u.bankHistory ?? prev.bankHistory), checking + savings].slice(-40);
     }
+    changed = true;
+  }
+
+
+  // Rental portfolio: owned investment units can be toggled on/off for rent. Income lands in checking,
+  // keeping passive income useful but still exposed to banking risk.
+  if (now - prev.propertyLastRentAt >= PROPERTY_RENT_INTERVAL) {
+    const periods = Math.min(168, Math.floor((now - prev.propertyLastRentAt) / PROPERTY_RENT_INTERVAL));
+    let netPerPeriod = 0;
+    for (const [id, countRaw] of Object.entries(prev.propertyHoldings)) {
+      const count = Math.max(0, Number(countRaw) || 0);
+      if (!count || !prev.propertyRentalEnabled[id]) continue;
+      const property = PROPERTIES.find((p) => p.id === id);
+      if (!property || property.price <= 0) continue;
+      netPerPeriod += Math.max(0, rentalGrossPerHour(property.price) - rentalUpkeepPerHour(property.price)) * count;
+    }
+    const earned = netPerPeriod * periods;
+    if (earned > 0) {
+      const bank = u.bank ?? prev.bank;
+      u.bank = bank + earned;
+      u.propertyRentEarned = prev.propertyRentEarned + earned;
+      u.bankTransactions = [{ id:`rent-${now}`, type:"rent", amount:earned, time:now, note:"Rental portfolio payout (after upkeep)" }, ...(u.bankTransactions ?? prev.bankTransactions)].slice(0,60);
+      u.bankHistory = [...(u.bankHistory ?? prev.bankHistory), bank + earned + (u.bankSavings ?? prev.bankSavings)].slice(-40);
+    }
+    u.propertyLastRentAt = prev.propertyLastRentAt + periods * PROPERTY_RENT_INTERVAL;
+    changed = true;
+  }
+
+  // Property portfolio risk. High Heat and a larger rental portfolio increase the chance of a raid,
+  // freeze, damage bill, or seizure. The simulation is abstract and designed for the game economy.
+  if (now - prev.propertyRiskLastCheck >= PROPERTY_RISK_INTERVAL) {
+    const checks = Math.min(30, Math.floor((now - prev.propertyRiskLastCheck) / PROPERTY_RISK_INTERVAL));
+    let holdings = { ...prev.propertyHoldings };
+    let losses = prev.propertyLosses;
+    let seizures = u.bankSeizures ?? prev.bankSeizures;
+    let frozenUntil = u.bankFrozenUntil ?? prev.bankFrozenUntil;
+    let tx = [...(u.bankTransactions ?? prev.bankTransactions)];
+    for (let i=0;i<checks;i++) {
+      const units = Object.values(holdings).reduce((a,b)=>a+Math.max(0, Number(b)||0),0);
+      const heatFactor = Math.max(0, Math.min(1, prev.heat/100));
+      if (units > 0 && Math.random() < 0.008 + units*0.002 + heatFactor*0.035) {
+        const rentable = Object.entries(holdings).filter(([id,c]) => (Number(c)||0)>0 && PROPERTIES.some(p=>p.id===id && p.price>0));
+        if (rentable.length) {
+          const [id] = rentable[Math.floor(Math.random()*rentable.length)];
+          const prop = PROPERTIES.find(p=>p.id===id)!;
+          if (Math.random() < 0.22 + heatFactor*0.28) {
+            holdings[id] = Math.max(0, (holdings[id]||0)-1);
+            const hit = Math.floor(prop.price*0.35);
+            losses += hit;
+            seizures += 1;
+            frozenUntil = Math.max(frozenUntil||0, now + BANK_FREEZE_MS);
+            tx.unshift({id:`property-seizure-${now}-${i}`,type:"risk",amount:-hit,time:now,note:`${prop.name} rental unit seized; bank temporarily frozen`});
+          } else {
+            const bill = Math.max(100, Math.floor(prop.price*(0.01+Math.random()*0.025)));
+            const bank = u.bank ?? prev.bank;
+            const paid = Math.min(bank, bill);
+            u.bank = bank-paid;
+            losses += paid;
+            tx.unshift({id:`property-risk-${now}-${i}`,type:"risk",amount:-paid,time:now,note:`${prop.name} raid/damage/tenant loss`});
+          }
+        }
+      }
+    }
+    u.propertyHoldings = holdings;
+    u.propertyLosses = losses;
+    u.bankSeizures = seizures;
+    u.bankFrozenUntil = frozenUntil;
+    u.bankTransactions = tx.slice(0,60);
+    u.propertyRiskLastCheck = prev.propertyRiskLastCheck + checks*PROPERTY_RISK_INTERVAL;
+    changed = true;
+  }
+
+  // Offshore accounts are the strongest store of wealth, but not invulnerable. A successful hostile
+  // player-style hack steals only a small percentage and then grants a protection window.
+  if (now - prev.offshoreRiskLastCheck >= OFFSHORE_RISK_INTERVAL) {
+    const checks = Math.min(30, Math.floor((now - prev.offshoreRiskLastCheck) / OFFSHORE_RISK_INTERVAL));
+    let offshore = prev.offshoreBalance;
+    let protectedUntil = prev.offshoreProtectedUntil;
+    let offshoreLosses = prev.offshoreLosses;
+    const tier = getOffshoreTier(prev.offshoreTier);
+    let tx = [...(u.bankTransactions ?? prev.bankTransactions)];
+    for (let i=0;i<checks;i++) {
+      if (!tier || offshore <= 0 || (protectedUntil && protectedUntil > now)) continue;
+      const wealthFactor = Math.min(.04, offshore / Math.max(1,tier.cap) * .025);
+      if (Math.random() < .012 + wealthFactor) {
+        const pct = tier.hackLossMin + Math.random()*(tier.hackLossMax-tier.hackLossMin);
+        const loss = Math.max(1, Math.floor(offshore*pct));
+        offshore -= loss;
+        offshoreLosses += loss;
+        protectedUntil = now + tier.protectionMs;
+        tx.unshift({id:`offshore-hack-${now}-${i}`,type:"risk",amount:-loss,time:now,note:`Offshore breach: hostile player stole ${(pct*100).toFixed(1)}%; protection activated`});
+      }
+    }
+    u.offshoreBalance = offshore;
+    u.offshoreProtectedUntil = protectedUntil;
+    u.offshoreLosses = offshoreLosses;
+    u.offshoreRiskLastCheck = prev.offshoreRiskLastCheck + checks*OFFSHORE_RISK_INTERVAL;
+    u.bankTransactions = tx.slice(0,60);
     changed = true;
   }
 

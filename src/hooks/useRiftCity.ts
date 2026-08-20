@@ -27,6 +27,7 @@ import { PLAYER_PROFILES } from "../data/playerProfiles";
 import { ALL_NPC_LISTINGS, listingFee } from "../systems/auctionSystem";
 import { getCrimeTool } from "../systems/crimeTools";
 import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
+import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
 import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES, WORLD_EVENTS, getFaction, getFactionRank, challengeProgress } from "../data/expansion";
 export function useRiftCity() {
   const [gameState, setGameState] = useState<SaveData>(() =>
@@ -1062,6 +1063,9 @@ export function useRiftCity() {
     amount: number
   ) =>
     setGameState((prev) => {
+      if (prev.bankFrozenUntil && prev.bankFrozenUntil > Date.now()) {
+        return appendActivity(prev, "Your domestic bank account is temporarily frozen.", "failure");
+      }
       const n = Math.min(
         prev.cash,
         Math.max(0, amount)
@@ -1086,6 +1090,9 @@ export function useRiftCity() {
     amount: number
   ) =>
     setGameState((prev) => {
+      if (prev.bankFrozenUntil && prev.bankFrozenUntil > Date.now()) {
+        return appendActivity(prev, "Your domestic bank account is temporarily frozen.", "failure");
+      }
       const n = Math.min(
         prev.bank,
         Math.max(0, amount)
@@ -1104,6 +1111,57 @@ export function useRiftCity() {
         bankTransactions: [{ id: `wd-${Date.now()}`, type: "withdrawal", amount: -n, time: Date.now(), note: "Cash withdrawal" }, ...prev.bankTransactions].slice(0, 60),
       };
     });
+
+
+
+  const unlockOffshoreTier = (tierId: string) =>
+    setGameState((prev) => {
+      const tier = OFFSHORE_TIERS.find(t => t.id === tierId);
+      if (!tier) return prev;
+      const netWorth = prev.cash + prev.bank + prev.bankSavings + prev.offshoreBalance + Object.entries(prev.propertyHoldings).reduce((sum,[id,count]) => sum + ((PROPERTIES.find(p=>p.id===id)?.price || 0) * (Number(count)||0)), 0);
+      const currentIndex = OFFSHORE_TIERS.findIndex(t => t.id === prev.offshoreTier);
+      const nextIndex = OFFSHORE_TIERS.findIndex(t => t.id === tierId);
+      if (netWorth < tier.unlockNetWorth || nextIndex < 0 || nextIndex > currentIndex + 1) return appendActivity(prev, `Offshore tier locked. Requires ${money(tier.unlockNetWorth)} net worth.`, "failure");
+      if (currentIndex >= nextIndex) return prev;
+      return appendActivity({ ...prev, offshoreTier:tierId }, `${tier.name} unlocked.`, "success");
+    });
+
+  const offshoreDeposit = (amount:number) =>
+    setGameState((prev) => {
+      const tier = getOffshoreTier(prev.offshoreTier);
+      if (!tier) return appendActivity(prev, "Unlock an offshore account tier first.", "failure");
+      const gross = Math.min(prev.cash, Math.max(0, Math.floor(amount)), Math.max(0, tier.cap-prev.offshoreBalance));
+      if (gross <= 0) return prev;
+      const fee = Math.max(1, Math.floor(gross*tier.depositFeeRate));
+      const credited = Math.max(0, gross-fee);
+      const next:SaveData = { ...prev, cash:prev.cash-gross, offshoreBalance:prev.offshoreBalance+credited, offshoreLosses:prev.offshoreLosses+fee, bankTransactions:[{id:`offshore-dep-${Date.now()}`,type:"offshore",amount:credited,time:Date.now(),note:`Offshore deposit (${money(fee)} routing fee)`},...prev.bankTransactions].slice(0,60) };
+      return appendActivity(next, `${money(credited)} moved offshore after fees.`, "success");
+    });
+
+  const offshoreWithdraw = (amount:number) =>
+    setGameState((prev) => {
+      const tier = getOffshoreTier(prev.offshoreTier);
+      if (!tier) return prev;
+      const gross = Math.min(prev.offshoreBalance, Math.max(0, Math.floor(amount)));
+      if (gross <= 0) return prev;
+      const fee = Math.max(1, Math.floor(gross*tier.withdrawFeeRate));
+      const credited = Math.max(0, gross-fee);
+      const next:SaveData = { ...prev, cash:prev.cash+credited, offshoreBalance:prev.offshoreBalance-gross, offshoreLosses:prev.offshoreLosses+fee, bankTransactions:[{id:`offshore-wd-${Date.now()}`,type:"offshore",amount:-gross,time:Date.now(),note:`Offshore withdrawal (${money(fee)} routing fee)`},...prev.bankTransactions].slice(0,60) };
+      return appendActivity(next, `${money(credited)} withdrawn from offshore storage.`, "success");
+    });
+
+  const buyRentalProperty = (id:string) =>
+    setGameState((prev) => {
+      const p = PROPERTIES.find(x=>x.id===id);
+      if (!p || p.price<=0 || prev.cash<p.price) return appendActivity(prev, "You cannot afford that rental property.", "failure");
+      const holdings = { ...prev.propertyHoldings, [id]:(prev.propertyHoldings[id]||0)+1 };
+      const rental = { ...prev.propertyRentalEnabled, [id]:true };
+      return appendActivity({ ...prev, cash:prev.cash-p.price, propertyHoldings:holdings, propertyRentalEnabled:rental }, `Purchased a ${p.name} rental unit.`, "success");
+    });
+
+  const togglePropertyRental = (id:string) =>
+    setGameState((prev) => ({ ...prev, propertyRentalEnabled:{ ...prev.propertyRentalEnabled, [id]:!prev.propertyRentalEnabled[id] } }));
+
 
   /*
    * EDUCATION
@@ -1809,6 +1867,11 @@ export function useRiftCity() {
 
     bankDeposit,
     bankWithdraw,
+    unlockOffshoreTier,
+    offshoreDeposit,
+    offshoreWithdraw,
+    buyRentalProperty,
+    togglePropertyRental,
 
     startEducation,
     finishEducation,
