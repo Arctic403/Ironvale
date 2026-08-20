@@ -19,7 +19,7 @@ import {
 } from "../../views/GameScreens";
 
 import { City } from "../../views/City";
-import { Bank, Hospital, Jail, Police, Pharmacy, BlackMarket, Park, Downtown, Casino, Airport } from "../../views/CityServices";
+import { Bank, Hospital, Jail, Police, Pharmacy, BlackMarket, Park, Downtown, Casino, Nightclub, Airport } from "../../views/CityServices";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;
 
@@ -55,6 +55,7 @@ const SCREEN_COMPONENTS: Record<
   park: Park,
   downtown: Downtown,
   casino: Casino,
+  nightclub: Nightclub,
   airport: Airport,
 };
 

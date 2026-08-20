@@ -2,7 +2,7 @@ export type Screen =
   | "city" | "crimes" | "combat" | "gym" | "jobs" | "inventory" | "shops"
   | "missions" | "education" | "property" | "character"
   | "market" | "faction" | "awards" | "progression"
-  | "bank" | "hospital" | "jail" | "police" | "pharmacy" | "casino"
+  | "bank" | "hospital" | "jail" | "police" | "pharmacy" | "casino" | "nightclub"
   | "blackmarket" | "park" | "downtown" | "airport";
 
 export type ActivityType =
@@ -27,12 +27,21 @@ export type AuctionListing = {
 
 import type { CombatStats } from "../systems/progressionSystem";
 
+export type BankTransaction = { id: string; type: string; amount: number; time: number; note: string; };
+export type BankInvestment = { id: string; tierId: string; principal: number; rate: number; startedAt: number; maturesAt: number; };
+
 export type SaveData = {
   cash: number;
   bank: number;
   xp: number;
   bankInterest: number;
   lastBankInterest: number;
+  bankSavings: number;
+  bankLifetimeDeposits: number;
+  bankOpenedAt: number;
+  bankHistory: number[];
+  bankTransactions: BankTransaction[];
+  bankInvestments: BankInvestment[];
   merits: number;
   points: number;
   energy: number;
@@ -123,6 +132,9 @@ export type SaveData = {
   casinoWins: number;
   casinoBestStreak: number;
   casinoCurrentStreak: number;
+  casinoJackpotPool: number;
+  nightclubReputation: number;
+  nightclubVisits: number;
   activities: Activity[];
 };
 

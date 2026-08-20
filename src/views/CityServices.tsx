@@ -20,28 +20,59 @@ function BackToCity({ g }: { g: Game }) {
 }
 
 export function Bank({ g }: { g: Game }) {
+  const now = useNow();
   const [amount, setAmount] = useState("100");
-  const n = Math.max(0, Number(amount) || 0);
+  const [investAmount, setInvestAmount] = useState("500");
+  const n = Math.max(0, Math.floor(Number(amount) || 0));
+  const invN = Math.max(0, Math.floor(Number(investAmount) || 0));
+  const tiers = [
+    { id:"starter", name:"Starter Note", unlockDeposit:0, unlockMs:0, cap:2000, term:5*60_000, rate:.02 },
+    { id:"growth", name:"Growth Certificate", unlockDeposit:5000, unlockMs:30*60_000, cap:10000, term:15*60_000, rate:.04 },
+    { id:"prime", name:"Prime Fund", unlockDeposit:25000, unlockMs:2*60*60_000, cap:50000, term:30*60_000, rate:.07 },
+    { id:"elite", name:"Elite Capital", unlockDeposit:100000, unlockMs:6*60*60_000, cap:250000, term:60*60_000, rate:.12 },
+  ];
+  const unlocked = (t: typeof tiers[number]) => g.gameState.bankLifetimeDeposits >= t.unlockDeposit && now - g.gameState.bankOpenedAt >= t.unlockMs;
+  const transferSavings = (direction:"toSavings"|"toChecking") => g.setGameState(prev => {
+    const source = direction === "toSavings" ? prev.bank : prev.bankSavings;
+    const move = Math.min(source, n);
+    if (move <= 0) return prev;
+    const bank = direction === "toSavings" ? prev.bank - move : prev.bank + move;
+    const bankSavings = direction === "toSavings" ? prev.bankSavings + move : prev.bankSavings - move;
+    return { ...prev, bank, bankSavings, bankHistory:[...prev.bankHistory, bank + bankSavings].slice(-40), bankTransactions:[{id:`transfer-${Date.now()}`,type:"transfer",amount:move,time:Date.now(),note:direction === "toSavings" ? "Checking → Savings" : "Savings → Checking"},...prev.bankTransactions].slice(0,60) };
+  });
+  const startInvestment = (tier: typeof tiers[number]) => g.setGameState(prev => {
+    if (!unlocked(tier)) return prev;
+    const committed = prev.bankInvestments.filter(x => x.tierId === tier.id).reduce((sum,x)=>sum+x.principal,0);
+    const availableCap = Math.max(0, tier.cap - committed);
+    const principal = Math.min(invN, prev.bank, availableCap);
+    if (principal <= 0) return prev;
+    const startedAt = Date.now();
+    return { ...prev, bank:prev.bank-principal, bankInvestments:[...prev.bankInvestments,{id:`inv-${startedAt}-${tier.id}`,tierId:tier.id,principal,rate:tier.rate,startedAt,maturesAt:startedAt+tier.term}], bankHistory:[...prev.bankHistory, prev.bank - principal + prev.bankSavings].slice(-40), bankTransactions:[{id:`inv-${startedAt}`,type:"investment",amount:-principal,time:startedAt,note:`Started ${tier.name}`},...prev.bankTransactions].slice(0,60) };
+  });
+  const total = g.gameState.bank + g.gameState.bankSavings + g.gameState.bankInvestments.reduce((sum,x)=>sum+x.principal,0);
+  const history = g.gameState.bankHistory.length > 1 ? g.gameState.bankHistory : [0,total];
+  const max = Math.max(1,...history), min = Math.min(...history);
+  const points = history.map((v,i)=>`${(i/(history.length-1))*100},${42-((v-min)/Math.max(1,max-min))*36}`).join(" ");
   return (
-    <div className="ui-grid two-col city-service-page">
-      <Panel title="RiftCity Bank">
-        <div className="service-hero"><span>🏦</span><div><h2>{money(g.gameState.bank)}</h2><p>Protected balance</p></div></div>
-        <div className="input-group">
-          <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <div className="btn-group">
-            <Button disabled={n <= 0} onClick={() => g.bankDeposit(n)}>Deposit</Button>
-            <Button disabled={n <= 0} onClick={() => g.bankWithdraw(n)}>Withdraw</Button>
-          </div>
-        </div>
+    <div className="city-service-page bank-v2">
+      <section className="bank-hero"><div><small>RIFTCITY FINANCIAL</small><h2>{money(total)}</h2><p>Total managed balance</p></div><div className="bank-account-pills"><span>Checking <b>{money(g.gameState.bank)}</b></span><span>Savings <b>{money(g.gameState.bankSavings)}</b></span><span>Invested <b>{money(g.gameState.bankInvestments.reduce((s,x)=>s+x.principal,0))}</b></span></div></section>
+      <div className="ui-grid two-col">
+        <Panel title="Accounts">
+          <div className="input-group"><input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)}/><div className="btn-group"><Button disabled={n<=0} onClick={()=>g.bankDeposit(n)}>Deposit Cash</Button><Button disabled={n<=0} onClick={()=>g.bankWithdraw(n)}>Withdraw</Button></div></div>
+          <div className="btn-group"><Button disabled={n<=0||g.gameState.bank<n} onClick={()=>transferSavings("toSavings")}>Move to Savings</Button><Button disabled={n<=0||g.gameState.bankSavings<n} onClick={()=>transferSavings("toChecking")}>Move to Checking</Button></div>
+          <div className="data-list"><div className="data-row"><span>Checking daily interest</span><b>1.0% + perks</b></div><div className="data-row"><span>Savings daily interest</span><b>1.5% + perks</b></div><div className="data-row"><span>Lifetime deposits</span><b>{money(g.gameState.bankLifetimeDeposits)}</b></div><div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div></div>
+        </Panel>
+        <Panel title="Balance Graph">
+          <div className="bank-chart"><svg viewBox="0 0 100 44" preserveAspectRatio="none"><polyline points={points}/></svg><div><span>{money(min)}</span><b>{money(history.at(-1) || 0)}</b><span>{money(max)}</span></div></div>
+          <p className="muted-copy">Tracks recent account balance changes, transfers, interest, and investment maturities.</p>
+        </Panel>
+      </div>
+      <Panel title="Investment Desk">
+        <div className="investment-input"><label>Investment amount</label><input type="number" min="1" value={investAmount} onChange={e=>setInvestAmount(e.target.value)}/></div>
+        <div className="investment-tier-grid">{tiers.map(t=>{const open=unlocked(t); const committed=g.gameState.bankInvestments.filter(x=>x.tierId===t.id).reduce((sum,x)=>sum+x.principal,0); return <div key={t.id} className={`investment-tier ${open?"open":"locked"}`}><small>{open?"UNLOCKED":"LOCKED"}</small><h3>{t.name}</h3><div><span>Cap</span><b>{money(t.cap)}</b></div><div><span>Term</span><b>{formatTime(t.term)}</b></div><div><span>Return</span><b>{Math.round(t.rate*100)}%</b></div><div><span>Committed</span><b>{money(committed)}</b></div>{!open&&<p>Requires {money(t.unlockDeposit)} lifetime deposits + {formatTime(t.unlockMs)} account age.</p>}<Button disabled={!open||invN<=0||g.gameState.bank<=0||committed>=t.cap} onClick={()=>startInvestment(t)}>Invest</Button></div>})}</div>
+        {g.gameState.bankInvestments.length>0&&<div className="active-investments"><h3>Active Investments</h3>{g.gameState.bankInvestments.map(inv=>{const t=tiers.find(x=>x.id===inv.tierId); return <div key={inv.id}><span>{t?.name||inv.tierId}</span><b>{money(inv.principal)} → {money(Math.floor(inv.principal*(1+inv.rate)))}</b><small>{now>=inv.maturesAt?"Maturing now":`${formatTime(inv.maturesAt-now)} remaining`}</small></div>})}</div>}
       </Panel>
-      <Panel title="Account Summary">
-        <div className="data-list">
-          <div className="data-row"><span>Cash on hand</span><b>{money(g.gameState.cash)}</b></div>
-          <div className="data-row"><span>Bank balance</span><b>{money(g.gameState.bank)}</b></div>
-          <div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div>
-        </div>
-        <BackToCity g={g} />
-      </Panel>
+      <Panel title="Recent Banking Activity"><div className="bank-ledger">{g.gameState.bankTransactions.length?g.gameState.bankTransactions.slice(0,8).map(tx=><div key={tx.id}><span>{tx.note}</span><b className={tx.amount>=0?"positive":"negative"}>{tx.amount>=0?"+":""}{money(tx.amount)}</b><small>{new Date(tx.time).toLocaleString()}</small></div>):<p>No transactions yet.</p>}</div><BackToCity g={g}/></Panel>
     </div>
   );
 }
@@ -209,12 +240,12 @@ export function Downtown({ g }: { g: Game }) {
   return <div className="city-service-page"><Panel title="Downtown RiftCity"><div className="service-hero"><span>📍</span><div><h2>Downtown</h2><p>The city's busiest hub. Jump directly to nearby services.</p></div></div><div className="service-link-grid">{links.map(([screen, label]) => <div key={screen}><Button onClick={() => g.setCurrentScreen(screen as any)}>{label}</Button></div>)}</div><BackToCity g={g} /></Panel></div>;
 }
 
-type CasinoGameId = "blackjack" | "poker" | "wheel" | "racing" | "reels";
+type CasinoGameId = "blackjack" | "poker" | "roulette" | "baccarat" | "craps" | "war" | "wheel" | "racing" | "reels";
 type CasinoCard = { rank: string; suit: string; value: number };
 type PokerStage = "waiting" | "preflop" | "flop" | "turn" | "river" | "showdown";
 type PokerSeat = { name: string; npc: boolean; chips: number; bet: number; folded: boolean; cards: CasinoCard[]; action: string };
 type Horse = { name: string; number: number; speed: number; stamina: number; form: number; consistency: number; style: string; icon: string };
-type SlotMachine = { id: string; name: string; icon: string; subtitle: string; symbols: string[]; jackpot: string };
+type SlotMachine = { id: string; name: string; icon: string; subtitle: string; symbols: string[]; jackpot: string; reels: number; baseMult: number };
 
 const CASINO_CHIP_CAP = 75;
 const CASINO_NPCS = ["Maya Vale", "Vince Romano", "Juno Park", "Theo Knox", "Aria Stone", "Malik Reed"];
@@ -226,10 +257,12 @@ const RACE_BETTING_MS = 75_000;
 const RACE_RUNNING_MS = 35_000;
 
 const SLOT_MACHINES: SlotMachine[] = [
-  { id:"neon", name:"Neon Reels", icon:"⚡", subtitle:"Electric city lights and Rift stars", symbols:["⚡","◆","★","7","R","♛"], jackpot:"TRIPLE RIFT" },
-  { id:"vault", name:"Vault Breaker", icon:"💰", subtitle:"Crack the vault and line up the gold", symbols:["💰","🔐","💎","🪙","★","7"], jackpot:"VAULT OPEN" },
-  { id:"midnight", name:"Midnight Drive", icon:"🏎️", subtitle:"Street lights, cars, and midnight boosts", symbols:["🏎️","🌙","💨","🏁","★","7"], jackpot:"NIGHT RUN" },
-  { id:"rift", name:"Rift Reactor", icon:"🌀", subtitle:"Unstable Rift energy with rare wild chains", symbols:["🌀","✦","⚛","◆","★","R"], jackpot:"RIFT SURGE" },
+  { id:"neon", name:"Neon Reels", icon:"⚡", subtitle:"5 reels · wild streaks", symbols:["⚡","◆","★","7","R","♛"], jackpot:"NEON JACKPOT", reels:5, baseMult:8 },
+  { id:"vault", name:"Vault Breaker", icon:"💰", subtitle:"5 reels · vault bonus", symbols:["💰","🔐","💎","🪙","★","7"], jackpot:"VAULT OPEN", reels:5, baseMult:10 },
+  { id:"gold", name:"Gold Rush Mine", icon:"⛏️", subtitle:"6 reels · gold collect · random jackpot", symbols:["⛏️","🪙","💰","💎","🧨","🚋","★"], jackpot:"MOTHERLODE", reels:6, baseMult:12 },
+  { id:"midnight", name:"Midnight Drive", icon:"🏎️", subtitle:"5 reels · boost multiplier", symbols:["🏎️","🌙","💨","🏁","★","7"], jackpot:"NIGHT RUN", reels:5, baseMult:9 },
+  { id:"rift", name:"Rift Reactor", icon:"🌀", subtitle:"6 reels · cascade-style chain bonus", symbols:["🌀","✦","⚛","◆","★","R"], jackpot:"RIFT SURGE", reels:6, baseMult:11 },
+  { id:"crown", name:"Crown & Diamonds", icon:"👑", subtitle:"5 reels · premium symbol boosts", symbols:["👑","💎","♛","★","7","R"], jackpot:"ROYAL DROP", reels:5, baseMult:10 },
 ];
 
 function buildCasinoDeck() {
@@ -361,7 +394,8 @@ export function Casino({ g }: { g: Game }) {
   const [wheelResult, setWheelResult] = useState<string | null>(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [slotMachineId, setSlotMachineId] = useState("neon");
-  const [reels, setReels] = useState(["◆","★","7"]);
+  const [reels, setReels] = useState(["◆","★","7","R","⚡"]);
+  const [tableResult,setTableResult]=useState("Choose a bet and play a round.");
   const [reelsSpinning, setReelsSpinning] = useState(false);
 
   const [pokerStage,setPokerStage]=useState<PokerStage>("waiting");
@@ -523,13 +557,40 @@ export function Casino({ g }: { g: Game }) {
     },1800);
   };
 
+  const playRoulette = (pick:"red"|"black"|"green") => {
+    if(!canPlay||!takeWager()) return;
+    const roll=Math.floor(Math.random()*37); const color=roll===0?"green":roll%2===0?"red":"black"; const mult=pick==="green"?36:2;
+    if(color===pick){payCash(wager*mult);recordGame("Roulette","win",2);setTableResult(`${roll} ${color.toUpperCase()} — paid ${money(wager*mult)}.`);} else {recordGame("Roulette","loss",0);setTableResult(`${roll} ${color.toUpperCase()} — ${money(wager)} lost.`);}
+  };
+  const playBaccarat = (pick:"player"|"banker"|"tie") => {
+    if(!canPlay||!takeWager()) return;
+    const p=Math.floor(Math.random()*10), b=Math.floor(Math.random()*10); const result=p===b?"tie":p>b?"player":"banker"; const mult=pick==="tie"?9:2;
+    if(result===pick){payCash(wager*mult);recordGame("Baccarat","win",2);} else recordGame("Baccarat","loss",0);
+    setTableResult(`Player ${p} · Banker ${b} · ${result.toUpperCase()}${result===pick?` — paid ${money(wager*mult)}`:""}.`);
+  };
+  const playCraps = (pick:"pass"|"field") => {
+    if(!canPlay||!takeWager()) return;
+    const a=1+Math.floor(Math.random()*6), b=1+Math.floor(Math.random()*6), total=a+b; const win=pick==="pass"?[7,11].includes(total):[2,3,4,9,10,11,12].includes(total); const mult=pick==="field"&&[2,12].includes(total)?3:2;
+    if(win){payCash(wager*mult);recordGame("Craps","win",2);} else recordGame("Craps","loss",0); setTableResult(`Dice ${a} + ${b} = ${total}${win?` — paid ${money(wager*mult)}`:` — ${money(wager)} lost`}.`);
+  };
+  const playWar = () => {
+    if(!canPlay||!takeWager()) return; const deck=shuffledDeck(); const you=deck.pop()!, dealer=deck.pop()!; const win=you.value>dealer.value, tie=you.value===dealer.value;
+    if(win){payCash(wager*2);recordGame("Casino War","win",1);} else if(tie){payCash(wager);recordGame("Casino War","draw",1);} else recordGame("Casino War","loss",0); setTableResult(`You ${you.rank}${you.suit} · Dealer ${dealer.rank}${dealer.suit} — ${win?"YOU WIN":tie?"TIE":"DEALER WINS"}.`);
+  };
+
   const activeMachine=SLOT_MACHINES.find(m=>m.id===slotMachineId) || SLOT_MACHINES[0];
   const spinReels = () => {
     if (!canPlay || reelsSpinning || !takeWager() || !recordGame(activeMachine.name, "draw", 1)) return;
-    const stake=wager;
+    const stake=wager; const contribution=Math.max(1,Math.floor(stake*.02));
+    g.setGameState(prev=>({...prev,casinoJackpotPool:prev.casinoJackpotPool+contribution}));
     setReelsSpinning(true); setMessage(`${activeMachine.name} reels are spinning…`);
     let ticks=0;
-    const id=window.setInterval(()=>{ setReels([0,1,2].map(()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)])); ticks+=1; if(ticks>=12){window.clearInterval(id); const next=[0,1,2].map(()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)]); setReels(next); const match=next[0]===next[1]&&next[1]===next[2]; if(match){ payCash(stake*10); recordGame(activeMachine.name,"win",3); } else recordGame(activeMachine.name,"loss",0); setMessage(match?`${activeMachine.jackpot}! Triple ${next[0]} — paid ${money(stake*10)}.`:`Reels stop — ${money(stake)} lost.`); setReelsSpinning(false);}},75);
+    const id=window.setInterval(()=>{ setReels(Array.from({length:activeMachine.reels},()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)])); ticks+=1; if(ticks>=14){window.clearInterval(id); const next=Array.from({length:activeMachine.reels},()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)]); setReels(next);
+      const counts=next.reduce<Record<string,number>>((acc,x)=>(acc[x]=(acc[x]||0)+1,acc),{}); const best=Math.max(...Object.values(counts)); const jackpotHit=Math.random()<0.0025;
+      if(jackpotHit){ const jackpot=Math.max(10000,g.gameState.casinoJackpotPool); payCash(jackpot); g.setGameState(prev=>({...prev,casinoJackpotPool:25000})); recordGame(activeMachine.name,"win",8); setMessage(`${activeMachine.jackpot}! RANDOM JACKPOT — paid ${money(jackpot)}!`); }
+      else if(best>=4){ const mult=activeMachine.baseMult+(best-activeMachine.reels+1)*4; payCash(stake*mult); recordGame(activeMachine.name,"win",3); setMessage(`${best} matching symbols — paid ${money(stake*mult)}.`); }
+      else if(best>=3){ payCash(stake*3); recordGame(activeMachine.name,"win",2); setMessage(`3-symbol hit — paid ${money(stake*3)}.`); }
+      else {recordGame(activeMachine.name,"loss",0);setMessage(`Reels stop — ${money(stake)} lost.`);} setReelsSpinning(false);}},70);
   };
 
   const lockRacePrediction=()=>{
@@ -568,6 +629,10 @@ export function Casino({ g }: { g: Game }) {
         {[
           ["blackjack","🂡","Blackjack Hall","Dealer Elena · animated felt table","PLAYABLE TABLE"],
           ["poker","♠","Texas Hold'em Room","5-seat Hold'em · NPCs fill open seats","REAL POKER"],
+          ["roulette","🔴","Roulette Room","Red · black · green zero","TABLE GAME"],
+          ["baccarat","🃏","Baccarat Salon","Player · banker · tie","TABLE GAME"],
+          ["craps","🎲","Craps Pit","Pass line and field bets","TABLE GAME"],
+          ["war","⚔️","Casino War","Fast high-card table","TABLE GAME"],
           ["wheel","◉","Rift Wheel","Animated wheel · cash multipliers","ARCADE FLOOR"],
           ["racing","🏇","Rift Downs","Timed races · live horse stats and track","LIVE RACING"],
           ["reels","🎰","Slots Gallery",`${SLOT_MACHINES.length} animated themed machines`,"ANIMATED SLOTS"],
@@ -590,7 +655,7 @@ export function Casino({ g }: { g: Game }) {
       {game && <div className="casino-game-backdrop" role="dialog" aria-modal="true" aria-label="Casino game">
         <div className={`casino-game-modal casino-game-${game}`}><div className="casino-wager-bar"><label>Cash wager</label><input type="number" min="1" max={Math.max(1,g.gameState.cash)} value={betAmount} onChange={e=>setBetAmount(Math.max(1,Number(e.target.value)||1))}/><b>{money(wager)}</b></div>
           <button type="button" className="casino-game-close" onClick={()=>setGame(null)}>×</button>
-          <div className="casino-game-heading"><span>{game==="blackjack"?"🂡":game==="poker"?"♠":game==="wheel"?"◉":game==="racing"?"🏇":"🎰"}</span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Texas Hold'em":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Slots Gallery"}</h3></div><b>{money(g.gameState.cash)} cash</b></div>
+          <div className="casino-game-heading"><span>{game==="blackjack"?"🂡":game==="poker"?"♠":game==="roulette"?"🔴":game==="baccarat"?"🃏":game==="craps"?"🎲":game==="war"?"⚔️":game==="wheel"?"◉":game==="racing"?"🏇":"🎰"}</span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Texas Hold'em":game==="roulette"?"Roulette":game==="baccarat"?"Baccarat":game==="craps"?"Craps":game==="war"?"Casino War":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Slots Gallery"}</h3></div><b>{money(g.gameState.cash)} cash</b></div>
 
           {game==="blackjack" && <div className="casino-table-game animated-felt">
             <div className="casino-seat-row"><span className="casino-seat npc">MAYA<br/><small>NPC</small></span><span className="casino-seat npc">VINCE<br/><small>NPC</small></span><span className="casino-seat dealer">ELENA<br/><small>DEALER</small></span><span className="casino-seat npc">JUNO<br/><small>NPC</small></span></div>
@@ -625,6 +690,11 @@ export function Casino({ g }: { g: Game }) {
             <p className="casino-fair-note">Texas Hold'em uses a {money(POKER_BUY_IN)} cash buy-in. Table chips represent that hand's bankroll and cash back out when the hand ends.</p>
           </div>}
 
+          {game==="roulette" && <div className="casino-table-game animated-felt"><div className="roulette-display"><span>0</span><span>RED</span><span>BLACK</span></div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playRoulette("red")}>Bet Red</Button><Button disabled={!canPlay} onClick={()=>playRoulette("black")}>Bet Black</Button><Button disabled={!canPlay} onClick={()=>playRoulette("green")}>Bet Green 0</Button></div><strong>{tableResult}</strong></div>}
+          {game==="baccarat" && <div className="casino-table-game animated-felt"><div className="table-big-label">BACCARAT</div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playBaccarat("player")}>Player</Button><Button disabled={!canPlay} onClick={()=>playBaccarat("banker")}>Banker</Button><Button disabled={!canPlay} onClick={()=>playBaccarat("tie")}>Tie</Button></div><strong>{tableResult}</strong></div>}
+          {game==="craps" && <div className="casino-table-game animated-felt"><div className="dice-stage">🎲 🎲</div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playCraps("pass")}>Pass Line</Button><Button disabled={!canPlay} onClick={()=>playCraps("field")}>Field</Button></div><strong>{tableResult}</strong></div>}
+          {game==="war" && <div className="casino-table-game animated-felt"><div className="table-big-label">CASINO WAR</div><Button disabled={!canPlay} onClick={playWar}>Deal Cards</Button><strong>{tableResult}</strong></div>}
+
           {game==="wheel" && <div className="casino-wheel-game"><div className={`rift-wheel ${wheelSpinning?"spinning":""}`}><span>R</span></div><strong>{wheelResult || (wheelSpinning?"SPINNING…":"Ready to spin")}</strong><Button disabled={!canPlay||wheelSpinning} onClick={spinWheel}>Spin Arcade Wheel</Button></div>}
 
           {game==="racing" && <div className="race-center">
@@ -639,15 +709,27 @@ export function Casino({ g }: { g: Game }) {
           </div>}
 
           {game==="reels" && <div className="slots-gallery">
-            <div className="slot-machine-tabs">{SLOT_MACHINES.map(m=><button type="button" key={m.id} className={slotMachineId===m.id?"active":""} onClick={()=>{setSlotMachineId(m.id);setReels(m.symbols.slice(0,3));}}><span>{m.icon}</span><b>{m.name}</b><small>{m.subtitle}</small></button>)}</div>
-            <div className={`slot-cabinet theme-${activeMachine.id} ${reelsSpinning?"spinning":""}`}><div className="slot-marquee"><span>{activeMachine.icon}</span><b>{activeMachine.name}</b><small>{activeMachine.jackpot}</small></div><div className="slot-lights">{Array.from({length:18},(_,i)=><i key={i}/>)}</div><div className="neon-reels">{reels.map((r,i)=><span className={`reel reel-${i}`} key={i}>{r}</span>)}</div><div className="slot-payline">★ PAYLINE ★</div><Button disabled={!canPlay||reelsSpinning} onClick={spinReels}>{reelsSpinning?"SPINNING…":"Spin Machine"}</Button></div>
-            <p className="casino-fair-note">Slot wagers come directly from RiftCity cash. Wins are paid back to the same cash balance.</p>
+            <div className="slot-machine-tabs">{SLOT_MACHINES.map(m=><button type="button" key={m.id} className={slotMachineId===m.id?"active":""} onClick={()=>{setSlotMachineId(m.id);setReels(Array.from({length:m.reels},(_,i)=>m.symbols[i%m.symbols.length]));}}><span>{m.icon}</span><b>{m.name}</b><small>{m.subtitle}</small></button>)}</div>
+            <div className={`slot-cabinet theme-${activeMachine.id} ${reelsSpinning?"spinning":""}`}><div className="slot-marquee"><span>{activeMachine.icon}</span><b>{activeMachine.name}</b><small>{activeMachine.jackpot} · Pool {money(g.gameState.casinoJackpotPool)}</small></div><div className="slot-lights">{Array.from({length:18},(_,i)=><i key={i}/>)}</div><div className={`neon-reels reels-${activeMachine.reels}`}>{reels.map((r,i)=><span className={`reel reel-${i}`} key={i}>{r}</span>)}</div><div className="slot-payline">★ PAYLINE ★</div><Button disabled={!canPlay||reelsSpinning} onClick={spinReels}>{reelsSpinning?"SPINNING…":"Spin Machine"}</Button></div>
+            <p className="casino-fair-note">5- and 6-reel machines use RiftCity cash, matching-symbol payouts, and a rare random progressive-style jackpot funded by slot wagers.</p>
           </div>}
           <p className="casino-game-message">{message}</p>
         </div>
       </div>}
     </div>
   );
+}
+
+export function Nightclub({ g }: { g: Game }) {
+  const [message,setMessage]=useState("The doors are open and the main floor is packed.");
+  const rank=g.gameState.nightclubReputation>=120?"Headliner":g.gameState.nightclubReputation>=60?"VIP":g.gameState.nightclubReputation>=25?"Regular":"Guest";
+  const action=(kind:"dance"|"dj"|"lounge")=>g.setGameState(prev=>{
+    const cost=kind==="dance"?2:kind==="dj"?4:1; if(prev.energy<cost) return prev;
+    const rep=kind==="dj"?4:kind==="dance"?2:1; const happy=kind==="dj"?8:kind==="dance"?6:3;
+    const next={...prev,energy:prev.energy-cost,happiness:Math.min(g.maxHappiness,prev.happiness+happy),nightclubReputation:prev.nightclubReputation+rep,nightclubVisits:prev.nightclubVisits+1};
+    return g.appendActivity(next,`Pulse Nightclub: ${kind==="dj"?"guest DJ set":kind==="dance"?"dance floor session":"VIP lounge visit"}.`,`system`);
+  });
+  return <div className="city-service-page nightclub-v1"><section className="nightclub-hero"><div className="club-lasers"/><small>ENTERTAINMENT DISTRICT</small><h2>PULSE</h2><p>Music, dancing, social events, reputation, and VIP progression.</p><div className="club-metrics"><span>Rank <b>{rank}</b></span><span>Rep <b>{g.gameState.nightclubReputation}</b></span><span>Visits <b>{g.gameState.nightclubVisits}</b></span></div></section><div className="nightclub-floor-grid"><button onClick={()=>{action("dance");setMessage("You hit the dance floor and build your nightlife rep.");}}><span>💃</span><b>Main Dance Floor</b><small>2 energy · +2 rep · happiness</small></button><button onClick={()=>{action("dj");setMessage("Your guest DJ set gets the room moving.");}}><span>🎧</span><b>Guest DJ Booth</b><small>4 energy · +4 rep · bigger happiness boost</small></button><button onClick={()=>{action("lounge");setMessage("You network in the lounge and meet new regulars.");}}><span>✨</span><b>Social Lounge</b><small>1 energy · +1 rep · social progression</small></button><div className={`club-vip-card ${g.gameState.nightclubReputation>=60?"open":"locked"}`}><span>👑</span><b>VIP Mezzanine</b><small>{g.gameState.nightclubReputation>=60?"Unlocked — premium social events":"Unlocks at 60 reputation"}</small></div></div><Panel title="Tonight at Pulse"><div className="club-event-line"><span>21:00</span><b>Neon City Set</b><small>Resident DJ rotation</small></div><div className="club-event-line"><span>23:00</span><b>Rift Lights</b><small>Animated floor event</small></div><div className="club-event-line"><span>01:00</span><b>After Hours Mix</b><small>High-rep social event</small></div><p>{message}</p><BackToCity g={g}/></Panel></div>;
 }
 
 export function Airport({ g }: { g: Game }) {

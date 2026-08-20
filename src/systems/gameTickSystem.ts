@@ -56,13 +56,29 @@ export const tickGameState = (
     u.hospitalUntil = null; u.health = ctx.maxHealth; u.lastHealthUpdate = now; changed = true;
   }
 
-  if (prev.bank > 0 && now - prev.lastBankInterest >= BANK_INTEREST_INTERVAL) {
+  if ((prev.bank > 0 || prev.bankSavings > 0) && now - prev.lastBankInterest >= BANK_INTEREST_INTERVAL) {
     const n = Math.floor((now - prev.lastBankInterest) / BANK_INTEREST_INTERVAL);
-    const rate = 0.01 + (prev.meritUpgrades.banker ?? 0) * 0.002;
-    const interest = Math.floor(prev.bank * rate * n);
-    u.bank = prev.bank + interest;
-    u.bankInterest = prev.bankInterest + interest;
+    const bonus = (prev.meritUpgrades.banker ?? 0) * 0.002;
+    const checkingInterest = Math.floor(prev.bank * (0.01 + bonus) * n);
+    const savingsInterest = Math.floor(prev.bankSavings * (0.015 + bonus) * n);
+    u.bank = prev.bank + checkingInterest;
+    u.bankSavings = prev.bankSavings + savingsInterest;
+    u.bankInterest = prev.bankInterest + checkingInterest + savingsInterest;
     u.lastBankInterest = prev.lastBankInterest + n * BANK_INTEREST_INTERVAL;
+    u.bankHistory = [...prev.bankHistory, prev.bank + checkingInterest + prev.bankSavings + savingsInterest].slice(-40);
+    changed = true;
+  }
+
+  const matured = prev.bankInvestments.filter((inv) => now >= inv.maturesAt);
+  if (matured.length) {
+    const payout = matured.reduce((sum, inv) => sum + Math.floor(inv.principal * (1 + inv.rate)), 0);
+    const profit = matured.reduce((sum, inv) => sum + Math.floor(inv.principal * inv.rate), 0);
+    const baseBank = u.bank ?? prev.bank;
+    u.bank = baseBank + payout;
+    u.bankInterest = (u.bankInterest ?? prev.bankInterest) + profit;
+    u.bankInvestments = prev.bankInvestments.filter((inv) => now < inv.maturesAt);
+    u.bankTransactions = [{ id: `maturity-${now}`, type: "investment", amount: payout, time: now, note: `${matured.length} investment${matured.length === 1 ? "" : "s"} matured` }, ...prev.bankTransactions].slice(0, 60);
+    u.bankHistory = [...(u.bankHistory ?? prev.bankHistory), baseBank + payout + (u.bankSavings ?? prev.bankSavings)].slice(-40);
     changed = true;
   }
 

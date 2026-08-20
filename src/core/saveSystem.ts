@@ -4,7 +4,7 @@ import type { SaveData } from "../types/riftCity";
 export function freshSave(): SaveData {
   const now = Date.now();
   return {
-    cash: 1000, bank: 0, xp: 0, bankInterest: 0, lastBankInterest: now,
+    cash: 1000, bank: 0, xp: 0, bankInterest: 0, lastBankInterest: now, bankSavings: 0, bankLifetimeDeposits: 0, bankOpenedAt: now, bankHistory: [0], bankTransactions: [], bankInvestments: [],
     merits: 0, points: 0, energy: 100, lastEnergyUpdate: now,
     nerve: 10, lastNerveUpdate: now, health: 100, lastHealthUpdate: now,
     crimeExperience: 0, crimeMastery: {}, stats: { strength: 5, defense: 5, speed: 5, dexterity: 5 },
@@ -27,7 +27,7 @@ export function freshSave(): SaveData {
     marketHistory: Object.fromEntries(Object.entries(DEFAULT_MARKET_PRICES).map(([id, price]) => [id, [price]])),
     activeWorldEvent: null, worldEventUntil: null, lastWorldEventRefresh: 0,
     casinoChips: 75, casinoActionsUsed: 0, casinoWindowStartedAt: 0, casinoCooldownUntil: null, casinoSessionActions: 0,
-    casinoReputation: 0, casinoGamesPlayed: 0, casinoWins: 0, casinoBestStreak: 0, casinoCurrentStreak: 0,
+    casinoReputation: 0, casinoGamesPlayed: 0, casinoWins: 0, casinoBestStreak: 0, casinoCurrentStreak: 0, casinoJackpotPool: 25000, nightclubReputation: 0, nightclubVisits: 0,
     activities: [{ id: now, text: "Welcome to RiftCity.", type: "system", time: now }],
   };
 }
@@ -83,6 +83,15 @@ export function loadSave(): SaveData {
       casinoWins: Math.max(0, Number(parsed.casinoWins) || 0),
       casinoBestStreak: Math.max(0, Number(parsed.casinoBestStreak) || 0),
       casinoCurrentStreak: Math.max(0, Number(parsed.casinoCurrentStreak) || 0),
+      casinoJackpotPool: Math.max(10000, Number(parsed.casinoJackpotPool) || 25000),
+      bankSavings: Math.max(0, Number(parsed.bankSavings) || 0),
+      bankLifetimeDeposits: Math.max(Number(parsed.bankLifetimeDeposits) || 0, Number(parsed.bank) || 0),
+      bankOpenedAt: typeof parsed.bankOpenedAt === "number" ? parsed.bankOpenedAt : base.bankOpenedAt,
+      bankHistory: Array.isArray(parsed.bankHistory) && parsed.bankHistory.length ? parsed.bankHistory.slice(-40) : [Math.max(0, Number(parsed.bank) || 0)],
+      bankTransactions: Array.isArray(parsed.bankTransactions) ? parsed.bankTransactions.slice(0, 60) : [],
+      bankInvestments: Array.isArray(parsed.bankInvestments) ? parsed.bankInvestments : [],
+      nightclubReputation: Math.max(0, Number(parsed.nightclubReputation) || 0),
+      nightclubVisits: Math.max(0, Number(parsed.nightclubVisits) || 0),
     };
   } catch {
     return freshSave();

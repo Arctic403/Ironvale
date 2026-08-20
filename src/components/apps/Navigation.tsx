@@ -106,6 +106,7 @@ const LOCATION_TITLES: Partial<Record<Screen, string>> = {
   police: "Police Department",
   pharmacy: "RiftCare Pharmacy",
   casino: "The Rift Casino",
+  nightclub: "Pulse Nightclub",
   blackmarket: "Black Market",
   park: "Central Park",
   downtown: "Downtown",

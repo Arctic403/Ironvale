@@ -16,6 +16,7 @@ export type CityScreen =
   | "police"
   | "pharmacy"
   | "casino"
+  | "nightclub"
   | "blackmarket"
   | "park"
   | "downtown"
@@ -159,6 +160,17 @@ export const CITY_LOCATIONS: CityLocation[] = [
     screen: "casino",
     x: "68%",
     y: "51%",
+  },
+
+  {
+    id: "nightclub",
+    name: "Pulse Nightclub",
+    icon: "🎵",
+    description: "Music, dancing, social events, reputation, and VIP nightlife progression.",
+    district: "Entertainment District",
+    screen: "nightclub",
+    x: "63%",
+    y: "61%",
   },
 
   // =========================================================

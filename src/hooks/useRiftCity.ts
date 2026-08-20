@@ -993,14 +993,14 @@ export function useRiftCity() {
         return prev;
       }
 
+      const nextBank = prev.bank + n;
       return {
         ...prev,
-
-        cash:
-          prev.cash - n,
-
-        bank:
-          prev.bank + n,
+        cash: prev.cash - n,
+        bank: nextBank,
+        bankLifetimeDeposits: prev.bankLifetimeDeposits + n,
+        bankHistory: [...prev.bankHistory, nextBank + prev.bankSavings].slice(-40),
+        bankTransactions: [{ id: `dep-${Date.now()}`, type: "deposit", amount: n, time: Date.now(), note: "Cash deposit" }, ...prev.bankTransactions].slice(0, 60),
       };
     });
 
@@ -1017,14 +1017,13 @@ export function useRiftCity() {
         return prev;
       }
 
+      const nextBank = prev.bank - n;
       return {
         ...prev,
-
-        cash:
-          prev.cash + n,
-
-        bank:
-          prev.bank - n,
+        cash: prev.cash + n,
+        bank: nextBank,
+        bankHistory: [...prev.bankHistory, nextBank + prev.bankSavings].slice(-40),
+        bankTransactions: [{ id: `wd-${Date.now()}`, type: "withdrawal", amount: -n, time: Date.now(), note: "Cash withdrawal" }, ...prev.bankTransactions].slice(0, 60),
       };
     });
 
