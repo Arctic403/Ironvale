@@ -3,6 +3,7 @@ import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button, Panel } from "../components/ui";
 import { ITEMS } from "../data/gameData";
 import { formatTime, money, timeLeft } from "../core/gameCore";
+import { BANK_INVESTMENT_TIERS, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE, checkingProtectedCap, savingsProtectedCap } from "../data/banking";
 
 type Game = ReturnType<typeof useRiftCity>;
 
@@ -25,20 +26,17 @@ export function Bank({ g }: { g: Game }) {
   const [investAmount, setInvestAmount] = useState("500");
   const n = Math.max(0, Math.floor(Number(amount) || 0));
   const invN = Math.max(0, Math.floor(Number(investAmount) || 0));
-  const tiers = [
-    { id:"starter", name:"Starter Note", unlockDeposit:0, unlockMs:0, cap:2000, term:5*60_000, rate:.02 },
-    { id:"growth", name:"Growth Certificate", unlockDeposit:5000, unlockMs:30*60_000, cap:10000, term:15*60_000, rate:.04 },
-    { id:"prime", name:"Prime Fund", unlockDeposit:25000, unlockMs:2*60*60_000, cap:50000, term:30*60_000, rate:.07 },
-    { id:"elite", name:"Elite Capital", unlockDeposit:100000, unlockMs:6*60*60_000, cap:250000, term:60*60_000, rate:.12 },
-  ];
+  const tiers = BANK_INVESTMENT_TIERS;
   const unlocked = (t: typeof tiers[number]) => g.gameState.bankLifetimeDeposits >= t.unlockDeposit && now - g.gameState.bankOpenedAt >= t.unlockMs;
   const transferSavings = (direction:"toSavings"|"toChecking") => g.setGameState(prev => {
     const source = direction === "toSavings" ? prev.bank : prev.bankSavings;
     const move = Math.min(source, n);
     if (move <= 0) return prev;
-    const bank = direction === "toSavings" ? prev.bank - move : prev.bank + move;
+    const fee = direction === "toChecking" ? Math.min(move, Math.max(SAVINGS_WITHDRAWAL_MIN_FEE, Math.floor(move * SAVINGS_WITHDRAWAL_FEE_RATE))) : 0;
+    const credited = Math.max(0, move - fee);
+    const bank = direction === "toSavings" ? prev.bank - move : prev.bank + credited;
     const bankSavings = direction === "toSavings" ? prev.bankSavings + move : prev.bankSavings - move;
-    return { ...prev, bank, bankSavings, bankHistory:[...prev.bankHistory, bank + bankSavings].slice(-40), bankTransactions:[{id:`transfer-${Date.now()}`,type:"transfer",amount:move,time:Date.now(),note:direction === "toSavings" ? "Checking → Savings" : "Savings → Checking"},...prev.bankTransactions].slice(0,60) };
+    return { ...prev, bank, bankSavings, bankLosses:prev.bankLosses+fee, bankHistory:[...prev.bankHistory, bank + bankSavings].slice(-40), bankTransactions:[{id:`transfer-${Date.now()}`,type:"transfer",amount:direction === "toSavings" ? move : credited,time:Date.now(),note:direction === "toSavings" ? "Checking → Savings" : `Savings → Checking (${money(fee)} early-access fee)`},...prev.bankTransactions].slice(0,60) };
   });
   const startInvestment = (tier: typeof tiers[number]) => g.setGameState(prev => {
     if (!unlocked(tier)) return prev;
@@ -47,20 +45,25 @@ export function Bank({ g }: { g: Game }) {
     const principal = Math.min(invN, prev.bank, availableCap);
     if (principal <= 0) return prev;
     const startedAt = Date.now();
-    return { ...prev, bank:prev.bank-principal, bankInvestments:[...prev.bankInvestments,{id:`inv-${startedAt}-${tier.id}`,tierId:tier.id,principal,rate:tier.rate,startedAt,maturesAt:startedAt+tier.term}], bankHistory:[...prev.bankHistory, prev.bank - principal + prev.bankSavings].slice(-40), bankTransactions:[{id:`inv-${startedAt}`,type:"investment",amount:-principal,time:startedAt,note:`Started ${tier.name}`},...prev.bankTransactions].slice(0,60) };
+    return { ...prev, bank:prev.bank-principal, bankInvestments:[...prev.bankInvestments,{id:`inv-${startedAt}-${tier.id}`,tierId:tier.id,principal,rate:tier.targetRate,startedAt,maturesAt:startedAt+tier.term}], bankHistory:[...prev.bankHistory, prev.bank - principal + prev.bankSavings].slice(-40), bankTransactions:[{id:`inv-${startedAt}`,type:"investment",amount:-principal,time:startedAt,note:`Started ${tier.name}`},...prev.bankTransactions].slice(0,60) };
   });
   const total = g.gameState.bank + g.gameState.bankSavings + g.gameState.bankInvestments.reduce((sum,x)=>sum+x.principal,0);
+  const checkingCap = checkingProtectedCap(g.gameState.bankLifetimeDeposits);
+  const savingsCap = savingsProtectedCap(g.gameState.bankLifetimeDeposits);
+  const checkingExposed = Math.max(0, g.gameState.bank - checkingCap);
+  const savingsExposed = Math.max(0, g.gameState.bankSavings - savingsCap);
   const history = g.gameState.bankHistory.length > 1 ? g.gameState.bankHistory : [0,total];
   const max = Math.max(1,...history), min = Math.min(...history);
   const points = history.map((v,i)=>`${(i/(history.length-1))*100},${42-((v-min)/Math.max(1,max-min))*36}`).join(" ");
   return (
     <div className="city-service-page bank-v2">
-      <section className="bank-hero"><div><small>RIFTCITY FINANCIAL</small><h2>{money(total)}</h2><p>Total managed balance</p></div><div className="bank-account-pills"><span>Checking <b>{money(g.gameState.bank)}</b></span><span>Savings <b>{money(g.gameState.bankSavings)}</b></span><span>Invested <b>{money(g.gameState.bankInvestments.reduce((s,x)=>s+x.principal,0))}</b></span></div></section>
+      <section className="bank-hero"><div><small>RIFTCITY FINANCIAL</small><h2>{money(total)}</h2><p>Total managed balance · protection reduces risk, it does not erase it</p></div><div className="bank-account-pills"><span>Checking <b>{money(g.gameState.bank)}</b></span><span>Savings <b>{money(g.gameState.bankSavings)}</b></span><span>Invested <b>{money(g.gameState.bankInvestments.reduce((s,x)=>s+x.principal,0))}</b></span></div></section>
+      <div className="bank-risk-grid"><div><small>CASH ON HAND</small><b>Highest exposure</b><span>Crime failures and arrests can cost carried cash.</span></div><div><small>CHECKING</small><b>{checkingExposed ? `${money(checkingExposed)} exposed` : "Within protected allowance"}</b><span>Allowance: {money(checkingCap)} · excess can be hit by fraud/seizure events.</span></div><div><small>SAVINGS</small><b>{savingsExposed ? `${money(savingsExposed)} exposed` : "Within protected allowance"}</b><span>Allowance: {money(savingsCap)} · 2% early-access fee.</span></div><div><small>INVESTMENTS</small><b>Market risk</b><span>Returns can finish above or below principal depending on tier.</span></div></div>
       <div className="ui-grid two-col">
         <Panel title="Accounts">
           <div className="input-group"><input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)}/><div className="btn-group"><Button disabled={n<=0} onClick={()=>g.bankDeposit(n)}>Deposit Cash</Button><Button disabled={n<=0} onClick={()=>g.bankWithdraw(n)}>Withdraw</Button></div></div>
           <div className="btn-group"><Button disabled={n<=0||g.gameState.bank<n} onClick={()=>transferSavings("toSavings")}>Move to Savings</Button><Button disabled={n<=0||g.gameState.bankSavings<n} onClick={()=>transferSavings("toChecking")}>Move to Checking</Button></div>
-          <div className="data-list"><div className="data-row"><span>Checking daily interest</span><b>1.0% + perks</b></div><div className="data-row"><span>Savings daily interest</span><b>1.5% + perks</b></div><div className="data-row"><span>Lifetime deposits</span><b>{money(g.gameState.bankLifetimeDeposits)}</b></div><div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div></div>
+          <div className="data-list"><div className="data-row"><span>Checking daily interest</span><b>1.0% + perks</b></div><div className="data-row"><span>Savings daily interest</span><b>1.5% + perks</b></div><div className="data-row"><span>Lifetime deposits</span><b>{money(g.gameState.bankLifetimeDeposits)}</b></div><div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div><div className="data-row"><span>Financial losses</span><b>{money(g.gameState.bankLosses)}</b></div><div className="data-row"><span>Heat exposure</span><b>{g.gameState.heat}/100</b></div></div>
         </Panel>
         <Panel title="Balance Graph">
           <div className="bank-chart"><svg viewBox="0 0 100 44" preserveAspectRatio="none"><polyline points={points}/></svg><div><span>{money(min)}</span><b>{money(history.at(-1) || 0)}</b><span>{money(max)}</span></div></div>
@@ -69,8 +72,8 @@ export function Bank({ g }: { g: Game }) {
       </div>
       <Panel title="Investment Desk">
         <div className="investment-input"><label>Investment amount</label><input type="number" min="1" value={investAmount} onChange={e=>setInvestAmount(e.target.value)}/></div>
-        <div className="investment-tier-grid">{tiers.map(t=>{const open=unlocked(t); const committed=g.gameState.bankInvestments.filter(x=>x.tierId===t.id).reduce((sum,x)=>sum+x.principal,0); return <div key={t.id} className={`investment-tier ${open?"open":"locked"}`}><small>{open?"UNLOCKED":"LOCKED"}</small><h3>{t.name}</h3><div><span>Cap</span><b>{money(t.cap)}</b></div><div><span>Term</span><b>{formatTime(t.term)}</b></div><div><span>Return</span><b>{Math.round(t.rate*100)}%</b></div><div><span>Committed</span><b>{money(committed)}</b></div>{!open&&<p>Requires {money(t.unlockDeposit)} lifetime deposits + {formatTime(t.unlockMs)} account age.</p>}<Button disabled={!open||invN<=0||g.gameState.bank<=0||committed>=t.cap} onClick={()=>startInvestment(t)}>Invest</Button></div>})}</div>
-        {g.gameState.bankInvestments.length>0&&<div className="active-investments"><h3>Active Investments</h3>{g.gameState.bankInvestments.map(inv=>{const t=tiers.find(x=>x.id===inv.tierId); return <div key={inv.id}><span>{t?.name||inv.tierId}</span><b>{money(inv.principal)} → {money(Math.floor(inv.principal*(1+inv.rate)))}</b><small>{now>=inv.maturesAt?"Maturing now":`${formatTime(inv.maturesAt-now)} remaining`}</small></div>})}</div>}
+        <div className="investment-tier-grid">{tiers.map(t=>{const open=unlocked(t); const committed=g.gameState.bankInvestments.filter(x=>x.tierId===t.id).reduce((sum,x)=>sum+x.principal,0); return <div key={t.id} className={`investment-tier ${open?"open":"locked"}`}><small>{open?"UNLOCKED":"LOCKED"}</small><h3>{t.name}</h3><div><span>Cap</span><b>{money(t.cap)}</b></div><div><span>Term</span><b>{formatTime(t.term)}</b></div><div><span>Target return</span><b>{Math.round(t.targetRate*100)}%</b></div><div><span>Possible range</span><b>{Math.round(t.minRate*100)}% to +{Math.round(t.maxRate*100)}%</b></div><div><span>Risk</span><b>{t.riskLabel}</b></div><div><span>Committed</span><b>{money(committed)}</b></div>{!open&&<p>Requires {money(t.unlockDeposit)} lifetime deposits + {formatTime(t.unlockMs)} account age.</p>}<Button disabled={!open||invN<=0||g.gameState.bank<=0||committed>=t.cap} onClick={()=>startInvestment(t)}>Invest</Button></div>})}</div>
+        {g.gameState.bankInvestments.length>0&&<div className="active-investments"><h3>Active Investments</h3>{g.gameState.bankInvestments.map(inv=>{const t=tiers.find(x=>x.id===inv.tierId); return <div key={inv.id}><span>{t?.name||inv.tierId}</span><b>{money(inv.principal)} · target {money(Math.floor(inv.principal*(1+inv.rate)))}</b><small>{now>=inv.maturesAt?"Maturing now":`${formatTime(inv.maturesAt-now)} remaining`}</small></div>})}</div>}
       </Panel>
       <Panel title="Recent Banking Activity"><div className="bank-ledger">{g.gameState.bankTransactions.length?g.gameState.bankTransactions.slice(0,8).map(tx=><div key={tx.id}><span>{tx.note}</span><b className={tx.amount>=0?"positive":"negative"}>{tx.amount>=0?"+":""}{money(tx.amount)}</b><small>{new Date(tx.time).toLocaleString()}</small></div>):<p>No transactions yet.</p>}</div><BackToCity g={g}/></Panel>
     </div>

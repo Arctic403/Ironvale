@@ -189,3 +189,25 @@ button.compact-hud-item {
 .crime-run-story{display:flex;flex-direction:column;gap:4px;margin-top:10px;padding:9px 11px;border-radius:10px;background:rgba(255,255,255,.018);color:var(--muted);font-size:8px}.crime-run-story strong{color:var(--text);font-size:9px}
 @media(max-width:700px){.crime-intro-card{align-items:flex-start;flex-direction:column}.crime-intro-card span{text-align:left}.crime-live-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.crime-event-options{grid-template-columns:1fr}}
 .crime-event-option:disabled,.crime-event-option.locked{opacity:.42;cursor:not-allowed;filter:saturate(.55)}
+
+/* Risk-based banking expansion */
+.bank-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 18px;
+}
+.bank-risk-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 12px;
+  background: rgba(9, 14, 24, .72);
+}
+.bank-risk-grid small { opacity: .65; letter-spacing: .08em; font-size: .68rem; }
+.bank-risk-grid b { font-size: .92rem; }
+.bank-risk-grid span { opacity: .72; font-size: .76rem; line-height: 1.35; }
+@media (max-width: 900px) { .bank-risk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 540px) { .bank-risk-grid { grid-template-columns: 1fr; } }

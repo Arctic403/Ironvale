@@ -1,4 +1,5 @@
 import type { SaveData } from "../types/riftCity";
+import { checkingProtectedCap, savingsProtectedCap, investmentRealizedRate } from "../data/banking";
 import { getJob, getJobPosition, getJobSkillLevel } from "../data/jobs";
 import {
   BANK_INTEREST_INTERVAL, DEFAULT_MARKET_PRICES, ENERGY_REGEN_INTERVAL,
@@ -71,14 +72,75 @@ export const tickGameState = (
 
   const matured = prev.bankInvestments.filter((inv) => now >= inv.maturesAt);
   if (matured.length) {
-    const payout = matured.reduce((sum, inv) => sum + Math.floor(inv.principal * (1 + inv.rate)), 0);
-    const profit = matured.reduce((sum, inv) => sum + Math.floor(inv.principal * inv.rate), 0);
+    let payout = 0;
+    let profit = 0;
+    const maturityTx = matured.map((inv) => {
+      const realizedRate = investmentRealizedRate(inv.tierId, inv.rate);
+      const result = Math.max(0, Math.floor(inv.principal * (1 + realizedRate)));
+      const gain = result - inv.principal;
+      payout += result;
+      profit += gain;
+      return {
+        id: `maturity-${inv.id}-${now}`,
+        type: "investment",
+        amount: result,
+        time: now,
+        note: `${inv.tierId} matured at ${(realizedRate * 100).toFixed(1)}% (${gain >= 0 ? "+" : ""}${gain})`,
+      };
+    });
     const baseBank = u.bank ?? prev.bank;
     u.bank = baseBank + payout;
-    u.bankInterest = (u.bankInterest ?? prev.bankInterest) + profit;
+    u.bankInterest = (u.bankInterest ?? prev.bankInterest) + Math.max(0, profit);
+    if (profit < 0) u.bankLosses = (u.bankLosses ?? prev.bankLosses) + Math.abs(profit);
     u.bankInvestments = prev.bankInvestments.filter((inv) => now < inv.maturesAt);
-    u.bankTransactions = [{ id: `maturity-${now}`, type: "investment", amount: payout, time: now, note: `${matured.length} investment${matured.length === 1 ? "" : "s"} matured` }, ...prev.bankTransactions].slice(0, 60);
+    u.bankTransactions = [...maturityTx, ...(u.bankTransactions ?? prev.bankTransactions)].slice(0, 60);
     u.bankHistory = [...(u.bankHistory ?? prev.bankHistory), baseBank + payout + (u.bankSavings ?? prev.bankSavings)].slice(-40);
+    changed = true;
+  }
+
+  // Bank exposure check: balances above the protected allowance can be hit by fraud/seizure events.
+  // High heat raises the chance, so moving dirty money into the bank is safer than carrying cash but not perfectly safe.
+  const riskInterval = 24 * 60 * 60 * 1000;
+  if (now - prev.bankRiskLastCheck >= riskInterval) {
+    const checks = Math.min(30, Math.floor((now - prev.bankRiskLastCheck) / riskInterval));
+    let checking = u.bank ?? prev.bank;
+    let savings = u.bankSavings ?? prev.bankSavings;
+    let losses = u.bankLosses ?? prev.bankLosses;
+    const tx = [...(u.bankTransactions ?? prev.bankTransactions)];
+    let riskChanged = false;
+
+    for (let i = 0; i < checks; i++) {
+      const heatFactor = Math.max(0, Math.min(1, prev.heat / 100));
+      const checkingExposed = Math.max(0, checking - checkingProtectedCap(prev.bankLifetimeDeposits));
+      const savingsExposed = Math.max(0, savings - savingsProtectedCap(prev.bankLifetimeDeposits));
+
+      const checkingChance = checkingExposed > 0 ? 0.025 + heatFactor * 0.075 : 0;
+      if (Math.random() < checkingChance) {
+        const loss = Math.min(checking, Math.max(1, Math.floor(checkingExposed * (0.03 + Math.random() * 0.05))));
+        checking -= loss;
+        losses += loss;
+        tx.unshift({ id:`risk-checking-${now}-${i}`, type:"risk", amount:-loss, time:now, note:"Checking exposure loss (fraud / seizure event)" });
+        riskChanged = true;
+      }
+
+      const savingsChance = savingsExposed > 0 ? 0.01 + heatFactor * 0.03 : 0;
+      if (Math.random() < savingsChance) {
+        const loss = Math.min(savings, Math.max(1, Math.floor(savingsExposed * (0.01 + Math.random() * 0.025))));
+        savings -= loss;
+        losses += loss;
+        tx.unshift({ id:`risk-savings-${now}-${i}`, type:"risk", amount:-loss, time:now, note:"Savings exposure loss" });
+        riskChanged = true;
+      }
+    }
+
+    u.bankRiskLastCheck = prev.bankRiskLastCheck + checks * riskInterval;
+    if (riskChanged) {
+      u.bank = checking;
+      u.bankSavings = savings;
+      u.bankLosses = losses;
+      u.bankTransactions = tx.slice(0,60);
+      u.bankHistory = [...(u.bankHistory ?? prev.bankHistory), checking + savings].slice(-40);
+    }
     changed = true;
   }
 

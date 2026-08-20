@@ -4,7 +4,7 @@ import type { SaveData } from "../types/riftCity";
 export function freshSave(): SaveData {
   const now = Date.now();
   return {
-    cash: 1000, bank: 0, xp: 0, bankInterest: 0, lastBankInterest: now, bankSavings: 0, bankLifetimeDeposits: 0, bankOpenedAt: now, bankHistory: [0], bankTransactions: [], bankInvestments: [],
+    cash: 1000, bank: 0, xp: 0, bankInterest: 0, lastBankInterest: now, bankSavings: 0, bankLifetimeDeposits: 0, bankOpenedAt: now, bankHistory: [0], bankTransactions: [], bankInvestments: [], bankRiskLastCheck: now, bankLosses: 0,
     merits: 0, points: 0, energy: 100, lastEnergyUpdate: now,
     nerve: 10, lastNerveUpdate: now, health: 100, lastHealthUpdate: now,
     crimeExperience: 0, crimeMastery: {}, stats: { strength: 5, defense: 5, speed: 5, dexterity: 5 },
@@ -90,6 +90,8 @@ export function loadSave(): SaveData {
       bankHistory: Array.isArray(parsed.bankHistory) && parsed.bankHistory.length ? parsed.bankHistory.slice(-40) : [Math.max(0, Number(parsed.bank) || 0)],
       bankTransactions: Array.isArray(parsed.bankTransactions) ? parsed.bankTransactions.slice(0, 60) : [],
       bankInvestments: Array.isArray(parsed.bankInvestments) ? parsed.bankInvestments : [],
+      bankRiskLastCheck: typeof parsed.bankRiskLastCheck === "number" ? parsed.bankRiskLastCheck : base.bankRiskLastCheck,
+      bankLosses: Math.max(0, Number(parsed.bankLosses) || 0),
       nightclubReputation: Math.max(0, Number(parsed.nightclubReputation) || 0),
       nightclubVisits: Math.max(0, Number(parsed.nightclubVisits) || 0),
     };

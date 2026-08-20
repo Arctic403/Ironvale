@@ -297,20 +297,23 @@ export function useRiftCity() {
         const charges=[crime.name, ...(contraband.length?["Contraband Possession"]:[])];
         const sentenceMultiplier=1+Math.min(.8,Math.max(0,runMod.arrestModifier)/30);
         const sentence=Math.round(JAIL_MINUTES*60000*sentenceMultiplier);
-        next = { ...next, crimesFailed: prev.crimesFailed + 1, timesJailed: prev.timesJailed + 1, jailUntil: Date.now()+sentence, jailStartedAt: Date.now(), jailReason: charges.join(" + "), jailSentenceMs: sentence, activeCharges:charges, currentLocation:"jail", locationsVisited:prev.locationsVisited.includes("jail")?prev.locationsVisited:[...prev.locationsVisited,"jail"], heat:Math.max(0,prev.heat-15) };
-        return appendActivity(next, `ARRESTED: ${crime.name}. Charges: ${charges.join(", ")}.${storySuffix}`, "jailed");
+        const carriedLoss=Math.min(prev.cash,Math.floor(prev.cash*(0.03+Math.random()*0.05)));
+        next = { ...next, cash:Math.max(0,prev.cash-carriedLoss), crimesFailed: prev.crimesFailed + 1, timesJailed: prev.timesJailed + 1, jailUntil: Date.now()+sentence, jailStartedAt: Date.now(), jailReason: charges.join(" + "), jailSentenceMs: sentence, activeCharges:charges, currentLocation:"jail", locationsVisited:prev.locationsVisited.includes("jail")?prev.locationsVisited:[...prev.locationsVisited,"jail"], heat:Math.max(0,prev.heat-15) };
+        return appendActivity(next, `ARRESTED: ${crime.name}. Charges: ${charges.join(", ")}.${carriedLoss?` Lost ${money(carriedLoss)} carried cash.`:""}${storySuffix}`, "jailed");
       }
 
       if (outcome === "critical-fail") {
         const damage=Math.max(10,Math.round(12+crime.risk*.2));
-        next = { ...next, crimesFailed: prev.crimesFailed + 1, health: Math.max(1, prev.health - damage), heat:Math.min(100,prev.heat+Math.max(2,runMod.heatModifier)) };
-        return appendActivity(next, `CRITICAL FAIL: ${crime.name}. You escape hurt (-${damage} HP).${storySuffix}`, "critical");
+        const carriedLoss=Math.min(prev.cash,Math.floor(prev.cash*(0.02+Math.random()*0.04)));
+        next = { ...next, cash:Math.max(0,prev.cash-carriedLoss), crimesFailed: prev.crimesFailed + 1, health: Math.max(1, prev.health - damage), heat:Math.min(100,prev.heat+Math.max(2,runMod.heatModifier)) };
+        return appendActivity(next, `CRITICAL FAIL: ${crime.name}. You escape hurt (-${damage} HP)${carriedLoss?` and lose ${money(carriedLoss)} carried cash`:""}.${storySuffix}`, "critical");
       }
 
       const spookInjury=Math.random()<runMod.injuryChance*.35;
       const spookDamage=spookInjury?Math.max(2,Math.round(4+Math.random()*6)):0;
-      next = { ...next, crimesSpooked: prev.crimesSpooked + 1, health:Math.max(1,prev.health-spookDamage), heat:Math.min(100,Math.max(0,prev.heat+Math.max(0,Math.round(runMod.heatModifier*.35)))) };
-      return appendActivity(next, `SPOOKED: ${crime.name} · ${selectedChoice.label}. You got out before the score collapsed${spookDamage?` but lost ${spookDamage} HP`:""}.${storySuffix}`, "spooked");
+      const carriedLoss=Math.min(prev.cash,Math.floor(prev.cash*(Math.random()*0.015)));
+      next = { ...next, cash:Math.max(0,prev.cash-carriedLoss), crimesSpooked: prev.crimesSpooked + 1, health:Math.max(1,prev.health-spookDamage), heat:Math.min(100,Math.max(0,prev.heat+Math.max(0,Math.round(runMod.heatModifier*.35)))) };
+      return appendActivity(next, `SPOOKED: ${crime.name} · ${selectedChoice.label}. You got out before the score collapsed${spookDamage?` but lost ${spookDamage} HP`:""}${carriedLoss?` · dropped ${money(carriedLoss)} cash`:""}.${storySuffix}`, "spooked");
     });
   };
 

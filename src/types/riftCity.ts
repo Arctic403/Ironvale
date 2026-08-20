@@ -42,6 +42,8 @@ export type SaveData = {
   bankHistory: number[];
   bankTransactions: BankTransaction[];
   bankInvestments: BankInvestment[];
+  bankRiskLastCheck: number;
+  bankLosses: number;
   merits: number;
   points: number;
   energy: number;
