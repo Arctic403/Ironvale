@@ -1,4 +1,19 @@
 /* RiftCity master map image integration — click the art itself, no old marker boxes. */
+.city-page.city-page-scroll-left{
+  max-height:calc(100vh - 200px);
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-left:4px;
+  direction:rtl;
+  scrollbar-width:auto;
+  scrollbar-color:rgba(96,165,250,.75) rgba(255,255,255,.06);
+}
+.city-page.city-page-scroll-left > *{direction:ltr}
+.city-page.city-page-scroll-left::-webkit-scrollbar{width:16px}
+.city-page.city-page-scroll-left::-webkit-scrollbar-track{background:rgba(255,255,255,.06);border-radius:999px}
+.city-page.city-page-scroll-left::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(96,165,250,.95),rgba(59,130,246,.78));border-radius:999px;border:3px solid rgba(6,11,16,.92)}
+.city-page.city-page-scroll-left::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(125,186,255,.98),rgba(78,150,255,.84))}
+
 .master-map-svg{aspect-ratio:571/448;background:#050a0f;border-radius:18px}
 .master-map-image{pointer-events:none;user-select:none;-webkit-user-drag:none}
 .master-district-hotspot{fill:transparent;stroke:transparent;cursor:pointer;pointer-events:all}
@@ -19,13 +34,25 @@
 /* The popup is intentionally a sibling of the interactive map now. This keeps
    the map's pointer handlers and overflow clipping from swallowing popup taps. */
 .city-map-panel{position:relative}
+.city-map-tool.city-map-fullscreen{min-width:118px}
+.city-map-panel.is-fullscreen{display:flex;flex-direction:column;width:100%;height:100%;background:linear-gradient(180deg, rgba(10,16,21,.98), rgba(7,12,16,.99))}
+.city-map-panel.is-fullscreen .riftcity-map.interactive-map{flex:1 1 auto;min-height:0;aspect-ratio:auto;height:100%}
+.city-map-panel:fullscreen{padding:0;border-radius:0;max-width:none;width:100%;height:100%;margin:0;background:linear-gradient(180deg, rgba(10,16,21,.98), rgba(7,12,16,.99))}
+.city-map-panel:fullscreen .city-map-header{padding:14px 18px}
+.city-map-panel:fullscreen .riftcity-map.interactive-map{flex:1 1 auto;height:100%;aspect-ratio:auto;min-height:0}
+.city-map-panel:fullscreen .riftcity-map-svg,.city-map-panel:fullscreen .master-map-svg{width:100%;height:100%;display:block}
+.city-map-panel:fullscreen .map-location-panel{z-index:3}
+.city-map-panel:fullscreen .map-drag-hint{z-index:2}
+.city-map-panel:fullscreen::backdrop{background:rgba(2,6,10,.88)}
 .master-map-popup{pointer-events:auto;touch-action:pan-y;user-select:text;-webkit-user-select:text}
 .master-map-popup *{pointer-events:auto}
 
 .city-map-back-top{display:none}
 
 @media (max-width:700px){
-  /* One finger scrolls the page. Map zoom is still available from +/- controls,
+  .city-page.city-page-scroll-left{max-height:calc(100vh - 128px);padding-left:2px}
+  .city-page.city-page-scroll-left::-webkit-scrollbar{width:18px}
+  /* One finger scrolls the page until the map is zoomed. Map zoom is still available from +/- controls,
      and the JS keeps a two-pointer path for pinch attempts. */
   .riftcity-map.interactive-map{overflow:hidden;aspect-ratio:571/448;min-height:0;touch-action:pan-y}
   .riftcity-map-svg{width:100%;height:100%;display:block;touch-action:pan-y}
@@ -64,6 +91,8 @@
 
   /* Escape hatch for long pages: remains reachable even if the map occupies the
      entire visible screen. Kept above bottom navigation but below open popups. */
+  .city-map-tool.city-map-fullscreen{min-width:92px;font-size:10px}
+
   .city-map-back-top{
     display:block;
     position:fixed;

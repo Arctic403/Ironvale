@@ -90,6 +90,7 @@ export function City({ g }: { g: Game }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     try {
@@ -125,6 +126,26 @@ export function City({ g }: { g: Game }) {
     }
   }, [selectedId, zoom, pan]);
 
+  useEffect(() => {
+    const syncFullscreen = () => {
+      const fullscreenElement = document.fullscreenElement;
+      const active = Boolean(
+        panelRef.current &&
+        fullscreenElement &&
+        (fullscreenElement === panelRef.current || panelRef.current.contains(fullscreenElement)),
+      );
+      setIsFullscreen(active);
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    syncFullscreen();
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+    };
+  }, []);
+
+  const panelRef = useRef<HTMLElement | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
 
   const pointersRef = useRef(
@@ -321,6 +342,21 @@ export function City({ g }: { g: Game }) {
     setDragging(false);
   };
 
+  const toggleFullscreen = async () => {
+    const target = panelRef.current;
+    if (!target) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (target.requestFullscreen) {
+        await target.requestFullscreen();
+      }
+    } catch {
+      // ignore fullscreen failures on unsupported environments
+    }
+  };
+
   const zoomAtCenter = (
     delta: number,
   ) => {
@@ -359,10 +395,11 @@ export function City({ g }: { g: Game }) {
       return;
     }
 
-    // On touch screens, keep one-finger vertical scrolling available.
-    // Mouse/pen still use the custom drag system; two-finger touch can still
-    // transition into the pinch path when a second pointer arrives.
-    if (event.pointerType !== "touch") {
+    const allowSingleTouchDrag = zoom > MIN_ZOOM + 0.02;
+
+    // Keep normal page scrolling available when the map is not zoomed in.
+    // Once the player zooms the map, allow one-finger touch drag panning again.
+    if (event.pointerType !== "touch" || allowSingleTouchDrag) {
       event.preventDefault();
     }
 
@@ -377,7 +414,7 @@ export function City({ g }: { g: Game }) {
     );
 
     try {
-      if (event.pointerType !== "touch") {
+      if (event.pointerType !== "touch" || allowSingleTouchDrag) {
         event.currentTarget.setPointerCapture(
           event.pointerId,
         );
@@ -476,9 +513,9 @@ export function City({ g }: { g: Game }) {
       return;
     }
 
-    // A single finger is reserved for normal page scrolling on mobile.
-    // This prevents the map from trapping the user at the bottom of the page.
-    if (event.pointerType === "touch" && pointersRef.current.size === 1) {
+    // Reserve one-finger touch for page scrolling only while the map is not zoomed.
+    // Once zoomed in, a single finger can pan the map again.
+    if (event.pointerType === "touch" && pointersRef.current.size === 1 && zoom <= MIN_ZOOM + 0.02) {
       return;
     }
 
@@ -702,7 +739,7 @@ export function City({ g }: { g: Game }) {
   };
 
   return (
-    <div className="city-page">
+    <div className="city-page city-page-scroll-left">
 
       {/* =====================================================
           CITY HEADER
@@ -801,7 +838,7 @@ export function City({ g }: { g: Game }) {
           CITY MAP
       ===================================================== */}
 
-      <section className="city-map-panel card">
+      <section ref={panelRef} className={`city-map-panel card ${isFullscreen ? "is-fullscreen" : ""}`}>
 
         <div className="city-map-header">
 
@@ -851,6 +888,14 @@ export function City({ g }: { g: Game }) {
               onClick={resetMap}
             >
               Reset
+            </button>
+
+            <button
+              type="button"
+              className="city-map-tool city-map-fullscreen"
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
             </button>
 
           </div>
@@ -975,7 +1020,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="map-drag-hint">
             <span>✋</span>
-            Tap a map location or district · Drag to explore · Pinch / + / − to zoom
+            Tap a location or district · Drag to pan when zoomed · Pinch / + / − to zoom
           </div>
 
 

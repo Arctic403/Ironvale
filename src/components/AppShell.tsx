@@ -141,7 +141,16 @@ function App() {
 
         <main className="screen-container">
           <div className="screen-header shell-screen-header">
-            <div>
+            <div className="screen-header-title-block">
+              {g.currentScreen !== "city" && (
+                <button
+                  type="button"
+                  className="return-city-top-btn"
+                  onClick={() => g.setCurrentScreen("city")}
+                >
+                  ← Return to City
+                </button>
+              )}
               <span className="location-tag">{g.gameState.currentLocation.toUpperCase()}</span>
               <h1>{title}</h1>
             </div>
