@@ -136,7 +136,7 @@ export function Combat({ g }: { g: Game }) {
           g.setCurrentScreen("combat");
         }}
         onDefeat={() =>
-          setGameStateForCombatDefeat(g)
+          setGameStateForCombatDefeat(g, opponent.name)
         }
       />
     );
@@ -251,7 +251,8 @@ export function Combat({ g }: { g: Game }) {
 ========================================================= */
 
 function setGameStateForCombatDefeat(
-  g: Game
+  g: Game,
+  opponentName: string
 ) {
   const hospitalUntil =
     Date.now() +
@@ -281,6 +282,13 @@ function setGameStateForCombatDefeat(
           previous.fightsLost + 1,
 
         hospitalUntil,
+        hospitalStartedAt: Date.now(),
+        hospitalReason: `Combat defeat vs ${opponentName}`,
+        hospitalDurationMs: HOSPITAL_MINUTES * 60_000,
+        currentLocation: "hospital",
+        locationsVisited: previous.locationsVisited.includes("hospital")
+          ? previous.locationsVisited
+          : [...previous.locationsVisited, "hospital"],
 
         activities: [
           activity,
@@ -292,5 +300,5 @@ function setGameStateForCombatDefeat(
 
   g.setCombatOpponent(null);
   g.setCombatStarted(false);
-  g.setCurrentScreen("city");
+  g.setCurrentScreen("hospital");
 }

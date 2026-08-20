@@ -156,12 +156,25 @@ export function Navigation({
   );
 }
 
+const LOCATION_TITLES: Partial<Record<Screen, string>> = {
+  bank: "RiftCity Bank",
+  hospital: "RiftCity Hospital",
+  jail: "RiftCity Jail",
+  police: "Police Department",
+  pharmacy: "RiftCare Pharmacy",
+  casino: "The Rift Casino",
+  blackmarket: "Black Market",
+  park: "Central Park",
+  downtown: "Downtown",
+  airport: "RiftCity Airport",
+};
+
 export function getScreenTitle(
   screen: Screen
 ) {
   return (
-    NAV_ITEMS.find(
-      (item) => item.id === screen
-    )?.label || "RiftCity"
+    NAV_ITEMS.find((item) => item.id === screen)?.label ||
+    LOCATION_TITLES[screen] ||
+    "RiftCity"
   );
 }

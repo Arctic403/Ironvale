@@ -1,7 +1,9 @@
 export type Screen =
   | "city" | "crimes" | "combat" | "gym" | "jobs" | "inventory" | "shops"
   | "missions" | "education" | "property" | "character"
-  | "market" | "faction" | "awards" | "progression";
+  | "market" | "faction" | "awards" | "progression"
+  | "bank" | "hospital" | "jail" | "police" | "pharmacy" | "casino"
+  | "blackmarket" | "park" | "downtown" | "airport";
 
 export type ActivityType =
   | "success" | "failure" | "critical" | "spooked" | "jailed"
@@ -44,7 +46,13 @@ export type SaveData = {
   jobSkills: Record<string, number>;
   jobPositionTiers: Record<string, number>;
   jailUntil: number | null;
+  jailStartedAt: number | null;
+  jailReason: string | null;
+  jailSentenceMs: number | null;
   hospitalUntil: number | null;
+  hospitalStartedAt: number | null;
+  hospitalReason: string | null;
+  hospitalDurationMs: number | null;
   inventory: Record<string, number>;
   equippedWeapon: string | null;
   equippedArmor: string | null;

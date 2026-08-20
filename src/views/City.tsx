@@ -173,10 +173,17 @@ export function City({ g }: { g: Game }) {
         location.id === selectedId,
     ) ?? null;
 
+  const canEnterLocation = (location: CityLocation) =>
+    !incapacitated ||
+    (jailed && location.id === "jail") ||
+    (hospitalized && location.id === "hospital");
+
   const goTo = (location: CityLocation) => {
-    if (incapacitated) return;
+    if (!canEnterLocation(location)) return;
     g.visitLocation(location.id);
-    if (location.screen) g.setCurrentScreen(location.screen);
+    if (location.screen) {
+      g.setCurrentScreen(location.screen);
+    }
   };
 
   /* =========================================================
@@ -653,9 +660,15 @@ export function City({ g }: { g: Game }) {
             </strong>
 
             <p>
-              You cannot access city activities until your
-              current timer expires.
+              Other city activities are locked until your current timer expires.
             </p>
+            <Button
+              onClick={() =>
+                g.setCurrentScreen(hospitalized ? "hospital" : "jail")
+              }
+            >
+              Open {hospitalized ? "Hospital" : "Jail"} Record
+            </Button>
           </div>
         </div>
       )}
@@ -1105,20 +1118,16 @@ export function City({ g }: { g: Game }) {
                       100) *
                     MAP_HEIGHT;
 
-                  const active =
-                    selectedId ===
-                    location.id;
+                  const active = selectedId === location.id;
+                  const isCurrent = g.gameState.currentLocation === location.id;
+                  const isVisited = g.gameState.locationsVisited.includes(location.id);
 
                   return (
                     <g
-                      key={
-                        location.id
-                      }
+                      key={location.id}
                       className={`map-location ${
-                        active
-                          ? "is-selected"
-                          : ""
-                      }`}
+                        active ? "is-selected" : ""
+                      } ${isCurrent ? "is-current" : ""} ${isVisited ? "is-visited" : ""}`}
                       transform={`translate(${x} ${y})`}
                       onClick={() => {
                         /*
@@ -1144,17 +1153,12 @@ export function City({ g }: { g: Game }) {
                       onKeyDown={(
                         event,
                       ) => {
-                        if (
-                          event.key ===
-                            "Enter" ||
-                          event.key ===
-                            " "
-                        ) {
+                        if (event.key === "Enter") {
                           event.preventDefault();
-
-                          setSelectedId(
-                            location.id,
-                          );
+                          goTo(location);
+                        } else if (event.key === " ") {
+                          event.preventDefault();
+                          setSelectedId(location.id);
                         }
                       }}
                     >
@@ -1332,14 +1336,17 @@ export function City({ g }: { g: Game }) {
                 </h4>
 
                 <p>{selected.description}</p>
+                <div className="map-location-status-row">
+                  {g.gameState.currentLocation === selected.id && <span className="map-status-chip current">YOU ARE HERE</span>}
+                  {g.gameState.locationsVisited.includes(selected.id) && <span className="map-status-chip">VISITED</span>}
+                  {!g.gameState.locationsVisited.includes(selected.id) && <span className="map-status-chip new">NEW</span>}
+                </div>
                 {LOCATION_TRAITS[selected.id] && (
                   <p className="status-text"><b>Local Effect:</b> {LOCATION_TRAITS[selected.id]}</p>
                 )}
 
                 <Button
-                  disabled={
-                    incapacitated
-                  }
+                  disabled={!canEnterLocation(selected)}
                   onClick={() =>
                     goTo(selected)
                   }

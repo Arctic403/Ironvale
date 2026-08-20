@@ -19,6 +19,7 @@ import {
 } from "../../views/GameScreens";
 
 import { City } from "../../views/City";
+import { Bank, Hospital, Jail, Police, Pharmacy, BlackMarket, Park, Downtown, Casino, Airport } from "../../views/CityServices";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;
 
@@ -45,6 +46,16 @@ const SCREEN_COMPONENTS: Record<
   faction: Faction,
   awards: Awards,
   progression: Progression,
+  bank: Bank,
+  hospital: Hospital,
+  jail: Jail,
+  police: Police,
+  pharmacy: Pharmacy,
+  blackmarket: BlackMarket,
+  park: Park,
+  downtown: Downtown,
+  casino: Casino,
+  airport: Airport,
 };
 
 export function ScreenContent({

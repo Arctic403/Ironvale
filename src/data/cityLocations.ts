@@ -9,7 +9,17 @@ export type CityScreen =
   | "combat"
   | "missions"
   | "property"
-  | "market";
+  | "market"
+  | "bank"
+  | "hospital"
+  | "jail"
+  | "police"
+  | "pharmacy"
+  | "casino"
+  | "blackmarket"
+  | "park"
+  | "downtown"
+  | "airport";
 
 export type CityLocation = {
   id: string;
@@ -34,7 +44,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "Medical treatment and recovery after serious injuries.",
     district: "Medical District",
-    screen: "character",
+    screen: "hospital",
     x: "18%",
     y: "19%",
   },
@@ -46,6 +56,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "Law enforcement, wanted records, and city security.",
     district: "Northside",
+    screen: "police",
     x: "38%",
     y: "12%",
   },
@@ -57,7 +68,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "Store your cash safely and manage your bank balance.",
     district: "Financial District",
-    screen: "character",
+    screen: "bank",
     x: "58%",
     y: "18%",
   },
@@ -85,7 +96,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "The central green space of RiftCity.",
     district: "Central District",
-    screen: "character",
+    screen: "park",
     x: "51%",
     y: "39%",
   },
@@ -121,7 +132,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "The heart of RiftCity, filled with businesses, people, and activity.",
     district: "Downtown",
-    screen: "character",
+    screen: "downtown",
     x: "52%",
     y: "57%",
   },
@@ -133,6 +144,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "Purchase medical supplies, recovery items, and other essentials.",
     district: "Medical District",
+    screen: "pharmacy",
     x: "34%",
     y: "48%",
   },
@@ -144,6 +156,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "A high-stakes entertainment venue where fortune can change quickly.",
     district: "Entertainment District",
+    screen: "casino",
     x: "68%",
     y: "51%",
   },
@@ -183,6 +196,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "An underground marketplace dealing in restricted and hard-to-find goods.",
     district: "East Market",
+    screen: "blackmarket",
     x: "91%",
     y: "47%",
   },
@@ -210,6 +224,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "The city's detention facility for criminals awaiting release.",
     district: "Justice District",
+    screen: "jail",
     x: "35%",
     y: "72%",
   },
@@ -261,6 +276,7 @@ export const CITY_LOCATIONS: CityLocation[] = [
     description:
       "Travel to other cities and eventually connect RiftCity to the wider world.",
     district: "Airport District",
+    screen: "airport",
     x: "88%",
     y: "15%",
   },

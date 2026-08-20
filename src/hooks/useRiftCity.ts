@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tickGameState } from "../systems/gameTickSystem";
 import { getJobPosition, getJobStatBonuses } from "../data/jobs";
 import {
@@ -32,6 +32,11 @@ export function useRiftCity() {
 
   const [currentScreen, setCurrentScreen] =
     useState<Screen>("character");
+
+  const lastRestrictionRef = useRef<{ jail: number | null; hospital: number | null }>({
+    jail: null,
+    hospital: null,
+  });
 
   const [encounter, setEncounter] =
     useState<Encounter | null>(null);
@@ -168,6 +173,31 @@ export function useRiftCity() {
 
     return () => window.clearInterval(id);
   }, [maxNerve, maxHealth, maxEnergy, property?.maxHappiness, gameState.propertyUpgrades]);
+
+  useEffect(() => {
+    const jailStarted = Boolean(
+      gameState.jailUntil &&
+      gameState.jailUntil > Date.now() &&
+      gameState.jailUntil !== lastRestrictionRef.current.jail
+    );
+
+    const hospitalStarted = Boolean(
+      gameState.hospitalUntil &&
+      gameState.hospitalUntil > Date.now() &&
+      gameState.hospitalUntil !== lastRestrictionRef.current.hospital
+    );
+
+    if (jailStarted) {
+      setCurrentScreen("jail");
+    } else if (hospitalStarted) {
+      setCurrentScreen("hospital");
+    }
+
+    lastRestrictionRef.current = {
+      jail: gameState.jailUntil,
+      hospital: gameState.hospitalUntil,
+    };
+  }, [gameState.jailUntil, gameState.hospitalUntil]);
 
   const blocked = () =>
     Boolean(
@@ -345,6 +375,13 @@ export function useRiftCity() {
           jailUntil:
             Date.now() +
             JAIL_MINUTES * 60000,
+          jailStartedAt: Date.now(),
+          jailReason: crime.name,
+          jailSentenceMs: JAIL_MINUTES * 60000,
+          currentLocation: "jail",
+          locationsVisited: prev.locationsVisited.includes("jail")
+            ? prev.locationsVisited
+            : [...prev.locationsVisited, "jail"],
           heat: Math.max(0, prev.heat - 15),
         };
 
