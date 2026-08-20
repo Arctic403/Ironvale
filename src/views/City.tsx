@@ -92,6 +92,9 @@ export function City({ g }: { g: Game }) {
   const [dragging, setDragging] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     try {
       const saved = window.sessionStorage.getItem("riftcity-map-view");
@@ -128,25 +131,12 @@ export function City({ g }: { g: Game }) {
 
   useEffect(() => {
     const syncFullscreen = () => {
-      const fullscreenElement = document.fullscreenElement;
-      const active = Boolean(
-        panelRef.current &&
-        fullscreenElement &&
-        (fullscreenElement === panelRef.current || panelRef.current.contains(fullscreenElement)),
-      );
-      setIsFullscreen(active);
+      setIsFullscreen(document.fullscreenElement === panelRef.current);
     };
 
     document.addEventListener("fullscreenchange", syncFullscreen);
-    syncFullscreen();
-
-    return () => {
-      document.removeEventListener("fullscreenchange", syncFullscreen);
-    };
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
-
-  const panelRef = useRef<HTMLElement | null>(null);
-  const mapRef = useRef<HTMLDivElement | null>(null);
 
   const pointersRef = useRef(
     new Map<number, PointerPoint>(),
@@ -353,7 +343,7 @@ export function City({ g }: { g: Game }) {
         await target.requestFullscreen();
       }
     } catch {
-      // ignore fullscreen failures on unsupported environments
+      // Fullscreen is optional; keep the map usable if a browser rejects it.
     }
   };
 
@@ -395,11 +385,10 @@ export function City({ g }: { g: Game }) {
       return;
     }
 
-    const allowSingleTouchDrag = zoom > MIN_ZOOM + 0.02;
+    const singleTouchCanPan = zoom > MIN_ZOOM + 0.02;
 
-    // Keep normal page scrolling available when the map is not zoomed in.
-    // Once the player zooms the map, allow one-finger touch drag panning again.
-    if (event.pointerType !== "touch" || allowSingleTouchDrag) {
+    // At 1x, one finger scrolls the page. Once zoomed, one finger pans the map.
+    if (event.pointerType !== "touch" || singleTouchCanPan) {
       event.preventDefault();
     }
 
@@ -414,7 +403,7 @@ export function City({ g }: { g: Game }) {
     );
 
     try {
-      if (event.pointerType !== "touch" || allowSingleTouchDrag) {
+      if (event.pointerType !== "touch" || singleTouchCanPan) {
         event.currentTarget.setPointerCapture(
           event.pointerId,
         );
@@ -513,8 +502,7 @@ export function City({ g }: { g: Game }) {
       return;
     }
 
-    // Reserve one-finger touch for page scrolling only while the map is not zoomed.
-    // Once zoomed in, a single finger can pan the map again.
+    // At 1x a single finger remains page-scroll; zoomed maps use one-finger pan.
     if (event.pointerType === "touch" && pointersRef.current.size === 1 && zoom <= MIN_ZOOM + 0.02) {
       return;
     }
@@ -738,8 +726,14 @@ export function City({ g }: { g: Game }) {
     );
   };
 
+  const verticalPanLimit = Math.max(0, ((zoom - 1) * MAP_HEIGHT) / 2);
+
+  const setVerticalPan = (value: number) => {
+    setPan((current) => clampPan({ x: current.x, y: value }, zoom));
+  };
+
   return (
-    <div className="city-page city-page-scroll-left">
+    <div className="city-page">
 
       {/* =====================================================
           CITY HEADER
@@ -907,11 +901,7 @@ export function City({ g }: { g: Game }) {
 
         <div
           ref={mapRef}
-          className={`riftcity-map interactive-map ${
-            dragging
-              ? "is-dragging"
-              : ""
-          }`}
+          className={`riftcity-map interactive-map ${dragging ? "is-dragging" : ""} ${zoom > MIN_ZOOM + 0.02 ? "is-zoomed" : ""}`}
           onPointerDown={
             onPointerDown
           }
@@ -926,6 +916,19 @@ export function City({ g }: { g: Game }) {
           }
           onWheel={onWheel}
         >
+
+          <div className="map-native-scroll-control" aria-label="Map vertical pan control">
+            <input
+              type="range"
+              min={-verticalPanLimit}
+              max={verticalPanLimit}
+              step="1"
+              value={pan.y}
+              disabled={verticalPanLimit <= 0}
+              onChange={(event) => setVerticalPan(Number(event.target.value))}
+              aria-label="Scroll map vertically"
+            />
+          </div>
 
           <svg
             className="riftcity-map-svg master-map-svg"
@@ -1020,7 +1023,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="map-drag-hint">
             <span>✋</span>
-            Tap a location or district · Drag to pan when zoomed · Pinch / + / − to zoom
+            Tap a location or district · Zoom, then drag to pan · Use the left map scrollbar anytime
           </div>
 
 

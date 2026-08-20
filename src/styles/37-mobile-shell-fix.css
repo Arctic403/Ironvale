@@ -171,17 +171,6 @@
     padding: 0 2px !important;
   }
 
-  .screen-header-title-block {
-    min-width: 0;
-    gap: 4px;
-  }
-
-  .return-city-top-btn {
-    min-height: 30px;
-    padding: 0 10px;
-    font-size: 10px;
-  }
-
   .shell-screen-header h1 {
     margin-top: 1px;
     font-size: 22px !important;
