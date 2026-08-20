@@ -216,13 +216,11 @@ type PokerSeat = { name: string; npc: boolean; chips: number; bet: number; folde
 type Horse = { name: string; number: number; speed: number; stamina: number; form: number; consistency: number; style: string; icon: string };
 type SlotMachine = { id: string; name: string; icon: string; subtitle: string; symbols: string[]; jackpot: string };
 
-const CASINO_DAILY_LIMIT = 50;
-const CASINO_WINDOW_MS = 24 * 60 * 60 * 1000;
-const CASINO_SESSION_LIMIT = 15;
-const CASINO_COOLDOWN_MS = 10 * 60 * 1000;
+const CASINO_CHIP_CAP = 75;
 const CASINO_NPCS = ["Maya Vale", "Vince Romano", "Juno Park", "Theo Knox", "Aria Stone", "Malik Reed"];
-const POKER_SMALL_BLIND = 10;
-const POKER_BIG_BLIND = 20;
+const POKER_SMALL_BLIND = 5;
+const POKER_BIG_BLIND = 10;
+const POKER_BUY_IN = 200;
 const RACE_CYCLE_MS = 120_000;
 const RACE_BETTING_MS = 75_000;
 const RACE_RUNNING_MS = 35_000;
@@ -354,6 +352,9 @@ export function Casino({ g }: { g: Game }) {
   const now = useNow();
   const [game, setGame] = useState<CasinoGameId | null>(null);
   const [message, setMessage] = useState("Choose a room on the casino floor.");
+  const [betAmount, setBetAmount] = useState(25);
+  const blackjackBetRef = useRef(0);
+  const raceBetRef = useRef(0);
   const [playerHand, setPlayerHand] = useState<CasinoCard[]>([]);
   const [dealerHand, setDealerHand] = useState<CasinoCard[]>([]);
   const [blackjackDone, setBlackjackDone] = useState(true);
@@ -383,39 +384,14 @@ export function Casino({ g }: { g: Game }) {
   const raceProgress=Math.min(1,raceElapsed/RACE_RUNNING_MS);
   const orderedFinish=useMemo(()=>[...raceHorses].sort((a,b)=>horseFinishScore(b,raceId)-horseFinishScore(a,raceId)),[raceHorses,raceId]);
 
-  const windowExpired = !g.gameState.casinoWindowStartedAt || now - g.gameState.casinoWindowStartedAt >= CASINO_WINDOW_MS;
-  const used = windowExpired ? 0 : g.gameState.casinoActionsUsed;
-  const remaining = Math.max(0, CASINO_DAILY_LIMIT - used);
-  const resetAt = windowExpired ? null : g.gameState.casinoWindowStartedAt + CASINO_WINDOW_MS;
-  const cooldownActive = Boolean(g.gameState.casinoCooldownUntil && g.gameState.casinoCooldownUntil > now);
-  const cooldownRemaining = cooldownActive && g.gameState.casinoCooldownUntil ? formatTime(timeLeft(g.gameState.casinoCooldownUntil)) : null;
   const rank = g.gameState.casinoReputation >= 120 ? "Rift Elite" : g.gameState.casinoReputation >= 60 ? "VIP" : g.gameState.casinoReputation >= 25 ? "Regular" : "Visitor";
 
-  useEffect(() => {
-    if (windowExpired && g.gameState.casinoWindowStartedAt) {
-      g.setGameState((prev) => ({ ...prev, casinoActionsUsed: 0, casinoWindowStartedAt: 0, casinoSessionActions: 0, casinoCooldownUntil: null }));
-    } else if (g.gameState.casinoCooldownUntil && g.gameState.casinoCooldownUntil <= now && g.gameState.casinoSessionActions !== 0) {
-      g.setGameState((prev) => ({ ...prev, casinoCooldownUntil: null, casinoSessionActions: 0 }));
-    }
-  }, [windowExpired, now, g.gameState.casinoWindowStartedAt, g.gameState.casinoCooldownUntil, g.gameState.casinoSessionActions]);
-
   const recordGame = (label: string, outcome: "win" | "loss" | "draw", rep = 1) => {
-    if (remaining <= 0 || cooldownActive) return false;
     g.setGameState((prev) => {
-      const t = Date.now();
-      const expired = !prev.casinoWindowStartedAt || t - prev.casinoWindowStartedAt >= CASINO_WINDOW_MS;
-      const actionsUsed = expired ? 0 : prev.casinoActionsUsed;
-      if (actionsUsed >= CASINO_DAILY_LIMIT) return prev;
-      const sessionActions = (prev.casinoCooldownUntil && prev.casinoCooldownUntil > t) ? prev.casinoSessionActions : prev.casinoSessionActions + 1;
       const win = outcome === "win";
       const streak = win ? prev.casinoCurrentStreak + 1 : 0;
-      const hitCooldown = sessionActions >= CASINO_SESSION_LIMIT;
       const next = {
         ...prev,
-        casinoWindowStartedAt: expired ? t : prev.casinoWindowStartedAt,
-        casinoActionsUsed: actionsUsed + 1,
-        casinoSessionActions: hitCooldown ? 0 : sessionActions,
-        casinoCooldownUntil: hitCooldown ? t + CASINO_COOLDOWN_MS : prev.casinoCooldownUntil,
         casinoReputation: prev.casinoReputation + Math.max(1, rep + (win ? 1 : 0)),
         casinoGamesPlayed: prev.casinoGamesPlayed + 1,
         casinoWins: prev.casinoWins + (win ? 1 : 0),
@@ -427,10 +403,18 @@ export function Casino({ g }: { g: Game }) {
     return true;
   };
 
-  const canPlay = remaining > 0 && !cooldownActive;
+  const wager = Math.max(1, Math.floor(betAmount));
+  const canPlay = g.gameState.cash >= wager;
+  const takeWager = (amount = wager) => {
+    if (amount <= 0 || g.gameState.cash < amount) return false;
+    g.setGameState(prev => ({ ...prev, cash: prev.cash - amount }));
+    return true;
+  };
+  const payCash = (amount:number) => g.setGameState(prev => ({ ...prev, cash: prev.cash + Math.max(0, Math.floor(amount)) }));
 
   const startBlackjack = () => {
-    if (!canPlay || !recordGame("Blackjack Hall", "draw", 1)) return;
+    if (!canPlay || !takeWager() || !recordGame("Blackjack Hall", "draw", 1)) return;
+    blackjackBetRef.current = wager;
     const deck=shuffledDeck();
     setPlayerHand([deck.pop()!, deck.pop()!]);
     setDealerHand([deck.pop()!, deck.pop()!]);
@@ -440,14 +424,17 @@ export function Casino({ g }: { g: Game }) {
   const hitBlackjack = () => {
     if (blackjackDone) return;
     const next = [...playerHand, casinoCard()]; setPlayerHand(next);
-    if (blackjackValue(next) > 21) { setBlackjackDone(true); setMessage("Bust — dealer takes the round."); }
+    if (blackjackValue(next) > 21) { setBlackjackDone(true); recordGame("Blackjack Hall", "loss", 0); setMessage(`Bust — you lose ${money(blackjackBetRef.current)}.`); blackjackBetRef.current=0; }
   };
   const standBlackjack = () => {
     if (blackjackDone) return;
     const nextDealer = [...dealerHand]; while (blackjackValue(nextDealer) < 17) nextDealer.push(casinoCard());
     setDealerHand(nextDealer); const p = blackjackValue(playerHand), d = blackjackValue(nextDealer); setBlackjackDone(true);
-    if (d > 21 || p > d) { setMessage("You win the blackjack round."); g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+2})); }
-    else if (p === d) setMessage("Push — even round."); else setMessage("Dealer wins this round.");
+    const stake=blackjackBetRef.current;
+    if (d > 21 || p > d) { payCash(stake*2); recordGame("Blackjack Hall", "win", 2); setMessage(`You win ${money(stake)} profit.`); }
+    else if (p === d) { payCash(stake); setMessage("Push — your wager is returned."); }
+    else { recordGame("Blackjack Hall", "loss", 0); setMessage(`Dealer wins — you lose ${money(stake)}.`); }
+    blackjackBetRef.current=0;
   };
 
   const appendPokerLog=(entry:string)=>setPokerLog(prev=>[entry,...prev].slice(0,8));
@@ -459,7 +446,8 @@ export function Casino({ g }: { g: Game }) {
       const winner=active[0];
       const next=seats.map(s=>s.name===winner.name?{...s,chips:s.chips+pot,action:"WON POT"}:s);
       setPokerSeats(next); setPokerStage("showdown"); appendPokerLog(`${winner.name} wins ${pot} table chips uncontested.`);
-      if(!winner.npc) { setMessage("You take the pot."); g.setGameState(prev=>({...prev,casinoReputation:prev.casinoReputation+4,casinoWins:prev.casinoWins+1})); }
+      const you=next[0]; payCash(you.chips);
+      if(!winner.npc) { setMessage(`You take the pot and cash out ${money(you.chips)}.`); g.setGameState(prev=>({...prev,casinoReputation:prev.casinoReputation+4,casinoWins:prev.casinoWins+1})); } else setMessage(`Hand over — you cash out ${money(you.chips)}.`);
       return;
     }
     const scored=active.map(s=>({seat:s,score:bestPokerHand([...s.cards,...board])}));
@@ -469,8 +457,10 @@ export function Casino({ g }: { g: Game }) {
     setPokerSeats(seats.map(s=>winners.some(w=>w.seat.name===s.name)?{...s,chips:s.chips+share,action:`${best.name} · WON`}:s));
     setPokerStage("showdown");
     appendPokerLog(`${winners.map(w=>w.seat.name).join(" & ")} win with ${best.name}.`);
-    if(winners.some(w=>!w.seat.npc)){ setMessage(`You win with ${best.name}.`); g.setGameState(prev=>({...prev,casinoReputation:prev.casinoReputation+5,casinoWins:prev.casinoWins+1})); }
-    else setMessage(`${winners[0].seat.name} wins with ${best.name}.`);
+    const finalSeats=seats.map(s=>winners.some(w=>w.seat.name===s.name)?{...s,chips:s.chips+share,action:`${best.name} · WON`}:s);
+    const you=finalSeats[0]; payCash(you.chips);
+    if(winners.some(w=>!w.seat.npc)){ setMessage(`You win with ${best.name} and cash out ${money(you.chips)}.`); g.setGameState(prev=>({...prev,casinoReputation:prev.casinoReputation+5,casinoWins:prev.casinoWins+1})); }
+    else setMessage(`${winners[0].seat.name} wins with ${best.name}. You cash out ${money(you.chips)}.`);
   };
 
   const npcStreetActions=(seats:PokerSeat[], targetBet:number, board:CasinoCard[])=>{
@@ -494,15 +484,15 @@ export function Casino({ g }: { g: Game }) {
   };
 
   const startPoker=()=>{
-    if(!canPlay||!recordGame("Poker Room","draw",2)) return;
+    if(g.gameState.cash<POKER_BUY_IN||!takeWager(POKER_BUY_IN)||!recordGame("Poker Room","draw",2)) return;
     const nextDealer=(dealerIndex+1)%5;
     setDealerIndex(nextDealer);
     const deck=shuffledDeck(); pokerDeckRef.current=deck;
     const names=["You",...CASINO_NPCS.slice(0,4)];
-    let seats=names.map((name,i)=>({name,npc:i!==0,chips:1000,bet:0,folded:false,cards:[deck.pop()!,deck.pop()!],action:"WAITING"}));
+    let seats=names.map((name,i)=>({name,npc:i!==0,chips:POKER_BUY_IN,bet:0,folded:false,cards:[deck.pop()!,deck.pop()!],action:"WAITING"}));
     const sb=(nextDealer+1)%seats.length, bb=(nextDealer+2)%seats.length;
     seats=seats.map((s,i)=>i===sb?{...s,chips:s.chips-POKER_SMALL_BLIND,bet:POKER_SMALL_BLIND,action:`SB ${POKER_SMALL_BLIND}`}:i===bb?{...s,chips:s.chips-POKER_BIG_BLIND,bet:POKER_BIG_BLIND,action:`BB ${POKER_BIG_BLIND}`}:s);
-    setPokerSeats(seats); setCommunity([]); setPokerPot(POKER_SMALL_BLIND+POKER_BIG_BLIND); setPokerCurrentBet(POKER_BIG_BLIND); setPokerStage("preflop"); setPokerLog([`Blinds posted ${POKER_SMALL_BLIND}/${POKER_BIG_BLIND}.`,`Dealer: ${seats[nextDealer].name}`]); setMessage("Texas Hold'em hand started. Table chips reset each hand and have no cash value.");
+    setPokerSeats(seats); setCommunity([]); setPokerPot(POKER_SMALL_BLIND+POKER_BIG_BLIND); setPokerCurrentBet(POKER_BIG_BLIND); setPokerStage("preflop"); setPokerLog([`Blinds posted ${POKER_SMALL_BLIND}/${POKER_BIG_BLIND}.`,`Dealer: ${seats[nextDealer].name}`]); setMessage(`Texas Hold'em hand started with a ${money(POKER_BUY_IN)} cash buy-in.`);
   };
 
   const pokerPlayerAction=(kind:"checkcall"|"raise"|"fold")=>{
@@ -521,26 +511,30 @@ export function Casino({ g }: { g: Game }) {
   };
 
   const spinWheel = () => {
-    if (!canPlay || wheelSpinning || !recordGame("Rift Wheel", "draw", 1)) return;
+    if (!canPlay || wheelSpinning || !takeWager() || !recordGame("Rift Wheel", "draw", 1)) return;
+    const stake=wager;
     setWheelSpinning(true); setWheelResult(null); setMessage("The Rift Wheel is spinning…");
     window.setTimeout(()=>{
-      const segments = ["RIFT STAR +3 REP","BLUE SECTOR +1 REP","GOLD SECTOR +2 REP","NEUTRAL","DOUBLE STAR +4 REP","NEUTRAL"];
+      const segments = ["RIFT STAR 5X","BLUE SECTOR 2X","GOLD SECTOR 3X","HOUSE","DOUBLE STAR 4X","HOUSE"];
       const result = segments[Math.floor(Math.random()*segments.length)]; setWheelResult(result); setWheelSpinning(false);
-      const bonus = result.includes("+4")?4:result.includes("+3")?3:result.includes("+2")?2:result.includes("+1")?1:0;
-      if (bonus) g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+bonus})); setMessage(`Wheel result: ${result}.`);
+      const mult = result.includes("5X")?5:result.includes("4X")?4:result.includes("3X")?3:result.includes("2X")?2:0;
+      if (mult) { payCash(stake*mult); recordGame("Rift Wheel","win",2); } else recordGame("Rift Wheel","loss",0);
+      setMessage(mult?`Wheel result: ${result}. Paid ${money(stake*mult)}.`:`Wheel result: ${result}. House takes ${money(stake)}.`);
     },1800);
   };
 
   const activeMachine=SLOT_MACHINES.find(m=>m.id===slotMachineId) || SLOT_MACHINES[0];
   const spinReels = () => {
-    if (!canPlay || reelsSpinning || !recordGame(activeMachine.name, "draw", 1)) return;
+    if (!canPlay || reelsSpinning || !takeWager() || !recordGame(activeMachine.name, "draw", 1)) return;
+    const stake=wager;
     setReelsSpinning(true); setMessage(`${activeMachine.name} reels are spinning…`);
     let ticks=0;
-    const id=window.setInterval(()=>{ setReels([0,1,2].map(()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)])); ticks+=1; if(ticks>=12){window.clearInterval(id); const next=[0,1,2].map(()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)]); setReels(next); const match=next[0]===next[1]&&next[1]===next[2]; if(match)g.setGameState(prev=>({...prev,casinoReputation:prev.casinoReputation+6})); setMessage(match?`${activeMachine.jackpot}! Triple ${next[0]} — reputation bonus.`:"Reels stop. Lights settle across the machine."); setReelsSpinning(false);}},75);
+    const id=window.setInterval(()=>{ setReels([0,1,2].map(()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)])); ticks+=1; if(ticks>=12){window.clearInterval(id); const next=[0,1,2].map(()=>activeMachine.symbols[Math.floor(Math.random()*activeMachine.symbols.length)]); setReels(next); const match=next[0]===next[1]&&next[1]===next[2]; if(match){ payCash(stake*10); recordGame(activeMachine.name,"win",3); } else recordGame(activeMachine.name,"loss",0); setMessage(match?`${activeMachine.jackpot}! Triple ${next[0]} — paid ${money(stake*10)}.`:`Reels stop — ${money(stake)} lost.`); setReelsSpinning(false);}},75);
   };
 
   const lockRacePrediction=()=>{
-    if(racePhase!=="betting"||raceLockedId===raceId||!canPlay||!recordGame("Rift Downs Prediction","draw",1)) return;
+    if(racePhase!=="betting"||raceLockedId===raceId||!canPlay||!takeWager()||!recordGame("Rift Downs Bet","draw",1)) return;
+    raceBetRef.current=wager;
     setRaceLockedId(raceId); setMessage(`Prediction locked: ${raceHorses[racePick]?.name}. Race starts automatically.`);
   };
 
@@ -548,8 +542,10 @@ export function Casino({ g }: { g: Game }) {
     if(racePhase!=="results"||raceLockedId!==raceId||settledRaces.current.has(raceId)) return;
     settledRaces.current.add(raceId);
     const winner=orderedFinish[0]; const hit=winner.number-1===racePick;
-    if(hit) g.setGameState(prev=>({...prev,casinoReputation:prev.casinoReputation+5,casinoWins:prev.casinoWins+1}));
-    setMessage(hit?`${winner.name} wins — your prediction hit!`:`${winner.name} wins race #${raceId%1000}.`);
+    const stake=raceBetRef.current;
+    if(hit) { payCash(stake*5); recordGame("Rift Downs Bet","win",3); } else recordGame("Rift Downs Bet","loss",0);
+    setMessage(hit?`${winner.name} wins — paid ${money(stake*5)}!`:`${winner.name} wins race #${raceId%1000}. You lose ${money(stake)}.`);
+    raceBetRef.current=0;
   },[racePhase,raceId,raceLockedId,racePick,orderedFinish]);
 
   const raceCountdown = racePhase==="betting" ? RACE_BETTING_MS-raceMs : racePhase==="running" ? RACE_BETTING_MS+RACE_RUNNING_MS-raceMs : RACE_CYCLE_MS-raceMs;
@@ -558,22 +554,21 @@ export function Casino({ g }: { g: Game }) {
     <div className="city-service-page casino-v4">
       <section className="casino-hero casino-animated-lobby">
         <div className="casino-hero-glow"/><div className="casino-light-beam beam-a"/><div className="casino-light-beam beam-b"/>
-        <div className="casino-brand"><span>✦</span><div><small>RIFTCITY ENTERTAINMENT DISTRICT</small><h2>THE RIFT CASINO</h2><p>Animated tables, live race schedules, NPC regulars, and arcade-style casino games.</p></div></div>
+        <div className="casino-brand"><span>✦</span><div><small>RIFTCITY ENTERTAINMENT DISTRICT</small><h2>THE RIFT CASINO</h2><p>Animated tables, live race schedules, NPC regulars, cash wagering, jackpots, and casino games.</p></div></div>
         <div className="casino-live-ticker"><span>LIVE</span><b>Rift Downs race #{raceId%1000}</b><small>{racePhase.toUpperCase()} · {formatTime(raceCountdown)}</small><i/> <b>Poker Room</b><small>NPC tables active</small><i/> <b>{activeMachine.name}</b><small>Featured machine</small></div>
         <div className="casino-metrics">
-          <div><span>Daily Plays</span><strong>{remaining}/{CASINO_DAILY_LIMIT}</strong><small>{resetAt ? `Resets in ${formatTime(Math.max(0,resetAt-now))}` : "24h window starts on first play"}</small></div>
+          <div><span>Cash</span><strong>{money(g.gameState.cash)}</strong><small>Available bankroll</small></div>
           <div><span>Casino Rank</span><strong>{rank}</strong><small>{g.gameState.casinoReputation} reputation</small></div>
           <div><span>Record</span><strong>{g.gameState.casinoWins}/{g.gameState.casinoGamesPlayed}</strong><small>Best streak {g.gameState.casinoBestStreak}</small></div>
         </div>
-        <div className="casino-limit-note">Play is capped at {CASINO_DAILY_LIMIT} actions per 24 hours. After {CASINO_SESSION_LIMIT} consecutive actions, the floor enforces a {CASINO_COOLDOWN_MS/60000}-minute break. Table chips are play-only, reset, cannot be bought or traded, and have no cash value.</div>
-        {cooldownActive && <div className="casino-cooldown">☕ Floor break active · {cooldownRemaining} remaining. You can still browse and spectate.</div>}
+        <div className="casino-limit-note">No play timer or cooldown. Casino wagers use RiftCity cash. Bonus casino chips are capped at {CASINO_CHIP_CAP}; current chips: {Math.min(CASINO_CHIP_CAP,g.gameState.casinoChips)}.</div>
       </section>
 
       <div className="casino-floor-grid">
         {[
           ["blackjack","🂡","Blackjack Hall","Dealer Elena · animated felt table","PLAYABLE TABLE"],
           ["poker","♠","Texas Hold'em Room","5-seat Hold'em · NPCs fill open seats","REAL POKER"],
-          ["wheel","◉","Rift Wheel","Animated arcade wheel · reputation prizes","ARCADE FLOOR"],
+          ["wheel","◉","Rift Wheel","Animated wheel · cash multipliers","ARCADE FLOOR"],
           ["racing","🏇","Rift Downs","Timed races · live horse stats and track","LIVE RACING"],
           ["reels","🎰","Slots Gallery",`${SLOT_MACHINES.length} animated themed machines`,"ANIMATED SLOTS"],
         ].map(([id,icon,title,sub,status])=>(
@@ -593,9 +588,9 @@ export function Casino({ g }: { g: Game }) {
       <div className="casino-footer-actions"><p>{message}</p><div className="btn-group"><Button onClick={g.randomEncounter}>Explore Casino Floor</Button><BackToCity g={g}/></div></div>
 
       {game && <div className="casino-game-backdrop" role="dialog" aria-modal="true" aria-label="Casino game">
-        <div className={`casino-game-modal casino-game-${game}`}>
+        <div className={`casino-game-modal casino-game-${game}`}><div className="casino-wager-bar"><label>Cash wager</label><input type="number" min="1" max={Math.max(1,g.gameState.cash)} value={betAmount} onChange={e=>setBetAmount(Math.max(1,Number(e.target.value)||1))}/><b>{money(wager)}</b></div>
           <button type="button" className="casino-game-close" onClick={()=>setGame(null)}>×</button>
-          <div className="casino-game-heading"><span>{game==="blackjack"?"🂡":game==="poker"?"♠":game==="wheel"?"◉":game==="racing"?"🏇":"🎰"}</span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Texas Hold'em":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Slots Gallery"}</h3></div><b>{remaining} plays left</b></div>
+          <div className="casino-game-heading"><span>{game==="blackjack"?"🂡":game==="poker"?"♠":game==="wheel"?"◉":game==="racing"?"🏇":"🎰"}</span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Texas Hold'em":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Slots Gallery"}</h3></div><b>{money(g.gameState.cash)} cash</b></div>
 
           {game==="blackjack" && <div className="casino-table-game animated-felt">
             <div className="casino-seat-row"><span className="casino-seat npc">MAYA<br/><small>NPC</small></span><span className="casino-seat npc">VINCE<br/><small>NPC</small></span><span className="casino-seat dealer">ELENA<br/><small>DEALER</small></span><span className="casino-seat npc">JUNO<br/><small>NPC</small></span></div>
@@ -608,8 +603,8 @@ export function Casino({ g }: { g: Game }) {
             <div className="poker-table-shell">
               <div className="poker-felt-logo">RIFT HOLD'EM</div>
               <div className="community-cards">{community.length?community.map((c,i)=><CasinoCardView card={c} key={i} delay={i*100}/>):<span className="board-placeholder">COMMUNITY CARDS</span>}</div>
-              <div className="poker-pot"><small>POT</small><b>{pokerPot}</b><span>PLAY CHIPS</span></div>
-              {(pokerSeats.length?pokerSeats:["You",...CASINO_NPCS.slice(0,4)].map((name,i)=>({name,npc:i!==0,chips:1000,bet:0,folded:false,cards:[],action:"WAITING"}))).map((seat,i)=>{
+              <div className="poker-pot"><small>POT</small><b>{pokerPot}</b><span>TABLE CHIPS</span></div>
+              {(pokerSeats.length?pokerSeats:["You",...CASINO_NPCS.slice(0,4)].map((name,i)=>({name,npc:i!==0,chips:POKER_BUY_IN,bet:0,folded:false,cards:[],action:"WAITING"}))).map((seat,i)=>{
                 const hand=pokerStage==="showdown"&&!seat.folded?bestPokerHand([...seat.cards,...community]).name:"";
                 return <div key={seat.name} className={`holdem-seat seat-${i} ${seat.npc?"npc":"you"} ${seat.folded?"folded":""}`}>
                   <div className="seat-avatar">{seat.npc?"◆":"YOU"}</div><b>{seat.name}</b><small>{seat.chips} chips</small>
@@ -621,13 +616,13 @@ export function Casino({ g }: { g: Game }) {
             </div>
             <div className="poker-status-row"><span>Stage <b>{pokerStage.toUpperCase()}</b></span><span>Blinds <b>{POKER_SMALL_BLIND}/{POKER_BIG_BLIND}</b></span><span>Current bet <b>{pokerCurrentBet}</b></span></div>
             <div className="poker-controls">
-              <Button disabled={!canPlay||!["waiting","showdown"].includes(pokerStage)} onClick={startPoker}>Deal Hold'em Hand</Button>
+              <Button disabled={g.gameState.cash<POKER_BUY_IN||!["waiting","showdown"].includes(pokerStage)} onClick={startPoker}>Deal Hold'em Hand</Button>
               <Button disabled={!pokerSeats.length||!["preflop","flop","turn","river"].includes(pokerStage)} onClick={()=>pokerPlayerAction("checkcall")}>{pokerSeats[0]&&pokerSeats[0].bet<pokerCurrentBet?`Call ${Math.max(0,pokerCurrentBet-pokerSeats[0].bet)}`:"Check"}</Button>
               <Button disabled={!pokerSeats.length||!["preflop","flop","turn","river"].includes(pokerStage)} onClick={()=>pokerPlayerAction("raise")}>Raise +40</Button>
               <Button disabled={!pokerSeats.length||!["preflop","flop","turn","river"].includes(pokerStage)} onClick={()=>pokerPlayerAction("fold")}>Fold</Button>
             </div>
             <div className="poker-action-log">{pokerLog.map((entry,i)=><span key={i}>{entry}</span>)}</div>
-            <p className="casino-fair-note">Texas Hold'em uses play-only table chips. They reset for each hand and cannot be purchased, traded, withdrawn, or converted to RiftCity cash.</p>
+            <p className="casino-fair-note">Texas Hold'em uses a {money(POKER_BUY_IN)} cash buy-in. Table chips represent that hand's bankroll and cash back out when the hand ends.</p>
           </div>}
 
           {game==="wheel" && <div className="casino-wheel-game"><div className={`rift-wheel ${wheelSpinning?"spinning":""}`}><span>R</span></div><strong>{wheelResult || (wheelSpinning?"SPINNING…":"Ready to spin")}</strong><Button disabled={!canPlay||wheelSpinning} onClick={spinWheel}>Spin Arcade Wheel</Button></div>}
@@ -646,10 +641,8 @@ export function Casino({ g }: { g: Game }) {
           {game==="reels" && <div className="slots-gallery">
             <div className="slot-machine-tabs">{SLOT_MACHINES.map(m=><button type="button" key={m.id} className={slotMachineId===m.id?"active":""} onClick={()=>{setSlotMachineId(m.id);setReels(m.symbols.slice(0,3));}}><span>{m.icon}</span><b>{m.name}</b><small>{m.subtitle}</small></button>)}</div>
             <div className={`slot-cabinet theme-${activeMachine.id} ${reelsSpinning?"spinning":""}`}><div className="slot-marquee"><span>{activeMachine.icon}</span><b>{activeMachine.name}</b><small>{activeMachine.jackpot}</small></div><div className="slot-lights">{Array.from({length:18},(_,i)=><i key={i}/>)}</div><div className="neon-reels">{reels.map((r,i)=><span className={`reel reel-${i}`} key={i}>{r}</span>)}</div><div className="slot-payline">★ PAYLINE ★</div><Button disabled={!canPlay||reelsSpinning} onClick={spinReels}>{reelsSpinning?"SPINNING…":"Spin Machine"}</Button></div>
-            <p className="casino-fair-note">All machines are arcade-style minigames. No purchasable or cash-out wagering currency is used.</p>
+            <p className="casino-fair-note">Slot wagers come directly from RiftCity cash. Wins are paid back to the same cash balance.</p>
           </div>}
-
-          {!canPlay && <div className="casino-play-blocked">{remaining<=0 ? "Daily play limit reached. Browse, spectate, or return after your 24-hour reset." : `Session break active for ${cooldownRemaining}.`}</div>}
           <p className="casino-game-message">{message}</p>
         </div>
       </div>}
