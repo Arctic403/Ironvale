@@ -1361,3 +1361,5 @@
 }
 
 .location-card .card-tag {
+  display: none !important;
+}
