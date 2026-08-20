@@ -1,0 +1,21 @@
+/* ============================================================
+   16. JOBS
+   ============================================================ */
+
+.job-card {
+  padding: 16px;
+}
+
+.job-card h3 {
+  margin: 9px 0 5px;
+  font-size: 16px;
+}
+
+.job-card .data-row {
+  margin: 10px 0;
+}
+
+.job-card .btn-primary {
+  width: 100%;
+}
+

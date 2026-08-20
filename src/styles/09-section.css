@@ -1,0 +1,42 @@
+/* ============================================================
+   9. DATA / STAT LISTS
+   ============================================================ */
+
+.data-list,
+.stats-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.data-row,
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #1b2530;
+}
+
+.data-row:last-child,
+.stat-row:last-child {
+  border-bottom: 0;
+}
+
+.data-row span,
+.stat-name {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.data-row b,
+.stat-val {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.stat-val {
+  font-variant-numeric: tabular-nums;
+}
+

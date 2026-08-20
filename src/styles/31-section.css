@@ -1,0 +1,348 @@
+/* ============================================================
+   31. RESPONSIVE — MOBILE
+   ============================================================ */
+
+@media (max-width: 760px) {
+  :root {
+    --sidebar-width: 0px;
+    --topbar-height: 60px;
+  }
+
+  body {
+    font-size: 13px;
+  }
+
+  .layout-root {
+    display: block;
+  }
+
+  .nav-rail {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    height: 64px;
+    padding: 6px 8px;
+    flex-direction: row;
+    align-items: center;
+    border-right: 0;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: rgba(8, 12, 17, 0.96);
+    backdrop-filter: blur(15px);
+  }
+
+  .brand,
+  .nav-footer {
+    display: none;
+  }
+
+  .nav-list {
+    width: 100%;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 5px;
+  }
+
+  .nav-item {
+    flex: 1 0 68px;
+    min-width: 68px;
+    min-height: 50px;
+    padding: 5px 6px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    text-align: center;
+  }
+
+  .nav-icon {
+    width: auto;
+    font-size: 15px;
+  }
+
+  .nav-label {
+    max-width: 68px;
+    font-size: 8px;
+  }
+
+  .main-wrapper {
+    width: 100%;
+    margin-left: 0;
+    padding-bottom: 72px;
+  }
+
+  .top-status-bar {
+    min-height: var(--topbar-height);
+    padding: 9px 13px;
+  }
+
+  .xp-container {
+    display: none;
+  }
+
+  .currency-bar {
+    margin-left: auto;
+  }
+
+  .screen-container {
+    padding: 16px 12px;
+  }
+
+  .screen-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 15px;
+  }
+
+  .screen-header h1 {
+    font-size: 25px;
+  }
+
+  .ui-grid.two-col,
+  .ui-grid.three-col,
+  .ui-grid.four-col,
+  .grid.two,
+  .grid.three,
+  .grid.four {
+    grid-template-columns: 1fr;
+  }
+
+  /* Gym remains unchanged */
+  .gym-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-body {
+    padding: 13px;
+  }
+
+  .card-header {
+    padding: 12px 13px;
+  }
+
+  /* -------------------------
+     MOBILE COMPACT COMBAT
+     ------------------------- */
+
+  .combat-container {
+    gap: 7px;
+  }
+
+  .combat-header {
+    padding: 9px 10px;
+  }
+
+  .combat-header-content {
+    align-items: center;
+  }
+
+  .combat-title {
+    font-size: 15px;
+  }
+
+  .combat-vs {
+    margin: 0 4px;
+    font-size: 8px;
+  }
+
+  .combat-turn-indicator {
+    font-size: 7px;
+    padding: 5px 6px;
+  }
+
+  .combat-arena {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .combat-fighter {
+    padding: 9px 10px;
+  }
+
+  /*
+     On mobile the fighter becomes a compact horizontal card.
+     This keeps the battle screen from becoming excessively tall.
+  */
+
+  .combat-fighter-top {
+    align-items: center;
+  }
+
+  .combat-avatar {
+    width: 48px;
+    height: 48px;
+    margin: 5px auto 4px;
+    font-size: 23px;
+  }
+
+  .combat-health-section {
+    margin-top: 2px;
+  }
+
+  .combat-health-label {
+    margin-bottom: 3px;
+    font-size: 7px;
+  }
+
+  .combat-health-label strong {
+    font-size: 9px;
+  }
+
+  .combat-health-bar {
+    height: 6px;
+  }
+
+  .combat-fighter-status {
+    margin-top: 4px;
+    padding-top: 4px;
+    font-size: 7px;
+  }
+
+  .combat-fighter-status strong {
+    font-size: 8px;
+  }
+
+  .combat-center {
+    flex-direction: row;
+    height: 22px;
+    gap: 5px;
+  }
+
+  .combat-center-line {
+    width: auto;
+    height: 1px;
+    min-height: 0;
+  }
+
+  .combat-vs-badge {
+    width: 27px;
+    height: 27px;
+    flex-shrink: 0;
+    font-size: 7px;
+  }
+
+  .combat-status-banner {
+    padding: 7px 8px;
+  }
+
+  .combat-status-icon {
+    width: 23px;
+    height: 23px;
+    font-size: 12px;
+  }
+
+  .combat-status-banner strong {
+    font-size: 9px;
+  }
+
+  .combat-status-banner span {
+    font-size: 8px;
+  }
+
+  .combat-actions {
+    padding: 9px;
+  }
+
+  .combat-actions-header {
+    margin-bottom: 6px;
+  }
+
+  .combat-actions h3,
+  .combat-log h3 {
+    font-size: 12px;
+  }
+
+  .combat-action-hint {
+    display: none;
+  }
+
+  .combat-attack-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .combat-attack-button {
+    min-height: 43px;
+    padding: 6px 7px;
+    gap: 6px;
+  }
+
+  .combat-attack-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+
+  .combat-attack-info strong {
+    font-size: 9px;
+  }
+
+  .combat-attack-info small {
+    font-size: 7px;
+  }
+
+  .combat-attack-arrow {
+    display: none;
+  }
+
+  .combat-equipped {
+    margin-top: 6px;
+    padding-top: 6px;
+    font-size: 7px;
+  }
+
+  .combat-result {
+    padding: 12px 9px;
+  }
+
+  .combat-result-icon {
+    font-size: 25px;
+  }
+
+  .combat-result h2 {
+    font-size: 15px;
+  }
+
+  .combat-result p {
+    font-size: 8px;
+    margin-bottom: 7px;
+  }
+
+  .combat-finish-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .combat-finish-button {
+    min-height: 54px;
+    padding: 5px 3px;
+  }
+
+  .combat-finish-button span {
+    font-size: 15px;
+  }
+
+  .combat-finish-button strong {
+    font-size: 8px;
+  }
+
+  .combat-finish-button small {
+    font-size: 6px;
+  }
+
+  .combat-log {
+    max-height: 150px;
+    padding: 8px 9px;
+  }
+
+  .combat-log-entry {
+    padding: 5px 2px;
+    font-size: 8px;
+  }
+
+  .combat-log-content small {
+    font-size: 6px;
+  }
+}
+

@@ -1,0 +1,843 @@
+/* ============================================================
+   28. COMBAT — COMPACT VISUAL SYSTEM
+   ============================================================ */
+
+.combat-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* -------------------------
+   Compact Combat Header
+   ------------------------- */
+
+.combat-header {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 13px;
+  border-radius: 9px;
+}
+
+.combat-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(109, 167, 255, 0.055),
+      transparent 35%,
+      transparent 65%,
+      rgba(239, 68, 68, 0.055)
+    );
+}
+
+.combat-header-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.combat-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  color: #60a5fa;
+}
+
+.combat-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #60a5fa;
+  box-shadow: 0 0 7px rgba(96, 165, 250, 0.8);
+  animation: combat-live-pulse 1.5s ease-in-out infinite;
+}
+
+.combat-title {
+  margin: 3px 0 0;
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.combat-vs {
+  margin: 0 5px;
+  font-size: 9px;
+  color: #596675;
+  vertical-align: middle;
+}
+
+.combat-turn-indicator {
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+.combat-your-turn {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.combat-enemy-turn {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.combat-result-win {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.combat-result-loss {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* -------------------------
+   Compact Fighter Arena
+   ------------------------- */
+
+.combat-arena {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    48px
+    minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+}
+
+.combat-fighter {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid #26313d;
+  border-radius: 9px;
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      rgba(109, 167, 255, 0.055),
+      transparent 55%
+    ),
+    #111820;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.combat-fighter-enemy {
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      rgba(239, 68, 68, 0.055),
+      transparent 55%
+    ),
+    #111820;
+}
+
+.combat-fighter-active {
+  border-color: rgba(109, 167, 255, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(109, 167, 255, 0.08),
+    0 0 20px rgba(109, 167, 255, 0.07);
+}
+
+.combat-fighter-enemy.combat-fighter-active {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(239, 68, 68, 0.08),
+    0 0 20px rgba(239, 68, 68, 0.07);
+}
+
+.combat-fighter-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 7px;
+}
+
+.combat-fighter-top h3 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.combat-fighter-label {
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  color: #60a5fa;
+}
+
+.enemy-label {
+  color: #f87171;
+}
+
+.combat-level {
+  padding: 3px 5px;
+  border: 1px solid #303b47;
+  border-radius: 4px;
+  color: #8f9baa;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* -------------------------
+   Smaller Combat Avatar
+   ------------------------- */
+
+.combat-avatar {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 7px auto 5px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid #26313d;
+  box-shadow:
+    inset 0 0 20px rgba(255, 255, 255, 0.02),
+    0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+.combat-avatar-player {
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.combat-avatar-enemy {
+  border-color: rgba(248, 113, 113, 0.25);
+}
+
+/* -------------------------
+   Compact Health
+   ------------------------- */
+
+.combat-health-section {
+  margin-top: 4px;
+}
+
+.combat-health-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: #748294;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.combat-health-label strong {
+  color: #e8edf3;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+.combat-health-bar {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #202a35;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.combat-health-fill {
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  transition:
+    width 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.2s ease;
+}
+
+.combat-health-player {
+  background: linear-gradient(90deg, #16a34a, #4ade80);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.2);
+}
+
+.combat-health-enemy {
+  background: linear-gradient(90deg, #dc2626, #f87171);
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.2);
+}
+
+.combat-fighter-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #1e2833;
+  color: #687584;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.combat-fighter-status strong {
+  color: #b8c1cc;
+  text-align: right;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+
+/* -------------------------
+   Compact VS Center
+   ------------------------- */
+
+.combat-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.combat-center-line {
+  width: 1px;
+  flex: 1;
+  min-height: 12px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    #303b47,
+    transparent
+  );
+}
+
+.combat-vs-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid #354454;
+  background: #0d131a;
+  color: #798797;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.25);
+}
+
+/* -------------------------
+   Compact Combat Status
+   ------------------------- */
+
+.combat-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  border: 1px solid #26313d;
+  background: #111820;
+}
+
+.combat-status-player {
+  border-color: rgba(96, 165, 250, 0.25);
+}
+
+.combat-status-enemy {
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.combat-status-icon {
+  width: 25px;
+  height: 25px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 13px;
+}
+
+.combat-status-banner strong {
+  display: block;
+  font-size: 10px;
+}
+
+.combat-status-banner span {
+  display: block;
+  margin-top: 1px;
+  color: #718095;
+  font-size: 9px;
+}
+
+/* ============================================================
+   COMPACT COMBAT ACTIONS
+   ============================================================ */
+
+.combat-actions {
+  padding: 10px 12px;
+}
+
+.combat-actions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.combat-section-label {
+  color: #718095;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.combat-actions h3,
+.combat-log h3 {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.combat-action-hint {
+  color: #667383;
+  font-size: 8px;
+}
+
+/* Compact attack buttons */
+
+.combat-attack-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(145px, 1fr)
+  );
+  gap: 6px;
+}
+
+.combat-attack-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 7px 9px;
+  overflow: hidden;
+  border: 1px solid #344456;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #192533, #14202c);
+  color: #eaf3ff;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.combat-attack-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.05) 45%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.45s ease;
+}
+
+.combat-attack-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #6da7ff;
+  background: linear-gradient(135deg, #1d3045, #172638);
+  box-shadow:
+    0 5px 16px rgba(0, 0, 0, 0.25),
+    0 0 14px rgba(109, 167, 255, 0.08);
+}
+
+.combat-attack-button:hover:not(:disabled)::before {
+  transform: translateX(100%);
+}
+
+.combat-attack-button:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+}
+
+.combat-attack-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.combat-attack-icon {
+  width: 29px;
+  height: 29px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 16px;
+}
+
+.combat-attack-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.combat-attack-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+
+.combat-attack-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #718095;
+  font-size: 8px;
+}
+
+.combat-attack-arrow {
+  margin-left: auto;
+  color: #596675;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.combat-attack-button:hover:not(:disabled)
+  .combat-attack-arrow {
+  transform: translateX(2px);
+  color: #9bc4ff;
+}
+
+.combat-equipped {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid #1e2833;
+  color: #687584;
+  font-size: 8px;
+}
+
+.combat-equipped strong {
+  color: #d5dce4;
+}
+
+/* ============================================================
+   COMBAT IMPACT EFFECTS
+   ============================================================ */
+
+.combat-impact-hit {
+  animation: combat-hit 0.5s ease;
+}
+
+.combat-impact-crit {
+  animation: combat-critical-hit 0.52s ease;
+}
+
+.combat-impact-miss {
+  animation: combat-miss 0.45s ease;
+}
+
+.combat-impact-hit .combat-avatar {
+  animation: combat-avatar-hit 0.45s ease;
+}
+
+.combat-impact-crit .combat-avatar {
+  animation: combat-avatar-crit 0.5s ease;
+}
+
+.combat-impact-miss .combat-avatar {
+  animation: combat-avatar-miss 0.4s ease;
+}
+
+.combat-impact-hit .combat-health-fill,
+.combat-impact-crit .combat-health-fill {
+  filter: brightness(1.35);
+}
+
+.combat-impact-text {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  z-index: 5;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 900;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.8),
+    0 0 12px rgba(239, 68, 68, 0.45);
+  animation: combat-damage-number 0.52s ease forwards;
+}
+
+.combat-impact-crit .combat-impact-text {
+  color: #fbbf24;
+  font-size: 15px;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.8),
+    0 0 15px rgba(251, 191, 36, 0.65);
+}
+
+.combat-impact-miss .combat-impact-text {
+  color: #94a3b8;
+}
+
+.combat-fighter-defeated {
+  opacity: 0.58;
+  filter: grayscale(0.55);
+}
+
+.combat-fighter-defeated .combat-avatar {
+  transform: scale(0.94);
+}
+
+/* ============================================================
+   COMBAT RESULT
+   ============================================================ */
+
+.combat-result {
+  position: relative;
+  overflow: hidden;
+  padding: 14px 12px;
+  border-radius: 9px;
+  text-align: center;
+  animation: combat-result-enter 0.45s ease;
+}
+
+.combat-result-victory {
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(34, 197, 94, 0.12),
+      transparent 55%
+    ),
+    #111820;
+}
+
+.combat-result-defeat {
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(239, 68, 68, 0.12),
+      transparent 55%
+    ),
+    #111820;
+}
+
+.combat-result-icon {
+  font-size: 28px;
+  animation: combat-result-icon 0.65s ease;
+}
+
+.combat-result-label {
+  margin-top: 3px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.combat-result-victory .combat-result-label {
+  color: #4ade80;
+}
+
+.combat-result-defeat .combat-result-label {
+  color: #f87171;
+}
+
+.combat-result h2 {
+  margin: 3px 0;
+  font-size: 16px;
+}
+
+.combat-result p {
+  margin: 0 0 9px;
+  color: #8794a3;
+  font-size: 9px;
+}
+
+.combat-finish-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.combat-finish-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 62px;
+  padding: 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  color: #fff;
+  background: #192533;
+  border: 1px solid #344456;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.combat-finish-button:hover {
+  transform: translateY(-1px);
+}
+
+.combat-finish-button span {
+  font-size: 17px;
+}
+
+.combat-finish-button strong {
+  font-size: 9px;
+}
+
+.combat-finish-button small {
+  color: #7d8997;
+  font-size: 7px;
+}
+
+.combat-finish-leave:hover {
+  border-color: #4ade80;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.combat-finish-mug:hover {
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.08);
+}
+
+.combat-finish-hospitalize:hover {
+  border-color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ============================================================
+   COMBAT LOG — COMPACT
+   ============================================================ */
+
+.combat-log {
+  padding: 9px 11px;
+  max-height: 190px;
+  overflow-y: auto;
+  background: #090d12;
+}
+
+.combat-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.combat-log-header > span {
+  color: #596675;
+  font-size: 8px;
+}
+
+.combat-log-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.combat-log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 3px;
+  border-bottom: 1px solid #171e27;
+  font-size: 9px;
+  color: #cbd3dc;
+}
+
+.combat-log-entry-new {
+  animation: combat-log-enter 0.3s ease;
+}
+
+.combat-log-marker {
+  width: 19px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.combat-log-content {
+  min-width: 0;
+}
+
+.combat-log-content small {
+  display: block;
+  margin-top: 1px;
+  color: #596675;
+  font-size: 7px;
+}
+
+.combat-log-critical {
+  color: #fbbf24;
+}
+
+.combat-log-critical .combat-log-content small {
+  color: #a47c1d;
+}
+
+.combat-log-miss {
+  color: #687584;
+}
+
+.combat-log-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 13px;
+  color: #596675;
+  text-align: center;
+}
+
+.combat-log-empty span {
+  font-size: 17px;
+  opacity: 0.55;
+}
+
+.combat-log-empty p {
+  margin: 4px 0 0;
+  font-size: 8px;
+}
+

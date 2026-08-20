@@ -1,0 +1,77 @@
+/* ============================================================
+   6. CARDS / PANELS
+   ============================================================ */
+
+.card {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(17, 26, 35, 0.98),
+      rgba(14, 21, 29, 0.98)
+    );
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.015);
+}
+
+.card:hover {
+  border-color: #304052;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.012);
+}
+
+.card-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.card-header-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.card-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 7px;
+  border: 1px solid #303c49;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #7f8d9c;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.card h3 {
+  color: var(--text);
+}
+
+.card p {
+  font-size: 11px;
+  line-height: 1.6;
+}
+

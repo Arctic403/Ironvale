@@ -1,0 +1,21 @@
+/* ============================================================
+   18. MISSIONS
+   ============================================================ */
+
+.mission-card {
+  padding: 16px;
+}
+
+.mission-card h3 {
+  margin: 9px 0 5px;
+  font-size: 15px;
+}
+
+.mission-card .data-row {
+  margin-bottom: 10px;
+}
+
+.mission-card .btn-primary {
+  width: 100%;
+}
+

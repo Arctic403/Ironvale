@@ -1,0 +1,48 @@
+/* ============================================================
+   23. AWARDS
+   ============================================================ */
+
+.achievement-card {
+  min-height: 135px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.achievement-card h3 {
+  margin-bottom: 7px;
+  font-size: 14px;
+}
+
+.status-text {
+  display: block;
+  margin-bottom: auto;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.achievement-card.unlocked {
+  border-color: rgba(74, 222, 128, 0.25);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(34, 197, 94, 0.08),
+      transparent 45%
+    ),
+    var(--surface);
+}
+
+.achievement-card.unlocked .status-text {
+  color: #86efac;
+}
+
+.achievement-card.locked {
+  opacity: 0.62;
+}
+
+.achievement-card .btn-primary {
+  width: 100%;
+  margin-top: 10px;
+}
+

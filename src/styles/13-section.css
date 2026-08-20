@@ -1,0 +1,36 @@
+/* ============================================================
+   13. CRIME
+   ============================================================ */
+
+.crime-card {
+  padding: 16px;
+}
+
+.crime-card h3 {
+  margin: 10px 0 5px;
+  font-size: 16px;
+}
+
+.crime-card p {
+  min-height: 38px;
+  margin-bottom: 8px;
+}
+
+.crime-card.disabled {
+  opacity: 0.55;
+}
+
+.chance-badge {
+  padding: 4px 7px;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 5px;
+  background: rgba(96, 165, 250, 0.06);
+  color: #8fbdff;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.crime-card .btn-primary {
+  width: 100%;
+}
+

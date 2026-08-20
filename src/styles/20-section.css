@@ -1,0 +1,24 @@
+/* ============================================================
+   20. PROPERTY
+   ============================================================ */
+
+.property-card {
+  padding: 16px;
+}
+
+.property-card h3 {
+  margin: 9px 0 5px;
+}
+
+.property-card .data-list {
+  margin: 10px 0;
+}
+
+.property-card .btn-primary {
+  width: 100%;
+}
+
+.property-card.disabled {
+  opacity: 0.52;
+}
+

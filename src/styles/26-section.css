@@ -1,0 +1,63 @@
+/* ============================================================
+   26. MODALS
+   ============================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(7px);
+}
+
+.modal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      #121b24,
+      #0d141b
+    );
+  box-shadow:
+    0 25px 80px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.015);
+}
+
+.modal-header {
+  padding: 17px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+
+.modal-body {
+  padding: 17px;
+}
+
+.modal-footer,
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 17px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-tag {
+  color: var(--blue);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
