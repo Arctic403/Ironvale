@@ -26,6 +26,8 @@ export function freshSave(): SaveData {
     challengesClaimed: [], jobActions: 0,
     marketHistory: Object.fromEntries(Object.entries(DEFAULT_MARKET_PRICES).map(([id, price]) => [id, [price]])),
     activeWorldEvent: null, worldEventUntil: null, lastWorldEventRefresh: 0,
+    casinoActionsUsed: 0, casinoWindowStartedAt: 0, casinoCooldownUntil: null, casinoSessionActions: 0,
+    casinoReputation: 0, casinoGamesPlayed: 0, casinoWins: 0, casinoBestStreak: 0, casinoCurrentStreak: 0,
     activities: [{ id: now, text: "Welcome to RiftCity.", type: "system", time: now }],
   };
 }
@@ -71,6 +73,15 @@ export function loadSave(): SaveData {
       lastHealthUpdate: typeof parsed.lastHealthUpdate === "number" ? parsed.lastHealthUpdate : base.lastHealthUpdate,
       lastJobSkillUpdate: typeof parsed.lastJobSkillUpdate === "number" ? parsed.lastJobSkillUpdate : base.lastJobSkillUpdate,
       lastMarketUpdate: typeof parsed.lastMarketUpdate === "number" ? parsed.lastMarketUpdate : base.lastMarketUpdate,
+      casinoActionsUsed: Math.max(0, Number(parsed.casinoActionsUsed) || 0),
+      casinoWindowStartedAt: Math.max(0, Number(parsed.casinoWindowStartedAt) || 0),
+      casinoCooldownUntil: typeof parsed.casinoCooldownUntil === "number" ? parsed.casinoCooldownUntil : null,
+      casinoSessionActions: Math.max(0, Number(parsed.casinoSessionActions) || 0),
+      casinoReputation: Math.max(0, Number(parsed.casinoReputation) || 0),
+      casinoGamesPlayed: Math.max(0, Number(parsed.casinoGamesPlayed) || 0),
+      casinoWins: Math.max(0, Number(parsed.casinoWins) || 0),
+      casinoBestStreak: Math.max(0, Number(parsed.casinoBestStreak) || 0),
+      casinoCurrentStreak: Math.max(0, Number(parsed.casinoCurrentStreak) || 0),
     };
   } catch {
     return freshSave();

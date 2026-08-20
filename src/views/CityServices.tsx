@@ -209,8 +209,237 @@ export function Downtown({ g }: { g: Game }) {
   return <div className="city-service-page"><Panel title="Downtown RiftCity"><div className="service-hero"><span>📍</span><div><h2>Downtown</h2><p>The city's busiest hub. Jump directly to nearby services.</p></div></div><div className="service-link-grid">{links.map(([screen, label]) => <div key={screen}><Button onClick={() => g.setCurrentScreen(screen as any)}>{label}</Button></div>)}</div><BackToCity g={g} /></Panel></div>;
 }
 
+type CasinoGameId = "blackjack" | "poker" | "wheel" | "racing" | "reels";
+type CasinoCard = { rank: string; suit: string; value: number };
+
+const CASINO_DAILY_LIMIT = 50;
+const CASINO_WINDOW_MS = 24 * 60 * 60 * 1000;
+const CASINO_SESSION_LIMIT = 15;
+const CASINO_COOLDOWN_MS = 10 * 60 * 1000;
+const CASINO_NPCS = ["Maya Vale", "Vince Romano", "Juno Park", "Theo Knox", "Aria Stone", "Malik Reed"];
+
+function casinoCard(): CasinoCard {
+  const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+  const suits = ["♠","♥","♦","♣"];
+  const rank = ranks[Math.floor(Math.random()*ranks.length)];
+  const value = rank === "A" ? 11 : ["J","Q","K"].includes(rank) ? 10 : Number(rank);
+  return { rank, suit: suits[Math.floor(Math.random()*suits.length)], value };
+}
+
+function blackjackValue(cards: CasinoCard[]) {
+  let total = cards.reduce((sum, card) => sum + card.value, 0);
+  let aces = cards.filter((card) => card.rank === "A").length;
+  while (total > 21 && aces > 0) { total -= 10; aces -= 1; }
+  return total;
+}
+
+function pokerScore(cards: CasinoCard[]) {
+  const counts = Object.values(cards.reduce<Record<string,number>>((acc,c)=>{ acc[c.rank]=(acc[c.rank]||0)+1; return acc; },{})).sort((a,b)=>b-a);
+  const flush = cards.every((c)=>c.suit===cards[0].suit);
+  const order = cards.map(c=>["2","3","4","5","6","7","8","9","10","J","Q","K","A"].indexOf(c.rank)).sort((a,b)=>a-b);
+  const straight = order.every((v,i)=>i===0 || v===order[i-1]+1);
+  if (straight && flush) return { rank: 8, name: "Straight Flush" };
+  if (counts[0]===4) return { rank: 7, name: "Four of a Kind" };
+  if (counts[0]===3 && counts[1]===2) return { rank: 6, name: "Full House" };
+  if (flush) return { rank: 5, name: "Flush" };
+  if (straight) return { rank: 4, name: "Straight" };
+  if (counts[0]===3) return { rank: 3, name: "Three of a Kind" };
+  if (counts[0]===2 && counts[1]===2) return { rank: 2, name: "Two Pair" };
+  if (counts[0]===2) return { rank: 1, name: "Pair" };
+  return { rank: 0, name: "High Card" };
+}
+
+function CasinoCardView({ card }: { card: CasinoCard }) {
+  const red = card.suit === "♥" || card.suit === "♦";
+  return <span className={`casino-playing-card ${red ? "red" : ""}`}><b>{card.rank}</b><em>{card.suit}</em></span>;
+}
+
 export function Casino({ g }: { g: Game }) {
-  return <div className="city-service-page"><Panel title="The Rift Casino"><div className="service-hero"><span>🎰</span><div><h2>Entertainment Floor</h2><p>The venue is open for social events, shows, and city encounters.</p></div></div><p className="status-text">Wagering mechanics are not enabled in this build. The location is fully enterable and ready for future non-wagering events and mission content.</p><div className="btn-group"><Button onClick={g.randomEncounter}>Look Around</Button><BackToCity g={g} /></div></Panel></div>;
+  const now = useNow();
+  const [game, setGame] = useState<CasinoGameId | null>(null);
+  const [message, setMessage] = useState("Choose a room on the casino floor.");
+  const [playerHand, setPlayerHand] = useState<CasinoCard[]>([]);
+  const [dealerHand, setDealerHand] = useState<CasinoCard[]>([]);
+  const [blackjackDone, setBlackjackDone] = useState(true);
+  const [pokerHands, setPokerHands] = useState<Array<{name:string;cards:CasinoCard[];score:{rank:number;name:string}}>>([]);
+  const [wheelResult, setWheelResult] = useState<string | null>(null);
+  const [racePick, setRacePick] = useState(0);
+  const [raceResult, setRaceResult] = useState<string | null>(null);
+  const [reels, setReels] = useState(["◆","★","7"]);
+
+  const windowExpired = !g.gameState.casinoWindowStartedAt || now - g.gameState.casinoWindowStartedAt >= CASINO_WINDOW_MS;
+  const used = windowExpired ? 0 : g.gameState.casinoActionsUsed;
+  const remaining = Math.max(0, CASINO_DAILY_LIMIT - used);
+  const resetAt = windowExpired ? null : g.gameState.casinoWindowStartedAt + CASINO_WINDOW_MS;
+  const cooldownActive = Boolean(g.gameState.casinoCooldownUntil && g.gameState.casinoCooldownUntil > now);
+  const cooldownRemaining = cooldownActive && g.gameState.casinoCooldownUntil ? formatTime(timeLeft(g.gameState.casinoCooldownUntil)) : null;
+  const rank = g.gameState.casinoReputation >= 120 ? "Rift Elite" : g.gameState.casinoReputation >= 60 ? "VIP" : g.gameState.casinoReputation >= 25 ? "Regular" : "Visitor";
+
+  useEffect(() => {
+    if (windowExpired && g.gameState.casinoWindowStartedAt) {
+      g.setGameState((prev) => ({ ...prev, casinoActionsUsed: 0, casinoWindowStartedAt: 0, casinoSessionActions: 0, casinoCooldownUntil: null }));
+    } else if (g.gameState.casinoCooldownUntil && g.gameState.casinoCooldownUntil <= now && g.gameState.casinoSessionActions !== 0) {
+      g.setGameState((prev) => ({ ...prev, casinoCooldownUntil: null, casinoSessionActions: 0 }));
+    }
+  }, [windowExpired, now, g.gameState.casinoWindowStartedAt, g.gameState.casinoCooldownUntil, g.gameState.casinoSessionActions]);
+
+  const recordGame = (label: string, outcome: "win" | "loss" | "draw", rep = 1) => {
+    if (remaining <= 0 || cooldownActive) return false;
+    g.setGameState((prev) => {
+      const t = Date.now();
+      const expired = !prev.casinoWindowStartedAt || t - prev.casinoWindowStartedAt >= CASINO_WINDOW_MS;
+      const actionsUsed = expired ? 0 : prev.casinoActionsUsed;
+      if (actionsUsed >= CASINO_DAILY_LIMIT) return prev;
+      const sessionActions = (prev.casinoCooldownUntil && prev.casinoCooldownUntil > t) ? prev.casinoSessionActions : prev.casinoSessionActions + 1;
+      const win = outcome === "win";
+      const streak = win ? prev.casinoCurrentStreak + 1 : 0;
+      const hitCooldown = sessionActions >= CASINO_SESSION_LIMIT;
+      const next = {
+        ...prev,
+        casinoWindowStartedAt: expired ? t : prev.casinoWindowStartedAt,
+        casinoActionsUsed: actionsUsed + 1,
+        casinoSessionActions: hitCooldown ? 0 : sessionActions,
+        casinoCooldownUntil: hitCooldown ? t + CASINO_COOLDOWN_MS : prev.casinoCooldownUntil,
+        casinoReputation: prev.casinoReputation + Math.max(1, rep + (win ? 1 : 0)),
+        casinoGamesPlayed: prev.casinoGamesPlayed + 1,
+        casinoWins: prev.casinoWins + (win ? 1 : 0),
+        casinoCurrentStreak: streak,
+        casinoBestStreak: Math.max(prev.casinoBestStreak, streak),
+      };
+      return g.appendActivity(next, `Casino: ${label} — ${outcome}.`, win ? "success" : "system");
+    });
+    return true;
+  };
+
+  const canPlay = remaining > 0 && !cooldownActive;
+
+  const startBlackjack = () => {
+    if (!canPlay || !recordGame("Blackjack Hall", "draw", 1)) return;
+    setPlayerHand([casinoCard(), casinoCard()]);
+    setDealerHand([casinoCard(), casinoCard()]);
+    setBlackjackDone(false);
+    setMessage("Blackjack practice table started. Hit or stand.");
+  };
+  const hitBlackjack = () => {
+    if (blackjackDone) return;
+    const next = [...playerHand, casinoCard()];
+    setPlayerHand(next);
+    if (blackjackValue(next) > 21) { setBlackjackDone(true); setMessage("Bust — dealer takes the round."); }
+  };
+  const standBlackjack = () => {
+    if (blackjackDone) return;
+    const nextDealer = [...dealerHand];
+    while (blackjackValue(nextDealer) < 17) nextDealer.push(casinoCard());
+    setDealerHand(nextDealer);
+    const p = blackjackValue(playerHand), d = blackjackValue(nextDealer);
+    setBlackjackDone(true);
+    if (d > 21 || p > d) { setMessage("You win the table round — reputation up."); g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+2,casinoWins:prev.casinoWins+1,casinoCurrentStreak:prev.casinoCurrentStreak+1,casinoBestStreak:Math.max(prev.casinoBestStreak,prev.casinoCurrentStreak+1)})); }
+    else if (p === d) setMessage("Push — even round.");
+    else { setMessage("Dealer wins this round."); g.setGameState((prev)=>({...prev,casinoCurrentStreak:0})); }
+  };
+
+  const dealPoker = () => {
+    if (!canPlay || !recordGame("Poker Room", "draw", 1)) return;
+    const names = ["You", ...CASINO_NPCS.slice(0,4)];
+    const hands = names.map((name)=>{ const cards=[casinoCard(),casinoCard(),casinoCard(),casinoCard(),casinoCard()]; return {name,cards,score:pokerScore(cards)}; });
+    const best = Math.max(...hands.map(h=>h.score.rank));
+    const winners = hands.filter(h=>h.score.rank===best);
+    setPokerHands(hands);
+    if (winners.some(w=>w.name==="You")) { setMessage(`Showdown win — ${hands[0].score.name}.`); g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+3,casinoWins:prev.casinoWins+1})); }
+    else setMessage(`${winners[0].name} takes the showdown with ${winners[0].score.name}.`);
+  };
+
+  const spinWheel = () => {
+    if (!canPlay || !recordGame("Rift Wheel", "draw", 1)) return;
+    const segments = ["RIFT STAR +3 REP","BLUE SECTOR +1 REP","GOLD SECTOR +2 REP","NEUTRAL","DOUBLE STAR +4 REP","NEUTRAL"];
+    const result = segments[Math.floor(Math.random()*segments.length)];
+    setWheelResult(result);
+    const bonus = result.includes("+4")?4:result.includes("+3")?3:result.includes("+2")?2:result.includes("+1")?1:0;
+    if (bonus) g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+bonus,casinoWins:prev.casinoWins+1}));
+    setMessage(`Wheel result: ${result}.`);
+  };
+
+  const runRace = () => {
+    if (!canPlay || !recordGame("Rift Downs", "draw", 1)) return;
+    const horses = ["Night Signal","Blue Comet","Iron Echo","Velvet Rift","Northline"];
+    const winner = Math.floor(Math.random()*horses.length);
+    setRaceResult(`${horses[winner]} wins the race${winner===racePick ? " — your prediction was right!" : "."}`);
+    if (winner===racePick) g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+4,casinoWins:prev.casinoWins+1}));
+  };
+
+  const spinReels = () => {
+    if (!canPlay || !recordGame("Neon Reels", "draw", 1)) return;
+    const symbols=["◆","★","7","R","♛"];
+    const next=[0,1,2].map(()=>symbols[Math.floor(Math.random()*symbols.length)]);
+    setReels(next);
+    const match = next[0]===next[1]&&next[1]===next[2];
+    if (match) g.setGameState((prev)=>({...prev,casinoReputation:prev.casinoReputation+5,casinoWins:prev.casinoWins+1}));
+    setMessage(match ? "Triple match — big reputation bonus!" : "Reels stopped. Try another floor activity later.");
+  };
+
+  return (
+    <div className="city-service-page casino-v3">
+      <section className="casino-hero">
+        <div className="casino-hero-glow" />
+        <div className="casino-brand"><span>✦</span><div><small>RIFTCITY ENTERTAINMENT DISTRICT</small><h2>THE RIFT CASINO</h2><p>Live tables, NPC regulars, tournaments, racing, and arcade-style casino games.</p></div></div>
+        <div className="casino-metrics">
+          <div><span>Daily Plays</span><strong>{remaining}/{CASINO_DAILY_LIMIT}</strong><small>{resetAt ? `Resets in ${formatTime(Math.max(0,resetAt-now))}` : "24h window starts on first play"}</small></div>
+          <div><span>Casino Rank</span><strong>{rank}</strong><small>{g.gameState.casinoReputation} reputation</small></div>
+          <div><span>Record</span><strong>{g.gameState.casinoWins}/{g.gameState.casinoGamesPlayed}</strong><small>Best streak {g.gameState.casinoBestStreak}</small></div>
+        </div>
+        <div className="casino-limit-note">Play is capped at {CASINO_DAILY_LIMIT} actions per 24 hours. After {CASINO_SESSION_LIMIT} consecutive actions, the floor enforces a {CASINO_COOLDOWN_MS/60000}-minute break. There is no purchasable, tradable, or cash-out casino currency.</div>
+        {cooldownActive && <div className="casino-cooldown">☕ Floor break active · {cooldownRemaining} remaining. You can still browse and spectate.</div>}
+      </section>
+
+      <div className="casino-floor-grid">
+        {[
+          ["blackjack","🂡","Blackjack Hall","Dealer Elena · 4/5 seats","Playable table"],
+          ["poker","♠","Poker Room","5-seat table · NPCs fill empty seats","Playable showdown"],
+          ["wheel","◉","Rift Wheel","Arcade wheel · reputation prizes","Playable"],
+          ["racing","🏇","Rift Downs","Scheduled-style race simulator","Playable prediction"],
+          ["reels","🎰","Neon Reels","Arcade reels · no wagering","Playable"],
+        ].map(([id,icon,title,sub,status])=>(
+          <button key={id} type="button" className="casino-room" onClick={()=>setGame(id as CasinoGameId)}>
+            <span className="casino-room-icon">{icon}</span><div><small>{status}</small><h3>{title}</h3><p>{sub}</p></div><b>ENTER →</b>
+          </button>
+        ))}
+        <div className="casino-room locked"><span className="casino-room-icon">💎</span><div><small>Reputation 60</small><h3>VIP Lounge</h3><p>Special NPCs, social events, cosmetics, and future tournaments.</p></div><b>{g.gameState.casinoReputation>=60?"UNLOCKED":"LOCKED"}</b></div>
+      </div>
+
+      <div className="casino-table-strip">
+        <div><span className="live-dot"/> TABLE 04 <b>4/5</b><small>You · Maya Vale · Vince Romano · Juno Park · Open Seat</small></div>
+        <div><span className="live-dot"/> TABLE 09 <b>5/5</b><small>NPC-filled until multiplayer players sit down</small></div>
+        <div><span className="live-dot"/> POKER 02 <b>3/5</b><small>2 open player seats · NPCs keep the room alive</small></div>
+      </div>
+
+      <div className="casino-footer-actions"><p>{message}</p><div className="btn-group"><Button onClick={g.randomEncounter}>Explore Casino Floor</Button><BackToCity g={g} /></div></div>
+
+      {game && <div className="casino-game-backdrop" role="dialog" aria-modal="true" aria-label="Casino game">
+        <div className="casino-game-modal">
+          <button type="button" className="casino-game-close" onClick={()=>setGame(null)}>×</button>
+          <div className="casino-game-heading"><span>{game==="blackjack"?"🂡":game==="poker"?"♠":game==="wheel"?"◉":game==="racing"?"🏇":"🎰"}</span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Poker Room":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Neon Reels"}</h3></div><b>{remaining} plays left</b></div>
+
+          {game==="blackjack" && <div className="casino-table-game">
+            <div className="casino-seat-row"><span className="casino-seat npc">MAYA<br/><small>NPC</small></span><span className="casino-seat npc">VINCE<br/><small>NPC</small></span><span className="casino-seat dealer">ELENA<br/><small>DEALER</small></span><span className="casino-seat npc">JUNO<br/><small>NPC</small></span></div>
+            <div className="casino-hand"><label>Dealer · {dealerHand.length ? blackjackValue(dealerHand) : "—"}</label><div>{dealerHand.map((c,i)=><CasinoCardView key={i} card={c}/>)}</div></div>
+            <div className="casino-hand player"><label>You · {playerHand.length ? blackjackValue(playerHand) : "—"}</label><div>{playerHand.map((c,i)=><CasinoCardView key={i} card={c}/>)}</div></div>
+            <div className="btn-group"><Button disabled={!canPlay || !blackjackDone} onClick={startBlackjack}>Deal New Round</Button><Button disabled={blackjackDone} onClick={hitBlackjack}>Hit</Button><Button disabled={blackjackDone} onClick={standBlackjack}>Stand</Button></div>
+          </div>}
+
+          {game==="poker" && <div className="casino-poker-game"><div className="casino-poker-table">{(pokerHands.length?pokerHands:["You",...CASINO_NPCS.slice(0,4)].map(name=>({name,cards:[] as CasinoCard[],score:{rank:0,name:"Waiting"}}))).map((h,i)=><div className={`casino-poker-seat ${i===0?"you":""}`} key={h.name}><b>{h.name}</b><small>{i===0?"PLAYER":"NPC"} · {h.score.name}</small><div>{h.cards.map((c,j)=><CasinoCardView key={j} card={c}/>)}</div></div>)}</div><Button disabled={!canPlay} onClick={dealPoker}>Deal Showdown</Button></div>}
+
+          {game==="wheel" && <div className="casino-wheel-game"><div className="rift-wheel"><span>R</span></div><strong>{wheelResult || "Ready to spin"}</strong><Button disabled={!canPlay} onClick={spinWheel}>Spin Arcade Wheel</Button></div>}
+
+          {game==="racing" && <div className="casino-race-game"><div className="race-track">🏇  · · · · · · · · · ·  🏁</div><label>Choose your prediction<select value={racePick} onChange={(e)=>setRacePick(Number(e.target.value))}>{["Night Signal","Blue Comet","Iron Echo","Velvet Rift","Northline"].map((h,i)=><option value={i} key={h}>{h}</option>)}</select></label><strong>{raceResult || "Race board ready"}</strong><Button disabled={!canPlay} onClick={runRace}>Run Race</Button></div>}
+
+          {game==="reels" && <div className="casino-reels-game"><div className="neon-reels">{reels.map((r,i)=><span key={i}>{r}</span>)}</div><Button disabled={!canPlay} onClick={spinReels}>Spin Reels</Button></div>}
+
+          {!canPlay && <div className="casino-play-blocked">{remaining<=0 ? "Daily play limit reached. Browse, spectate, or return after your 24-hour reset." : `Session break active for ${cooldownRemaining}.`}</div>}
+          <p className="casino-game-message">{message}</p>
+        </div>
+      </div>}
+    </div>
+  );
 }
 
 export function Airport({ g }: { g: Game }) {

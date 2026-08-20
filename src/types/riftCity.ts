@@ -113,6 +113,15 @@ export type SaveData = {
   activeWorldEvent: string | null;
   worldEventUntil: number | null;
   lastWorldEventRefresh: number;
+  casinoActionsUsed: number;
+  casinoWindowStartedAt: number;
+  casinoCooldownUntil: number | null;
+  casinoSessionActions: number;
+  casinoReputation: number;
+  casinoGamesPlayed: number;
+  casinoWins: number;
+  casinoBestStreak: number;
+  casinoCurrentStreak: number;
   activities: Activity[];
 };
 
