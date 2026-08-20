@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { tickGameState } from "../systems/gameTickSystem";
 import { getJobPosition, getJobStatBonuses } from "../data/jobs";
 import {
-  CRIMES, Crime, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
+  CRIMES, Crime, CrimeChoice, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
 } from "../systems/crimeSystem";
 import { CombatStats, getLevel, getMaxHealth } from "../systems/progressionSystem";
 import {
@@ -13,17 +13,18 @@ import {
   getAvailableEncounter, ENCOUNTERS, SAVE_KEY, DEFAULT_MARKET_PRICES,
 } from "../core/gameCore";
 import {
-  GYMS, TRAINING_STATS, TrainingStat, applyTraining, canTrainStat,
-  getGymExperienceGain, gymUnlocked,
+  GYMS, TRAINING_STATS, TRAINING_PROGRAMS, TrainingStat, applyTraining, canTrainStat,
+  getGymExperienceGain, gymUnlocked, getTrainingProgram, programUnlocked, trainingEnergyCost,
 } from "../systems/gymSystem";
 import { PlayerProfile } from "../systems/combatSystem";
 import {
   EDUCATION, ITEMS, JOBS, MISSIONS, PROPERTIES,
   getItem, getJob, getProperty,
 } from "../data/gameData";
-import type { Screen, SaveData, ActivityType, Activity } from "../types/riftCity";
+import type { Screen, SaveData, ActivityType, Activity, AuctionListing } from "../types/riftCity";
 import type { Encounter, EncounterChoice } from "../constants/encounters";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
+import { SEEDED_LISTINGS, listingFee } from "../systems/auctionSystem";
 import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES, WORLD_EVENTS, getFaction, getFactionRank, challengeProgress } from "../data/expansion";
 export function useRiftCity() {
   const [gameState, setGameState] = useState<SaveData>(() =>
@@ -70,8 +71,10 @@ export function useRiftCity() {
     (gameState.meritUpgrades["nerve-cap"] ?? 0);
 
   const gym =
-    GYMS.find((g) => g.id === gameState.activeGym) ??
+    (gameState.jailUntil ? GYMS.find((g) => g.jailOnly) : GYMS.find((g) => !g.jailOnly)) ??
     GYMS[0];
+
+  const trainingProgram = getTrainingProgram(gameState.activeTrainingProgram);
 
   const job = getJob(gameState.currentJob);
 
@@ -208,35 +211,19 @@ export function useRiftCity() {
   /*
    * CRIME SYSTEM
    */
-  const commitCrime = (crime: Crime) => {
+  const commitCrime = (crime: Crime, choiceId = "balanced") => {
     if (blocked()) {
-      log(
-        gameState.jailUntil
-          ? "You are in jail."
-          : "You are in hospital.",
-        "failure"
-      );
-
+      log("You cannot commit crimes right now.", "failure");
       return;
     }
 
-    if (
-      !crimeUnlocked(
-        crime,
-        gameState.crimeExperience
-      )
-    ) {
-      log(
-        "That crime is locked until your crime experience is high enough.",
-        "failure"
-      );
-
+    if (!crimeUnlocked(crime, gameState.crimeExperience)) {
+      log("That crime is locked until your crime experience is high enough.", "failure");
       return;
     }
 
     if (gameState.nerve < crime.nerve) {
       log("Not enough nerve.", "failure");
-
       return;
     }
 
@@ -245,184 +232,95 @@ export function useRiftCity() {
       return;
     }
 
+    const selectedChoice = crime.choices.find((choice) => choice.id === choiceId) ?? crime.choices[1] ?? crime.choices[0];
+
     setGameState((prev) => {
-      const chance = Math.max(
-        0,
-        Math.min(
-          100,
-          crimeSuccessChance(
-            crime,
-            prev.crimeExperience,
-            1,
-            getCrimeStatBonus((() => { const j=getJob(prev.currentJob); const b=getJobStatBonuses(j, prev.jobSkills); return { strength: prev.stats.strength+(b.strength??0), defense: prev.stats.defense+(b.defense??0), speed: prev.stats.speed+(b.speed??0), dexterity: prev.stats.dexterity+(b.dexterity??0) }; })()) + (prev.meritUpgrades["crime-edge"] ?? 0) * 2 + (prev.npcReputation.mara >= 25 ? 2 : 0) + (prev.currentLocation === "crime" ? 2 : 0) - Math.floor(prev.heat / 25)
-          )
+      const masteryXp = prev.crimeMastery[crime.id] ?? 0;
+      const chance = Math.max(0, Math.min(100,
+        crimeSuccessChance(
+          crime,
+          prev.crimeExperience,
+          1,
+          getCrimeStatBonus((() => {
+            const j=getJob(prev.currentJob);
+            const b=getJobStatBonuses(j, prev.jobSkills);
+            return { strength: prev.stats.strength+(b.strength??0), defense: prev.stats.defense+(b.defense??0), speed: prev.stats.speed+(b.speed??0), dexterity: prev.stats.dexterity+(b.dexterity??0) };
+          })()) + (prev.meritUpgrades["crime-edge"] ?? 0) * 2 + ((prev.npcReputation.mara ?? 0) >= 25 ? 2 : 0) + (prev.currentLocation === "crime" ? 2 : 0) - Math.floor(prev.heat / 25),
+          masteryXp,
+          selectedChoice,
         )
-      );
+      ));
 
       const roll = Math.random() * 100;
+      const criticalSuccessChance = chance * 0.08;
+      let outcome: "critical" | "success" | "jailed" | "critical-fail" | "spooked";
 
-      /*
-       * Explicit outcome bands.
-       *
-       * Critical success:
-       * 8% of the successful range.
-       *
-       * Critical failure:
-       * final 0.5% of the roll.
-       */
-      const criticalSuccessChance =
-        chance * 0.08;
+      if (roll < criticalSuccessChance) outcome = "critical";
+      else if (roll < chance) outcome = "success";
+      else if (roll >= 99.5) outcome = "critical-fail";
+      else if (roll < chance + crime.risk * 0.55) outcome = "jailed";
+      else outcome = "spooked";
 
-      let outcome:
-        | "critical"
-        | "success"
-        | "jailed"
-        | "critical-fail"
-        | "spooked";
-
-      if (
-        roll < criticalSuccessChance
-      ) {
-        outcome = "critical";
-      } else if (
-        roll < chance
-      ) {
-        outcome = "success";
-      } else if (
-        roll >= 99.5
-      ) {
-        outcome = "critical-fail";
-      } else if (
-        roll <
-        chance + crime.risk * 0.55
-      ) {
-        outcome = "jailed";
-      } else {
-        outcome = "spooked";
-      }
-
+      const masteryGain = Math.max(1, Math.round(crime.crimeExperience * selectedChoice.masteryMultiplier));
       let next: SaveData = {
         ...prev,
-
-        nerve: Math.max(
-          0,
-          prev.nerve - crime.nerve
-        ),
+        nerve: Math.max(0, prev.nerve - crime.nerve),
+        crimeMastery: { ...prev.crimeMastery, [crime.id]: masteryXp + masteryGain },
       };
 
-      if (outcome === "critical") {
-        const reward = Math.floor(
-          randomReward(crime) * 1.75
-        );
+      const maybeDropLoot = (state: SaveData, critical: boolean) => {
+        const candidates = ITEMS.filter((item) => item.dropChance && item.dropChance > 0);
+        const multiplier = critical ? 2.5 : 1;
+        for (const item of candidates) {
+          if (Math.random() < Math.min(.35, (item.dropChance ?? 0) * multiplier)) {
+            state = { ...state, inventory: { ...state.inventory, [item.id]: (state.inventory[item.id] || 0) + 1 } };
+            return { state, loot: item.name };
+          }
+        }
+        return { state, loot: null as string | null };
+      };
 
+      if (outcome === "critical" || outcome === "success") {
+        const critical = outcome === "critical";
+        const reward = Math.floor(randomReward(crime) * selectedChoice.rewardMultiplier * (critical ? 1.75 : 1));
         next = {
           ...next,
           cash: prev.cash + reward,
-          xp: prev.xp + crime.xp * 2,
-          crimeExperience:
-            prev.crimeExperience +
-            crime.crimeExperience * 2,
-          crimesCompleted:
-            prev.crimesCompleted + 1,
-          crimesCritical:
-            prev.crimesCritical + 1,
+          xp: prev.xp + crime.xp * (critical ? 2 : 1),
+          crimeExperience: prev.crimeExperience + crime.crimeExperience * (critical ? 2 : 1),
+          crimesCompleted: prev.crimesCompleted + 1,
+          crimesCritical: prev.crimesCritical + (critical ? 1 : 0),
           crimeIntel: crime.grantsIntel && !prev.crimeIntel.includes(crime.grantsIntel) ? [...prev.crimeIntel, crime.grantsIntel] : prev.crimeIntel,
-          heat: Math.min(100, prev.heat + Math.max(1, Math.ceil(crime.risk / 8) + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
+          heat: Math.min(100, Math.max(0, prev.heat + Math.ceil(crime.risk / (critical ? 8 : 10)) + selectedChoice.heatModifier + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
         };
-
-        return appendActivity(
-          next,
-          `CRITICAL SUCCESS: ${crime.name} paid ${money(
-            reward
-          )}.`,
-          "critical"
-        );
-      }
-
-      if (outcome === "success") {
-        const reward =
-          randomReward(crime);
-
-        next = {
-          ...next,
-          cash: prev.cash + reward,
-          xp: prev.xp + crime.xp,
-          crimeExperience:
-            prev.crimeExperience +
-            crime.crimeExperience,
-          crimesCompleted:
-            prev.crimesCompleted + 1,
-          crimeIntel: crime.grantsIntel && !prev.crimeIntel.includes(crime.grantsIntel) ? [...prev.crimeIntel, crime.grantsIntel] : prev.crimeIntel,
-          heat: Math.min(100, prev.heat + Math.max(1, Math.ceil(crime.risk / 10) + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
-        };
-
-        return appendActivity(
-          next,
-          `SUCCESS: ${crime.name} paid ${money(
-            reward
-          )}.`,
-          "success"
-        );
+        const dropped = maybeDropLoot(next, critical);
+        next = dropped.state;
+        return appendActivity(next, `${critical ? "CRITICAL SUCCESS" : "SUCCESS"}: ${crime.name} · ${selectedChoice.label} paid ${money(reward)}${dropped.loot ? ` and dropped ${dropped.loot}` : ""}.`, critical ? "critical" : "success");
       }
 
       if (outcome === "jailed") {
         next = {
           ...next,
-          crimesFailed:
-            prev.crimesFailed + 1,
-          timesJailed:
-            prev.timesJailed + 1,
-          jailUntil:
-            Date.now() +
-            JAIL_MINUTES * 60000,
+          crimesFailed: prev.crimesFailed + 1,
+          timesJailed: prev.timesJailed + 1,
+          jailUntil: Date.now() + JAIL_MINUTES * 60000,
           jailStartedAt: Date.now(),
           jailReason: crime.name,
           jailSentenceMs: JAIL_MINUTES * 60000,
           currentLocation: "jail",
-          locationsVisited: prev.locationsVisited.includes("jail")
-            ? prev.locationsVisited
-            : [...prev.locationsVisited, "jail"],
+          locationsVisited: prev.locationsVisited.includes("jail") ? prev.locationsVisited : [...prev.locationsVisited, "jail"],
           heat: Math.max(0, prev.heat - 15),
         };
-
-        return appendActivity(
-          next,
-          `FAILED: ${crime.name}. You were jailed.`,
-          "jailed"
-        );
+        return appendActivity(next, `FAILED: ${crime.name} · ${selectedChoice.label}. You were jailed.`, "jailed");
       }
 
-      if (
-        outcome === "critical-fail"
-      ) {
-        next = {
-          ...next,
-          crimesFailed:
-            prev.crimesFailed + 1,
-          health: Math.max(
-            1,
-            prev.health - 12
-          ),
-        };
-
-        return appendActivity(
-          next,
-          `CRITICAL FAIL: ${crime.name}. You escaped, barely.`,
-          "critical"
-        );
+      if (outcome === "critical-fail") {
+        next = { ...next, crimesFailed: prev.crimesFailed + 1, health: Math.max(1, prev.health - 12) };
+        return appendActivity(next, `CRITICAL FAIL: ${crime.name}. You escaped, barely.`, "critical");
       }
 
-      next = {
-        ...next,
-        crimesSpooked:
-          prev.crimesSpooked + 1,
-      };
-
-      return appendActivity(
-        next,
-        `SPOOKED: ${crime.name} failed without further consequences.`,
-        "spooked"
-      );
+      next = { ...next, crimesSpooked: prev.crimesSpooked + 1 };
+      return appendActivity(next, `SPOOKED: ${crime.name} · ${selectedChoice.label} failed without further consequences.`, "spooked");
     });
   };
 
@@ -431,153 +329,60 @@ export function useRiftCity() {
    */
   const train = (stat: TrainingStat) => {
     if (blocked()) {
-      log(
-        "You cannot train right now.",
-        "failure"
-      );
-
+      log("You cannot train right now.", "failure");
       return;
     }
 
-    if (!canTrainStat(gym, stat)) {
-      log(
-        "This gym cannot train that stat.",
-        "failure"
-      );
-
+    const activeProgram = getTrainingProgram(gameState.activeTrainingProgram);
+    if (!programUnlocked(activeProgram, gameState.gymExperience)) {
+      log("That training program is still locked.", "failure");
       return;
     }
 
-    if (
-      gameState.energy <
-      gym.energyCost
-    ) {
-      log(
-        `You need ${gym.energyCost} energy.`,
-        "failure"
-      );
-
+    const cost = trainingEnergyCost(gym, activeProgram);
+    if (gameState.energy < cost) {
+      log(`You need ${cost} energy.`, "failure");
       return;
     }
 
     setGameState((prev) => {
-      const currentGym =
-        GYMS.find(
-          (g) => g.id === prev.activeGym
-        ) ?? GYMS[0];
-
-      const educationMultiplier =
-        prev.educationCompleted.some(
-          (id) =>
-            id === "fitness-basics" ||
-            id === "advanced-fitness"
-        )
-          ? 1.05
-          : 1;
-
+      const currentGym = (prev.jailUntil ? GYMS.find((x) => x.jailOnly) : GYMS.find((x) => !x.jailOnly)) ?? GYMS[0];
+      const program = getTrainingProgram(prev.activeTrainingProgram);
+      const currentCost = trainingEnergyCost(currentGym, program);
+      const educationMultiplier = prev.educationCompleted.some((id) => id === "fitness-basics" || id === "advanced-fitness") ? 1.05 : 1;
       const eventMultiplier = prev.activeWorldEvent === "gym-rush" ? 1.1 : 1;
       const meritMultiplier = 1 + (prev.meritUpgrades["gym-focus"] ?? 0) * 0.03;
       const homeGymMultiplier = 1 + (prev.propertyUpgrades["home-gym"] ?? 0) * 0.02;
-      const contactMultiplier = prev.npcReputation.dax >= 25 ? 1.05 : 1;
+      const contactMultiplier = (prev.npcReputation.dax ?? 0) >= 25 ? 1.05 : 1;
       const locationMultiplier = prev.currentLocation === "gym" ? 1.03 : 1;
-      const result = applyTraining(
-        prev.stats,
-        currentGym,
-        stat,
-        prev.happiness,
-        educationMultiplier * eventMultiplier * meritMultiplier * homeGymMultiplier * contactMultiplier * locationMultiplier
-      );
+      const now = Date.now();
+      const continuedStreak = prev.lastTrainingAt && now - prev.lastTrainingAt <= 36 * 60 * 60 * 1000;
+      const streak = continuedStreak ? Math.min(10, prev.trainingStreak + 1) : 1;
+      const result = applyTraining(prev.stats, currentGym, stat, prev.happiness, educationMultiplier * eventMultiplier * meritMultiplier * homeGymMultiplier * contactMultiplier * locationMultiplier, program, streak);
 
       const next: SaveData = {
         ...prev,
-
-        energy:
-          prev.energy -
-          currentGym.energyCost,
-
+        energy: prev.energy - currentCost,
         stats: result.stats,
-
-        gymExperience:
-          prev.gymExperience +
-          getGymExperienceGain(
-            currentGym.energyCost
-          ),
-
-        gymSessions:
-          prev.gymSessions + 1,
-
-        happiness: Math.max(
-          0,
-          prev.happiness -
-            currentGym.energyCost * 0.5
-        ),
+        gymExperience: prev.gymExperience + getGymExperienceGain(currentCost),
+        gymSessions: prev.gymSessions + 1,
+        trainingStreak: streak,
+        lastTrainingAt: now,
+        happiness: Math.max(0, prev.happiness - currentCost * 0.4),
       };
-
-      return appendActivity(
-        next,
-        `TRAINED ${stat.toUpperCase()}: +${result.gain.toFixed(
-          2
-        )} gain.`,
-        "gym"
-      );
+      return appendActivity(next, `${program.name}: ${stat.toUpperCase()} +${result.gain.toFixed(2)} · streak ${streak}.`, "gym");
     });
   };
 
-  const buyGym = (id: string) =>
+  const selectTrainingProgram = (id: string) =>
     setGameState((prev) => {
-      const g = GYMS.find(
-        (x) => x.id === id
-      );
-
-      if (
-        !g ||
-        g.jailOnly ||
-        !gymUnlocked(
-          g,
-          prev.gymExperience
-        )
-      ) {
-        return prev;
-      }
-
-      if (
-        prev.gymMemberships.includes(id)
-      ) {
-        return {
-          ...prev,
-          activeGym: id,
-        };
-      }
-
-      if (
-        prev.cash <
-        g.membershipCost
-      ) {
-        return appendActivity(
-          prev,
-          "Not enough cash for membership.",
-          "failure"
-        );
-      }
-
-      const next: SaveData = {
-        ...prev,
-        cash:
-          prev.cash -
-          g.membershipCost,
-        gymMemberships: [
-          ...prev.gymMemberships,
-          id,
-        ],
-        activeGym: id,
-      };
-
-      return appendActivity(
-        next,
-        `Joined ${g.name}.`,
-        "success"
-      );
+      const program = TRAINING_PROGRAMS.find((x) => x.id === id);
+      if (!program || !programUnlocked(program, prev.gymExperience)) return appendActivity(prev, "That training program is locked.", "failure");
+      return appendActivity({ ...prev, activeTrainingProgram: id }, `Training program changed to ${program.name}.`, "gym");
     });
+
+  /* Kept as a compatibility alias for older UI code. */
+  const buyGym = (_id: string) => undefined;
 
   /*
    * COMBAT
@@ -770,11 +575,35 @@ export function useRiftCity() {
       }
 
       if (item.type === "nerve") {
-        next.nerve = Math.min(
-          maxNerve,
-          prev.nerve +
-            (item.effect || 0)
-        );
+        next.nerve = Math.min(maxNerve, prev.nerve + (item.effect || 0));
+      }
+
+      if (item.id === "sugar-rush") {
+        next.energy = Math.min(maxEnergy, prev.energy + 6);
+        next.happiness = prev.happiness + 3;
+      } else if (item.id === "moon-chews") {
+        next.happiness = prev.happiness + 12;
+        if (Math.random() < .25) next.nerve = Math.min(maxNerve, prev.nerve + 1);
+      } else if (item.id === "neon-dust") {
+        next.energy = Math.min(maxEnergy, prev.energy + 18);
+        next.nerve = Math.min(maxNerve, prev.nerve + 2);
+        next.heat = Math.min(100, prev.heat + 8);
+      } else if (item.id === "rift-tabs") {
+        const roll = Math.random();
+        if (roll < .34) next.xp = prev.xp + 60;
+        else if (roll < .67) next.nerve = Math.min(maxNerve, prev.nerve + 5);
+        else next.happiness = prev.happiness + 25;
+        next.heat = Math.min(100, prev.heat + 5);
+      } else if (item.id === "ghost-serum") {
+        const roll = Math.random();
+        if (roll < .45) { next.xp = prev.xp + 250; next.energy = Math.min(maxEnergy, prev.energy + 30); }
+        else if (roll < .8) { next.cash = prev.cash + 3500; next.nerve = Math.min(maxNerve, prev.nerve + 6); }
+        else { next.health = Math.max(1, prev.health - 25); next.happiness = Math.max(0, prev.happiness - 20); }
+        next.heat = Math.min(100, prev.heat + 15);
+      } else if (item.id === "black-envelope") {
+        const payout = Math.floor(Math.random() * 1401);
+        next.cash = prev.cash + payout;
+        if (Math.random() < .18 && !prev.crimeIntel.includes("vault-intel")) next.crimeIntel = [...prev.crimeIntel, "vault-intel"];
       }
 
       return appendActivity(
@@ -811,6 +640,55 @@ export function useRiftCity() {
             ...prev,
             equippedArmor: id,
           };
+    });
+
+  const createAuctionListing = (itemId: string, price: number, quantity = 1) =>
+    setGameState((prev) => {
+      const item = getItem(itemId);
+      const qty = Math.max(1, Math.floor(quantity));
+      const unitPrice = Math.max(1, Math.floor(price));
+      const owned = prev.inventory[itemId] || 0;
+      if (!item || owned < qty) return appendActivity(prev, "You do not own enough of that item.", "failure");
+      const fee = listingFee(unitPrice, qty);
+      if (prev.cash < fee) return appendActivity(prev, `You need ${money(fee)} for the listing fee.`, "failure");
+      const listing: AuctionListing = { id:`listing-${Date.now()}-${Math.random()}`, itemId, seller:"You", price:unitPrice, quantity:qty, createdAt:Date.now() };
+      const next: SaveData = {
+        ...prev,
+        cash: prev.cash - fee,
+        inventory: { ...prev.inventory, [itemId]: owned - qty },
+        auctionListings: [listing, ...prev.auctionListings],
+      };
+      return appendActivity(next, `Listed ${qty}× ${item.name} for ${money(unitPrice)} each. Fee ${money(fee)}.`, "success");
+    });
+
+  const cancelAuctionListing = (listingId: string) =>
+    setGameState((prev) => {
+      const listing = prev.auctionListings.find((x) => x.id === listingId && x.seller === "You");
+      if (!listing) return prev;
+      const next: SaveData = {
+        ...prev,
+        inventory: { ...prev.inventory, [listing.itemId]: (prev.inventory[listing.itemId] || 0) + listing.quantity },
+        auctionListings: prev.auctionListings.filter((x) => x.id !== listingId),
+      };
+      return appendActivity(next, "Auction listing cancelled and items returned.", "system");
+    });
+
+  const buyAuctionListing = (listingId: string) =>
+    setGameState((prev) => {
+      const all = [...prev.auctionListings, ...SEEDED_LISTINGS.filter((x) => !prev.auctionRemovedListingIds.includes(x.id))];
+      const listing = all.find((x) => x.id === listingId);
+      if (!listing || listing.seller === "You") return prev;
+      const total = listing.price * listing.quantity;
+      if (prev.cash < total) return appendActivity(prev, "Not enough cash for that listing.", "failure");
+      const nextListings = prev.auctionListings.filter((x) => x.id !== listingId);
+      const next: SaveData = {
+        ...prev,
+        cash: prev.cash - total,
+        inventory: { ...prev.inventory, [listing.itemId]: (prev.inventory[listing.itemId] || 0) + listing.quantity },
+        auctionListings: nextListings,
+        auctionRemovedListingIds: listing.id.startsWith("seed-") ? [...prev.auctionRemovedListingIds, listing.id] : prev.auctionRemovedListingIds,
+      };
+      return appendActivity(next, `Bought ${listing.quantity}× ${getItem(listing.itemId)?.name ?? listing.itemId} from ${listing.seller} for ${money(total)}.`, "success");
     });
 
   /*
@@ -1830,6 +1708,8 @@ export function useRiftCity() {
 
     train,
     buyGym,
+    trainingProgram,
+    selectTrainingProgram,
 
     attack,
     beginCombat,
@@ -1839,6 +1719,10 @@ export function useRiftCity() {
     buyItem,
     useItem,
     equip,
+    createAuctionListing,
+    cancelAuctionListing,
+    buyAuctionListing,
+    seededAuctionListings: SEEDED_LISTINGS,
 
     randomEncounter,
     chooseEncounter,

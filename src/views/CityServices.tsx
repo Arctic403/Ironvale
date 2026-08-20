@@ -105,7 +105,95 @@ function ItemShop({ g, ids, title, icon }: { g: Game; ids: string[]; title: stri
 }
 
 export function Pharmacy({ g }: { g: Game }) { return <ItemShop g={g} ids={["medkit", "energy-drink", "nerve-tonic"]} title="RiftCare Pharmacy" icon="💊" />; }
-export function BlackMarket({ g }: { g: Game }) { return <ItemShop g={g} ids={["knife", "bat", "pistol", "vest"]} title="The Black Market" icon="🕶️" />; }
+export function BlackMarket({ g }: { g: Game }) {
+  const [itemId, setItemId] = useState("");
+  const [price, setPrice] = useState("500");
+  const [quantity, setQuantity] = useState("1");
+  const [query, setQuery] = useState("");
+
+  const ownListable = ITEMS.filter((item) => (g.gameState.inventory[item.id] || 0) > 0);
+  const listings = [...g.gameState.auctionListings, ...g.seededAuctionListings.filter((listing) => !g.gameState.auctionRemovedListingIds.includes(listing.id))]
+    .filter((listing) => {
+      const item = ITEMS.find((x) => x.id === listing.itemId);
+      const q = query.trim().toLowerCase();
+      return !q || item?.name.toLowerCase().includes(q) || listing.seller.toLowerCase().includes(q);
+    })
+    .sort((a,b) => a.price - b.price);
+
+  const selectedOwned = itemId ? (g.gameState.inventory[itemId] || 0) : 0;
+  const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+  const unitPrice = Math.max(1, Math.floor(Number(price) || 1));
+
+  return (
+    <div className="city-service-page black-market-v2">
+      <Panel title="Black Market Exchange">
+        <div className="service-hero">
+          <span>🕶️</span>
+          <div>
+            <h2>Player Listings</h2>
+            <p>Underground items are traded by players, not sold by a duplicate NPC weapon shop.</p>
+          </div>
+        </div>
+
+        <div className="black-market-toolbar">
+          <label>
+            <span>Search listings</span>
+            <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Item or seller" />
+          </label>
+          <div className="black-market-balance"><span>Cash</span><strong>{money(g.gameState.cash)}</strong></div>
+        </div>
+
+        <div className="auction-listings">
+          {listings.map((listing) => {
+            const item = ITEMS.find((x) => x.id === listing.itemId);
+            if (!item) return null;
+            const mine = listing.seller === "You";
+            const total = listing.price * listing.quantity;
+            return (
+              <article className="auction-listing" key={listing.id}>
+                <div className="auction-item-copy">
+                  <span className={`rarity-pill ${(item.rarity || "Common").toLowerCase()}`}>{item.rarity || "Common"}</span>
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                  <small>Seller: <b>{listing.seller}</b> · Qty {listing.quantity}{item.contraband ? " · CONTRABAND" : ""}</small>
+                </div>
+                <div className="auction-listing-action">
+                  <strong>{money(listing.price)} ea.</strong>
+                  <small>{money(total)} total</small>
+                  {mine ? (
+                    <Button onClick={() => g.cancelAuctionListing(listing.id)}>Cancel Listing</Button>
+                  ) : (
+                    <Button disabled={g.gameState.cash < total} onClick={() => g.buyAuctionListing(listing.id)}>
+                      {g.gameState.cash < total ? "Not Enough Cash" : "Buy Listing"}
+                    </Button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <Panel title="List an Item">
+        <p>Listings are stored locally for now, but this UI is structured so the seller and listing data can later come from the multiplayer server.</p>
+        <div className="auction-create-grid">
+          <label><span>Item</span><select value={itemId} onChange={(e)=>setItemId(e.target.value)}><option value="">Choose an item</option>{ownListable.map((item)=><option key={item.id} value={item.id}>{item.name} ({g.gameState.inventory[item.id]})</option>)}</select></label>
+          <label><span>Quantity</span><input type="number" min="1" max={Math.max(1,selectedOwned)} value={quantity} onChange={(e)=>setQuantity(e.target.value)} /></label>
+          <label><span>Price each</span><input type="number" min="1" value={price} onChange={(e)=>setPrice(e.target.value)} /></label>
+        </div>
+        <div className="data-list">
+          <div className="data-row"><span>Owned</span><b>{selectedOwned}</b></div>
+          <div className="data-row"><span>Listing total</span><b>{money(unitPrice * qty)}</b></div>
+          <div className="data-row"><span>Listing fee</span><b>{money(Math.max(25,Math.floor(unitPrice*qty*.03)))}</b></div>
+        </div>
+        <div className="btn-group">
+          <Button disabled={!itemId || selectedOwned < qty} onClick={() => g.createAuctionListing(itemId, unitPrice, qty)}>Create Listing</Button>
+          <BackToCity g={g} />
+        </div>
+      </Panel>
+    </div>
+  );
+}
 
 export function Park({ g }: { g: Game }) {
   const rest = () => g.setGameState((prev) => {
@@ -118,7 +206,7 @@ export function Park({ g }: { g: Game }) {
 
 export function Downtown({ g }: { g: Game }) {
   const links: Array<[string, string]> = [["shops", "🛒 Shops"], ["jobs", "💼 Employment"], ["market", "📈 Market"], ["bank", "🏦 Bank"], ["missions", "🎯 Missions"]];
-  return <div className="city-service-page"><Panel title="Downtown RiftCity"><div className="service-hero"><span>📍</span><div><h2>Downtown</h2><p>The city's busiest hub. Jump directly to nearby services.</p></div></div><div className="service-link-grid">{links.map(([screen, label]) => <Button key={screen} onClick={() => g.setCurrentScreen(screen as any)}>{label}</Button>)}</div><BackToCity g={g} /></Panel></div>;
+  return <div className="city-service-page"><Panel title="Downtown RiftCity"><div className="service-hero"><span>📍</span><div><h2>Downtown</h2><p>The city's busiest hub. Jump directly to nearby services.</p></div></div><div className="service-link-grid">{links.map(([screen, label]) => <div key={screen}><Button onClick={() => g.setCurrentScreen(screen as any)}>{label}</Button></div>)}</div><BackToCity g={g} /></Panel></div>;
 }
 
 export function Casino({ g }: { g: Game }) {

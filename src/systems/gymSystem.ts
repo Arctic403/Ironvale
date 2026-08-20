@@ -1,321 +1,89 @@
-import {
-  CombatStats,
-} from "./progressionSystem";
+import { CombatStats } from "./progressionSystem";
 
-export type TrainingStat =
-  | "strength"
-  | "defense"
-  | "speed"
-  | "dexterity";
+export type TrainingStat = "strength" | "defense" | "speed" | "dexterity";
 
 export type Gym = {
-  id: string;
-  name: string;
-  description: string;
-
-  /*
-   * Gym progression.
-   *
-   * Gym EXP unlocks the facility.
-   * Membership is purchased separately.
-   */
-  gymExpRequired: number;
-  membershipCost: number;
-
-  /*
-   * Energy spent per training session.
-   */
-  energyCost: number;
-
-  /*
-   * Base gain for each battle stat.
-   *
-   * null = this gym cannot train that stat.
-   */
-  gains: Record<
-    TrainingStat,
-    number | null
-  >;
-
-  /*
-   * Jail-only facility.
-   */
-  jailOnly?: boolean;
+  id:string;
+  name:string;
+  description:string;
+  gymExpRequired:number;
+  membershipCost:number;
+  energyCost:number;
+  gains:Record<TrainingStat,number|null>;
+  jailOnly?:boolean;
 };
 
-export type TrainingStatInfo = {
-  id: TrainingStat;
-  name: string;
-  icon: string;
-  description: string;
+export type TrainingProgram = {
+  id:string;
+  name:string;
+  description:string;
+  energyModifier:number;
+  statMultipliers:Record<TrainingStat,number>;
+  unlockGymExp:number;
+  streakBonus:number;
 };
 
-export type TrainingResult = {
-  stats: CombatStats;
-  gain: number;
-};
+export type TrainingStatInfo = { id:TrainingStat; name:string; icon:string; description:string; };
+export type TrainingResult = { stats:CombatStats; gain:number; };
 
-export const TRAINING_STATS: TrainingStatInfo[] = [
-  {
-    id: "strength",
-    name: "Strength",
-    icon: "💪",
-    description:
-      "Improves your physical attacking ability.",
-  },
-  {
-    id: "defense",
-    name: "Defense",
-    icon: "🛡️",
-    description:
-      "Improves your ability to absorb attacks.",
-  },
-  {
-    id: "speed",
-    name: "Speed",
-    icon: "⚡",
-    description:
-      "Improves your speed and combat initiative.",
-  },
-  {
-    id: "dexterity",
-    name: "Dexterity",
-    icon: "🎯",
-    description:
-      "Improves accuracy, agility and precision.",
-  },
+export const TRAINING_STATS:TrainingStatInfo[]=[
+  {id:"strength",name:"Strength",icon:"💪",description:"Raises physical damage and close-range power."},
+  {id:"defense",name:"Defense",icon:"🛡️",description:"Raises damage resistance and staying power."},
+  {id:"speed",name:"Speed",icon:"⚡",description:"Raises initiative, movement and combat pace."},
+  {id:"dexterity",name:"Dexterity",icon:"🎯",description:"Raises accuracy, control and precision."},
 ];
 
 /*
- * Torn-inspired gym progression.
- *
- * The important distinction is:
- *
- * - Energy is the training resource.
- * - Gym EXP unlocks better gyms.
- * - Memberships unlock access.
- * - There is NO gym cooldown.
- * - The player chooses the stat trained.
+ * RiftCity uses one evolving training facility instead of copying
+ * the standard "buy better gym" ladder. Progression comes from
+ * unlocking training programs and building a consistency streak.
  */
-export const GYMS: Gym[] = [
+export const GYMS:Gym[]=[
   {
-    id: "premier-fitness",
-    name: "Premier Fitness",
-    description:
-      "The entry-level city gym. A reliable place to build your first battle stats.",
-    gymExpRequired: 0,
-    membershipCost: 0,
-    energyCost: 5,
-    gains: {
-      strength: 0.65,
-      defense: 0.65,
-      speed: 0.55,
-      dexterity: 0.45,
-    },
+    id:"rift-performance-lab",
+    name:"Rift Performance Lab",
+    description:"RiftCity's adaptive training complex. Your program matters more than the building.",
+    gymExpRequired:0,
+    membershipCost:0,
+    energyCost:8,
+    gains:{strength:1.0,defense:1.0,speed:1.0,dexterity:1.0},
   },
-
   {
-    id: "ricks-gym",
-    name: "Ricks Gym",
-    description:
-      "A serious training facility for players who have started building their battle stats.",
-    gymExpRequired: 500,
-    membershipCost: 5000,
-    energyCost: 10,
-    gains: {
-      strength: 1.10,
-      defense: 1.05,
-      speed: 0.90,
-      dexterity: 0.80,
-    },
-  },
-
-  {
-    id: "frontline-fitness",
-    name: "Frontline Fitness",
-    description:
-      "Specialized equipment designed for experienced fighters.",
-    gymExpRequired: 2500,
-    membershipCost: 15000,
-    energyCost: 15,
-    gains: {
-      strength: 1.55,
-      defense: 1.50,
-      speed: 1.30,
-      dexterity: 1.20,
-    },
-  },
-
-  {
-    id: "apollo-gym",
-    name: "Apollo Gym",
-    description:
-      "A premium facility reserved for dedicated fighters.",
-    gymExpRequired: 7500,
-    membershipCost: 50000,
-    energyCost: 20,
-    gains: {
-      strength: 2.05,
-      defense: 2.00,
-      speed: 1.80,
-      dexterity: 1.70,
-    },
-  },
-
-  {
-    id: "gym-3000",
-    name: "Gym 3000",
-    description:
-      "An elite training facility with advanced equipment across every discipline.",
-    gymExpRequired: 20000,
-    membershipCost: 150000,
-    energyCost: 25,
-    gains: {
-      strength: 2.70,
-      defense: 2.65,
-      speed: 2.45,
-      dexterity: 2.35,
-    },
-  },
-
-  {
-    id: "crims-gym",
-    name: "Crims Gym",
-    description:
-      "A prison gym. Basic equipment, limited resources, but training is still possible while incarcerated.",
-    gymExpRequired: 0,
-    membershipCost: 0,
-    energyCost: 5,
-    gains: {
-      strength: null,
-      defense: 0.45,
-      speed: null,
-      dexterity: null,
-    },
-    jailOnly: true,
+    id:"crims-gym",
+    name:"Crims Yard",
+    description:"A stripped-down jail training area with limited options.",
+    gymExpRequired:0,
+    membershipCost:0,
+    energyCost:6,
+    gains:{strength:.55,defense:.65,speed:.45,dexterity:.4},
+    jailOnly:true,
   },
 ];
 
-export function isJailGym(
-  gym: Gym
-): boolean {
-  return gym.jailOnly === true;
+export const TRAINING_PROGRAMS:TrainingProgram[]=[
+  {id:"balanced",name:"Balanced Foundation",description:"Reliable gains across every combat stat.",energyModifier:1,statMultipliers:{strength:1,defense:1,speed:1,dexterity:1},unlockGymExp:0,streakBonus:.015},
+  {id:"power",name:"Power Cycle",description:"Heavy sessions that strongly favor Strength and Defense.",energyModifier:1.25,statMultipliers:{strength:1.45,defense:1.2,speed:.8,dexterity:.78},unlockGymExp:150,streakBonus:.012},
+  {id:"velocity",name:"Velocity Protocol",description:"Fast, reactive sessions focused on Speed and Dexterity.",energyModifier:1.15,statMultipliers:{strength:.82,defense:.82,speed:1.42,dexterity:1.28},unlockGymExp:350,streakBonus:.014},
+  {id:"precision",name:"Precision Lab",description:"Lower-volume technical work with a major Dexterity focus.",energyModifier:.95,statMultipliers:{strength:.78,defense:.88,speed:1.08,dexterity:1.5},unlockGymExp:750,streakBonus:.018},
+  {id:"ironwall",name:"Ironwall Conditioning",description:"Punishing conditioning designed around Defense and consistency.",energyModifier:1.35,statMultipliers:{strength:1.05,defense:1.55,speed:.78,dexterity:.72},unlockGymExp:1400,streakBonus:.02},
+  {id:"hybrid",name:"Rift Hybrid",description:"Elite adaptive program with strong gains across all four stats.",energyModifier:1.4,statMultipliers:{strength:1.3,defense:1.3,speed:1.3,dexterity:1.3},unlockGymExp:3000,streakBonus:.022},
+];
+
+export function isJailGym(gym:Gym){return gym.jailOnly===true}
+export function gymUnlocked(gym:Gym,gymExperience:number){return isJailGym(gym)||gymExperience>=gym.gymExpRequired}
+export function canTrainStat(gym:Gym,stat:TrainingStat){return gym.gains[stat]!==null&&gym.gains[stat]!==undefined}
+export function getNextGym(_gymExperience:number){return null}
+export function getGymExperienceGain(energyCost:number){return Math.max(1,Math.floor(energyCost))}
+export function getHappinessMultiplier(happiness:number){const c=Math.max(0,Math.min(100,happiness));return .5+c/200}
+export function getTrainingProgram(id:string){return TRAINING_PROGRAMS.find(p=>p.id===id)??TRAINING_PROGRAMS[0]}
+export function programUnlocked(program:TrainingProgram,gymExperience:number){return gymExperience>=program.unlockGymExp}
+export function trainingEnergyCost(gym:Gym,program:TrainingProgram){return Math.max(1,Math.round(gym.energyCost*program.energyModifier))}
+export function projectedTrainingGain(gym:Gym,stat:TrainingStat,program:TrainingProgram,happiness:number,streak:number,multiplier=1){
+  const base=gym.gains[stat]??0;
+  const streakMult=1+Math.min(10,Math.max(0,streak))*program.streakBonus;
+  return base*program.statMultipliers[stat]*getHappinessMultiplier(happiness)*streakMult*Math.max(0,multiplier);
 }
-
-export function gymUnlocked(
-  gym: Gym,
-  gymExperience: number
-): boolean {
-  if (isJailGym(gym)) {
-    return true;
-  }
-
-  return (
-    gymExperience >=
-    gym.gymExpRequired
-  );
-}
-
-export function canTrainStat(
-  gym: Gym,
-  stat: TrainingStat
-): boolean {
-  return (
-    gym.gains[stat] !== null &&
-    gym.gains[stat] !== undefined
-  );
-}
-
-/*
- * Returns the first gym that is not yet
- * unlocked by Gym EXP.
- */
-export function getNextGym(
-  gymExperience: number
-): Gym | null {
-  const next =
-    GYMS
-      .filter(
-        (gym) =>
-          !isJailGym(gym) &&
-          gym.gymExpRequired >
-            gymExperience
-      )
-      .sort(
-        (a, b) =>
-          a.gymExpRequired -
-          b.gymExpRequired
-      )[0];
-
-  return next || null;
-}
-
-/*
- * Gym EXP gained from a training session.
- *
- * More Energy spent = more Gym EXP.
- */
-export function getGymExperienceGain(
-  energyCost: number
-): number {
-  return Math.max(
-    1,
-    Math.floor(
-      energyCost
-    )
-  );
-}
-
-/*
- * Happiness affects training gains.
- *
- * This deliberately has diminishing extremes:
- *
- * 100 happiness = full gain
- * 50 happiness  = roughly 75% gain
- * 0 happiness   = roughly 50% gain
- *
- * This keeps Happiness meaningful without
- * making low Happiness completely disable training.
- */
-export function getHappinessMultiplier(
-  happiness: number
-): number {
-  const clamped =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        happiness
-      )
-    );
-
-  return (
-    0.5 +
-    clamped / 200
-  );
-}
-
-/*
- * Apply one training session.
- *
- * IMPORTANT:
- * This function changes the selected stat
- * exactly once.
- *
- * The old App implementation had a bug where
- * applyTraining() was called and the stat was
- * then manually incremented again.
- */
-export function applyTraining(
-  stats: CombatStats,
-  gym: Gym,
-  stat: TrainingStat,
-  happiness = 100,
-  educationMultiplier = 1
-): TrainingResult {
-  const baseGain = gym.gains[stat];
-  if (baseGain === null || baseGain === undefined) return { stats: { ...stats }, gain: 0 };
-  const gain = baseGain * getHappinessMultiplier(happiness) * Math.max(0, educationMultiplier);
-  return { stats: { ...stats, [stat]: stats[stat] + gain }, gain };
+export function applyTraining(stats:CombatStats,gym:Gym,stat:TrainingStat,happiness=100,educationMultiplier=1,program:TrainingProgram=TRAINING_PROGRAMS[0],streak=0):TrainingResult{
+  const gain=projectedTrainingGain(gym,stat,program,happiness,streak,educationMultiplier);
+  return {stats:{...stats,[stat]:stats[stat]+gain},gain};
 }

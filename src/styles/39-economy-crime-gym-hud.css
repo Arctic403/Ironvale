@@ -1,0 +1,180 @@
+/* ============================================================
+   39. ECONOMY / CRIME / GYM / COMPACT HUD OVERHAUL
+   ============================================================ */
+
+/* Compact always-visible HUD. No expandable stats control. */
+.top-status-bar.floating-status-panel.compact-hud-v3 {
+  min-height: 46px !important;
+  padding: 7px 10px !important;
+  border-radius: 14px !important;
+}
+
+.compact-hud-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.compact-hud-item {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,.065);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+button.compact-hud-item {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: manipulation;
+}
+
+.compact-hud-item.level { color: #dcecff; border-color: rgba(96,165,250,.18); }
+.compact-hud-item.cash { color: #b9f5ce; border-color: rgba(74,222,128,.14); }
+.compact-hud-item.bank { color: #c8ddff; border-color: rgba(96,165,250,.14); }
+
+/* Bottom control stack now only contains Menu + Log. */
+@media (max-width:760px) {
+  .floating-ui-stack {
+    left: auto !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+  }
+
+  .floating-ui-stack .floating-ui-btn {
+    flex: 0 0 auto !important;
+    min-width: 62px !important;
+    width: auto !important;
+  }
+
+  .top-status-bar.floating-status-panel.compact-hud-v3 {
+    top: calc(6px + env(safe-area-inset-top)) !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    pointer-events: auto !important;
+    z-index: 142 !important;
+  }
+
+  .compact-hud-row {
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+  .compact-hud-row::-webkit-scrollbar { display:none; }
+  .compact-hud-item { flex:0 0 auto; min-height:26px; padding:3px 7px; font-size:9px; }
+
+  .layout-root.ui-shell .screen-container {
+    padding-top: calc(72px + env(safe-area-inset-top)) !important;
+  }
+}
+
+/* Crime mastery + decision UI */
+.crime-screen-v2 { display:flex; flex-direction:column; gap:14px; }
+.crime-summary-strip {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+}
+.crime-summary-strip > div {
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:rgba(255,255,255,.02);
+}
+.crime-summary-strip span { display:block; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.07em; }
+.crime-summary-strip strong { display:block; margin-top:3px; font-size:15px; }
+.crime-card-v2 { display:flex; flex-direction:column; gap:10px; }
+.crime-card-v2 .card-header-split h3 { margin:5px 0 0; }
+.crime-meta-row { display:flex; flex-wrap:wrap; gap:6px; }
+.crime-meta-row span { padding:5px 8px; border:1px solid var(--border); border-radius:999px; color:var(--text-soft); font-size:9px; }
+.crime-mastery-line { display:grid; grid-template-columns:auto minmax(80px,1fr); align-items:center; gap:10px; color:var(--muted); font-size:9px; }
+.crime-choice-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+.crime-choice {
+  min-width:0; min-height:108px; padding:10px;
+  display:flex; flex-direction:column; align-items:flex-start; gap:5px;
+  text-align:left; border:1px solid var(--border); border-radius:12px;
+  background:rgba(255,255,255,.018); color:var(--text); cursor:pointer;
+}
+.crime-choice.active { border-color:rgba(96,165,250,.46); background:rgba(96,165,250,.08); }
+.crime-choice strong { font-size:11px; }
+.crime-choice small { color:var(--muted); font-size:9px; line-height:1.35; }
+.crime-choice span { margin-top:auto; color:var(--text-soft); font-size:8px; }
+
+/* Gym program system */
+.gym-v2 { display:flex; flex-direction:column; gap:14px; }
+.gym-program-shell { padding:16px; }
+.gym-program-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.gym-program-header h2 { margin:5px 0 5px; }
+.gym-program-header p { margin:0; max-width:720px; }
+.gym-streak-badge { min-width:120px; padding:10px 12px; border:1px solid var(--border); border-radius:13px; background:rgba(255,255,255,.02); }
+.gym-streak-badge span,.gym-streak-badge small { display:block; color:var(--muted); font-size:8px; text-transform:uppercase; }
+.gym-streak-badge strong { display:block; margin:2px 0; font-size:22px; }
+.gym-program-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.gym-program-card {
+  min-height:102px; padding:11px; display:flex; flex-direction:column; justify-content:space-between; gap:8px;
+  border:1px solid var(--border); border-radius:13px; background:rgba(255,255,255,.018); color:var(--text); text-align:left; cursor:pointer;
+}
+.gym-program-card.active { border-color:rgba(74,222,128,.36); background:rgba(74,222,128,.055); }
+.gym-program-card:disabled { opacity:.48; cursor:not-allowed; }
+.gym-program-card strong { display:block; font-size:11px; }
+.gym-program-card small { display:block; margin-top:4px; color:var(--muted); font-size:9px; }
+.gym-program-card > span { color:var(--text-soft); font-size:8px; }
+.gym-stat-summary { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.gym-stat-summary span { padding:6px 9px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:9px; }
+.train-card-v2 { display:flex; flex-direction:column; }
+.train-stat-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.training-current-stat { color:var(--blue); font-size:18px; font-weight:900; }
+
+/* Player auction house / black market */
+.black-market-v2 { display:grid; gap:14px; }
+.black-market-toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:end; margin:12px 0; }
+.black-market-toolbar label,.auction-create-grid label { display:flex; flex-direction:column; gap:5px; color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; }
+.black-market-toolbar input,.auction-create-grid input,.auction-create-grid select {
+  width:100%; min-height:38px; padding:8px 10px; border:1px solid var(--border-light); border-radius:10px; background:var(--surface-2); color:var(--text);
+}
+.black-market-balance { min-width:120px; padding:8px 10px; border:1px solid var(--border); border-radius:10px; }
+.black-market-balance span { display:block; color:var(--muted); font-size:8px; text-transform:uppercase; }
+.black-market-balance strong { display:block; margin-top:2px; }
+.auction-listings { display:flex; flex-direction:column; gap:8px; }
+.auction-listing { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; padding:12px; border:1px solid var(--border); border-radius:13px; background:rgba(255,255,255,.018); }
+.auction-item-copy h3 { margin:5px 0 4px; }
+.auction-item-copy p { margin-bottom:6px; font-size:10px; }
+.auction-item-copy small { color:var(--muted); }
+.auction-listing-action { min-width:130px; display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:5px; text-align:right; }
+.auction-listing-action > strong { font-size:14px; }
+.auction-listing-action > small { color:var(--muted); }
+.rarity-pill { display:inline-flex; padding:3px 6px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:8px; text-transform:uppercase; letter-spacing:.06em; }
+.rarity-pill.rare { color:#a8c9ff; border-color:rgba(96,165,250,.3); }
+.rarity-pill.epic { color:#c9b6ff; border-color:rgba(167,139,250,.35); }
+.rarity-pill.legendary { color:#ffe99a; border-color:rgba(250,204,21,.35); }
+.auction-create-grid { display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px; margin:10px 0; }
+
+@media (max-width:760px) {
+  .crime-summary-strip { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .crime-choice-grid { grid-template-columns:1fr; }
+  .crime-choice { min-height:0; }
+  .gym-program-header { flex-direction:column; }
+  .gym-streak-badge { width:100%; }
+  .gym-program-grid { grid-template-columns:1fr; }
+  .auction-listing { grid-template-columns:1fr; }
+  .auction-listing-action { min-width:0; align-items:stretch; text-align:left; }
+  .black-market-toolbar,.auction-create-grid { grid-template-columns:1fr; }
+  .black-market-balance { min-width:0; }
+}

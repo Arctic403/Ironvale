@@ -16,6 +16,15 @@ export type Activity = {
   time: number;
 };
 
+export type AuctionListing = {
+  id: string;
+  itemId: string;
+  seller: string;
+  price: number;
+  quantity: number;
+  createdAt: number;
+};
+
 import type { CombatStats } from "../systems/progressionSystem";
 
 export type SaveData = {
@@ -33,10 +42,14 @@ export type SaveData = {
   health: number;
   lastHealthUpdate: number;
   crimeExperience: number;
+  crimeMastery: Record<string, number>;
   stats: CombatStats;
   gymExperience: number;
   gymMemberships: string[];
   activeGym: string;
+  activeTrainingProgram: string;
+  trainingStreak: number;
+  lastTrainingAt: number | null;
   happiness: number;
   lastHappinessUpdate: number;
   currentJob: string | null;
@@ -54,6 +67,8 @@ export type SaveData = {
   hospitalReason: string | null;
   hospitalDurationMs: number | null;
   inventory: Record<string, number>;
+  auctionListings: AuctionListing[];
+  auctionRemovedListingIds: string[];
   equippedWeapon: string | null;
   equippedArmor: string | null;
   ownedProperty: string;

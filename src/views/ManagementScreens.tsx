@@ -221,6 +221,8 @@ export function Inventory({ g }: { g: Game }) {
       {item.accuracy != null && <div className="data-row"><span>Accuracy</span><b>{item.accuracy}%</b></div>}
       {item.durability != null && <div className="data-row"><span>Durability</span><b>{item.durability}%</b></div>}
       {item.sellValue != null && <div className="data-row"><span>Base Sell Value</span><b>{money(item.sellValue)}</b></div>}
+      {item.specialEffect && <div className="data-row"><span>Special</span><b>{item.specialEffect}</b></div>}
+      {item.contraband && <div className="data-row"><span>Classification</span><b>Contraband</b></div>}
       {equippable && <div className="data-row"><span>Status</span><b>{equipped?"Equipped":"Stored"}</b></div>}</div>
       {equippable?<Button disabled={equipped} onClick={()=>g.equip(item.id)}>{equipped?"Equipped":"Equip"}</Button>:<Button onClick={()=>g.useItem(item.id)}>Use</Button>}
     </div>;
@@ -251,13 +253,19 @@ export function Shops({ g }: { g: Game }) {
       description: "Medical, energy, and nerve supplies.",
       types: ["medical", "energy", "nerve"],
     },
+    {
+      title: "Corner Store",
+      tag: "SNACKS",
+      description: "Candy and everyday consumables with small game effects.",
+      types: ["misc"],
+    },
   ] as const;
 
   return (
     <div className="shop-list">
       {shopGroups.map((shop) => {
         const items = ITEMS.filter((item) =>
-          item.price > 0 && shop.types.some((type) => type === item.type)
+          item.price > 0 && (item.store === "shop" || item.store === "pharmacy") && shop.types.some((type) => type === item.type)
         );
 
         return (

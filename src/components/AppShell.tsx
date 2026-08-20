@@ -19,7 +19,7 @@ import {
   getScreenTitle,
 } from "./apps/Navigation";
 
-import { StatusBar, StatusDetails } from "./apps/StatusBar";
+import { StatusBar } from "./apps/StatusBar";
 import { ResourceModal } from "./apps/ResourceModal";
 import { ScreenContent } from "./apps/ScreenContent";
 import { ActivityLog } from "./apps/ActivityLog";
@@ -31,7 +31,6 @@ function App() {
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [now, setNow] = useState(Date.now());
   const [navOpen, setNavOpen] = useState(false);
-  const [statusExpanded, setStatusExpanded] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
 
   useEffect(() => {
@@ -78,7 +77,7 @@ function App() {
 
   return (
     <div
-      className={`layout-root ui-shell ${navOpen ? "nav-open" : ""} ${statusExpanded ? "status-open" : ""} ${activityOpen ? "activity-open" : ""}`}
+      className={`layout-root ui-shell ${navOpen ? "nav-open" : ""} ${activityOpen ? "activity-open" : ""}`}
     >
       {(navOpen || activityOpen) && (
         <button
@@ -89,15 +88,6 @@ function App() {
             setNavOpen(false);
             setActivityOpen(false);
           }}
-        />
-      )}
-
-      {statusExpanded && (
-        <button
-          type="button"
-          className="mobile-stats-backdrop"
-          aria-label="Close stats"
-          onClick={() => setStatusExpanded(false)}
         />
       )}
 
@@ -116,7 +106,6 @@ function App() {
           className={`floating-ui-btn ${navOpen ? "active" : ""}`}
           onClick={() => {
             setNavOpen((open) => !open);
-            setStatusExpanded(false);
             setActivityOpen(false);
           }}
         >
@@ -126,24 +115,10 @@ function App() {
 
         <button
           type="button"
-          className={`floating-ui-btn ${statusExpanded ? "active" : ""}`}
-          onClick={() => {
-            setStatusExpanded((open) => !open);
-            setNavOpen(false);
-            setActivityOpen(false);
-          }}
-        >
-          <span>📊</span>
-          <strong>Stats</strong>
-        </button>
-
-        <button
-          type="button"
           className={`floating-ui-btn ${activityOpen ? "active" : ""}`}
           onClick={() => {
             setActivityOpen((open) => !open);
             setNavOpen(false);
-            setStatusExpanded(false);
           }}
         >
           <span>📝</span>
@@ -152,11 +127,7 @@ function App() {
       </div>
 
       <div className="main-wrapper">
-        <StatusBar g={g} setActiveModal={setActiveModal} expanded={statusExpanded} onToggleExpanded={() => {
-          setStatusExpanded((open) => !open);
-          setNavOpen(false);
-          setActivityOpen(false);
-        }} />
+        <StatusBar g={g} setActiveModal={setActiveModal} />
 
         <ResourceModal
           g={g}
@@ -193,26 +164,6 @@ function App() {
           <ScreenContent g={g} />
         </main>
       </div>
-
-      <aside className={`mobile-stats-drawer ${statusExpanded ? "open" : ""}`} aria-hidden={!statusExpanded}>
-        <div className="mobile-stats-header">
-          <div>
-            <span className="card-tag">PLAYER</span>
-            <h3>Stats</h3>
-          </div>
-          <button
-            type="button"
-            className="activity-drawer-close"
-            onClick={() => setStatusExpanded(false)}
-            aria-label="Close stats"
-          >
-            ×
-          </button>
-        </div>
-        <div className="mobile-stats-content">
-          <StatusDetails g={g} setActiveModal={setActiveModal} />
-        </div>
-      </aside>
 
       <aside className={`activity-drawer ${activityOpen ? "open" : ""}`} aria-hidden={!activityOpen}>
         <div className="activity-drawer-header">
