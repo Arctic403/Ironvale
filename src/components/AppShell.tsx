@@ -19,7 +19,7 @@ import {
   getScreenTitle,
 } from "./apps/Navigation";
 
-import { StatusBar } from "./apps/StatusBar";
+import { StatusBar, StatusDetails } from "./apps/StatusBar";
 import { ResourceModal } from "./apps/ResourceModal";
 import { ScreenContent } from "./apps/ScreenContent";
 import { ActivityLog } from "./apps/ActivityLog";
@@ -92,6 +92,15 @@ function App() {
         />
       )}
 
+      {statusExpanded && (
+        <button
+          type="button"
+          className="mobile-stats-backdrop"
+          aria-label="Close stats"
+          onClick={() => setStatusExpanded(false)}
+        />
+      )}
+
       <Navigation
         currentScreen={g.currentScreen}
         onNavigate={g.setCurrentScreen}
@@ -105,7 +114,11 @@ function App() {
         <button
           type="button"
           className={`floating-ui-btn ${navOpen ? "active" : ""}`}
-          onClick={() => setNavOpen((open) => !open)}
+          onClick={() => {
+            setNavOpen((open) => !open);
+            setStatusExpanded(false);
+            setActivityOpen(false);
+          }}
         >
           <span>☰</span>
           <strong>Menu</strong>
@@ -114,7 +127,11 @@ function App() {
         <button
           type="button"
           className={`floating-ui-btn ${statusExpanded ? "active" : ""}`}
-          onClick={() => setStatusExpanded((open) => !open)}
+          onClick={() => {
+            setStatusExpanded((open) => !open);
+            setNavOpen(false);
+            setActivityOpen(false);
+          }}
         >
           <span>📊</span>
           <strong>Stats</strong>
@@ -123,7 +140,11 @@ function App() {
         <button
           type="button"
           className={`floating-ui-btn ${activityOpen ? "active" : ""}`}
-          onClick={() => setActivityOpen((open) => !open)}
+          onClick={() => {
+            setActivityOpen((open) => !open);
+            setNavOpen(false);
+            setStatusExpanded(false);
+          }}
         >
           <span>📝</span>
           <strong>Log</strong>
@@ -131,7 +152,11 @@ function App() {
       </div>
 
       <div className="main-wrapper">
-        <StatusBar g={g} setActiveModal={setActiveModal} expanded={statusExpanded} onToggleExpanded={() => setStatusExpanded((open) => !open)} />
+        <StatusBar g={g} setActiveModal={setActiveModal} expanded={statusExpanded} onToggleExpanded={() => {
+          setStatusExpanded((open) => !open);
+          setNavOpen(false);
+          setActivityOpen(false);
+        }} />
 
         <ResourceModal
           g={g}
@@ -168,6 +193,26 @@ function App() {
           <ScreenContent g={g} />
         </main>
       </div>
+
+      <aside className={`mobile-stats-drawer ${statusExpanded ? "open" : ""}`} aria-hidden={!statusExpanded}>
+        <div className="mobile-stats-header">
+          <div>
+            <span className="card-tag">PLAYER</span>
+            <h3>Stats</h3>
+          </div>
+          <button
+            type="button"
+            className="activity-drawer-close"
+            onClick={() => setStatusExpanded(false)}
+            aria-label="Close stats"
+          >
+            ×
+          </button>
+        </div>
+        <div className="mobile-stats-content">
+          <StatusDetails g={g} setActiveModal={setActiveModal} />
+        </div>
+      </aside>
 
       <aside className={`activity-drawer ${activityOpen ? "open" : ""}`} aria-hidden={!activityOpen}>
         <div className="activity-drawer-header">

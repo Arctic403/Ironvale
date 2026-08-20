@@ -1,0 +1,220 @@
+/* ============================================================
+   38. MOBILE INTERACTION FIX
+   - real stats sheet
+   - tappable HUD controls
+   - scrollable/selectable activity log
+   - mutually exclusive overlays
+   ============================================================ */
+
+.mobile-stats-drawer,
+.mobile-stats-backdrop {
+  display: none;
+}
+
+.status-detail-button {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.level-badge-button {
+  cursor: pointer;
+  color: inherit;
+}
+
+@media (max-width: 760px) {
+  /* Keep the always-visible HUD above normal game content and make its
+     actual controls reliable tap targets on iOS Safari. */
+  .top-status-bar.floating-status-panel {
+    z-index: 142 !important;
+    pointer-events: auto !important;
+    touch-action: manipulation;
+  }
+
+  .floating-status-panel .status-panel-header,
+  .floating-status-panel .status-primary-cluster,
+  .floating-status-panel .status-currency-pills {
+    pointer-events: auto !important;
+  }
+
+  .floating-status-panel .level-badge-button,
+  .floating-status-panel .hud-resource-button,
+  .floating-status-panel .floating-panel-toggle {
+    position: relative;
+    z-index: 2;
+    pointer-events: auto !important;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .floating-status-panel .level-badge-button {
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+
+  /* On phones the embedded details inside the HUD are always hidden.
+     Stats are rendered in the dedicated sheet below instead. */
+  .floating-status-panel .status-detail-grid,
+  .floating-status-panel.expanded .status-detail-grid {
+    display: none !important;
+  }
+
+  .mobile-stats-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 158;
+    border: 0;
+    background: rgba(3, 7, 11, 0.64);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+
+  .mobile-stats-drawer {
+    position: fixed;
+    z-index: 165;
+    left: 8px;
+    right: 8px;
+    bottom: calc(70px + env(safe-area-inset-bottom));
+    width: auto;
+    height: min(64dvh, 540px);
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    background: rgba(8, 13, 18, 0.985);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.55);
+    transform: translateY(calc(100% + 120px));
+    transition: transform 0.2s ease;
+    pointer-events: none;
+  }
+
+  .mobile-stats-drawer.open {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .mobile-stats-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 14px 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .mobile-stats-header h3 {
+    margin: 4px 0 0;
+  }
+
+  .mobile-stats-content {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding: 12px;
+  }
+
+  .mobile-stats-content .status-detail-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    margin: 0 !important;
+  }
+
+  .mobile-stats-content .status-detail-card {
+    min-height: 92px;
+    padding: 10px;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.03);
+  }
+
+  .mobile-stats-content .status-detail-button {
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  /* Activity drawer must own its own scrollable content area. */
+  .activity-drawer {
+    z-index: 165 !important;
+    overflow: hidden !important;
+    pointer-events: none;
+  }
+
+  .activity-drawer.open {
+    pointer-events: auto;
+  }
+
+  .activity-drawer-header {
+    flex: 0 0 auto;
+  }
+
+  .activity-card.embedded {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+    pointer-events: auto !important;
+  }
+
+  .activity-card.embedded .activity-list {
+    min-height: 0;
+    height: 100%;
+    max-height: none !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    pointer-events: auto !important;
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+
+  .activity-card.embedded .activity-item,
+  .activity-card.embedded .activity-item *,
+  .activity-card.embedded .desc,
+  .activity-card.embedded .time,
+  .activity-card.embedded .type-tag {
+    user-select: text !important;
+    -webkit-user-select: text !important;
+  }
+
+  .activity-card.embedded .activity-item {
+    touch-action: pan-y;
+  }
+
+  /* Overlay ordering. Normal HUD remains tappable when no sheet is open.
+     Actual drawers intentionally sit above it while open. */
+  .shell-backdrop {
+    z-index: 158 !important;
+  }
+
+  .drawer-nav.nav-rail {
+    z-index: 165 !important;
+  }
+
+  .floating-ui-stack {
+    z-index: 170 !important;
+    pointer-events: none;
+  }
+
+  .floating-ui-stack .floating-ui-btn {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 390px) {
+  .mobile-stats-content .status-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
