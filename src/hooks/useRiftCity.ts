@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { tickGameState } from "../systems/gameTickSystem";
 import { getJobPosition, getJobStatBonuses } from "../data/jobs";
 import {
-  CRIMES, Crime, CrimeChoice, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
+  Crime, CrimeRunModifiers, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
 } from "../systems/crimeSystem";
 import { CombatStats, getLevel, getMaxHealth } from "../systems/progressionSystem";
 import {
@@ -211,116 +211,106 @@ export function useRiftCity() {
   /*
    * CRIME SYSTEM
    */
-  const commitCrime = (crime: Crime, choiceId = "balanced") => {
-    if (blocked()) {
-      log("You cannot commit crimes right now.", "failure");
-      return;
-    }
-
-    if (!crimeUnlocked(crime, gameState.crimeExperience)) {
-      log("That crime is locked until your crime experience is high enough.", "failure");
-      return;
-    }
-
-    if (gameState.nerve < crime.nerve) {
-      log("Not enough nerve.", "failure");
-      return;
-    }
-
-    if (crime.requiredIntel && !gameState.crimeIntel.includes(crime.requiredIntel)) {
-      log("You are missing the intel needed to attempt this crime chain step.", "failure");
-      return;
-    }
+  const commitCrime = (crime: Crime, choiceId = "balanced", run?: CrimeRunModifiers) => {
+    if (blocked()) { log("You cannot commit crimes right now.", "failure"); return; }
+    if (!crimeUnlocked(crime, gameState.crimeExperience)) { log("That crime is locked until your crime experience is high enough.", "failure"); return; }
+    if (gameState.nerve < crime.nerve) { log("Not enough nerve.", "failure"); return; }
+    if (crime.requiredIntel && !gameState.crimeIntel.includes(crime.requiredIntel)) { log("You are missing the intel needed to attempt this crime chain step.", "failure"); return; }
 
     const selectedChoice = crime.choices.find((choice) => choice.id === choiceId) ?? crime.choices[1] ?? crime.choices[0];
+    const runMod: CrimeRunModifiers = run ?? { chanceModifier:0,rewardMultiplier:1,heatModifier:0,arrestModifier:0,injuryChance:0,bountyChance:0,bountyMultiplier:1,lootMultiplier:1,masteryMultiplier:1,extraXpMultiplier:1,riskLabel:"BASE",story:[] };
 
     setGameState((prev) => {
       const masteryXp = prev.crimeMastery[crime.id] ?? 0;
-      const chance = Math.max(0, Math.min(100,
+      const chance = Math.max(2, Math.min(97,
         crimeSuccessChance(
-          crime,
-          prev.crimeExperience,
-          1,
+          crime, prev.crimeExperience, 1,
           getCrimeStatBonus((() => {
-            const j=getJob(prev.currentJob);
-            const b=getJobStatBonuses(j, prev.jobSkills);
+            const j=getJob(prev.currentJob); const b=getJobStatBonuses(j, prev.jobSkills);
             return { strength: prev.stats.strength+(b.strength??0), defense: prev.stats.defense+(b.defense??0), speed: prev.stats.speed+(b.speed??0), dexterity: prev.stats.dexterity+(b.dexterity??0) };
           })()) + (prev.meritUpgrades["crime-edge"] ?? 0) * 2 + ((prev.npcReputation.mara ?? 0) >= 25 ? 2 : 0) + (prev.currentLocation === "crime" ? 2 : 0) - Math.floor(prev.heat / 25),
-          masteryXp,
-          selectedChoice,
-        )
+          masteryXp, selectedChoice,
+        ) + runMod.chanceModifier
       ));
 
       const roll = Math.random() * 100;
-      const criticalSuccessChance = chance * 0.08;
+      const criticalSuccessChance = Math.max(1, chance * 0.08);
+      const jailWindow = Math.max(2, crime.risk * .55 + runMod.arrestModifier);
       let outcome: "critical" | "success" | "jailed" | "critical-fail" | "spooked";
-
       if (roll < criticalSuccessChance) outcome = "critical";
       else if (roll < chance) outcome = "success";
       else if (roll >= 99.5) outcome = "critical-fail";
-      else if (roll < chance + crime.risk * 0.55) outcome = "jailed";
+      else if (roll < chance + jailWindow) outcome = "jailed";
       else outcome = "spooked";
 
-      const masteryGain = Math.max(1, Math.round(crime.crimeExperience * selectedChoice.masteryMultiplier));
-      let next: SaveData = {
-        ...prev,
-        nerve: Math.max(0, prev.nerve - crime.nerve),
-        crimeMastery: { ...prev.crimeMastery, [crime.id]: masteryXp + masteryGain },
-      };
+      const masteryGain = Math.max(1, Math.round(crime.crimeExperience * selectedChoice.masteryMultiplier * runMod.masteryMultiplier));
+      let next: SaveData = { ...prev, nerve: Math.max(0, prev.nerve - crime.nerve), crimeMastery: { ...prev.crimeMastery, [crime.id]: masteryXp + masteryGain } };
 
       const maybeDropLoot = (state: SaveData, critical: boolean) => {
+        // Every successful crime can produce ordinary finds. Rare item definitions still control the true jackpot rates.
+        const guaranteedPool = ["sugar-rush","moon-chews","black-envelope"];
+        const found:string[]=[];
+        const lootBoost=Math.max(.35,runMod.lootMultiplier)*(critical?2.25:1);
+        if(Math.random()<Math.min(.58,.12*lootBoost)){
+          const id=guaranteedPool[Math.floor(Math.random()*guaranteedPool.length)];
+          const item=ITEMS.find(x=>x.id===id);
+          if(item){ state={...state,inventory:{...state.inventory,[id]:(state.inventory[id]||0)+1}}; found.push(item.name); }
+        }
         const candidates = ITEMS.filter((item) => item.dropChance && item.dropChance > 0);
-        const multiplier = critical ? 2.5 : 1;
         for (const item of candidates) {
-          if (Math.random() < Math.min(.35, (item.dropChance ?? 0) * multiplier)) {
+          if (Math.random() < Math.min(.42, (item.dropChance ?? 0) * lootBoost)) {
             state = { ...state, inventory: { ...state.inventory, [item.id]: (state.inventory[item.id] || 0) + 1 } };
-            return { state, loot: item.name };
+            found.push(item.name);
+            if(found.length>=2) break;
           }
         }
-        return { state, loot: null as string | null };
+        return { state, loot: found };
       };
 
+      const storySuffix=runMod.story.length?` Decisions: ${runMod.story.join(" ")}`:"";
       if (outcome === "critical" || outcome === "success") {
         const critical = outcome === "critical";
-        const reward = Math.floor(randomReward(crime) * selectedChoice.rewardMultiplier * (critical ? 1.75 : 1));
+        const reward = Math.floor(randomReward(crime) * selectedChoice.rewardMultiplier * runMod.rewardMultiplier * (critical ? 1.75 : 1));
+        const bountyHit=Math.random()<runMod.bountyChance;
+        const bountyGain=bountyHit?Math.max(50,Math.round((crime.risk*18+reward*.08)*runMod.bountyMultiplier)):0;
+        const injured=Math.random()<runMod.injuryChance;
+        const injuryDamage=injured?Math.max(2,Math.round(3+crime.risk*.22+Math.random()*8)):0;
         next = {
           ...next,
           cash: prev.cash + reward,
-          xp: prev.xp + crime.xp * (critical ? 2 : 1),
-          crimeExperience: prev.crimeExperience + crime.crimeExperience * (critical ? 2 : 1),
+          xp: prev.xp + Math.round(crime.xp * runMod.extraXpMultiplier * (critical ? 2 : 1)),
+          crimeExperience: prev.crimeExperience + Math.round(crime.crimeExperience * runMod.extraXpMultiplier * (critical ? 2 : 1)),
           crimesCompleted: prev.crimesCompleted + 1,
           crimesCritical: prev.crimesCritical + (critical ? 1 : 0),
           crimeIntel: crime.grantsIntel && !prev.crimeIntel.includes(crime.grantsIntel) ? [...prev.crimeIntel, crime.grantsIntel] : prev.crimeIntel,
-          heat: Math.min(100, Math.max(0, prev.heat + Math.ceil(crime.risk / (critical ? 8 : 10)) + selectedChoice.heatModifier + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
+          heat: Math.min(100, Math.max(0, prev.heat + Math.ceil(crime.risk / (critical ? 8 : 10)) + selectedChoice.heatModifier + runMod.heatModifier + (prev.activeWorldEvent === "guard-crackdown" ? 2 : 0) - (prev.activeWorldEvent === "quiet-night" ? 2 : 0) - (prev.propertyUpgrades.security ?? 0) * 2)),
+          playerBounty: prev.playerBounty+bountyGain,
+          health: Math.max(1,prev.health-injuryDamage),
         };
-        const dropped = maybeDropLoot(next, critical);
-        next = dropped.state;
-        return appendActivity(next, `${critical ? "CRITICAL SUCCESS" : "SUCCESS"}: ${crime.name} · ${selectedChoice.label} paid ${money(reward)}${dropped.loot ? ` and dropped ${dropped.loot}` : ""}.`, critical ? "critical" : "success");
+        const dropped = maybeDropLoot(next, critical); next = dropped.state;
+        const extras=[dropped.loot.length?`loot: ${dropped.loot.join(", ")}`:"",bountyGain?`bounty +${money(bountyGain)}`:"",injured?`injured -${injuryDamage} HP`:""].filter(Boolean).join(" · ");
+        return appendActivity(next, `${critical ? "CRITICAL SUCCESS" : "SUCCESS"}: ${crime.name} · ${selectedChoice.label} paid ${money(reward)}${extras?` · ${extras}`:""}.${storySuffix}`, critical ? "critical" : "success");
       }
 
       if (outcome === "jailed") {
-        next = {
-          ...next,
-          crimesFailed: prev.crimesFailed + 1,
-          timesJailed: prev.timesJailed + 1,
-          jailUntil: Date.now() + JAIL_MINUTES * 60000,
-          jailStartedAt: Date.now(),
-          jailReason: crime.name,
-          jailSentenceMs: JAIL_MINUTES * 60000,
-          currentLocation: "jail",
-          locationsVisited: prev.locationsVisited.includes("jail") ? prev.locationsVisited : [...prev.locationsVisited, "jail"],
-          heat: Math.max(0, prev.heat - 15),
-        };
-        return appendActivity(next, `FAILED: ${crime.name} · ${selectedChoice.label}. You were jailed.`, "jailed");
+        const contraband=ITEMS.filter(i=>i.contraband&&(prev.inventory[i.id]||0)>0);
+        const charges=[crime.name, ...(contraband.length?["Contraband Possession"]:[])];
+        const sentenceMultiplier=1+Math.min(.8,Math.max(0,runMod.arrestModifier)/30);
+        const sentence=Math.round(JAIL_MINUTES*60000*sentenceMultiplier);
+        next = { ...next, crimesFailed: prev.crimesFailed + 1, timesJailed: prev.timesJailed + 1, jailUntil: Date.now()+sentence, jailStartedAt: Date.now(), jailReason: charges.join(" + "), jailSentenceMs: sentence, activeCharges:charges, currentLocation:"jail", locationsVisited:prev.locationsVisited.includes("jail")?prev.locationsVisited:[...prev.locationsVisited,"jail"], heat:Math.max(0,prev.heat-15) };
+        return appendActivity(next, `ARRESTED: ${crime.name}. Charges: ${charges.join(", ")}.${storySuffix}`, "jailed");
       }
 
       if (outcome === "critical-fail") {
-        next = { ...next, crimesFailed: prev.crimesFailed + 1, health: Math.max(1, prev.health - 12) };
-        return appendActivity(next, `CRITICAL FAIL: ${crime.name}. You escaped, barely.`, "critical");
+        const damage=Math.max(10,Math.round(12+crime.risk*.2));
+        next = { ...next, crimesFailed: prev.crimesFailed + 1, health: Math.max(1, prev.health - damage), heat:Math.min(100,prev.heat+Math.max(2,runMod.heatModifier)) };
+        return appendActivity(next, `CRITICAL FAIL: ${crime.name}. You escape hurt (-${damage} HP).${storySuffix}`, "critical");
       }
 
-      next = { ...next, crimesSpooked: prev.crimesSpooked + 1 };
-      return appendActivity(next, `SPOOKED: ${crime.name} · ${selectedChoice.label} failed without further consequences.`, "spooked");
+      const spookInjury=Math.random()<runMod.injuryChance*.35;
+      const spookDamage=spookInjury?Math.max(2,Math.round(4+Math.random()*6)):0;
+      next = { ...next, crimesSpooked: prev.crimesSpooked + 1, health:Math.max(1,prev.health-spookDamage), heat:Math.min(100,Math.max(0,prev.heat+Math.max(0,Math.round(runMod.heatModifier*.35)))) };
+      return appendActivity(next, `SPOOKED: ${crime.name} · ${selectedChoice.label}. You got out before the score collapsed${spookDamage?` but lost ${spookDamage} HP`:""}.${storySuffix}`, "spooked");
     });
   };
 

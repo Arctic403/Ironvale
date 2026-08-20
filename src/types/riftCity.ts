@@ -98,6 +98,8 @@ export type SaveData = {
   dailyStreak: number;
   achievements: string[];
   heat: number;
+  playerBounty: number;
+  activeCharges: string[];
   crimeIntel: string[];
   meritUpgrades: Record<string, number>;
   propertyUpgrades: Record<string, number>;
