@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { tickGameState } from "../systems/gameTickSystem";
+import { getJobPosition } from "../data/jobs";
 import {
   CRIMES, Crime, crimeSuccessChance, crimeUnlocked, getCrimeStatBonus, randomReward,
 } from "../systems/crimeSystem";
@@ -64,6 +66,10 @@ export function useRiftCity() {
 
   const job = getJob(gameState.currentJob);
 
+  const jobPosition = job
+    ? getJobPosition(job, gameState.jobSkills)
+    : undefined;
+
   const education =
     EDUCATION.find(
       (e) => e.id === gameState.educationActive
@@ -116,289 +122,39 @@ export function useRiftCity() {
   };
 
   useEffect(() => {
-    localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify(gameState)
-    );
+    try {
+      localStorage.setItem(
+        SAVE_KEY,
+        JSON.stringify(gameState)
+      );
+    } catch {
+      // Storage can be unavailable or quota-restricted in some browser modes.
+    }
   }, [gameState]);
 
   /*
    * Main game clock.
+   *
+   * Keep all passive progression in the centralized tick system so
+   * health, jobs, market updates, and resource regeneration cannot
+   * drift apart across duplicate implementations.
    */
   useEffect(() => {
     const id = window.setInterval(() => {
       const now = Date.now();
+      const maxHappiness = property?.maxHappiness ?? 100;
 
-      setGameState((prev) => {
-        let changed = false;
-
-        const updates: Partial<SaveData> = {};
-
-        /*
-         * ENERGY
-         */
-        if (prev.energy < MAX_ENERGY) {
-          const ticks = Math.floor(
-            (now - prev.lastEnergyUpdate) /
-              ENERGY_REGEN_INTERVAL
-          );
-
-          if (ticks > 0) {
-            updates.energy = Math.min(
-              MAX_ENERGY,
-              prev.energy + ticks
-            );
-
-            updates.lastEnergyUpdate =
-              prev.lastEnergyUpdate +
-              ticks * ENERGY_REGEN_INTERVAL;
-
-            changed = true;
-          }
-        } else {
-          updates.lastEnergyUpdate = now;
-        }
-
-        /*
-         * NERVE
-         */
-        if (prev.nerve < maxNerve) {
-          const ticks = Math.floor(
-            (now - prev.lastNerveUpdate) /
-              NERVE_REGEN_INTERVAL
-          );
-
-          if (ticks > 0) {
-            updates.nerve = Math.min(
-              maxNerve,
-              prev.nerve + ticks
-            );
-
-            updates.lastNerveUpdate =
-              prev.lastNerveUpdate +
-              ticks * NERVE_REGEN_INTERVAL;
-
-            changed = true;
-          }
-        } else {
-          updates.lastNerveUpdate = now;
-        }
-
-        /*
-         * HAPPINESS
-         */
-        const maxHappiness =
-          property?.maxHappiness ?? 100;
-
-        if (prev.happiness < maxHappiness) {
-          const ticks = Math.floor(
-            (now - prev.lastHappinessUpdate) /
-              HAPPINESS_TICK
-          );
-
-          if (ticks > 0) {
-            updates.happiness = Math.min(
-              maxHappiness,
-              prev.happiness + ticks * 5
-            );
-
-            updates.lastHappinessUpdate =
-              prev.lastHappinessUpdate +
-              ticks * HAPPINESS_TICK;
-
-            changed = true;
-          }
-        } else {
-          updates.lastHappinessUpdate = now;
-        }
-
-        /*
-         * HEALTH
-         */
-        if (
-          prev.health < maxHealth &&
-          !prev.hospitalUntil &&
-          !prev.jailUntil
-        ) {
-          const ticks = Math.floor(
-            (now - prev.lastEnergyUpdate) /
-              HEALTH_REGEN_INTERVAL
-          );
-
-          if (ticks > 0) {
-            updates.health = Math.min(
-              maxHealth,
-              prev.health + ticks
-            );
-
-            changed = true;
-          }
-        }
-
-        /*
-         * JAIL
-         */
-        if (
-          prev.jailUntil &&
-          now >= prev.jailUntil
-        ) {
-          updates.jailUntil = null;
-
-          changed = true;
-        }
-
-        /*
-         * HOSPITAL
-         */
-        if (
-          prev.hospitalUntil &&
-          now >= prev.hospitalUntil
-        ) {
-          updates.hospitalUntil = null;
-          updates.health = maxHealth;
-
-          changed = true;
-        }
-
-        /*
-         * BANK INTEREST
-         */
-        if (
-          prev.bank > 0 &&
-          now - prev.lastBankInterest >=
-            BANK_INTEREST_INTERVAL
-        ) {
-          const days = Math.floor(
-            (now - prev.lastBankInterest) /
-              BANK_INTEREST_INTERVAL
-          );
-
-          if (days > 0) {
-            const interest = Math.floor(
-              prev.bank * 0.01 * days
-            );
-
-            updates.bank =
-              prev.bank + interest;
-
-            updates.bankInterest =
-              prev.bankInterest + interest;
-
-            updates.lastBankInterest =
-              prev.lastBankInterest +
-              days * BANK_INTEREST_INTERVAL;
-
-            changed = true;
-          }
-        }
-
-        /*
-         * JOB PAYMENT
-         */
-        if (
-          prev.currentJob &&
-          now - prev.lastJobPayment >=
-            JOB_PAY_INTERVAL
-        ) {
-          const currentJob =
-            getJob(prev.currentJob);
-
-          if (currentJob) {
-            const ticks = Math.floor(
-              (now - prev.lastJobPayment) /
-                JOB_PAY_INTERVAL
-            );
-
-            if (ticks > 0) {
-              const earned =
-                currentJob.salary * ticks;
-
-              updates.cash =
-                (updates.cash ?? prev.cash) +
-                earned;
-
-              updates.lastJobPayment =
-                prev.lastJobPayment +
-                ticks * JOB_PAY_INTERVAL;
-
-              changed = true;
-            }
-          }
-        }
-
-        /*
-         * MARKET UPDATE
-         *
-         * Market prices move periodically instead of
-         * changing every time someone presses Buy/Sell.
-         */
-        const lastMarketUpdate =
-          typeof (
-            prev as SaveData & {
-              lastMarketUpdate?: number;
-            }
-          ).lastMarketUpdate === "number"
-            ? (
-                prev as SaveData & {
-                  lastMarketUpdate?: number;
-                }
-              ).lastMarketUpdate!
-            : now;
-
-        if (
-          now - lastMarketUpdate >=
-          MARKET_UPDATE_INTERVAL
-        ) {
-          const updatedMarket = {
-            ...prev.market,
-          };
-
-          Object.keys(DEFAULT_MARKET_PRICES).forEach(
-            (id) => {
-              const current =
-                updatedMarket[id] ??
-                DEFAULT_MARKET_PRICES[id];
-
-              updatedMarket[id] =
-                randomMarketPrice(current);
-            }
-          );
-
-          (
-            updates as Partial<
-              SaveData & {
-                lastMarketUpdate: number;
-              }
-            >
-          ).market = updatedMarket;
-
-          (
-            updates as Partial<
-              SaveData & {
-                lastMarketUpdate: number;
-              }
-            >
-          ).lastMarketUpdate = now;
-
-          changed = true;
-        }
-
-        return changed
-          ? {
-              ...prev,
-              ...updates,
-            }
-          : prev;
-      });
+      setGameState((prev) =>
+        tickGameState(prev, now, {
+          maxHealth,
+          maxNerve,
+          maxHappiness,
+        })
+      );
     }, 1000);
 
-    return () =>
-      window.clearInterval(id);
-  }, [
-    maxNerve,
-    maxHealth,
-    property?.maxHappiness,
-  ]);
+    return () => window.clearInterval(id);
+  }, [maxNerve, maxHealth, property?.maxHappiness]);
 
   const blocked = () =>
     Boolean(
@@ -1183,7 +939,7 @@ export function useRiftCity() {
           if (ticks > 0) {
             next.cash =
               prev.cash +
-              previousJob.salary *
+              getJobPosition(previousJob, prev.jobSkills).salary *
                 ticks;
 
             next.lastJobPayment =
@@ -1207,6 +963,11 @@ export function useRiftCity() {
       next.currentJob = id;
       next.jobStartedAt = Date.now();
       next.lastJobPayment = Date.now();
+      next.lastJobSkillUpdate = Date.now();
+      next.jobPositionTiers = {
+        ...next.jobPositionTiers,
+        [id]: getJobPosition(newJob, next.jobSkills).tier,
+      };
 
       return appendActivity(
         next,
@@ -1812,9 +1573,11 @@ export function useRiftCity() {
    * Reset
    */
   const resetGame = () => {
-    localStorage.removeItem(
-      SAVE_KEY
-    );
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {
+      // Keep reset functional even when browser storage is unavailable.
+    }
 
     setGameState(freshSave());
 
@@ -1838,6 +1601,7 @@ export function useRiftCity() {
 
     gym,
     job,
+    jobPosition,
     education,
 
     encounter,

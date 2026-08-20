@@ -112,6 +112,7 @@ export function Navigation({
                 ? "active"
                 : ""
             }`}
+            aria-current={currentScreen === item.id ? "page" : undefined}
             onClick={() =>
               onNavigate(item.id)
             }
@@ -137,7 +138,11 @@ export function Navigation({
 
         <button
           className="btn-danger-ghost"
-          onClick={onReset}
+          onClick={() => {
+            if (window.confirm("Reset RiftCity and erase this local save?")) {
+              onReset();
+            }
+          }}
         >
           ↻ Reset
         </button>
