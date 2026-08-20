@@ -11,53 +11,53 @@ type Game = ReturnType<typeof useRiftCity>;
 type MasterMapLocation = CityLocation & { future?: boolean };
 
 const MASTER_MAP_POSITIONS: Record<string, { x: number; y: number }> = {
-  hospital: { x: 10.6, y: 18.9 }, police: { x: 28.0, y: 17.0 }, bank: { x: 40.7, y: 17.5 },
-  university: { x: 52.3, y: 17.3 }, airport: { x: 66.3, y: 18.9 }, park: { x: 36.6, y: 32.2 },
-  property: { x: 21.5, y: 35.3 }, jobs: { x: 54.1, y: 33.4 }, downtown: { x: 33.1, y: 48.9 },
-  pharmacy: { x: 8.1, y: 35.2 }, casino: { x: 48.1, y: 46.9 }, shops: { x: 61.9, y: 49.9 },
-  "black-market": { x: 70.9, y: 44.5 }, market: { x: 66.3, y: 65.3 }, gym: { x: 9.3, y: 48.8 },
-  jail: { x: 6.3, y: 60.9 }, crime: { x: 5.9, y: 73.5 }, combat: { x: 28.5, y: 71.3 },
-  missions: { x: 46.0, y: 70.9 },
+  hospital: { x: 13.44, y: 10.98 }, police: { x: 35.50, y: 8.68 }, bank: { x: 51.61, y: 9.28 },
+  university: { x: 66.31, y: 9.04 }, airport: { x: 84.07, y: 10.98 }, park: { x: 46.41, y: 27.10 },
+  property: { x: 27.26, y: 30.86 }, jobs: { x: 68.60, y: 28.55 }, downtown: { x: 41.97, y: 47.34 },
+  pharmacy: { x: 10.27, y: 30.73 }, casino: { x: 60.99, y: 44.92 }, shops: { x: 78.49, y: 48.55 },
+  "black-market": { x: 89.90, y: 42.01 }, market: { x: 84.07, y: 67.22 }, gym: { x: 11.79, y: 47.22 },
+  jail: { x: 7.99, y: 61.88 }, crime: { x: 7.48, y: 77.16 }, combat: { x: 36.14, y: 74.49 },
+  missions: { x: 58.33, y: 74.00 },
 };
 
 const FUTURE_MAP_LOCATIONS: MasterMapLocation[] = [
-  { id: "chop-shop", name: "Chop Shop / Auto Garage", icon: "🚗", description: "Vehicle work, parts, repairs, customization, and future underground auto activity.", district: "Industrial District", x: "20.5%", y: "53.9%", future: true },
-  { id: "courthouse", name: "Courthouse", icon: "⚖️", description: "Future legal cases, fines, warrants, hearings, and justice-system gameplay.", district: "Justice District", x: "22.2%", y: "58.9%", future: true },
-  { id: "company-plaza", name: "Player Company Plaza", icon: "🏢", description: "Future headquarters for player-owned companies, hiring, management, and business competition.", district: "Business District", x: "27.6%", y: "59.0%", future: true },
-  { id: "transit", name: "Transit Station", icon: "🚆", description: "Future city transit and regional travel connections.", district: "Downtown", x: "34.2%", y: "58.9%", future: true },
-  { id: "safehouse", name: "Safehouse Block", icon: "🔐", description: "Future private safehouses, stash storage, protection, and criminal utility.", district: "Downtown", x: "39.7%", y: "58.9%", future: true },
-  { id: "luxury-mall", name: "Luxury Mall", icon: "💎", description: "Future premium shopping, rare goods, fashion, collectibles, and high-end services.", district: "Commercial District", x: "45.7%", y: "58.9%", future: true },
-  { id: "pawn-loan", name: "Pawn & Loan", icon: "💵", description: "Future pawn sales, loans, valuables, and quick-cash services.", district: "Commercial District", x: "50.5%", y: "58.9%", future: true },
-  { id: "nightlife", name: "Nightlife Strip", icon: "🍸", description: "Future clubs, social events, nightlife jobs, encounters, and entertainment.", district: "Entertainment District", x: "55.3%", y: "58.9%", future: true },
-  { id: "harbor", name: "Harbor Docks / Dock Union Port", icon: "⚓", description: "Future cargo, smuggling, logistics, faction work, shipping, and trade routes.", district: "Harbor District", x: "15.9%", y: "81.7%", future: true },
-  { id: "warehouses", name: "Warehouse District", icon: "🏭", description: "Future storage, logistics, company inventory, cargo contracts, and crime opportunities.", district: "Warehouse District", x: "36.5%", y: "81.8%", future: true },
-  { id: "iron-hq", name: "Iron Syndicate HQ", icon: "☠️", description: "Future headquarters and deeper progression for the Iron Syndicate.", district: "Faction Row", x: "51.1%", y: "82.2%", future: true },
-  { id: "guard-hq", name: "Rift Guard Barracks", icon: "🛡️", description: "Future headquarters and deeper progression for the Rift Guard.", district: "Faction Row", x: "56.1%", y: "82.2%", future: true },
-  { id: "dock-union-hq", name: "Dock Union Hall", icon: "⚓", description: "Future headquarters and deeper progression for the Dock Union.", district: "Faction Row", x: "61.2%", y: "82.2%", future: true },
+  { id: "chop-shop", name: "Chop Shop / Auto Garage", icon: "🚗", description: "Vehicle work, parts, repairs, customization, and future underground auto activity.", district: "Industrial District", x: "25.99%", y: "53.40%", future: true },
+  { id: "courthouse", name: "Courthouse", icon: "⚖️", description: "Future legal cases, fines, warrants, hearings, and justice-system gameplay.", district: "Justice District", x: "28.15%", y: "59.46%", future: true },
+  { id: "company-plaza", name: "Player Company Plaza", icon: "🏢", description: "Future headquarters for player-owned companies, hiring, management, and business competition.", district: "Business District", x: "35.00%", y: "59.58%", future: true },
+  { id: "transit", name: "Transit Station", icon: "🚆", description: "Future city transit and regional travel connections.", district: "Downtown", x: "43.36%", y: "59.46%", future: true },
+  { id: "safehouse", name: "Safehouse Block", icon: "🔐", description: "Future private safehouses, stash storage, protection, and criminal utility.", district: "Downtown", x: "50.34%", y: "59.46%", future: true },
+  { id: "luxury-mall", name: "Luxury Mall", icon: "💎", description: "Future premium shopping, rare goods, fashion, collectibles, and high-end services.", district: "Commercial District", x: "57.95%", y: "59.46%", future: true },
+  { id: "pawn-loan", name: "Pawn & Loan", icon: "💵", description: "Future pawn sales, loans, valuables, and quick-cash services.", district: "Commercial District", x: "64.03%", y: "59.46%", future: true },
+  { id: "nightlife", name: "Nightlife Strip", icon: "🍸", description: "Future clubs, social events, nightlife jobs, encounters, and entertainment.", district: "Entertainment District", x: "70.12%", y: "59.46%", future: true },
+  { id: "harbor", name: "Harbor Docks / Dock Union Port", icon: "⚓", description: "Future cargo, smuggling, logistics, faction work, shipping, and trade routes.", district: "Harbor District", x: "20.16%", y: "87.09%", future: true },
+  { id: "warehouses", name: "Warehouse District", icon: "🏭", description: "Future storage, logistics, company inventory, cargo contracts, and crime opportunities.", district: "Warehouse District", x: "46.28%", y: "87.22%", future: true },
+  { id: "iron-hq", name: "Iron Syndicate HQ", icon: "☠️", description: "Future headquarters and deeper progression for the Iron Syndicate.", district: "Faction Row", x: "64.79%", y: "87.70%", future: true },
+  { id: "guard-hq", name: "Rift Guard Barracks", icon: "🛡️", description: "Future headquarters and deeper progression for the Rift Guard.", district: "Faction Row", x: "71.13%", y: "87.70%", future: true },
+  { id: "dock-union-hq", name: "Dock Union Hall", icon: "⚓", description: "Future headquarters and deeper progression for the Dock Union.", district: "Faction Row", x: "77.60%", y: "87.70%", future: true },
 ];
 
 const MASTER_DISTRICTS = [
-  { name: "Medical District", x: 1, y: 10, w: 20, h: 31 },
-  { name: "Northside", x: 22, y: 9, w: 12, h: 20 },
-  { name: "Financial District", x: 34, y: 9, w: 13, h: 20 },
-  { name: "University District", x: 47, y: 9, w: 12, h: 20 },
-  { name: "Airport District", x: 59, y: 8, w: 17, h: 28 },
-  { name: "Central District", x: 27, y: 24, w: 20, h: 18 },
-  { name: "Residential District", x: 14, y: 27, w: 15, h: 18 },
-  { name: "Business District", x: 48, y: 26, w: 15, h: 18 },
-  { name: "Downtown", x: 25, y: 41, w: 18, h: 19 },
-  { name: "Entertainment District", x: 42, y: 40, w: 15, h: 18 },
-  { name: "Commercial District", x: 56, y: 40, w: 14, h: 20 },
-  { name: "East Market", x: 68, y: 34, w: 8, h: 22 },
-  { name: "Industrial District", x: 1, y: 42, w: 22, h: 17 },
-  { name: "Justice District", x: 1, y: 56, w: 18, h: 14 },
-  { name: "Underground District", x: 1, y: 68, w: 17, h: 16 },
-  { name: "Combat District", x: 22, y: 66, w: 20, h: 15 },
-  { name: "Operations District", x: 41, y: 65, w: 20, h: 15 },
-  { name: "Market District", x: 60, y: 56, w: 16, h: 18 },
-  { name: "Harbor District", x: 7, y: 78, w: 21, h: 17 },
-  { name: "Warehouse District", x: 29, y: 78, w: 16, h: 17 },
-  { name: "Faction Row", x: 46, y: 77, w: 21, h: 18 },
+  { name: "Medical District", x: 1.27, y: 0.19, w: 25.36, h: 37.57 },
+  { name: "Northside", x: 27.89, y: 0, w: 15.22, h: 23.22 },
+  { name: "Financial District", x: 43.11, y: 0, w: 16.48, h: 23.22 },
+  { name: "University District", x: 59.59, y: 0, w: 15.22, h: 23.22 },
+  { name: "Airport District", x: 74.81, y: 0, w: 21.56, h: 31.71 },
+  { name: "Central District", x: 34.23, y: 17.16, w: 25.36, h: 21.82 },
+  { name: "Residential District", x: 17.75, y: 20.80, w: 19.02, h: 21.82 },
+  { name: "Business District", x: 60.86, y: 19.58, w: 19.02, h: 21.82 },
+  { name: "Downtown", x: 31.70, y: 37.76, w: 22.82, h: 23.03 },
+  { name: "Entertainment District", x: 53.25, y: 36.55, w: 19.02, h: 21.82 },
+  { name: "Commercial District", x: 71.01, y: 36.55, w: 17.75, h: 24.24 },
+  { name: "East Market", x: 86.22, y: 29.28, w: 10.14, h: 26.67 },
+  { name: "Industrial District", x: 1.27, y: 38.98, w: 27.89, h: 20.60 },
+  { name: "Justice District", x: 1.27, y: 55.95, w: 22.82, h: 16.97 },
+  { name: "Underground District", x: 1.27, y: 70.49, w: 21.56, h: 19.39 },
+  { name: "Combat District", x: 27.89, y: 68.07, w: 25.36, h: 18.18 },
+  { name: "Operations District", x: 51.99, y: 66.85, w: 25.36, h: 18.18 },
+  { name: "Market District", x: 76.08, y: 55.95, w: 20.29, h: 21.82 },
+  { name: "Harbor District", x: 8.88, y: 82.61, w: 26.63, h: 17.39 },
+  { name: "Warehouse District", x: 36.77, y: 82.61, w: 20.29, h: 17.39 },
+  { name: "Faction Row", x: 58.33, y: 81.40, w: 26.63, h: 18.60 },
 ];
 
 
@@ -148,8 +148,8 @@ export function City({ g }: { g: Game }) {
      MAP CONSTANTS
   ========================================================= */
 
-  const MAP_WIDTH = 1000;
-  const MAP_HEIGHT = 750;
+  const MAP_WIDTH = 1142;
+  const MAP_HEIGHT = 896;
 
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 2.5;
@@ -884,20 +884,20 @@ export function City({ g }: { g: Game }) {
 
           <svg
             className="riftcity-map-svg master-map-svg"
-            viewBox="0 0 1000 750"
+            viewBox="0 0 1142 896"
             role="application"
             aria-label="Interactive RiftCity master map"
           >
             <g
               className="map-world master-map-world"
-              transform={`translate(${500 + pan.x} ${375 + pan.y}) scale(${zoom}) translate(-500 -375)`}
+              transform={`translate(${571 + pan.x} ${448 + pan.y}) scale(${zoom}) translate(-571 -448)`}
             >
               <image
                 href={masterMapImage}
                 x="0"
                 y="0"
-                width="1000"
-                height="750"
+                width="1142"
+                height="896"
                 preserveAspectRatio="xMidYMid meet"
                 className="master-map-image"
               />

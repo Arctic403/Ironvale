@@ -1,5 +1,5 @@
 /* RiftCity master map image integration — click the art itself, no old marker boxes. */
-.master-map-svg{aspect-ratio:4/3;background:#050a0f;border-radius:18px}
+.master-map-svg{aspect-ratio:571/448;background:#050a0f;border-radius:18px}
 .master-map-image{pointer-events:none;user-select:none;-webkit-user-drag:none}
 .master-district-hotspot{fill:transparent;stroke:transparent;cursor:pointer;pointer-events:all}
 .master-district-hotspot:hover,.master-district-hotspot:focus{stroke:rgba(255,255,255,.18);stroke-width:2;fill:rgba(255,255,255,.025);outline:none}
@@ -27,7 +27,7 @@
 @media (max-width:700px){
   /* One finger scrolls the page. Map zoom is still available from +/- controls,
      and the JS keeps a two-pointer path for pinch attempts. */
-  .riftcity-map.interactive-map{overflow:hidden;aspect-ratio:4/3;min-height:0;touch-action:pan-y}
+  .riftcity-map.interactive-map{overflow:hidden;aspect-ratio:571/448;min-height:0;touch-action:pan-y}
   .riftcity-map-svg{width:100%;height:100%;display:block;touch-action:pan-y}
   .master-map-svg{width:100%;height:100%;display:block}
   .master-district-hotspot:hover{stroke:transparent;fill:transparent}
