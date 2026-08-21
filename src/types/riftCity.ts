@@ -3,7 +3,7 @@ export type Screen =
   | "missions" | "education" | "property" | "character"
   | "market" | "faction" | "awards" | "progression"
   | "bank" | "hospital" | "jail" | "police" | "pharmacy" | "casino" | "nightclub"
-  | "blackmarket" | "park" | "downtown" | "airport";
+  | "blackmarket" | "park" | "downtown" | "airport" | "wiki";
 
 export type ActivityType =
   | "success" | "failure" | "critical" | "spooked" | "jailed"

@@ -588,3 +588,182 @@ input,select,textarea { border-radius:6px !important; }
 .top-status-bar.floating-status-panel.compact-hud-v4{position:fixed!important;inset:0 0 auto 0!important;z-index:142!important}.main-wrapper{padding-top:0!important}
 
 @media(max-width:760px){.service-item{grid-template-columns:34px minmax(0,1fr)!important}.service-item-icon{width:34px;height:34px}.service-item>div:last-child{grid-column:1/-1;justify-self:stretch!important;width:100%;justify-content:space-between!important}.auction-item-copy{padding-left:38px}.auction-item-icon{width:30px;height:30px}.item-visual{width:43px;height:43px}.screen-title-icon{width:27px;height:27px}.screen-title-icon .game-icon{width:17px;height:17px}}
+
+/* ============================================================
+   45. STATIC CHARACTER HEADER + ACTIVE EFFECTS + WIKI
+   The player header is part of normal document flow. It is NOT
+   sticky/fixed and naturally scrolls off-screen with the page.
+   ============================================================ */
+.static-app-header{
+  position:relative;
+  z-index:20;
+  width:100%;
+  border-bottom:1px solid rgba(255,255,255,.075);
+  background:linear-gradient(180deg,rgba(6,10,14,.99),rgba(7,12,17,.97));
+  box-shadow:0 8px 22px rgba(0,0,0,.14);
+}
+.static-header-row{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:stretch;
+  min-width:0;
+}
+.static-header-tools.floating-ui-stack{
+  position:static!important;
+  inset:auto!important;
+  z-index:auto!important;
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center;
+  gap:6px!important;
+  padding:8px 9px;
+  border-right:1px solid rgba(255,255,255,.065);
+}
+.static-header-tools .floating-ui-btn{
+  position:relative!important;
+  min-width:34px!important;
+  width:34px!important;
+  min-height:34px!important;
+  height:34px!important;
+  padding:0!important;
+  border-radius:5px!important;
+  box-shadow:none!important;
+}
+.top-status-bar.floating-status-panel.compact-hud-v4{
+  position:static!important;
+  inset:auto!important;
+  top:auto!important;
+  left:auto!important;
+  right:auto!important;
+  z-index:auto!important;
+  width:100%!important;
+  min-height:58px!important;
+  padding:6px 12px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.layout-root.ui-shell .screen-container,
+.screen-city .screen-container{
+  padding-top:24px!important;
+}
+.main-wrapper{padding-top:0!important}
+
+.active-effects-bar{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  min-height:39px;
+  padding:5px 12px;
+  border-top:1px solid rgba(255,255,255,.05);
+  background:rgba(255,255,255,.012);
+}
+.active-effects-label{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  color:#7f94a7;
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.13em;
+}
+.active-effects-label .game-icon{color:#8fb7d9}
+.active-effects-scroll{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.active-effects-scroll::-webkit-scrollbar{display:none}
+.effect-empty{
+  color:#607383;
+  font-size:9px;
+  font-weight:700;
+}
+.effect-chip{
+  display:inline-grid;
+  grid-template-columns:auto minmax(0,auto) auto;
+  align-items:center;
+  gap:6px;
+  flex:0 0 auto;
+  max-width:330px;
+  min-height:27px;
+  padding:4px 7px;
+  border:1px solid rgba(255,255,255,.075);
+  border-radius:5px;
+  background:rgba(255,255,255,.025);
+  color:#b9c6d1;
+}
+.effect-chip.positive{border-color:rgba(74,222,128,.18);background:rgba(74,222,128,.045);color:#9ce3b5}
+.effect-chip.warning{border-color:rgba(251,191,36,.2);background:rgba(251,191,36,.05);color:#e7ca7b}
+.effect-chip.danger{border-color:rgba(248,113,113,.22);background:rgba(248,113,113,.055);color:#eca0a0}
+.effect-chip.neutral{border-color:rgba(96,165,250,.18);background:rgba(96,165,250,.045);color:#a8c8ef}
+.effect-chip-copy{display:flex;align-items:baseline;gap:5px;min-width:0}
+.effect-chip strong{font-size:8px;white-space:nowrap}
+.effect-chip small{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#718494;font-size:7px}
+.effect-chip time{padding-left:5px;border-left:1px solid rgba(255,255,255,.08);font-size:8px;font-weight:900;white-space:nowrap;color:currentColor}
+
+.screen-wiki{--game-accent:#8bb8ff;--game-accent-rgb:139,184,255}
+.wiki-page{display:grid;gap:12px}
+.wiki-hero{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:15px;
+  padding:17px 0 18px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.wiki-hero-icon,.wiki-article-icon{
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(var(--game-accent-rgb),.22);
+  background:rgba(var(--game-accent-rgb),.055);
+  color:var(--game-accent);
+  border-radius:6px;
+}
+.wiki-hero-icon{width:54px;height:54px}
+.wiki-hero h2{margin:2px 0 4px;font-size:27px;letter-spacing:-.035em}
+.wiki-hero p{max-width:760px;margin:0;color:var(--muted);font-size:11px;line-height:1.55}
+.wiki-hero-meta{display:grid;grid-template-columns:auto auto;gap:2px 8px;align-items:baseline;padding-left:14px;border-left:1px solid rgba(255,255,255,.07)}
+.wiki-hero-meta strong{font-size:17px;color:#d8e8ff;text-align:right}.wiki-hero-meta span{font-size:8px;color:#70859a;text-transform:uppercase;letter-spacing:.08em}
+.wiki-toolbar{display:grid;gap:8px;padding:10px 0 12px;border-bottom:1px solid rgba(255,255,255,.055)}
+.wiki-search{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;max-width:760px;padding:0 10px;border:1px solid rgba(255,255,255,.09);border-radius:5px;background:rgba(255,255,255,.025);color:#7e9ab3}
+.wiki-search input{width:100%;height:40px;border:0!important;outline:0;background:transparent!important;color:#e4edf5;font-size:11px;box-shadow:none!important}.wiki-search input::placeholder{color:#536778}.wiki-search button{border:0;background:transparent;color:#7f91a2;font-size:19px;cursor:pointer}
+.wiki-category-row{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none}.wiki-category-row::-webkit-scrollbar{display:none}.wiki-category-row button{flex:0 0 auto;padding:6px 9px;border:1px solid rgba(255,255,255,.07);border-radius:4px;background:transparent;color:#778a9b;font-size:8px;font-weight:850;letter-spacing:.04em;cursor:pointer}.wiki-category-row button.active{border-color:rgba(var(--game-accent-rgb),.28);background:rgba(var(--game-accent-rgb),.07);color:#cfe2ff}
+.wiki-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:18px;align-items:start}
+.wiki-index{position:sticky;top:12px;display:grid;gap:3px;padding:12px 0;border-right:1px solid rgba(255,255,255,.06)}
+.wiki-index>span{padding:0 10px 7px;color:#5e7387;font-size:7px;font-weight:900;letter-spacing:.14em}
+.wiki-index a{display:flex;align-items:center;gap:7px;padding:7px 10px 7px 9px;border-left:2px solid transparent;color:#8498a9;text-decoration:none;font-size:9px;font-weight:750;line-height:1.25}.wiki-index a:hover{border-left-color:rgba(var(--game-accent-rgb),.5);background:rgba(var(--game-accent-rgb),.035);color:#d4e4f5}
+.wiki-articles{display:grid;gap:12px;min-width:0}
+.wiki-article{scroll-margin-top:16px;padding:15px 0 20px;border-bottom:1px solid rgba(255,255,255,.065)}
+.wiki-article>header{display:grid;grid-template-columns:auto minmax(0,1fr);gap:11px;align-items:start;margin-bottom:12px}.wiki-article-icon{width:38px;height:38px}.wiki-article header small{display:block;margin-bottom:2px;color:var(--game-accent);font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.12em}.wiki-article h3{margin:0 0 4px;font-size:18px;letter-spacing:-.025em}.wiki-article header p{margin:0;max-width:760px;color:#7e91a2;font-size:9.5px;line-height:1.45}
+.wiki-article-body{display:grid;gap:9px;padding-left:49px;color:#aebbc6;font-size:10px;line-height:1.62}.wiki-article-body p{margin:0}.wiki-article-body b{color:#e0e9f1}
+.wiki-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:3px}.wiki-facts>div{display:grid;grid-template-columns:minmax(90px,.42fr) 1fr;gap:8px;padding:8px 9px;border-left:2px solid rgba(var(--game-accent-rgb),.28);background:rgba(255,255,255,.018)}.wiki-facts span{color:#6f8395;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}.wiki-facts strong{color:#b8c6d2;font-size:9px;font-weight:750}
+.wiki-table-wrap{max-width:100%;overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:5px;background:rgba(255,255,255,.012)}
+.wiki-table{width:100%;min-width:620px;border-collapse:collapse;font-size:8.5px}.wiki-table th{padding:8px 9px;border-bottom:1px solid rgba(255,255,255,.075);background:rgba(var(--game-accent-rgb),.035);color:#7690a8;text-align:left;text-transform:uppercase;letter-spacing:.06em;font-size:7px}.wiki-table td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.045);color:#a9b8c5;vertical-align:top}.wiki-table tr:last-child td{border-bottom:0}.wiki-table td:first-child{color:#d4dfe8;font-weight:800}
+.wiki-empty{display:grid;justify-items:center;gap:5px;padding:50px 15px;color:#64798b}.wiki-empty strong{color:#a8b7c3}.wiki-empty span{font-size:9px}
+
+@media(max-width:760px){
+  .static-header-row{grid-template-columns:58px minmax(0,1fr)}
+  .static-header-tools.floating-ui-stack{display:grid!important;grid-template-columns:1fr 1fr;gap:3px!important;padding:5px 4px!important}
+  .static-header-tools .floating-ui-btn{width:24px!important;min-width:24px!important;height:27px!important;min-height:27px!important}
+  .top-status-bar.floating-status-panel.compact-hud-v4{min-height:68px!important;padding:calc(5px + env(safe-area-inset-top)) 5px 5px!important}
+  .layout-root.ui-shell .screen-container,.screen-city .screen-container{padding-top:14px!important}
+  .active-effects-bar{grid-template-columns:auto minmax(0,1fr);padding:5px 7px;gap:6px}.active-effects-label span{display:none}.effect-chip{max-width:250px}.effect-chip small{max-width:105px}
+  .wiki-hero{grid-template-columns:auto 1fr;padding:12px 0}.wiki-hero-icon{width:44px;height:44px}.wiki-hero h2{font-size:22px}.wiki-hero-meta{grid-column:1/-1;grid-template-columns:repeat(4,auto);justify-content:start;padding:8px 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.05)}
+  .wiki-layout{grid-template-columns:1fr}.wiki-index{position:static;display:flex;gap:4px;overflow-x:auto;padding:0 0 9px;border-right:0;border-bottom:1px solid rgba(255,255,255,.055);scrollbar-width:none}.wiki-index::-webkit-scrollbar{display:none}.wiki-index>span{display:none}.wiki-index a{flex:0 0 auto;padding:6px 8px;border:1px solid rgba(255,255,255,.06);border-radius:4px;font-size:8px;white-space:nowrap}.wiki-index a:hover{border-left-color:rgba(255,255,255,.06);border-color:rgba(var(--game-accent-rgb),.28)}
+  .wiki-article{padding:11px 0 15px}.wiki-article>header{gap:8px}.wiki-article-icon{width:32px;height:32px}.wiki-article h3{font-size:15px}.wiki-article-body{padding-left:0;font-size:9.5px}.wiki-facts{grid-template-columns:1fr}.wiki-facts>div{grid-template-columns:100px 1fr}.wiki-table{min-width:560px}
+}
+
+@media(max-width:390px){
+  .static-header-row{grid-template-columns:53px minmax(0,1fr)}
+  .top-status-bar.floating-status-panel.compact-hud-v4{padding-left:3px!important;padding-right:3px!important}
+  .effect-chip small{display:none}.effect-chip{max-width:none}.active-effects-bar{min-height:36px}
+}

@@ -35,6 +35,7 @@ export const ROUTES: RouteDefinition[] = [
   { screen: "park", path: "/park", title: "Central Park" },
   { screen: "downtown", path: "/downtown", title: "Downtown" },
   { screen: "airport", path: "/airport", title: "RiftCity Airport" },
+  { screen: "wiki", path: "/wiki", title: "RiftCity Wiki", navLabel: "Wiki", icon: "book" },
 ];
 
 const SCREEN_TO_ROUTE = new Map(ROUTES.map((route) => [route.screen, route]));

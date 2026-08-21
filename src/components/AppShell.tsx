@@ -6,8 +6,6 @@ import {
   ENERGY_REGEN_INTERVAL,
   NERVE_REGEN_INTERVAL,
   HAPPINESS_TICK,
-  formatTime,
-  timeLeft,
 } from "../core/gameCore";
 
 import { getProperty } from "../data/gameData";
@@ -20,6 +18,7 @@ import {
 } from "./apps/Navigation";
 
 import { StatusBar } from "./apps/StatusBar";
+import { ActiveEffectsBar } from "./apps/ActiveEffectsBar";
 import { ResourceModal } from "./apps/ResourceModal";
 import { ScreenContent } from "./apps/ScreenContent";
 import { ActivityLog } from "./apps/ActivityLog";
@@ -29,7 +28,7 @@ import { GameIcon, type GameIconName } from "./GameIcon";
 
 const SCREEN_ICONS: Partial<Record<string, GameIconName>> = {
   character:"character", crimes:"crimes", combat:"combat", gym:"gym", jobs:"jobs", inventory:"inventory", shops:"shops", missions:"missions", education:"education", property:"property", market:"market", faction:"faction", awards:"awards", progression:"progression",
-  bank:"bank", hospital:"hospital", jail:"lock", police:"police", pharmacy:"pharmacy", casino:"casino", nightclub:"music", blackmarket:"disguise", park:"park", downtown:"pin", airport:"airport"
+  bank:"bank", hospital:"hospital", jail:"lock", police:"police", pharmacy:"pharmacy", casino:"casino", nightclub:"music", blackmarket:"disguise", park:"park", downtown:"pin", airport:"airport", wiki:"book"
 };
 
 function App() {
@@ -107,34 +106,40 @@ function App() {
         onClose={() => setNavOpen(false)}
       />
 
-      <div className="floating-ui-stack" aria-label="Interface controls">
-        <button
-          type="button"
-          className={`floating-ui-btn ${navOpen ? "active" : ""}`}
-          onClick={() => {
-            setNavOpen((open) => !open);
-            setActivityOpen(false);
-          }}
-        >
-          <GameIcon name="menu" size={17} />
-          <strong>Menu</strong>
-        </button>
-
-        <button
-          type="button"
-          className={`floating-ui-btn ${activityOpen ? "active" : ""}`}
-          onClick={() => {
-            setActivityOpen((open) => !open);
-            setNavOpen(false);
-          }}
-        >
-          <GameIcon name="log" size={17} />
-          <strong>Log</strong>
-        </button>
-      </div>
-
       <div className={`main-wrapper screen-shell screen-${g.currentScreen}`} data-screen={g.currentScreen}>
-        <StatusBar g={g} setActiveModal={setActiveModal} />
+        <div className="static-app-header">
+          <div className="static-header-row">
+            <div className="floating-ui-stack static-header-tools" aria-label="Interface controls">
+              <button
+                type="button"
+                className={`floating-ui-btn ${navOpen ? "active" : ""}`}
+                onClick={() => {
+                  setNavOpen((open) => !open);
+                  setActivityOpen(false);
+                }}
+                aria-label="Open navigation"
+              >
+                <GameIcon name="menu" size={17} />
+                <strong>Menu</strong>
+              </button>
+
+              <button
+                type="button"
+                className={`floating-ui-btn ${activityOpen ? "active" : ""}`}
+                onClick={() => {
+                  setActivityOpen((open) => !open);
+                  setNavOpen(false);
+                }}
+                aria-label="Open activity log"
+              >
+                <GameIcon name="log" size={17} />
+                <strong>Log</strong>
+              </button>
+            </div>
+            <StatusBar g={g} setActiveModal={setActiveModal} />
+          </div>
+          <ActiveEffectsBar g={g} now={now} />
+        </div>
 
         <ResourceModal
           g={g}
@@ -162,19 +167,6 @@ function App() {
               <div className="screen-title-row">{SCREEN_ICONS[g.currentScreen] && <span className="screen-title-icon"><GameIcon name={SCREEN_ICONS[g.currentScreen]!} size={20} /></span>}<h1>{title}</h1></div>
             </div>
 
-            <div className="header-quick-status">
-              {g.gameState.jailUntil && (
-                <div className="status-alert jail compact">
-                  <GameIcon name="lock" size={14} /> {formatTime(timeLeft(g.gameState.jailUntil))}
-                </div>
-              )}
-
-              {g.gameState.hospitalUntil && (
-                <div className="status-alert hospital compact">
-                  <GameIcon name="hospital" size={14} /> {formatTime(timeLeft(g.gameState.hospitalUntil))}
-                </div>
-              )}
-            </div>
           </div>
 
           <div className="feature-page-canvas">

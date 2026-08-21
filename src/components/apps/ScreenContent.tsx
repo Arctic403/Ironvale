@@ -33,6 +33,7 @@ const PAGE_COMPONENTS: Record<Screen, React.LazyExoticComponent<PageComponent>> 
   park: lazy(() => import("../../pages/ParkPage")),
   downtown: lazy(() => import("../../pages/DowntownPage")),
   airport: lazy(() => import("../../pages/AirportPage")),
+  wiki: lazy(() => import("../../pages/WikiPage")),
 };
 
 export function ScreenContent({ g }: ScreenContentProps) {
