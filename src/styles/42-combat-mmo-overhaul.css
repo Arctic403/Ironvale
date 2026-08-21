@@ -350,6 +350,9 @@
   transform: translateX(-50%);
   transform-origin: 50% 100%;
   animation: combatRigIdle 2.8s ease-in-out infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .combat-rig-head,
@@ -635,6 +638,115 @@
 }
 
 /* -----------------------------
+   PROJECTILES / MELEE SWIPES
+   ----------------------------- */
+
+.combat-stage-projectile {
+  position: absolute;
+  z-index: 10;
+  top: 59%;
+  width: 54px;
+  height: 4px;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, #fff7b2 26%, #ffc54a 64%, transparent);
+  box-shadow: 0 0 8px rgba(255, 198, 68, .9), 0 0 18px rgba(255, 142, 49, .45);
+  will-change: transform, opacity;
+}
+
+.combat-stage-projectile::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  transform: translateY(-50%) rotate(45deg);
+  background: #fff7c2;
+  box-shadow: 0 0 8px rgba(255, 205, 83, .95);
+}
+
+.combat-stage-projectile-player {
+  left: 29%;
+  animation: combatProjectilePlayer .34s cubic-bezier(.2,.72,.2,1) .23s both;
+}
+
+.combat-stage-projectile-enemy {
+  right: 29%;
+  transform: scaleX(-1);
+  animation: combatProjectileEnemy .34s cubic-bezier(.2,.72,.2,1) .23s both;
+}
+
+.combat-stage-projectile-smg {
+  height: 3px;
+  box-shadow:
+    0 -7px 0 rgba(255, 205, 83, .5),
+    0 7px 0 rgba(255, 205, 83, .32),
+    0 0 9px rgba(255, 198, 68, .9);
+}
+
+.combat-stage-projectile-shotgun {
+  width: 68px;
+  height: 5px;
+  filter: blur(.15px);
+}
+
+.combat-stage-projectile-rifle {
+  width: 72px;
+  height: 3px;
+}
+
+.combat-stage-melee-swipe {
+  position: absolute;
+  z-index: 9;
+  top: 49%;
+  width: 82px;
+  height: 92px;
+  pointer-events: none;
+  opacity: 0;
+  border: 4px solid rgba(204, 230, 255, .82);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 7px rgba(100, 174, 255, .52));
+  will-change: transform, opacity;
+}
+
+.combat-stage-melee-swipe-player {
+  left: 35%;
+  transform-origin: 0 100%;
+  animation: combatMeleeSwipePlayer .42s ease-out .23s both;
+}
+
+.combat-stage-melee-swipe-enemy {
+  right: 35%;
+  transform-origin: 100% 100%;
+  animation: combatMeleeSwipeEnemy .42s ease-out .23s both;
+}
+
+.combat-stage-melee-swipe-unarmed {
+  width: 58px;
+  height: 54px;
+  border-width: 3px;
+}
+
+.combat-stage-melee-swipe-blade {
+  border-color: rgba(229, 241, 255, .94);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  filter: drop-shadow(0 0 9px rgba(192, 224, 255, .72));
+}
+
+.combat-stage-melee-swipe-blunt {
+  border-width: 7px;
+  border-color: rgba(255, 194, 105, .72);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 147, 58, .46));
+}
+
+/* -----------------------------
    CENTER / STATUS
    ----------------------------- */
 
@@ -786,9 +898,9 @@
 
 @keyframes combatMeleeLunge {
   0% { transform: translateX(-50%) translateY(0) rotate(0); }
-  24% { transform: translateX(-50%) translateY(-3px) rotate(-3deg); }
-  48% { transform: translateX(calc(-50% + 46px)) translateY(-6px) rotate(6deg); }
-  66% { transform: translateX(calc(-50% + 38px)) translateY(-2px) rotate(3deg); }
+  20% { transform: translateX(calc(-50% - 8px)) translateY(-4px) rotate(-4deg); }
+  48% { transform: translateX(calc(-50% + 92px)) translateY(-9px) rotate(7deg); }
+  66% { transform: translateX(calc(-50% + 74px)) translateY(-3px) rotate(3deg); }
   100% { transform: translateX(-50%) translateY(0) rotate(0); }
 }
 
@@ -893,6 +1005,32 @@
   100% { opacity: 0; transform: translateX(-50%) translateY(-34px) scale(.96); }
 }
 
+@keyframes combatProjectilePlayer {
+  0% { opacity: 0; transform: translate3d(-10px, 0, 0) scaleX(.55); }
+  18% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(235px, -5px, 0) scaleX(1.2); }
+}
+
+@keyframes combatProjectileEnemy {
+  0% { opacity: 0; transform: translate3d(10px, 0, 0) scaleX(-.55); }
+  18% { opacity: 1; }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(-235px, -5px, 0) scaleX(-1.2); }
+}
+
+@keyframes combatMeleeSwipePlayer {
+  0% { opacity: 0; transform: rotate(-58deg) scale(.45); }
+  22% { opacity: .9; }
+  100% { opacity: 0; transform: rotate(42deg) scale(1.2); }
+}
+
+@keyframes combatMeleeSwipeEnemy {
+  0% { opacity: 0; transform: rotate(58deg) scale(.45) scaleX(-1); }
+  22% { opacity: .9; }
+  100% { opacity: 0; transform: rotate(-42deg) scale(1.2) scaleX(-1); }
+}
+
 @keyframes combatStageShake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-2px); }
@@ -965,6 +1103,17 @@
     height: 34px;
     font-size: 8px;
   }
+
+  .combat-stage-projectile-player {
+    left: 31%;
+  }
+
+  .combat-stage-projectile-enemy {
+    right: 31%;
+  }
+
+  .combat-stage-melee-swipe-player { left: 32%; }
+  .combat-stage-melee-swipe-enemy { right: 32%; }
 
   .combat-stage-status-strip {
     bottom: 9px;
@@ -1043,6 +1192,8 @@
   .combat-stage-fighter-attacking .combat-rig-weapon,
   .combat-stage-impact-burst,
   .combat-stage-impact-text,
+  .combat-stage-projectile,
+  .combat-stage-melee-swipe,
   .combat-stage-has-impact-crit {
     animation-duration: .001ms !important;
     animation-iteration-count: 1 !important;

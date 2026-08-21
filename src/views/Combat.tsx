@@ -726,6 +726,20 @@ export function InteractiveCombatView({
                 <span>VS</span>
               </div>
 
+              {actingFighter && activeWeaponClass && (
+                isFirearmClass(activeWeaponClass) ? (
+                  <span
+                    className={`combat-stage-projectile combat-stage-projectile-${actingFighter} combat-stage-projectile-${activeWeaponClass}`}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <span
+                    className={`combat-stage-melee-swipe combat-stage-melee-swipe-${actingFighter} combat-stage-melee-swipe-${activeWeaponClass}`}
+                    aria-hidden="true"
+                  />
+                )
+              )}
+
               <div className="combat-stage-fighter-slot combat-stage-fighter-slot-player">
                 <CombatCharacter
                   side="player"
