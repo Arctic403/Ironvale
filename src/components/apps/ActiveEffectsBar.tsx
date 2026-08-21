@@ -138,7 +138,7 @@ export function ActiveEffectsBar({ g, now }: { g: RiftCityGame; now: number }) {
     effects.push({
       id: "crime-ops-ready",
       label: readyCrimeOps.length === 1 ? "Crime Operation Ready" : `${readyCrimeOps.length} Crime Operations Ready`,
-      detail: "Return to Crimes → Operations to collect the result",
+      detail: "Return to Crimes and open the matching activity to collect the result",
       icon: "crimes",
       tone: "positive",
     });

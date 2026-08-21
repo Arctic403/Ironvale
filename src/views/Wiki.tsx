@@ -5,6 +5,7 @@ import { money, formatTime } from "../core/gameCore";
 import { CRIMES } from "../systems/crimeSystem";
 import { CRIME_TOOLS } from "../systems/crimeTools";
 import { CRIME_FAMILY_LABELS, CRIME_OPERATIONS, GRAFFITI_SPOTS } from "../systems/crimeActivities";
+import { CRIME_CAREERS, SHOPLIFT_STORES } from "../systems/crimeCareerSystem";
 import { DEFAULT_WEAPONS, WEAPON_SKILL_LABELS } from "../systems/combat/combatWeapons";
 import { TRAINING_PROGRAMS } from "../systems/gymSystem";
 import { JOBS } from "../data/jobs";
@@ -123,10 +124,10 @@ export function Wiki({ g }: { g: RiftCityGame }) {
       keywords: "crime nerve mastery heat arrest jail choices branching intel bounty loot odds success",
       summary: "Crime progression, choices, mastery, success odds, Heat and consequences.",
       content: <>
-        <p>Crimes are split into different gameplay rhythms instead of forcing every activity through the same three-choice sequence. Pickpocketing, burglary and vehicle theft use rotating target boards with optional scouting. Retail theft, package swipes and cargo theft resolve as quick crimes. Major robberies/heists keep the live branching-event system because the decisions carry more weight there.</p>
-        <p>Crime-family skills now progress separately: Street Theft, Burglary, Vehicle Crime, Fraud, Street Art and Organized Crime. Using a family improves that family over time. Street Reputation is a second progression track earned mainly through graffiti and successful criminal activity; it unlocks more visible graffiti spots and gives a small capped bonus to target work.</p>
-        <p>Outcomes still include normal/critical success, being spooked and arrest. Heat, character stats, family skill, Street Rep, scouting, mastery, location and optional crime tools can all influence the final odds depending on the activity.</p>
-        <WikiTable headers={["Legacy crime", "Crime XP", "Nerve", "Reward", "Risk"]} rows={CRIMES.map((crime) => [crime.name, crime.crimeExperienceRequired, crime.nerve, `${money(crime.minReward)}–${money(crime.maxReward)}`, crime.risk])} />
+        <p>The Crimes page is one mastery-driven list. Every crime has its own Mastery track from 1–100, but opening a crime can reveal a completely different loop: live opportunity timing, rotating targets, scouting, shoplifting baskets, graffiti, passive operations, preparation-item checks or branching major jobs.</p>
+        <p>Crime-family skills progress separately: Street Theft, Burglary, Vehicle Crime, Fraud, Cyber, Street Art and Organized Crime. Individual Mastery unlocks harder locations and targets while the family skill represents broader specialization.</p>
+        <p>Live city conditions and per-crime conditions can change risk without changing the crime list itself. Outcomes still feed Heat, jail, Street Reputation, XP, inventory and the Black Market economy.</p>
+        <WikiTable headers={["Crime", "Family", "Mode", "Crime XP unlock", "Base nerve"]} rows={CRIME_CAREERS.map((crime) => [crime.name, CRIME_FAMILY_LABELS[crime.family], crime.mode, crime.unlockCrimeExperience, `${crime.baseNerve}+`])} />
       </>,
     },
     {
@@ -137,10 +138,13 @@ export function Wiki({ g }: { g: RiftCityGame }) {
       keywords: "pickpocket scout burglary vehicle theft passive operations card skimming email fraud graffiti street reputation skill family",
       summary: "Rotating targets, passive criminal income, separate skill families and the Street Reputation graffiti ladder.",
       content: <>
-        <p><b>Targets:</b> Pickpocketing, burglary and vehicle theft show rotating target boards. Scouting costs 1 Nerve, reveals the target's payout/Heat estimate and adds a success bonus. Targets disappear from the board after an attempt and the board rotates every five minutes.</p>
-        <p><b>Operations:</b> Passive/semi-passive crimes consume setup cash and Nerve, then continue on a timer while you use other parts of the game. When finished, you collect the result. Higher matching skill reduces detection risk. These systems are deliberately abstract game mechanics rather than real-world procedures.</p>
-        <p><b>Graffiti:</b> Graffiti is primarily a Street Reputation activity. Better-known players unlock more visible spots, while every successful tag trains Street Art skill, adds Heat and can add a small amount of faction visibility when the character belongs to a faction.</p>
-        <WikiTable headers={["Crime family", "Role"]} rows={Object.entries(CRIME_FAMILY_LABELS).map(([id, label]) => [label, id === "fraud" ? "Passive fraud operations" : id === "street" ? "Graffiti / Street Rep" : id === "organized" ? "Major jobs and late-game operations" : "Target/quick-crime specialization"])} />
+        <p><b>Scavenging:</b> Locations have a live Opportunity Pulse. Searching at a strong moment improves expected finds, and some districts peak during specific real-world clock hours.</p>
+        <p><b>Pickpocketing / Burglary / Vehicle Theft:</b> Rotating target boards support scouting. Scouting costs 1 Nerve, reveals clearer risk/payout information and grants a success bonus.</p>
+        <p><b>Shoplifting:</b> Stores rotate through crowd, camera-security and staffing conditions. You build a merchandise basket and choose when to leave; higher Severity raises suspicion, and some premium items require two preparation items.</p>
+        <p><b>Operations:</b> Fraud, forgery, chop-shop, deliveries, smuggling and similar activities run on timers while you play elsewhere. They are intentionally abstract game systems and do not model real-world criminal procedures.</p>
+        <p><b>Graffiti:</b> Graffiti primarily builds Street Reputation, while major robberies/heists keep the branching-event system where decisions are important enough to justify it.</p>
+        <WikiTable headers={["Crime family", "Role"]} rows={Object.entries(CRIME_FAMILY_LABELS).map(([id, label]) => [label, id === "fraud" ? "Passive fraud operations" : id === "cyber" ? "Abstract fictional data crimes" : id === "street" ? "Graffiti / Street Rep" : id === "organized" ? "Major jobs and late-game operations" : "Target/action specialization"])} />
+        <WikiTable headers={["Shoplifting store", "Mastery", "Security base", "Items"]} rows={SHOPLIFT_STORES.map((store) => [store.name, store.masteryRequired, store.baseSecurity, store.items.length])} />
         <WikiTable headers={["Passive operation", "Crime XP", "Setup", "Timer", "Payout"]} rows={CRIME_OPERATIONS.map((operation) => [operation.name, operation.crimeExperienceRequired, money(operation.setupCost), formatTime(operation.durationMs), `${money(operation.minReward)}–${money(operation.maxReward)}`])} />
         <WikiTable headers={["Graffiti spot", "Street Rep", "Nerve", "Rep gain", "Heat"]} rows={GRAFFITI_SPOTS.map((spot) => [spot.name, spot.reputationRequired, spot.nerve, `+${spot.reputationGain}`, `+${spot.heat}`])} />
       </>,

@@ -32,6 +32,7 @@ import {
   targetSuccessChance, graffitiSuccessChance, randomCrimeReward,
 } from "../systems/crimeActivities";
 import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
+import { CRIME_CAREERS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES, careerActionSuccessChance, crimeCareerIdForOperation, crimeCareerMasteryLevel, getShopliftingConditions, scavengingOpportunity, shopliftingSuspicion } from "../systems/crimeCareerSystem";
 import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
 import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES, WORLD_EVENTS, getFaction, getFactionRank, challengeProgress } from "../data/expansion";
 export function useRiftCity() {
@@ -414,12 +415,15 @@ export function useRiftCity() {
       const arrestWindow = Math.max(3, Math.min(20, 5 + target.difficulty * 0.14 + prev.heat * 0.05 + (toolModifiers.arrestModifier ?? 0)));
       const skillGain = Math.max(5, Math.round(7 + target.difficulty * 0.32));
       const crimeXpGain = Math.max(4, Math.round(4 + target.difficulty * 0.17));
+      const careerId = target.kind === "vehicle" ? "vehicle-theft" : target.kind;
+      const masteryGain = Math.max(8, Math.round(8 + target.difficulty * 0.28));
       const resolved = [...prev.resolvedCrimeTargets.slice(-119), target.id];
       let next: SaveData = {
         ...prev,
         nerve: Math.max(0, prev.nerve - target.nerve),
         inventory: toolUsable && selectedTool ? { ...prev.inventory, [selectedTool.id]: Math.max(0, (prev.inventory[selectedTool.id] || 0) - 1) } : prev.inventory,
         resolvedCrimeTargets: resolved,
+        crimeMastery: { ...prev.crimeMastery, [careerId]: (prev.crimeMastery[careerId] ?? 0) + masteryGain },
         crimeSkillXp: { ...prev.crimeSkillXp, [target.family]: skillXp + skillGain },
       };
 
@@ -483,12 +487,17 @@ export function useRiftCity() {
       if (prev.crimeExperience < operation.crimeExperienceRequired) return appendActivity(prev, `Requires ${operation.crimeExperienceRequired} Crime Experience.`, "failure");
       if (prev.cash < operation.setupCost) return appendActivity(prev, `You need ${money(operation.setupCost)} for the setup.`, "failure");
       if (prev.nerve < operation.nerve) return appendActivity(prev, `You need ${operation.nerve} Nerve to launch that operation.`, "failure");
+      const missingRequired = (operation.requiredItems ?? []).filter((id) => (prev.inventory[id] || 0) <= 0);
+      if (missingRequired.length) return appendActivity(prev, `Missing required setup: ${missingRequired.map((id) => getItem(id)?.name ?? id).join(", ")}.`, "failure");
       if (prev.activeCrimeOperations.length >= 3) return appendActivity(prev, "You can only run 3 passive crime operations at once during beta.", "failure");
       if (prev.activeCrimeOperations.some((job) => job.operationId === operation.id)) return appendActivity(prev, "That operation is already running.", "failure");
       const now = Date.now();
       const job = { id: `${operation.id}-${now}-${Math.floor(Math.random() * 100000)}`, operationId: operation.id, startedAt: now, finishesAt: now + operation.durationMs };
+      const nextInventory = { ...prev.inventory };
+      for (const id of operation.requiredItems ?? []) nextInventory[id] = Math.max(0, (nextInventory[id] || 0) - 1);
       const next: SaveData = {
         ...prev,
+        inventory: nextInventory,
         cash: prev.cash - operation.setupCost,
         nerve: Math.max(0, prev.nerve - operation.nerve),
         heat: Math.min(100, prev.heat + Math.max(1, Math.ceil(operation.heat * 0.35))),
@@ -517,6 +526,7 @@ export function useRiftCity() {
         ...prev,
         activeCrimeOperations: remaining,
         crimeSkillXp: { ...prev.crimeSkillXp, [operation.family]: skillXp + skillGain },
+        crimeMastery: { ...prev.crimeMastery, [crimeCareerIdForOperation(operation.id)]: (prev.crimeMastery[crimeCareerIdForOperation(operation.id)] ?? 0) + Math.max(10, Math.round(10 + operation.crimeExperienceRequired * 0.035)) },
         crimeOperationsCompleted: prev.crimeOperationsCompleted + 1,
         crimeExperience: prev.crimeExperience + Math.max(8, Math.round(operation.crimeExperienceRequired * 0.055)),
         xp: prev.xp + Math.max(12, Math.round(operation.crimeExperienceRequired * 0.08)),
@@ -573,7 +583,8 @@ export function useRiftCity() {
       if (prev.streetReputation < spot.reputationRequired) return appendActivity(prev, `That spot requires ${spot.reputationRequired} Street Rep.`, "failure");
       if ((prev.graffitiCooldowns[spot.id] || 0) > now) return appendActivity(prev, "That wall is too hot right now. Try it again after the cooldown.", "failure");
       if (prev.nerve < spot.nerve) return appendActivity(prev, `You need ${spot.nerve} Nerve.`, "failure");
-      if (prev.cash < spot.paintCost) return appendActivity(prev, `You need ${money(spot.paintCost)} for paint and supplies.`, "failure");
+      if ((prev.inventory["spray-can"] || 0) <= 0) return appendActivity(prev, "You need a Street Paint Pack from the Black Market crime-prep section.", "failure");
+      if (prev.cash < spot.paintCost) return appendActivity(prev, `You need ${money(spot.paintCost)} for extra setup supplies.`, "failure");
       const j = getJob(prev.currentJob);
       const bonuses = getJobStatBonuses(j, prev.jobSkills);
       const dexterity = prev.stats.dexterity + (bonuses.dexterity ?? 0);
@@ -584,9 +595,11 @@ export function useRiftCity() {
       const base: SaveData = {
         ...prev,
         cash: prev.cash - spot.paintCost,
+        inventory: { ...prev.inventory, "spray-can": Math.max(0, (prev.inventory["spray-can"] || 0) - 1) },
         nerve: Math.max(0, prev.nerve - spot.nerve),
         graffitiCooldowns: cooldowns,
         crimeSkillXp: { ...prev.crimeSkillXp, street: streetXp + Math.max(6, spot.reputationGain * 4) },
+        crimeMastery: { ...prev.crimeMastery, graffiti: (prev.crimeMastery.graffiti ?? 0) + Math.max(8, spot.reputationGain * 3) },
       };
       if (success) {
         const factionRep = prev.faction ? prev.factionReputation + Math.max(1, Math.floor(spot.reputationGain / 5)) : prev.factionReputation;
@@ -609,6 +622,166 @@ export function useRiftCity() {
         heat: Math.min(100, prev.heat + spot.heat + 2),
       };
       return appendActivity(next, `GRAFFITI SPOOKED: ${spot.name}. No reputation gained and Heat increased.`, "spooked");
+    });
+  };
+
+  const resolveScavenging = (locationId: string) => {
+    if (blocked()) { log("You cannot scavenge right now.", "failure"); return; }
+    setGameState((prev) => {
+      const location = SCAVENGE_LOCATIONS.find((item) => item.id === locationId);
+      if (!location) return prev;
+      const masteryXp = prev.crimeMastery.scavenging ?? 0;
+      const mastery = crimeCareerMasteryLevel(masteryXp);
+      if (mastery < location.masteryRequired) return appendActivity(prev, `Requires Scavenging Mastery ${location.masteryRequired}.`, "failure");
+      if (prev.nerve < location.nerve) return appendActivity(prev, `You need ${location.nerve} Nerve.`, "failure");
+      const opportunity = scavengingOpportunity(location, Date.now());
+      const theftLevel = crimeFamilyLevel(prev.crimeSkillXp.theft ?? 0);
+      const chance = Math.max(12, Math.min(97, 50 + opportunity * 0.34 + theftLevel * 0.5 + mastery * 0.16 - location.difficulty * 0.42 - prev.heat * 0.08));
+      const success = Math.random() * 100 < chance;
+      const masteryGain = success ? Math.max(9, Math.round(8 + location.difficulty * 0.25)) : 4;
+      const skillGain = success ? Math.max(5, Math.round(5 + location.difficulty * 0.18)) : 2;
+      let next: SaveData = {
+        ...prev,
+        nerve: Math.max(0, prev.nerve - location.nerve),
+        crimeMastery: { ...prev.crimeMastery, scavenging: masteryXp + masteryGain },
+        crimeSkillXp: { ...prev.crimeSkillXp, theft: (prev.crimeSkillXp.theft ?? 0) + skillGain },
+      };
+      if (!success) {
+        next = { ...next, crimesSpooked: prev.crimesSpooked + 1, heat: Math.min(100, prev.heat + location.heat) };
+        return appendActivity(next, `SCAVENGING: ${location.name} came up empty. Opportunity was ${opportunity}%.`, "spooked");
+      }
+      const reward = Math.round(randomCrimeReward(location.minReward, location.maxReward) * (0.65 + opportunity / 125));
+      const lootPool = ["black-envelope","old-city-token","encrypted-chip","sugar-rush","moon-chews"];
+      let foundName = "";
+      let inventory = prev.inventory;
+      if (Math.random() < Math.min(0.42, 0.08 + opportunity / 260)) {
+        const id = lootPool[Math.floor(Math.random() * lootPool.length)];
+        const found = getItem(id);
+        if (found) { inventory = { ...inventory, [id]:(inventory[id] || 0) + 1 }; foundName = found.name; }
+      }
+      next = {
+        ...next,
+        inventory,
+        cash: prev.cash + reward,
+        xp: prev.xp + 8 + Math.round(location.difficulty * 0.2),
+        crimeExperience: prev.crimeExperience + 4 + Math.round(location.difficulty * 0.12),
+        crimesCompleted: prev.crimesCompleted + 1,
+        heat: Math.min(100, prev.heat + location.heat),
+      };
+      return appendActivity(next, `SCAVENGING: ${location.name} paid ${money(reward)} at ${opportunity}% opportunity${foundName ? ` · found ${foundName}` : ""}.`, "success");
+    });
+  };
+
+  const resolveShoplifting = (storeId: string, selectedItemIds: string[]) => {
+    if (blocked()) { log("You cannot shoplift right now.", "failure"); return; }
+    setGameState((prev) => {
+      const store = SHOPLIFT_STORES.find((item) => item.id === storeId);
+      if (!store || selectedItemIds.length === 0) return appendActivity(prev, "Choose at least one item before leaving the store.", "failure");
+      const masteryXp = prev.crimeMastery.shoplift ?? 0;
+      const mastery = crimeCareerMasteryLevel(masteryXp);
+      if (mastery < store.masteryRequired) return appendActivity(prev, `Requires Shoplifting Mastery ${store.masteryRequired}.`, "failure");
+      const selected = selectedItemIds.map((id) => store.items.find((item) => item.id === id)).filter((item): item is NonNullable<typeof item> => Boolean(item));
+      if (!selected.length) return prev;
+      const locked = selected.find((item) => mastery < item.masteryRequired);
+      if (locked) return appendActivity(prev, `${locked.name} requires Shoplifting Mastery ${locked.masteryRequired}.`, "failure");
+      const required = Array.from(new Set(selected.flatMap((item) => item.requiredItems ?? [])));
+      const missing = required.filter((id) => (prev.inventory[id] || 0) <= 0);
+      if (missing.length) return appendActivity(prev, `Missing required prep: ${missing.map((id) => getItem(id)?.name ?? id).join(", ")}.`, "failure");
+      const nerveCost = Math.max(2, Math.min(8, 1 + Math.ceil(selected.reduce((sum, item) => sum + item.severity, 0) / 2)));
+      if (prev.nerve < nerveCost) return appendActivity(prev, `You need ${nerveCost} Nerve for that basket.`, "failure");
+      const conditions = getShopliftingConditions(store, Date.now());
+      const suspicion = shopliftingSuspicion(store, selected, conditions, 0);
+      const theftLevel = crimeFamilyLevel(prev.crimeSkillXp.theft ?? 0);
+      const j = getJob(prev.currentJob); const b = getJobStatBonuses(j, prev.jobSkills);
+      const dexterity = prev.stats.dexterity + (b.dexterity ?? 0);
+      const chance = Math.max(4, Math.min(97, 98 - suspicion + theftLevel * 0.72 + mastery * 0.12 + Math.min(12, dexterity * 0.28) - prev.heat * 0.1));
+      const roll = Math.random() * 100;
+      const severityTotal = selected.reduce((sum, item) => sum + item.severity, 0);
+      const masteryGain = Math.max(8, 7 + severityTotal * 4);
+      const skillGain = Math.max(6, 5 + severityTotal * 3);
+      const nextInventory = { ...prev.inventory };
+      for (const id of required) nextInventory[id] = Math.max(0, (nextInventory[id] || 0) - 1);
+      let next: SaveData = {
+        ...prev,
+        inventory: nextInventory,
+        nerve: Math.max(0, prev.nerve - nerveCost),
+        crimeMastery: { ...prev.crimeMastery, shoplift: masteryXp + masteryGain },
+        crimeSkillXp: { ...prev.crimeSkillXp, theft: (prev.crimeSkillXp.theft ?? 0) + skillGain },
+      };
+      if (roll < chance) {
+        const critical = roll < Math.max(1.5, chance * 0.055);
+        const baseValue = selected.reduce((sum, item) => sum + item.value, 0);
+        const payout = Math.round(baseValue * conditions.payoutMultiplier * (0.86 + Math.random() * 0.28) * (critical ? 1.35 : 1));
+        next = {
+          ...next,
+          cash: prev.cash + payout,
+          xp: prev.xp + 8 + severityTotal * 4,
+          crimeExperience: prev.crimeExperience + 5 + severityTotal * 3,
+          crimesCompleted: prev.crimesCompleted + 1,
+          crimesCritical: prev.crimesCritical + (critical ? 1 : 0),
+          heat: Math.min(100, prev.heat + Math.max(1, Math.ceil(severityTotal / 2))),
+        };
+        return appendActivity(next, `${critical ? "CRITICAL SHOPLIFT" : "SHOPLIFT"}: ${store.name} · ${selected.length} item${selected.length === 1 ? "" : "s"} · ${suspicion}% suspicion · ${money(payout)}.`, critical ? "critical" : "success");
+      }
+      const arrestWindow = Math.min(25, 4 + suspicion * 0.18 + prev.heat * 0.04);
+      if (roll < chance + arrestWindow) {
+        const sentence = Math.round(JAIL_MINUTES * 60000 * (1 + severityTotal * 0.06));
+        next = { ...next, crimesFailed:prev.crimesFailed+1, timesJailed:prev.timesJailed+1, jailUntil:Date.now()+sentence, jailStartedAt:Date.now(), jailReason:"Retail theft", jailSentenceMs:sentence, activeCharges:["Retail Theft"], currentLocation:"jail", locationsVisited:prev.locationsVisited.includes("jail")?prev.locationsVisited:[...prev.locationsVisited,"jail"], heat:Math.max(0, prev.heat-8) };
+        return appendActivity(next, `ARRESTED: ${store.name}. Your ${suspicion}% suspicion basket drew too much attention.`, "jailed");
+      }
+      next = { ...next, crimesSpooked:prev.crimesSpooked+1, heat:Math.min(100,prev.heat+Math.max(2,Math.ceil(severityTotal/2))) };
+      return appendActivity(next, `SPOOKED: ${store.name}. You leave the basket behind before the situation gets worse.`, "spooked");
+    });
+  };
+
+  const runCrimeCareerAction = (crimeId: string, actionId: string) => {
+    if (blocked()) { log("You cannot commit crimes right now.", "failure"); return; }
+    setGameState((prev) => {
+      const career = CRIME_CAREERS.find((item) => item.id === crimeId);
+      const action = career?.actions?.find((item) => item.id === actionId);
+      if (!career || !action) return prev;
+      if (prev.crimeExperience < career.unlockCrimeExperience) return appendActivity(prev, `Requires ${career.unlockCrimeExperience} Crime Experience.`, "failure");
+      const masteryXp = prev.crimeMastery[career.id] ?? 0;
+      const mastery = crimeCareerMasteryLevel(masteryXp);
+      if (mastery < (action.masteryRequired ?? 1)) return appendActivity(prev, `Requires ${career.name} Mastery ${action.masteryRequired}.`, "failure");
+      if (prev.streetReputation < (action.streetRepRequired ?? 0)) return appendActivity(prev, `Requires ${action.streetRepRequired} Street Reputation.`, "failure");
+      if (prev.nerve < action.nerve) return appendActivity(prev, `You need ${action.nerve} Nerve.`, "failure");
+      const required = Array.from(new Set(action.requiredItems ?? []));
+      const missing = required.filter((id) => (prev.inventory[id] || 0) <= 0);
+      if (missing.length) return appendActivity(prev, `Missing required items: ${missing.map((id) => getItem(id)?.name ?? id).join(", ")}.`, "failure");
+      const familyLevel = crimeFamilyLevel(prev.crimeSkillXp[career.family] ?? 0);
+      const j = getJob(prev.currentJob); const b = getJobStatBonuses(j, prev.jobSkills);
+      const dexterity = prev.stats.dexterity + (b.dexterity ?? 0);
+      const chance = careerActionSuccessChance(action, familyLevel, mastery, dexterity, prev.heat);
+      const roll = Math.random() * 100;
+      const masteryGain = Math.max(8, Math.round(8 + action.difficulty * 0.28));
+      const skillGain = Math.max(6, Math.round(6 + action.difficulty * 0.22));
+      const nextInventory = { ...prev.inventory };
+      for (const id of required) nextInventory[id] = Math.max(0, (nextInventory[id] || 0) - 1);
+      let next: SaveData = { ...prev, inventory:nextInventory, nerve:Math.max(0,prev.nerve-action.nerve), crimeMastery:{...prev.crimeMastery,[career.id]:masteryXp+masteryGain}, crimeSkillXp:{...prev.crimeSkillXp,[career.family]:(prev.crimeSkillXp[career.family]??0)+skillGain} };
+      if (roll < chance) {
+        const critical = roll < Math.max(1.2, chance * 0.05);
+        const reward = randomCrimeReward(action.minReward, action.maxReward) * (critical ? 1.45 : 1);
+        next = { ...next, xp:prev.xp+Math.round(8+action.difficulty*.35)*(critical?2:1), crimeExperience:prev.crimeExperience+Math.round(5+action.difficulty*.18)*(critical?2:1), crimesCompleted:prev.crimesCompleted+1, crimesCritical:prev.crimesCritical+(critical?1:0) };
+        if (action.rewardType === "heat-reduction") {
+          next = { ...next, heat:Math.max(0,prev.heat-Math.round(reward)) };
+          return appendActivity(next, `${critical ? "CRITICAL CLEANUP" : "CLEANUP"}: ${action.name} reduced Heat by ${Math.round(reward)}.`, critical?"critical":"success");
+        }
+        if (action.rewardType === "street-rep") {
+          next = { ...next, streetReputation:prev.streetReputation+Math.round(reward), heat:Math.min(100,prev.heat+action.heat) };
+          return appendActivity(next, `${action.name} added ${Math.round(reward)} Street Rep.`, critical?"critical":"success");
+        }
+        next = { ...next, cash:prev.cash+Math.round(reward), heat:Math.min(100,prev.heat+action.heat) };
+        return appendActivity(next, `${critical ? "CRITICAL SUCCESS" : "SUCCESS"}: ${career.name} · ${action.name} paid ${money(Math.round(reward))}.`, critical?"critical":"success");
+      }
+      const arrestWindow = Math.min(24, 4 + action.difficulty * .16 + prev.heat * .04);
+      if (roll < chance + arrestWindow) {
+        const sentence = Math.round(JAIL_MINUTES * 60000 * (1 + action.difficulty / 180));
+        next = { ...next, crimesFailed:prev.crimesFailed+1, timesJailed:prev.timesJailed+1, jailUntil:Date.now()+sentence, jailStartedAt:Date.now(), jailReason:career.name, jailSentenceMs:sentence, activeCharges:[career.name], currentLocation:"jail", locationsVisited:prev.locationsVisited.includes("jail")?prev.locationsVisited:[...prev.locationsVisited,"jail"], heat:Math.max(0,prev.heat-10) };
+        return appendActivity(next, `ARRESTED: ${career.name} · ${action.name}.`, "jailed");
+      }
+      next = { ...next, crimesSpooked:prev.crimesSpooked+1, heat:Math.min(100,prev.heat+Math.max(1,Math.ceil(action.heat/2))) };
+      return appendActivity(next, `SPOOKED: ${career.name} · ${action.name}.`, "spooked");
     });
   };
 
@@ -2151,6 +2324,9 @@ export function useRiftCity() {
     startCrimeOperation,
     claimCrimeOperation,
     tagGraffiti,
+    resolveScavenging,
+    resolveShoplifting,
+    runCrimeCareerAction,
 
     train,
     buyGym,

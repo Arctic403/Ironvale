@@ -187,6 +187,11 @@ export function BlackMarket({ g }: { g: Game }) {
   const now = useNow();
 
   const ownListable = ITEMS.filter((item) => (g.gameState.inventory[item.id] || 0) > 0);
+  const careerPrepItems = ITEMS.filter((item) =>
+    item.store === "blackmarket" &&
+    item.crimeTool &&
+    !CRIME_TOOLS.some((tool) => tool.id === item.id)
+  );
   const listings = [...g.gameState.auctionListings, ...g.seededAuctionListings.filter((listing) => !g.gameState.auctionRemovedListingIds.includes(listing.id))]
     .filter((listing) => {
       const item = ITEMS.find((x) => x.id === listing.itemId);
@@ -275,6 +280,13 @@ export function BlackMarket({ g }: { g: Game }) {
         <p>Optional consumables improve selected crime odds, rewards, escape chance, or Heat. Each tool is consumed when the crime attempt begins.</p>
         <div className="service-item-grid">
           {CRIME_TOOLS.map(tool=><div className="service-item" key={tool.id}><div><b className="row-icon-label"><GameIcon name={iconFromLegacy(tool.icon, "tools")} size={16} /> {tool.name}</b><small>{tool.description}</small><small>Recommended: {tool.recommendedFor.map(x=>x.replace(/-/g," ")).join(", ")}</small></div><div><b>{money(tool.price)}</b><small>Owned {g.gameState.inventory[tool.id]||0}</small><Button disabled={g.gameState.cash<tool.price} onClick={()=>g.buyBlackMarketItem(tool.id)}>Buy</Button></div></div>)}
+        </div>
+      </Panel>
+
+      <Panel title="Crime Career Prep · Required Gear">
+        <p>Required gear unlocks advanced crime actions. Some higher-severity targets need two different prep items. These are fictional game tools and are consumed when the activity uses them.</p>
+        <div className="service-item-grid">
+          {careerPrepItems.map((item)=><div className="service-item" key={item.id}><span className="service-item-icon"><GameIcon name={serviceItemIcon(item)} size={23} /></span><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><small>Owned {g.gameState.inventory[item.id]||0}</small><Button disabled={g.gameState.cash<item.price} onClick={()=>g.buyBlackMarketItem(item.id)}>Buy</Button></div></div>)}
         </div>
       </Panel>
 

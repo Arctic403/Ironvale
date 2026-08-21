@@ -1,4 +1,4 @@
-export type CrimeFamily = "theft" | "burglary" | "vehicle" | "fraud" | "street" | "organized";
+export type CrimeFamily = "theft" | "burglary" | "vehicle" | "fraud" | "cyber" | "street" | "organized";
 export type TargetCrimeKind = "pickpocket" | "burglary" | "vehicle";
 
 export type CrimeTarget = {
@@ -29,7 +29,8 @@ export type CrimeOperationDefinition = {
   maxReward: number;
   heat: number;
   detectionRisk: number;
-  icon: "chip" | "envelope" | "package" | "garage" | "cash";
+  icon: "chip" | "envelope" | "package" | "garage" | "cash" | "badge" | "building" | "route" | "airport" | "dice";
+  requiredItems?: string[];
 };
 
 export type GraffitiSpot = {
@@ -51,6 +52,7 @@ export const CRIME_FAMILY_LABELS: Record<CrimeFamily, string> = {
   burglary: "Burglary",
   vehicle: "Vehicle Crime",
   fraud: "Fraud",
+  cyber: "Cyber",
   street: "Street Art",
   organized: "Organized Crime",
 };
@@ -73,7 +75,7 @@ export function crimeFamilyForLegacyCrime(crimeId: string): CrimeFamily {
   if (["pickpocket", "shoplift", "package-swipe"].includes(crimeId)) return "theft";
   if (["burglary", "cargo-theft"].includes(crimeId)) return "burglary";
   if (crimeId === "vehicle-theft") return "vehicle";
-  if (crimeId === "data-breach") return "fraud";
+  if (crimeId === "data-breach") return "cyber";
   return "organized";
 }
 
@@ -146,6 +148,43 @@ export function targetSuccessChance(target: CrimeTarget, skillXp: number, dexter
 }
 
 export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
+
+  {
+    id: "forgery-run",
+    name: "Forgery Commission",
+    description: "Run an abstract fictional document commission. The game tracks setup, skill, time and detection only.",
+    family: "fraud", crimeExperienceRequired: 135, setupCost: 1200, nerve: 5, durationMs: 5 * 60 * 1000, minReward: 2600, maxReward: 6200, heat: 8, detectionRisk: 22, icon: "badge", requiredItems:["forgery-kit"],
+  },
+  {
+    id: "identity-fraud",
+    name: "Identity Fraud Operation",
+    description: "High-tier fictional fraud operation with expensive setup and no real-world procedural detail.",
+    family: "fraud", crimeExperienceRequired: 220, setupCost: 3600, nerve: 7, durationMs: 9 * 60 * 1000, minReward: 7200, maxReward: 16000, heat: 13, detectionRisk: 29, icon: "building", requiredItems:["fraud-terminal","forgery-kit"],
+  },
+  {
+    id: "corporate-fraud",
+    name: "Corporate Fraud Cycle",
+    description: "Late-game abstract financial operation with a large bankroll requirement and serious enforcement exposure.",
+    family: "fraud", crimeExperienceRequired: 360, setupCost: 12000, nerve: 10, durationMs: 15 * 60 * 1000, minReward: 24000, maxReward: 52000, heat: 19, detectionRisk: 36, icon: "building", requiredItems:["fraud-terminal","inside-tip"],
+  },
+  {
+    id: "black-market-delivery",
+    name: "Black Market Delivery",
+    description: "A timed fictional delivery contract linked to the underground market economy.",
+    family: "organized", crimeExperienceRequired: 165, setupCost: 900, nerve: 5, durationMs: 4 * 60 * 1000, minReward: 2200, maxReward: 5200, heat: 7, detectionRisk: 18, icon: "route", requiredItems:["burner-phone"],
+  },
+  {
+    id: "smuggling-run",
+    name: "Smuggling Contract",
+    description: "Abstract high-level logistics operation intended to connect to airport destinations later.",
+    family: "organized", crimeExperienceRequired: 280, setupCost: 4800, nerve: 8, durationMs: 11 * 60 * 1000, minReward: 11000, maxReward: 26000, heat: 15, detectionRisk: 31, icon: "airport", requiredItems:["cargo-scanner","burner-phone"],
+  },
+  {
+    id: "underground-gambling",
+    name: "Underground Gambling Night",
+    description: "Fund a fictional illegal game and collect the result after the event resolves.",
+    family: "organized", crimeExperienceRequired: 250, setupCost: 6000, nerve: 7, durationMs: 10 * 60 * 1000, minReward: 9000, maxReward: 24000, heat: 14, detectionRisk: 28, icon: "dice", requiredItems:["burner-phone"],
+  },
   {
     id: "card-skimming",
     name: "Card Skimming Operation",
@@ -160,6 +199,7 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     heat: 5,
     detectionRisk: 16,
     icon: "chip",
+    requiredItems: ["skimmer-device"],
   },
   {
     id: "email-fraud",
@@ -175,6 +215,7 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     heat: 7,
     detectionRisk: 20,
     icon: "envelope",
+    requiredItems: ["campaign-pack"],
   },
   {
     id: "counterfeit-run",
@@ -190,6 +231,7 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     heat: 9,
     detectionRisk: 23,
     icon: "package",
+    requiredItems: ["forgery-kit"],
   },
   {
     id: "chop-shop",
@@ -205,6 +247,7 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     heat: 11,
     detectionRisk: 25,
     icon: "garage",
+    requiredItems: ["tool-bag", "vehicle-module"],
   },
   {
     id: "protection-racket",
@@ -220,6 +263,7 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     heat: 15,
     detectionRisk: 29,
     icon: "cash",
+    requiredItems: ["burner-phone"],
   },
 ];
 
