@@ -89,6 +89,10 @@ export function useRiftCity() {
 
   const maxEnergy = MAX_ENERGY + (gameState.meritUpgrades["energy-cap"] ?? 0) * 5;
 
+  const maxHappiness =
+    (property?.maxHappiness ?? 100) +
+    (gameState.propertyUpgrades["bedroom"] ?? 0) * 10;
+
   const level = getLevel(gameState.xp).level;
 
   const maxNerve =
@@ -192,8 +196,6 @@ export function useRiftCity() {
   useEffect(() => {
     const id = window.setInterval(() => {
       const now = Date.now();
-      const maxHappiness = (property?.maxHappiness ?? 100) + (gameState.propertyUpgrades["bedroom"] ?? 0) * 10;
-
       setGameState((prev) =>
         tickGameState(prev, now, {
           maxHealth,
@@ -205,7 +207,7 @@ export function useRiftCity() {
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [maxNerve, maxHealth, maxEnergy, property?.maxHappiness, gameState.propertyUpgrades]);
+  }, [maxNerve, maxHealth, maxHappiness, maxEnergy]);
 
   useEffect(() => {
     const jailStarted = Boolean(
@@ -1838,6 +1840,7 @@ export function useRiftCity() {
     maxHealth,
     maxNerve,
     maxEnergy,
+    maxHappiness,
 
     gym,
     job,

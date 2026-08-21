@@ -93,6 +93,7 @@ export function City({ g }: { g: Game }) {
 
   const panelRef = useRef<HTMLElement | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const fallbackFullscreenRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -130,12 +131,42 @@ export function City({ g }: { g: Game }) {
 
   useEffect(() => {
     const syncFullscreen = () => {
-      setIsFullscreen(document.fullscreenElement === panelRef.current);
+      // Native fullscreen reports through document.fullscreenElement. The
+      // CSS fallback used by iOS Safari has no fullscreenchange event, so
+      // native exit must not accidentally close an active fallback overlay.
+      if (document.fullscreenElement) {
+        fallbackFullscreenRef.current = false;
+        setIsFullscreen(document.fullscreenElement === panelRef.current);
+      } else if (!fallbackFullscreenRef.current) {
+        setIsFullscreen(false);
+      }
     };
 
     document.addEventListener("fullscreenchange", syncFullscreen);
     return () => document.removeEventListener("fullscreenchange", syncFullscreen);
   }, []);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.add("riftcity-map-fullscreen-open");
+    body.classList.add("riftcity-map-fullscreen-open");
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || document.fullscreenElement) return;
+      fallbackFullscreenRef.current = false;
+      setIsFullscreen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      root.classList.remove("riftcity-map-fullscreen-open");
+      body.classList.remove("riftcity-map-fullscreen-open");
+    };
+  }, [isFullscreen]);
 
   const pointersRef = useRef(
     new Map<number, PointerPoint>(),
@@ -335,15 +366,41 @@ export function City({ g }: { g: Game }) {
     const target = panelRef.current;
     if (!target) return;
 
-    try {
-      if (document.fullscreenElement) {
+    // Exit native fullscreen when it is active.
+    if (document.fullscreenElement) {
+      try {
         await document.exitFullscreen();
-      } else if (target.requestFullscreen) {
-        await target.requestFullscreen();
+      } finally {
+        fallbackFullscreenRef.current = false;
+        setIsFullscreen(false);
       }
-    } catch {
-      // Fullscreen is optional; keep the map usable if a browser rejects it.
+      return;
     }
+
+    // If we are using the CSS fullscreen fallback (notably iPhone Safari),
+    // the same button simply closes it.
+    if (isFullscreen) {
+      fallbackFullscreenRef.current = false;
+      setIsFullscreen(false);
+      return;
+    }
+
+    // Prefer the browser Fullscreen API where supported. iOS Safari can
+    // reject requestFullscreen on normal elements, so fall back to a fixed
+    // 100dvh overlay that behaves like fullscreen inside the usable viewport.
+    if (typeof target.requestFullscreen === "function") {
+      try {
+        fallbackFullscreenRef.current = false;
+        await target.requestFullscreen();
+        setIsFullscreen(true);
+        return;
+      } catch {
+        // Continue into the CSS fallback below.
+      }
+    }
+
+    fallbackFullscreenRef.current = true;
+    setIsFullscreen(true);
   };
 
   const zoomAtCenter = (
@@ -725,12 +782,6 @@ export function City({ g }: { g: Game }) {
     );
   };
 
-  const verticalPanLimit = Math.max(0, ((zoom - 1) * MAP_HEIGHT) / 2);
-
-  const setVerticalPan = (value: number) => {
-    setPan((current) => clampPan({ x: current.x, y: value }, zoom));
-  };
-
   return (
     <div className="city-page">
 
@@ -915,19 +966,6 @@ export function City({ g }: { g: Game }) {
           }
           onWheel={onWheel}
         >
-
-          <div className="map-native-scroll-control" aria-label="Map vertical pan control">
-            <input
-              type="range"
-              min={-verticalPanLimit}
-              max={verticalPanLimit}
-              step="1"
-              value={pan.y}
-              disabled={verticalPanLimit <= 0}
-              onChange={(event) => setVerticalPan(Number(event.target.value))}
-              aria-label="Scroll map vertically"
-            />
-          </div>
 
           <svg
             className="riftcity-map-svg master-map-svg"

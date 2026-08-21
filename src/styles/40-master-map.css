@@ -92,36 +92,6 @@
 /* ===== Safe map controls patch: does not resize or scroll-lock the city page ===== */
 .city-map-tool.city-map-fullscreen{min-width:106px}
 
-.map-native-scroll-control{
-  position:absolute;
-  left:8px;
-  top:50%;
-  z-index:12;
-  width:26px;
-  height:58%;
-  transform:translateY(-50%);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  padding:5px 0;
-  border:1px solid rgba(255,255,255,.15);
-  border-radius:999px;
-  background:rgba(5,10,15,.88);
-  box-shadow:0 6px 20px rgba(0,0,0,.36);
-  pointer-events:auto;
-}
-.map-native-scroll-control input[type="range"]{
-  width:16px;
-  height:100%;
-  margin:0;
-  padding:0;
-  writing-mode:vertical-lr;
-  direction:rtl;
-  accent-color:#60a5fa;
-  cursor:ns-resize;
-}
-.map-native-scroll-control input[type="range"]:disabled{opacity:.35;cursor:default}
-
 .city-map-panel:fullscreen,
 .city-map-panel.is-fullscreen{
   width:100%;
@@ -167,10 +137,97 @@
 @media (max-width:700px){
   .riftcity-map.interactive-map.is-zoomed,
   .riftcity-map.interactive-map.is-zoomed .riftcity-map-svg{touch-action:none!important}
-  .map-native-scroll-control{left:5px;width:30px;height:64%}
-  .map-native-scroll-control input[type="range"]{width:20px}
   .city-map-tool.city-map-fullscreen{min-width:88px;font-size:9px}
   .return-city-top-btn{min-height:30px;padding:0 9px;font-size:9px}
   .city-map-panel:fullscreen .master-map-popup.map-location-panel,
   .city-map-panel.is-fullscreen .master-map-popup.map-location-panel{z-index:2147483000!important}
+}
+
+/* ===== 2026-08 mobile map cleanup =====
+   The old vertical range slider was removed from City.tsx. Mobile Safari does
+   not reliably expose Element.requestFullscreen(), so .is-fullscreen doubles
+   as an app-level fullscreen fallback sized to the dynamic viewport. */
+html.riftcity-map-fullscreen-open,
+body.riftcity-map-fullscreen-open{
+  overflow:hidden!important;
+  overscroll-behavior:none;
+}
+
+.city-map-panel.is-fullscreen{
+  position:fixed!important;
+  inset:0!important;
+  z-index:2147482000!important;
+  width:100vw!important;
+  height:100dvh!important;
+  min-height:100svh!important;
+  max-height:100dvh!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  padding-top:max(0px,env(safe-area-inset-top))!important;
+  padding-right:max(0px,env(safe-area-inset-right))!important;
+  padding-bottom:max(0px,env(safe-area-inset-bottom))!important;
+  padding-left:max(0px,env(safe-area-inset-left))!important;
+}
+
+@supports not (height:100dvh){
+  .city-map-panel.is-fullscreen{height:100vh!important;max-height:100vh!important}
+}
+
+@media (max-width:700px){
+  /* City Menu belongs on the left on phones and stays clear of Safari's
+     right-side/browser controls. */
+  .city-map-back-top{
+    left:12px!important;
+    right:auto!important;
+  }
+
+  .city-map-panel.is-fullscreen .city-map-header,
+  .city-map-panel:fullscreen .city-map-header{
+    padding:8px 10px!important;
+    gap:7px!important;
+  }
+
+  .city-map-panel.is-fullscreen .city-map-header h3,
+  .city-map-panel:fullscreen .city-map-header h3{
+    font-size:14px!important;
+    line-height:1.15!important;
+  }
+
+  .city-map-panel.is-fullscreen .city-map-subtitle,
+  .city-map-panel:fullscreen .city-map-subtitle,
+  .city-map-panel.is-fullscreen .city-map-live,
+  .city-map-panel:fullscreen .city-map-live{
+    display:none!important;
+  }
+
+  .city-map-panel.is-fullscreen .city-map-tools,
+  .city-map-panel:fullscreen .city-map-tools{
+    gap:5px!important;
+    flex-wrap:nowrap!important;
+  }
+
+  .city-map-panel.is-fullscreen .city-map-tool,
+  .city-map-panel:fullscreen .city-map-tool{
+    min-width:38px!important;
+    min-height:38px!important;
+    padding:6px 8px!important;
+  }
+
+  .city-map-panel.is-fullscreen .city-map-fullscreen,
+  .city-map-panel:fullscreen .city-map-fullscreen{
+    min-width:78px!important;
+  }
+
+  .city-map-panel.is-fullscreen .riftcity-map.interactive-map,
+  .city-map-panel:fullscreen .riftcity-map.interactive-map{
+    flex:1 1 0!important;
+    min-height:0!important;
+    height:100%!important;
+    border-radius:0!important;
+  }
+
+  .city-map-panel.is-fullscreen .master-map-svg,
+  .city-map-panel:fullscreen .master-map-svg{
+    border-radius:0!important;
+  }
 }
