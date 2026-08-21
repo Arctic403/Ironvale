@@ -53,3 +53,490 @@
 /* Big economy/casino/nightclub expansion */
 .bank-v2{display:grid;gap:14px}.bank-hero{padding:20px;border:1px solid rgba(96,165,250,.22);border-radius:22px;background:linear-gradient(135deg,rgba(11,28,50,.96),rgba(8,15,26,.98));display:flex;justify-content:space-between;gap:16px;align-items:end}.bank-hero small{letter-spacing:.14em;color:#8fbaf7}.bank-hero h2{font-size:34px;margin:4px 0}.bank-hero p{margin:0;color:var(--muted)}.bank-account-pills{display:flex;gap:8px;flex-wrap:wrap}.bank-account-pills span{padding:10px 12px;border-radius:13px;background:rgba(255,255,255,.05);font-size:10px}.bank-account-pills b{display:block;font-size:14px;margin-top:2px}.bank-chart{padding:10px;border-radius:15px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07)}.bank-chart svg{width:100%;height:170px;overflow:visible}.bank-chart polyline{fill:none;stroke:currentColor;stroke-width:1.5;vector-effect:non-scaling-stroke}.bank-chart>div{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}.investment-input{display:flex;gap:10px;align-items:center;margin-bottom:12px}.investment-tier-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.investment-tier{padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.025)}.investment-tier.locked{opacity:.58}.investment-tier small{color:#8fbaf7}.investment-tier h3{margin:5px 0 10px}.investment-tier>div{display:flex;justify-content:space-between;font-size:11px;margin:6px 0}.investment-tier p{font-size:10px;color:var(--muted);min-height:30px}.active-investments{margin-top:14px;display:grid;gap:7px}.active-investments>div,.bank-ledger>div{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:9px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px}.bank-ledger .positive{color:#76e6a5}.bank-ledger .negative{color:#ff8f8f}.muted-copy{color:var(--muted);font-size:11px}.roulette-display,.table-big-label,.dice-stage{display:flex;justify-content:center;gap:14px;align-items:center;min-height:120px;font-size:34px;font-weight:800;letter-spacing:.08em}.roulette-display span{padding:20px;border:1px solid rgba(255,255,255,.1);border-radius:14px}.neon-reels.reels-5,.neon-reels.reels-6{grid-template-columns:repeat(5,minmax(0,1fr))}.neon-reels.reels-6{grid-template-columns:repeat(6,minmax(0,1fr))}.nightclub-v1{display:grid;gap:14px}.nightclub-hero{position:relative;overflow:hidden;padding:26px;border:1px solid rgba(185,90,255,.25);border-radius:24px;background:radial-gradient(circle at 20% 0%,rgba(255,47,179,.18),transparent 35%),radial-gradient(circle at 80% 20%,rgba(62,135,255,.2),transparent 35%),#090913}.nightclub-hero h2{font-size:44px;letter-spacing:.22em;margin:4px 0}.nightclub-hero p{color:var(--muted)}.club-lasers{position:absolute;inset:-30%;background:repeating-conic-gradient(from 0deg,transparent 0 18deg,rgba(181,68,255,.035) 20deg 21deg,transparent 23deg 38deg);animation:casinoGlow 16s linear infinite}.club-metrics{position:relative;display:flex;gap:10px;flex-wrap:wrap}.club-metrics span{padding:9px 12px;background:rgba(255,255,255,.05);border-radius:999px;font-size:11px}.nightclub-floor-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.nightclub-floor-grid>button,.club-vip-card{padding:20px;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(145deg,rgba(26,15,40,.96),rgba(9,12,18,.96));color:var(--text);text-align:left}.nightclub-floor-grid span{font-size:28px;display:block}.nightclub-floor-grid b,.nightclub-floor-grid small{display:block;margin-top:6px}.nightclub-floor-grid small{color:var(--muted)}.club-vip-card.locked{opacity:.55}.club-event-line{display:grid;grid-template-columns:70px 1fr auto;gap:10px;padding:10px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px}@media(max-width:760px){.investment-tier-grid{grid-template-columns:1fr 1fr}.bank-hero{align-items:stretch;flex-direction:column}.nightclub-floor-grid{grid-template-columns:1fr}.neon-reels.reels-6{grid-template-columns:repeat(3,1fr)}}
 
+
+/* === FINAL GAME UI REFRESH OVERRIDES === */
+/* ============================================================
+   44. GAME UI REFRESH — destination-first MMO layout
+   ============================================================ */
+
+:root {
+  --game-accent: #60a5fa;
+  --game-accent-rgb: 96, 165, 250;
+  --hud-height-desktop: 74px;
+  --hud-height-mobile: 78px;
+  --game-gutter: clamp(12px, 2vw, 24px);
+}
+
+/* ---------- Route identity ---------- */
+.screen-shell { --game-accent:#60a5fa; --game-accent-rgb:96,165,250; }
+.screen-crimes { --game-accent:#fb923c; --game-accent-rgb:251,146,60; }
+.screen-combat { --game-accent:#f87171; --game-accent-rgb:248,113,113; }
+.screen-gym { --game-accent:#4ade80; --game-accent-rgb:74,222,128; }
+.screen-jobs { --game-accent:#67e8f9; --game-accent-rgb:103,232,249; }
+.screen-blackmarket { --game-accent:#f59e0b; --game-accent-rgb:245,158,11; }
+.screen-bank { --game-accent:#38bdf8; --game-accent-rgb:56,189,248; }
+.screen-property { --game-accent:#34d399; --game-accent-rgb:52,211,153; }
+.screen-casino { --game-accent:#facc15; --game-accent-rgb:250,204,21; }
+.screen-nightclub { --game-accent:#e879f9; --game-accent-rgb:232,121,249; }
+.screen-airport { --game-accent:#7dd3fc; --game-accent-rgb:125,211,252; }
+.screen-police,.screen-jail { --game-accent:#93c5fd; --game-accent-rgb:147,197,253; }
+.screen-hospital,.screen-pharmacy { --game-accent:#5eead4; --game-accent-rgb:94,234,212; }
+.screen-faction { --game-accent:#c4b5fd; --game-accent-rgb:196,181,253; }
+.screen-education { --game-accent:#a5b4fc; --game-accent-rgb:165,180,252; }
+
+body {
+  background:
+    radial-gradient(circle at 50% -12%, rgba(96,165,250,.055), transparent 31rem),
+    linear-gradient(180deg,#070b10 0%,#080c11 56%,#06090d 100%);
+}
+
+.layout-root.ui-shell .main-wrapper {
+  min-height:100dvh;
+}
+
+.layout-root.ui-shell .screen-container {
+  position:relative;
+  width:100%;
+  max-width:1440px;
+  padding:calc(var(--hud-height-desktop) + 34px) var(--game-gutter) 108px;
+}
+
+.feature-page-canvas {
+  position:relative;
+  isolation:isolate;
+}
+
+.feature-page-canvas::before {
+  content:"";
+  position:absolute;
+  z-index:-1;
+  top:-80px;
+  left:-6vw;
+  width:min(700px,80vw);
+  height:340px;
+  pointer-events:none;
+  background:radial-gradient(ellipse at top left,rgba(var(--game-accent-rgb),.065),transparent 67%);
+  filter:blur(8px);
+}
+
+/* ---------- Compact MMO HUD: information, not a wall of pills ---------- */
+.top-status-bar.floating-status-panel.compact-hud-v4 {
+  position:fixed;
+  z-index:142;
+  top:10px;
+  left:138px;
+  right:18px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-height:0 !important;
+  padding:7px 10px !important;
+  border:1px solid rgba(255,255,255,.075) !important;
+  border-radius:10px !important;
+  background:rgba(7,12,17,.88) !important;
+  box-shadow:0 12px 38px rgba(0,0,0,.24) !important;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+
+.hud-line { min-width:0; display:flex; align-items:center; }
+.hud-line-primary { gap:0; min-height:29px; }
+.hud-line-secondary {
+  gap:0;
+  min-height:18px;
+  padding-top:4px;
+  border-top:1px solid rgba(255,255,255,.055);
+  overflow:hidden;
+}
+
+.hud-metric,.hud-mini {
+  appearance:none;
+  -webkit-appearance:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:0;
+  border:0;
+  border-right:1px solid rgba(255,255,255,.07);
+  background:transparent;
+  color:#c9d3de;
+  white-space:nowrap;
+}
+
+.hud-metric {
+  min-height:28px;
+  padding:0 13px;
+  font-size:11px;
+  font-weight:800;
+}
+.hud-metric:first-child { padding-left:6px; }
+.hud-metric:last-child { border-right:0; }
+.hud-metric b { margin-right:5px; color:#7f91a3; font-size:8px; letter-spacing:.12em; }
+.hud-metric strong { color:#e9f0f6; font-size:11px; }
+.hud-metric > span { margin-right:5px; }
+button.hud-metric,button.hud-mini { cursor:pointer; }
+.hud-level { color:#dbeafe; }
+.hud-cash { margin-left:auto; color:#9fe8bb; }
+.hud-cash b { color:#68b985; }
+.hud-vital:hover { background:rgba(255,255,255,.035); }
+
+.hud-mini {
+  min-height:17px;
+  padding:0 9px;
+  color:#8797a8;
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+.hud-mini:first-child { padding-left:6px; }
+.hud-mini:last-child { border-right:0; }
+.hud-mini b { margin-right:4px; color:#647486; font-size:7px; letter-spacing:.11em; }
+.hud-heat { color:#f6a46a; }
+
+/* ---------- Header: smaller, stronger hierarchy ---------- */
+.shell-screen-header {
+  position:relative;
+  min-height:54px;
+  align-items:flex-end;
+  margin:0 0 18px !important;
+  padding:0 0 13px 14px !important;
+  border-bottom:1px solid rgba(255,255,255,.075);
+}
+.shell-screen-header::before {
+  content:"";
+  position:absolute;
+  left:0;
+  top:3px;
+  bottom:13px;
+  width:3px;
+  border-radius:99px;
+  background:var(--game-accent);
+  box-shadow:0 0 18px rgba(var(--game-accent-rgb),.28);
+}
+.shell-screen-header h1 {
+  margin-top:2px;
+  font-size:clamp(22px,2.6vw,30px);
+  letter-spacing:-.025em;
+}
+.shell-screen-header .location-tag {
+  color:var(--game-accent);
+  opacity:.92;
+}
+.return-city-top-btn {
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+  color:#8191a2 !important;
+  font-size:9px !important;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.return-city-top-btn:hover { color:#d6e2ec !important; }
+
+/* City is already its own visual destination. Don't double-title it. */
+.screen-city .shell-screen-header { display:none; }
+.screen-city .feature-page-canvas::before { display:none; }
+.screen-city .screen-container { max-width:1580px !important; padding-top:calc(var(--hud-height-desktop) + 22px) !important; }
+
+/* ---------- Less dashboard, more game surface ---------- */
+.card {
+  border-color:rgba(118,140,161,.18);
+  border-radius:8px;
+  background:linear-gradient(180deg,rgba(13,20,27,.92),rgba(10,16,22,.94));
+  box-shadow:none;
+}
+.card:hover { border-color:rgba(135,159,182,.27); }
+.card-header {
+  padding:11px 13px;
+  border-bottom-color:rgba(255,255,255,.06);
+  background:rgba(255,255,255,.008);
+}
+.card-body { padding:13px; }
+.card-tag { border:0; border-radius:3px; padding:3px 5px; background:rgba(255,255,255,.035); }
+.ui-grid { gap:10px; }
+
+/* Panels that represent a whole feature section become open page sections. */
+.feature-page-canvas > .card,
+.feature-page-canvas > .city-service-page > .card {
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.feature-page-canvas > .card > .card-header,
+.feature-page-canvas > .city-service-page > .card > .card-header {
+  padding:8px 0 10px;
+  border-bottom:1px solid rgba(255,255,255,.085);
+  background:transparent;
+}
+.feature-page-canvas > .card > .card-header h3,
+.feature-page-canvas > .city-service-page > .card > .card-header h3 {
+  font-size:12px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:#acb9c6;
+}
+.feature-page-canvas > .card > .card-body,
+.feature-page-canvas > .city-service-page > .card > .card-body { padding:13px 0 22px; }
+
+/* Buttons are controls, not bubbles. */
+.btn-primary,.btn-secondary,.btn-danger-ghost {
+  border-radius:7px !important;
+  min-height:38px;
+  box-shadow:none !important;
+}
+input,select,textarea { border-radius:6px !important; }
+
+/* ---------- Navigation becomes a compact game drawer ---------- */
+.floating-ui-stack {
+  top:14px;
+  left:14px;
+  gap:6px;
+}
+.floating-ui-btn {
+  min-width:54px;
+  min-height:34px;
+  padding:7px 10px;
+  border-radius:8px;
+  background:rgba(7,12,17,.9);
+  box-shadow:none;
+}
+.floating-ui-btn strong { font-size:9px; letter-spacing:.04em; }
+.floating-ui-btn span { font-size:13px; }
+.drawer-nav.nav-rail { border-radius:0 10px 10px 0; }
+.drawer-nav-list .nav-item {
+  min-height:48px;
+  padding:9px 10px;
+  border-radius:6px;
+  background:transparent;
+  border-left:2px solid transparent;
+}
+.drawer-nav-list .nav-item:hover { background:rgba(255,255,255,.025); }
+.drawer-nav-list .nav-item.active {
+  border-left-color:var(--blue);
+  background:rgba(96,165,250,.07);
+}
+
+/* ---------- Generic list/data styling ---------- */
+.data-list { gap:0 !important; }
+.data-row {
+  min-height:36px;
+  padding:8px 2px !important;
+  border-bottom:1px solid rgba(255,255,255,.055) !important;
+  background:transparent !important;
+  border-radius:0 !important;
+}
+.data-row:last-child { border-bottom:0 !important; }
+
+/* ---------- Destination-specific composition ---------- */
+.screen-crimes .crime-summary-strip,
+.screen-blackmarket .black-market-stats,
+.screen-bank .bank-risk-grid {
+  border-top:1px solid rgba(var(--game-accent-rgb),.22);
+}
+
+.screen-crimes .crime-intro-card {
+  border-left:3px solid rgba(var(--game-accent-rgb),.7);
+  border-radius:4px;
+  background:linear-gradient(90deg,rgba(var(--game-accent-rgb),.07),transparent 70%);
+}
+.screen-crimes .crime-card-v2 {
+  border-radius:7px;
+  background:linear-gradient(135deg,rgba(16,23,30,.96),rgba(10,15,20,.96));
+}
+
+.screen-blackmarket .service-hero {
+  padding:20px 0 16px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  background:linear-gradient(90deg,rgba(245,158,11,.06),transparent 62%);
+}
+.screen-blackmarket .auction-listing {
+  border-width:0 0 1px !important;
+  border-radius:0 !important;
+  background:transparent !important;
+}
+.screen-blackmarket .auction-listing:hover { background:rgba(255,255,255,.018) !important; }
+
+.screen-bank .bank-hero {
+  border-radius:8px;
+  border-width:0 0 0 3px;
+  background:linear-gradient(110deg,rgba(12,31,48,.96),rgba(7,14,22,.98) 70%);
+}
+.screen-bank .investment-tier { border-radius:7px; }
+
+.screen-nightclub .nightclub-hero { border-radius:8px; }
+.screen-nightclub .nightclub-floor-grid > button,
+.screen-nightclub .club-vip-card { border-radius:7px; }
+
+.screen-casino .card { border-radius:8px; }
+.screen-casino .casino-v4 { --game-accent:#facc15; }
+
+.screen-character .feature-page-canvas > .ui-grid,
+.screen-jobs .feature-page-canvas > .ui-grid,
+.screen-inventory .feature-page-canvas > .ui-grid {
+  align-items:start;
+}
+.screen-character .feature-page-canvas > .ui-grid > .card {
+  border-top:2px solid rgba(var(--game-accent-rgb),.26);
+}
+.screen-inventory .item-card,
+.screen-jobs .job-card,
+.screen-missions .mission-card,
+.screen-education .course-card {
+  border-radius:7px;
+}
+
+/* Combat should read as an arena, not a dashboard column. */
+.screen-combat .feature-page-canvas { max-width:1180px; margin:0 auto; }
+.screen-combat .combat-container-live { width:100%; }
+
+/* Map: edge-to-edge visual focus within the page canvas. */
+.screen-city .city-map-panel {
+  border-radius:8px !important;
+  border-color:rgba(255,255,255,.075) !important;
+  box-shadow:none !important;
+}
+.screen-city .city-map-header { padding:12px 14px; }
+
+/* ---------- Mobile ---------- */
+@media (max-width: 760px) {
+  :root { --hud-height-mobile:82px; }
+
+  .layout-root.ui-shell .screen-container {
+    max-width:none;
+    padding:calc(var(--hud-height-mobile) + env(safe-area-inset-top) + 16px) 12px calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .screen-city .screen-container {
+    padding-top:calc(var(--hud-height-mobile) + env(safe-area-inset-top) + 8px) !important;
+    padding-left:0 !important;
+    padding-right:0 !important;
+  }
+
+  .top-status-bar.floating-status-panel.compact-hud-v4 {
+    top:calc(5px + env(safe-area-inset-top)) !important;
+    left:7px !important;
+    right:7px !important;
+    gap:3px;
+    padding:6px 6px !important;
+    border-radius:8px !important;
+  }
+
+  .hud-line-primary {
+    display:grid;
+    grid-template-columns:.72fr .78fr 1.18fr 1.18fr 1.18fr 1.45fr;
+    width:100%;
+  }
+  .hud-metric {
+    min-height:27px;
+    padding:0 3px;
+    font-size:9px;
+  }
+  .hud-metric:first-child { padding-left:3px; }
+  .hud-metric b { margin-right:2px; font-size:6px; letter-spacing:.06em; }
+  .hud-metric strong { font-size:9px; }
+  .hud-metric > span { margin-right:2px; font-size:10px; }
+  .hud-cash { margin-left:0; }
+
+  .hud-line-secondary {
+    display:grid;
+    grid-template-columns:repeat(9,minmax(0,1fr));
+    width:100%;
+  }
+  .hud-mini {
+    min-height:18px;
+    padding:0 2px;
+    font-size:7px;
+    overflow:hidden;
+  }
+  .hud-mini b { display:none; }
+  .hud-mini:nth-last-child(-n+4) b { display:inline; margin-right:1px; font-size:5px; }
+
+  .shell-screen-header {
+    min-height:44px;
+    margin-bottom:12px !important;
+    padding:0 0 9px 10px !important;
+  }
+  .shell-screen-header::before { bottom:9px; width:2px; }
+  .shell-screen-header h1 { font-size:22px; }
+  .header-quick-status { width:100%; }
+  .status-alert.compact { min-height:30px; padding:0 8px; font-size:9px; }
+
+  .floating-ui-stack {
+    top:auto !important;
+    left:10px !important;
+    right:auto !important;
+    bottom:calc(14px + env(safe-area-inset-bottom)) !important;
+    width:auto !important;
+    flex-direction:row !important;
+  }
+  .floating-ui-stack .floating-ui-btn {
+    min-width:52px !important;
+    min-height:44px !important;
+    width:52px !important;
+    padding:5px !important;
+    flex-direction:column;
+    gap:1px;
+    border-radius:9px;
+  }
+  .floating-ui-btn strong { font-size:7px; }
+
+  .activity-drawer {
+    bottom:calc(68px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .feature-page-canvas > .card > .card-body,
+  .feature-page-canvas > .city-service-page > .card > .card-body { padding-bottom:17px; }
+  .card-body { padding:11px; }
+  .ui-grid { gap:8px; }
+
+  .ui-grid.two-col,
+  .ui-grid.three-col,
+  .ui-grid.four-col { grid-template-columns:1fr; }
+
+  .crime-summary-strip,
+  .black-market-stats,
+  .bank-risk-grid { gap:6px !important; }
+}
+
+@media (max-width: 390px) {
+  .hud-metric { font-size:8px; }
+  .hud-metric strong { font-size:8px; }
+  .hud-line-secondary { grid-template-columns:repeat(9,minmax(0,1fr)); }
+  .hud-mini { font-size:6.5px; }
+}
+
+@media (min-width: 761px) {
+  .screen-character .feature-page-canvas > .ui-grid.two-col { grid-template-columns:1.05fr .95fr; }
+  .screen-inventory .feature-page-canvas > .ui-grid.three-col { grid-template-columns:repeat(3,minmax(240px,1fr)); }
+}
+
+
+/* Small identity cues for route-specific service destinations. */
+.hud-mini-icon{display:none;margin-right:2px;font-size:8px}
+.screen-airport .service-hero,
+.screen-hospital .service-hero,
+.screen-police .service-hero,
+.screen-pharmacy .service-hero,
+.screen-park .service-hero,
+.screen-downtown .service-hero{
+  padding:18px 0 14px;
+  border-left:3px solid rgba(var(--game-accent-rgb),.55);
+  border-bottom:1px solid rgba(255,255,255,.06);
+  background:linear-gradient(90deg,rgba(var(--game-accent-rgb),.055),transparent 65%);
+}
+.screen-airport .service-hero>span,
+.screen-hospital .service-hero>span,
+.screen-police .service-hero>span,
+.screen-pharmacy .service-hero>span,
+.screen-park .service-hero>span,
+.screen-downtown .service-hero>span{filter:drop-shadow(0 0 14px rgba(var(--game-accent-rgb),.2))}
+
+@media(max-width:760px){
+  .hud-mini-icon{display:inline}
+  .hud-mini:nth-child(-n+5) b{display:none!important}
+}
+
+/* HUD values may reach MMO-scale; keep them inside their cells on phones. */
+.hud-metric,.hud-mini{overflow:hidden;text-overflow:ellipsis}

@@ -126,7 +126,7 @@ function App() {
         </button>
       </div>
 
-      <div className="main-wrapper">
+      <div className={`main-wrapper screen-shell screen-${g.currentScreen}`} data-screen={g.currentScreen}>
         <StatusBar g={g} setActiveModal={setActiveModal} />
 
         <ResourceModal
@@ -170,7 +170,9 @@ function App() {
             </div>
           </div>
 
-          <ScreenContent g={g} />
+          <div className="feature-page-canvas">
+            <ScreenContent g={g} />
+          </div>
         </main>
       </div>
 
