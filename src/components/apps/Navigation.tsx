@@ -1,29 +1,6 @@
 import React from "react";
 import type { Screen } from "../../types/riftCity";
-
-type NavigationItem = {
-  id: Screen;
-  label: string;
-  icon: string;
-};
-
-const NAV_ITEMS: NavigationItem[] = [
-  { id: "character", label: "Character", icon: "👤" },
-  { id: "city", label: "City", icon: "🏙️" },
-  { id: "crimes", label: "Crimes", icon: "🕵️" },
-  { id: "combat", label: "Combat", icon: "⚔️" },
-  { id: "gym", label: "Gym", icon: "🏋️" },
-  { id: "jobs", label: "Jobs", icon: "💼" },
-  { id: "inventory", label: "Inventory", icon: "🎒" },
-  { id: "shops", label: "Shops", icon: "🛒" },
-  { id: "missions", label: "Missions", icon: "📜" },
-  { id: "education", label: "Education", icon: "🎓" },
-  { id: "property", label: "Property", icon: "🏠" },
-  { id: "market", label: "Market", icon: "📈" },
-  { id: "faction", label: "Faction", icon: "🛡️" },
-  { id: "awards", label: "Awards", icon: "🏆" },
-  { id: "progression", label: "Progression", icon: "🧬" },
-];
+import { getNavigationRoutes, getRouteTitle, screenToPath } from "../../routing/routes";
 
 type NavigationProps = {
   currentScreen: Screen;
@@ -42,6 +19,8 @@ export function Navigation({
   isOpen,
   onClose,
 }: NavigationProps) {
+  const navItems = getNavigationRoutes();
+
   return (
     <aside className={`nav-rail drawer-nav ${isOpen ? "open" : ""}`} aria-hidden={!isOpen}>
       <div className="brand drawer-brand">
@@ -51,7 +30,7 @@ export function Navigation({
         </div>
 
         <div className="drawer-brand-actions">
-          <span className="badge">v2.6</span>
+          <span className="badge">v2.7</span>
           <button type="button" className="drawer-close" aria-label="Close menu" onClick={onClose}>
             ×
           </button>
@@ -77,42 +56,31 @@ export function Navigation({
       </div>
 
       <nav className="nav-list drawer-nav-list">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            className={`nav-item ${currentScreen === item.id ? "active" : ""}`}
-            aria-current={currentScreen === item.id ? "page" : undefined}
-            onClick={() => {
-              onNavigate(item.id);
+        {navItems.map((item) => (
+          <a
+            key={item.screen}
+            href={screenToPath(item.screen)}
+            className={`nav-item ${currentScreen === item.screen ? "active" : ""}`}
+            aria-current={currentScreen === item.screen ? "page" : undefined}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              onNavigate(item.screen);
               onClose();
             }}
           >
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-copy">
-              <span className="nav-label">{item.label}</span>
-              <small>Open {item.label}</small>
+              <span className="nav-label">{item.navLabel}</span>
+              <small>Open {item.navLabel}</small>
             </span>
-          </button>
+          </a>
         ))}
       </nav>
     </aside>
   );
 }
 
-const LOCATION_TITLES: Partial<Record<Screen, string>> = {
-  bank: "RiftCity Bank",
-  hospital: "RiftCity Hospital",
-  jail: "RiftCity Jail",
-  police: "Police Department",
-  pharmacy: "RiftCare Pharmacy",
-  casino: "The Rift Casino",
-  nightclub: "Pulse Nightclub",
-  blackmarket: "Black Market",
-  park: "Central Park",
-  downtown: "Downtown",
-  airport: "RiftCity Airport",
-};
-
 export function getScreenTitle(screen: Screen) {
-  return NAV_ITEMS.find((item) => item.id === screen)?.label || LOCATION_TITLES[screen] || "RiftCity";
+  return getRouteTitle(screen);
 }

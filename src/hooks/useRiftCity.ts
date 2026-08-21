@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { tickGameState } from "../systems/gameTickSystem";
 import { getJobPosition, getJobStatBonuses } from "../data/jobs";
 import {
@@ -23,6 +23,7 @@ import {
 } from "../data/gameData";
 import type { Screen, SaveData, ActivityType, Activity, AuctionListing } from "../types/riftCity";
 import type { Encounter, EncounterChoice } from "../constants/encounters";
+import { pathToScreen, screenToPath } from "../routing/routes";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
 import { ALL_NPC_LISTINGS, listingFee } from "../systems/auctionSystem";
 import { getCrimeTool } from "../systems/crimeTools";
@@ -34,8 +35,34 @@ export function useRiftCity() {
     loadSave()
   );
 
-  const [currentScreen, setCurrentScreen] =
-    useState<Screen>("character");
+  const [currentScreen, setCurrentScreenState] =
+    useState<Screen>(() => pathToScreen(window.location.pathname));
+
+  const setCurrentScreen = useCallback((screen: Screen) => {
+    setCurrentScreenState(screen);
+
+    const nextPath = screenToPath(screen);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({ screen }, "", nextPath);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentScreenState(pathToScreen(window.location.pathname));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    const normalizedScreen = pathToScreen(window.location.pathname);
+    const canonicalPath = screenToPath(normalizedScreen);
+    if (window.location.pathname !== canonicalPath) {
+      window.history.replaceState({ screen: normalizedScreen }, "", canonicalPath);
+    }
+  }, []);
 
   const lastRestrictionRef = useRef<{ jail: number | null; hospital: number | null }>({
     jail: null,
