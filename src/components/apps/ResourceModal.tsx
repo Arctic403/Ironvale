@@ -4,6 +4,7 @@ import type { useRiftCity } from "../../hooks/useRiftCity";
 import {
   formatTime,
 } from "../../core/gameCore";
+import { GameIcon } from "../GameIcon";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;
 
@@ -60,7 +61,7 @@ export function ResourceModal({
       >
         {activeModal === "energy" && (
           <>
-            <h2>⚡ Energy</h2>
+            <h2 className="icon-title"><GameIcon name="energy" size={21} /> Energy</h2>
 
             <ResourceValue>
               {g.gameState.energy} / {g.maxEnergy}
@@ -78,7 +79,7 @@ export function ResourceModal({
 
         {activeModal === "nerve" && (
           <>
-            <h2>🔥 Nerve</h2>
+            <h2 className="icon-title"><GameIcon name="nerve" size={21} /> Nerve</h2>
 
             <ResourceValue>
               {g.gameState.nerve} / {g.maxNerve}
@@ -96,7 +97,7 @@ export function ResourceModal({
 
         {activeModal === "happy" && (
           <>
-            <h2>😊 Happiness</h2>
+            <h2 className="icon-title"><GameIcon name="happy" size={21} /> Happiness</h2>
 
             <ResourceValue>
               {Math.floor(g.gameState.happiness)} / {maxHappy}
@@ -114,7 +115,7 @@ export function ResourceModal({
 
         {activeModal === "health" && (
           <>
-            <h2>❤️ Health</h2>
+            <h2 className="icon-title"><GameIcon name="health" size={21} /> Health</h2>
 
             <ResourceValue>
               {Math.floor(g.gameState.health)} / {g.maxHealth}

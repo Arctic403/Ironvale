@@ -2,6 +2,7 @@ import React from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 
 import { Panel, Button } from "../components/ui";
+import { GameIcon, type GameIconName } from "../components/GameIcon";
 
 import {
   EDUCATION,
@@ -17,6 +18,38 @@ import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES,
 import { rentalGrossPerHour, rentalUpkeepPerHour } from "../data/wealthRisk";
 
 type Game = ReturnType<typeof useRiftCity>;
+
+function itemVisualIcon(item: (typeof ITEMS)[number]): GameIconName {
+  if (item.id === "knife" || item.id === "machete" || item.id === "syndicate-blade") return "blade";
+  if (item.id === "bat" || item.id === "crowbar") return "blunt";
+  if (item.id === "pistol" || item.id === "heavy-pistol") return "handgun";
+  if (item.id === "machine-pistol" || item.id === "smg") return "smg";
+  if (item.id === "shotgun") return "shotgun";
+  if (item.id === "carbine" || item.id === "rifle") return "rifle";
+  if (item.type === "armor") return "armor";
+  if (item.type === "medical") return "medkit";
+  if (item.type === "energy") return "drink";
+  if (item.type === "nerve") return "focus";
+  if (item.crimeTool) {
+    if (item.id.includes("glove")) return "gloves";
+    if (item.id.includes("phone")) return "phone";
+    if (item.id.includes("disguise")) return "disguise";
+    if (item.id.includes("badge")) return "badge";
+    if (item.id.includes("route")) return "route";
+    return "tools";
+  }
+  if (item.productionSupply) {
+    if (item.id.includes("plant")) return "plant";
+    if (item.id.includes("packaging")) return "package";
+    return "chemical";
+  }
+  if (item.id.includes("chip")) return "chip";
+  if (item.id.includes("key")) return "key";
+  if (item.id.includes("envelope")) return "envelope";
+  if (item.id.includes("candy") || item.id.includes("chew") || item.id.includes("pops")) return "candy";
+  if (item.contraband) return "contraband";
+  return "package";
+}
 
 /* =========================================================
    CHARACTER
@@ -45,21 +78,21 @@ export function Character({ g }: { g: Game }) {
 
       <Panel title="Weapon Skills">
         <div className="data-list">
-          {[
-            ["unarmed", "👊 Unarmed"],
-            ["blade", "🔪 Blades"],
-            ["blunt", "🏏 Blunt"],
-            ["handgun", "🔫 Handguns"],
-            ["smg", "⚡ SMGs"],
-            ["shotgun", "💥 Shotguns"],
-            ["rifle", "🎯 Rifles"],
-          ].map(([id, label]) => {
+          {([
+            ["unarmed", "Unarmed", "weapon"],
+            ["blade", "Blades", "blade"],
+            ["blunt", "Blunt", "blunt"],
+            ["handgun", "Handguns", "handgun"],
+            ["smg", "SMGs", "smg"],
+            ["shotgun", "Shotguns", "shotgun"],
+            ["rifle", "Rifles", "rifle"],
+          ] as Array<[string, string, GameIconName]>).map(([id, label, icon]) => {
             const xp = g.gameState.weaponSkillXp[id] || 0;
             const level = Math.min(100, 1 + Math.floor(Math.sqrt(xp / 12)));
             const nextXp = level >= 100 ? xp : Math.ceil(Math.pow(level, 2) * 12);
             return (
               <div className="data-row" key={id}>
-                <span>{label}</span>
+                <span className="row-icon-label"><GameIcon name={icon} size={15} /> {label}</span>
                 <b>Lv {level} · {level >= 100 ? "MAX" : `${xp}/${nextXp} XP`}</b>
               </div>
             );
@@ -71,7 +104,7 @@ export function Character({ g }: { g: Game }) {
       <Panel title="Core Resources">
         <div className="data-list">
           <div className="data-row">
-            <span>❤️ Health</span>
+            <span className="row-icon-label"><GameIcon name="health" size={14} /> Health</span>
 
             <b>
               {Math.floor(g.gameState.health)} / {g.maxHealth}
@@ -79,7 +112,7 @@ export function Character({ g }: { g: Game }) {
           </div>
 
           <div className="data-row">
-            <span>⚡ Energy</span>
+            <span className="row-icon-label"><GameIcon name="energy" size={14} /> Energy</span>
 
             <b>
               {g.gameState.energy} / {g.maxEnergy}
@@ -87,7 +120,7 @@ export function Character({ g }: { g: Game }) {
           </div>
 
           <div className="data-row">
-            <span>🧠 Nerve</span>
+            <span className="row-icon-label"><GameIcon name="nerve" size={14} /> Nerve</span>
 
             <b>
               {g.gameState.nerve} / {g.maxNerve}
@@ -95,7 +128,7 @@ export function Character({ g }: { g: Game }) {
           </div>
 
           <div className="data-row">
-            <span>😊 Happiness</span>
+            <span className="row-icon-label"><GameIcon name="happy" size={14} /> Happiness</span>
 
             <b>
               {Math.floor(g.gameState.happiness)} / {happinessMax}
@@ -134,7 +167,7 @@ export function Character({ g }: { g: Game }) {
           </div>
 
           <div className="data-row"><span>Attacks</span><b>{g.gameState.attacks}</b></div>
-          <div className="data-row"><span>🔥 Heat</span><b>{g.gameState.heat} / 100</b></div>
+          <div className="data-row"><span className="row-icon-label"><GameIcon name="heat" size={14} /> Heat</span><b>{g.gameState.heat} / 100</b></div>
           <div className="data-row"><span>Locations Discovered</span><b>{g.gameState.locationsVisited.length}</b></div>
           <div className="data-row"><span>Job Actions</span><b>{g.gameState.jobActions}</b></div>
           <div className="data-row"><span>Bank Interest Earned</span><b>{money(g.gameState.bankInterest)}</b></div>
@@ -160,7 +193,7 @@ export function Jobs({ g }: { g: Game }) {
             <div className="data-row"><span>Hourly Pay</span><b>{money(g.jobPosition.salary)}</b></div>
           </div>
           <div className="btn-group">
-            <Button disabled={g.gameState.energy < 8} onClick={g.workShift}>Work Shift (8 ⚡)</Button>
+            <Button disabled={g.gameState.energy < 8} onClick={g.workShift}>Work Shift (8 Energy)</Button>
             <Button onClick={g.quitJob}>Quit Job</Button>
           </div>
         </Panel>
@@ -202,6 +235,7 @@ export function Inventory({ g }: { g: Game }) {
     const equippable=item.type==="weapon"||item.type==="armor";
     const equipped=item.type==="weapon"?g.gameState.equippedWeapon===item.id:item.type==="armor"?g.gameState.equippedArmor===item.id:false;
     return <div className="card item-card" key={item.id}>
+      <div className="item-visual" aria-hidden="true"><GameIcon name={itemVisualIcon(item)} size={32} /></div>
       <span className="card-tag">{item.rarity ?? "Common"} · {item.type.toUpperCase()}</span>
       <h3>{item.name}</h3><p>{item.description}</p>
       <div className="data-list"><div className="data-row"><span>Owned</span><b>{owned}</b></div>
@@ -268,6 +302,7 @@ export function Shops({ g }: { g: Game }) {
 
                   return (
                     <div className="card item-card" key={item.id}>
+                      <div className="item-visual" aria-hidden="true"><GameIcon name={itemVisualIcon(item)} size={32} /></div>
                       <span className="card-tag">{shop.tag}</span>
 
                       <h3>{item.name}</h3>
@@ -532,7 +567,7 @@ export function Faction({ g }: { g: Game }) {
   const current=g.gameState.faction;
   const rank=getFactionRank(current,g.gameState.factionReputation);
   return <>
-    {current && <Panel title={`${current} Headquarters`}><div className="data-list"><div className="data-row"><span>Rank</span><b>{rank?.name}</b></div><div className="data-row"><span>Reputation</span><b>{g.gameState.factionReputation}</b></div><div className="data-row"><span>Rank Bonus</span><b>{rank?.bonus}</b></div></div><div className="btn-group"><Button disabled={g.gameState.energy<10} onClick={g.workFaction}>Faction Work (10 ⚡)</Button><Button disabled={g.gameState.energy<15} onClick={g.runFactionMission}>Faction Mission (15 ⚡)</Button><Button onClick={g.leaveFaction}>Leave Faction</Button></div></Panel>}
+    {current && <Panel title={`${current} Headquarters`}><div className="data-list"><div className="data-row"><span>Rank</span><b>{rank?.name}</b></div><div className="data-row"><span>Reputation</span><b>{g.gameState.factionReputation}</b></div><div className="data-row"><span>Rank Bonus</span><b>{rank?.bonus}</b></div></div><div className="btn-group"><Button disabled={g.gameState.energy<10} onClick={g.workFaction}>Faction Work (10 Energy)</Button><Button disabled={g.gameState.energy<15} onClick={g.runFactionMission}>Faction Mission (15 Energy)</Button><Button onClick={g.leaveFaction}>Leave Faction</Button></div></Panel>}
     <div className="ui-grid three-col">{FACTIONS.map((faction)=>{ const member=current===faction.id; const blocked=Boolean(current)&&!member; return <div className={`card faction-card ${blocked?"disabled":""}`} key={faction.id}><span className="card-tag">{faction.specialty}</span><h3>{faction.id}</h3><p>{faction.description}</p><Button disabled={blocked||member} onClick={()=>g.joinFaction(faction.id)}>{member?"Member":"Join · $500"}</Button></div>; })}</div>
     {current && <Panel title="Faction Reward Shop"><div className="ui-grid two-col">{FACTIONS.find(f=>f.id===current)?.rewards.map((reward)=>{const claimed=g.gameState.factionRewardsClaimed.includes(reward.id); const unlocked=g.gameState.factionReputation>=reward.reputation&&g.gameState.points>=reward.points; return <div className="card" key={reward.id}><h3>{reward.name}</h3><div className="data-row"><span>Requires</span><b>{reward.reputation} rep · {reward.points} points</b></div><Button disabled={claimed||!unlocked} onClick={()=>g.buyFactionReward(reward.id)}>{claimed?"Claimed":unlocked?"Claim Reward":"Locked"}</Button></div>;})}</div></Panel>}
   </>;
@@ -558,7 +593,7 @@ export function Awards({ g }: { g: Game }) {
 export function Progression({ g }: { g: Game }) {
   const activeEvent=WORLD_EVENTS.find(e=>e.id===g.gameState.activeWorldEvent);
   return <>
-    <Panel title="Heat / Wanted Level"><div className="data-row"><span>Current Heat</span><b>{g.gameState.heat}/100</b></div><div className="bar-track"><div className="bar-fill mission" style={{width:`${g.gameState.heat}%`}} /></div><p>Higher Heat reduces crime odds and makes the city less forgiving.</p><Button disabled={g.gameState.heat<=0||g.gameState.energy<5} onClick={g.coolHeat}>Lay Low (5 ⚡ · -10 Heat)</Button></Panel>
+    <Panel title="Heat / Wanted Level"><div className="data-row"><span>Current Heat</span><b>{g.gameState.heat}/100</b></div><div className="bar-track"><div className="bar-fill mission" style={{width:`${g.gameState.heat}%`}} /></div><p>Higher Heat reduces crime odds and makes the city less forgiving.</p><Button disabled={g.gameState.heat<=0||g.gameState.energy<5} onClick={g.coolHeat}>Lay Low (5 Energy · -10 Heat)</Button></Panel>
     <Panel title="Merit Upgrade Tree"><p>Available merits: <b>{g.gameState.merits}</b></p><div className="ui-grid three-col">{MERIT_UPGRADES.map(up=>{const rank=g.gameState.meritUpgrades[up.id]??0; const cost=up.baseCost+rank; return <div className="card" key={up.id}><span className="card-tag">RANK {rank}/{up.maxRank}</span><h3>{up.name}</h3><p>{up.description}</p><div className="data-row"><span>Effect</span><b>{up.effectLabel}</b></div><Button disabled={rank>=up.maxRank||g.gameState.merits<cost} onClick={()=>g.buyMeritUpgrade(up.id)}>{rank>=up.maxRank?"Maxed":`Upgrade · ${cost} merits`}</Button></div>;})}</div></Panel>
     <Panel title="Daily & Weekly Challenges"><div className="ui-grid two-col">{[...DAILY_CHALLENGES,...WEEKLY_CHALLENGES].map(ch=>{const progress=g.getChallengeProgress(ch); const claimed=g.isChallengeClaimed(ch.id); return <div className="card" key={ch.id}><span className="card-tag">{ch.id.startsWith("daily")?"DAILY":"WEEKLY"}</span><h3>{ch.name}</h3><p>{ch.description}</p><div className="bar-track"><div className="bar-fill mission" style={{width:`${Math.min(100,(progress/ch.target)*100)}%`}} /></div><div className="data-row"><span>Progress</span><b>{Math.min(progress,ch.target)}/{ch.target}</b></div><div className="data-row"><span>Rewards</span><b>{money(ch.rewardCash)} · {ch.rewardPoints} pts{ch.rewardMerits?` · ${ch.rewardMerits} merit`:""}</b></div><Button disabled={claimed||progress<ch.target} onClick={()=>g.claimChallenge(ch.id)}>{claimed?"Claimed":progress>=ch.target?"Claim":"In Progress"}</Button></div>;})}</div></Panel>
     <Panel title="World Events">{activeEvent?<div className="card"><span className="card-tag">ACTIVE EVENT</span><h3>{activeEvent.name}</h3><p>{activeEvent.description}</p><div className="data-row"><span>Effect</span><b>{activeEvent.effect}</b></div><div className="data-row"><span>Time Left</span><b>{g.gameState.worldEventUntil?formatTime(Math.max(0,g.gameState.worldEventUntil-Date.now())):"—"}</b></div></div>:<p>No city-wide event is active.</p>}<Button disabled={Boolean(activeEvent)} onClick={g.refreshWorldEvent}>Scan for World Event</Button></Panel>

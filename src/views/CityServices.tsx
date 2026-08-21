@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button, Panel } from "../components/ui";
+import { GameIcon, iconFromLegacy, type GameIconName } from "../components/GameIcon";
 import { ITEMS } from "../data/gameData";
 import { formatTime, money, timeLeft } from "../core/gameCore";
 import { BANK_INVESTMENT_TIERS, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE, checkingProtectedCap, savingsProtectedCap } from "../data/banking";
@@ -10,6 +11,26 @@ import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFaci
 import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
 
 type Game = ReturnType<typeof useRiftCity>;
+
+function serviceItemIcon(item: (typeof ITEMS)[number]): GameIconName {
+  if (item.id === "knife" || item.id === "machete" || item.id === "syndicate-blade") return "blade";
+  if (item.id === "bat" || item.id === "crowbar") return "blunt";
+  if (item.id === "pistol" || item.id === "heavy-pistol") return "handgun";
+  if (item.id === "machine-pistol" || item.id === "smg") return "smg";
+  if (item.id === "shotgun") return "shotgun";
+  if (item.id === "carbine" || item.id === "rifle") return "rifle";
+  if (item.type === "armor") return "armor";
+  if (item.type === "medical") return "medkit";
+  if (item.type === "energy") return "drink";
+  if (item.type === "nerve") return "focus";
+  if (item.crimeTool) return item.id.includes("phone") ? "phone" : item.id.includes("disguise") ? "disguise" : item.id.includes("glove") ? "gloves" : item.id.includes("badge") ? "badge" : item.id.includes("route") ? "route" : "tools";
+  if (item.productionSupply) return item.id.includes("plant") ? "plant" : item.id.includes("packaging") ? "package" : "chemical";
+  if (item.id.includes("chip")) return "chip";
+  if (item.id.includes("key")) return "key";
+  if (item.id.includes("envelope")) return "envelope";
+  if (item.contraband) return "contraband";
+  return "package";
+}
 
 function useNow() {
   const [now, setNow] = useState(Date.now());
@@ -105,7 +126,7 @@ export function Jail({ g }: { g: Game }) {
   return (
     <div className="city-service-page">
       <Panel title="RiftCity Jail — Detention Roster">
-        <div className={`custody-banner ${active ? "active" : "clear"}`}><span>🔒</span><div><b>{active ? "IN CUSTODY" : "NO ACTIVE DETENTION"}</b><small>{active ? `${remaining} remaining` : "You are currently free to leave."}</small></div></div>
+        <div className={`custody-banner ${active ? "active" : "clear"}`}><span className="service-vector-icon"><GameIcon name="lock" size={24} /></span><div><b>{active ? "IN CUSTODY" : "NO ACTIVE DETENTION"}</b><small>{active ? `${remaining} remaining` : "You are currently free to leave."}</small></div></div>
         <div className="custody-table-wrap">
           <table className="custody-table"><thead><tr><th>Player</th><th>Status</th><th>Offense</th><th>Sentence</th><th>Remaining</th></tr></thead>
             <tbody>{active ? <tr><td>You</td><td>Detained</td><td>{g.gameState.jailReason || "Unknown offense"}</td><td>{sentence}</td><td>{remaining}</td></tr> : <tr><td colSpan={5}>No active detainees.</td></tr>}</tbody>
@@ -136,7 +157,7 @@ export function Hospital({ g }: { g: Game }) {
   return (
     <div className="city-service-page">
       <Panel title="RiftCity Hospital — Patient Board">
-        <div className={`custody-banner hospital ${active ? "active" : "clear"}`}><span>🏥</span><div><b>{active ? "ADMITTED" : "NO ACTIVE ADMISSION"}</b><small>{active ? `${remaining} remaining` : "Walk-in treatment is available."}</small></div></div>
+        <div className={`custody-banner hospital ${active ? "active" : "clear"}`}><span className="service-vector-icon"><GameIcon name="hospital" size={24} /></span><div><b>{active ? "ADMITTED" : "NO ACTIVE ADMISSION"}</b><small>{active ? `${remaining} remaining` : "Walk-in treatment is available."}</small></div></div>
         <div className="custody-table-wrap"><table className="custody-table"><thead><tr><th>Patient</th><th>Status</th><th>Reason</th><th>Stay</th><th>Remaining</th></tr></thead>
           <tbody>{active ? <tr><td>You</td><td>Hospitalized</td><td>{g.gameState.hospitalReason || "Emergency admission"}</td><td>{duration}</td><td>{remaining}</td></tr> : <tr><td colSpan={5}>No active patients.</td></tr>}</tbody></table></div>
         <div className="data-list"><div className="data-row"><span>Health</span><b>{Math.floor(g.gameState.health)} / {g.maxHealth}</b></div><div className="data-row"><span>Walk-in treatment</span><b>{money(treatmentCost)}</b></div></div>
@@ -147,15 +168,15 @@ export function Hospital({ g }: { g: Game }) {
 }
 
 export function Police({ g }: { g: Game }) {
-  return <div className="ui-grid two-col city-service-page"><Panel title="RiftCity Police Department"><div className="service-hero"><span>🚔</span><div><h2>Heat {g.gameState.heat}/100</h2><p>{g.gameState.heat >= 75 ? "High priority" : g.gameState.heat >= 40 ? "Wanted" : g.gameState.heat > 0 ? "Known to police" : "No active attention"}</p></div></div><Button disabled={g.gameState.heat <= 0 || g.gameState.energy < 5} onClick={g.coolHeat}>Lay Low / Clear Attention (5 ⚡)</Button></Panel><Panel title="Custody Record"><div className="data-list"><div className="data-row"><span>Times jailed</span><b>{g.gameState.timesJailed}</b></div><div className="data-row"><span>Failed crimes</span><b>{g.gameState.crimesFailed}</b></div><div className="data-row"><span>Guard reputation</span><b>{g.gameState.npcReputation.torres ?? 0}</b></div></div><BackToCity g={g} /></Panel></div>;
+  return <div className="ui-grid two-col city-service-page"><Panel title="RiftCity Police Department"><div className="service-hero"><span className="service-vector-icon"><GameIcon name="police" size={28} /></span><div><h2>Heat {g.gameState.heat}/100</h2><p>{g.gameState.heat >= 75 ? "High priority" : g.gameState.heat >= 40 ? "Wanted" : g.gameState.heat > 0 ? "Known to police" : "No active attention"}</p></div></div><Button disabled={g.gameState.heat <= 0 || g.gameState.energy < 5} onClick={g.coolHeat}>Lay Low / Clear Attention (5 Energy)</Button></Panel><Panel title="Custody Record"><div className="data-list"><div className="data-row"><span>Times jailed</span><b>{g.gameState.timesJailed}</b></div><div className="data-row"><span>Failed crimes</span><b>{g.gameState.crimesFailed}</b></div><div className="data-row"><span>Guard reputation</span><b>{g.gameState.npcReputation.torres ?? 0}</b></div></div><BackToCity g={g} /></Panel></div>;
 }
 
-function ItemShop({ g, ids, title, icon }: { g: Game; ids: string[]; title: string; icon: string }) {
+function ItemShop({ g, ids, title, icon }: { g: Game; ids: string[]; title: string; icon: GameIconName }) {
   const items = useMemo(() => ITEMS.filter((item) => ids.includes(item.id)), [ids]);
-  return <div className="city-service-page"><Panel title={title}><div className="service-hero"><span>{icon}</span><div><h2>{title}</h2><p>Cash: {money(g.gameState.cash)}</p></div></div><div className="service-item-grid">{items.map((item) => <div className="service-item" key={item.id}><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><Button disabled={g.gameState.cash < item.price} onClick={() => g.buyItem(item.id)}>Buy</Button></div></div>)}</div><BackToCity g={g} /></Panel></div>;
+  return <div className="city-service-page"><Panel title={title}><div className="service-hero"><span className="service-vector-icon"><GameIcon name={icon} size={28} /></span><div><h2>{title}</h2><p>Cash: {money(g.gameState.cash)}</p></div></div><div className="service-item-grid">{items.map((item) => <div className="service-item" key={item.id}><span className="service-item-icon"><GameIcon name={serviceItemIcon(item)} size={24} /></span><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><Button disabled={g.gameState.cash < item.price} onClick={() => g.buyItem(item.id)}>Buy</Button></div></div>)}</div><BackToCity g={g} /></Panel></div>;
 }
 
-export function Pharmacy({ g }: { g: Game }) { return <ItemShop g={g} ids={["medkit", "energy-drink", "nerve-tonic"]} title="RiftCare Pharmacy" icon="💊" />; }
+export function Pharmacy({ g }: { g: Game }) { return <ItemShop g={g} ids={["medkit", "energy-drink", "nerve-tonic"]} title="RiftCare Pharmacy" icon="pharmacy" />; }
 export function BlackMarket({ g }: { g: Game }) {
   const [itemId, setItemId] = useState("");
   const [price, setPrice] = useState("500");
@@ -189,7 +210,7 @@ export function BlackMarket({ g }: { g: Game }) {
     <div className="city-service-page black-market-v2">
       <Panel title="Black Market Exchange · BETA">
         <div className="service-hero">
-          <span>🕶️</span>
+          <span className="service-vector-icon"><GameIcon name="disguise" size={30} /></span>
           <div>
             <h2>Underground Exchange</h2>
             <p>Simulated city-scale trading now runs beside player listings. NPC activity is beta economy data and can later be replaced by live multiplayer listings.</p>
@@ -218,6 +239,7 @@ export function BlackMarket({ g }: { g: Game }) {
             return (
               <article className="auction-listing" key={listing.id}>
                 <div className="auction-item-copy">
+                  <span className="auction-item-icon"><GameIcon name={serviceItemIcon(item)} size={28} /></span>
                   <span className={`rarity-pill ${(item.rarity || "Common").toLowerCase()}`}>{item.rarity || "Common"}</span>
                   <h3>{item.name}</h3><p>{item.description}</p>
                   <small>Seller: <b>{listing.seller}</b> · Qty {listing.quantity}{item.contraband ? " · CONTRABAND" : ""}</small>
@@ -234,7 +256,7 @@ export function BlackMarket({ g }: { g: Game }) {
       </Panel>
 
       <Panel title="Sell Inventory · BETA TEST MODE">
-        <div className="beta-market-callout"><strong>🤖 NPC AUTO-BUY ENABLED</strong><span>Temporary beta economy boost: the broker instantly buys inventory at 150% of normal sell value so you can fund and test the rest of RiftCity quickly.</span></div>
+        <div className="beta-market-callout"><strong className="row-icon-label"><GameIcon name="bot" size={15} /> NPC AUTO-BUY ENABLED</strong><span>Temporary beta economy boost: the broker instantly buys inventory at 150% of normal sell value so you can fund and test the rest of RiftCity quickly.</span></div>
         <div className="auction-create-grid">
           <label><span>Item to sell</span><select value={sellItemId} onChange={(e)=>{setSellItemId(e.target.value);setSellQuantity("1");}}><option value="">Choose an owned item</option>{ownListable.map((item)=><option key={item.id} value={item.id}>{item.name} ({g.gameState.inventory[item.id]})</option>)}</select></label>
           <label><span>Quantity</span><input type="number" min="1" max={Math.max(1,sellOwned)} value={sellQuantity} onChange={(e)=>setSellQuantity(e.target.value)} /></label>
@@ -252,19 +274,19 @@ export function BlackMarket({ g }: { g: Game }) {
       <Panel title="Crime Tools · One Attempt Each">
         <p>Optional consumables improve selected crime odds, rewards, escape chance, or Heat. Each tool is consumed when the crime attempt begins.</p>
         <div className="service-item-grid">
-          {CRIME_TOOLS.map(tool=><div className="service-item" key={tool.id}><div><b>{tool.icon} {tool.name}</b><small>{tool.description}</small><small>Recommended: {tool.recommendedFor.map(x=>x.replace(/-/g," ")).join(", ")}</small></div><div><b>{money(tool.price)}</b><small>Owned {g.gameState.inventory[tool.id]||0}</small><Button disabled={g.gameState.cash<tool.price} onClick={()=>g.buyBlackMarketItem(tool.id)}>Buy</Button></div></div>)}
+          {CRIME_TOOLS.map(tool=><div className="service-item" key={tool.id}><div><b className="row-icon-label"><GameIcon name={iconFromLegacy(tool.icon, "tools")} size={16} /> {tool.name}</b><small>{tool.description}</small><small>Recommended: {tool.recommendedFor.map(x=>x.replace(/-/g," ")).join(", ")}</small></div><div><b>{money(tool.price)}</b><small>Owned {g.gameState.inventory[tool.id]||0}</small><Button disabled={g.gameState.cash<tool.price} onClick={()=>g.buyBlackMarketItem(tool.id)}>Buy</Button></div></div>)}
         </div>
       </Panel>
 
       <Panel title="Production Supplies · BETA">
         <p>These are fictional abstract game resources, not real-world manufacturing ingredients.</p>
-        <div className="service-item-grid">{PRODUCTION_SUPPLIES.map(supply=><div className="service-item" key={supply.id}><div><b>{supply.name}</b><small>{supply.description}</small></div><div><b>{money(supply.price)}</b><small>Owned {g.gameState.inventory[supply.id]||0}</small><Button disabled={g.gameState.cash<supply.price} onClick={()=>g.buyBlackMarketItem(supply.id)}>Buy</Button></div></div>)}</div>
+        <div className="service-item-grid">{PRODUCTION_SUPPLIES.map(supply=><div className="service-item" key={supply.id}><span className="service-item-icon"><GameIcon name={serviceItemIcon(ITEMS.find(i=>i.id===supply.id)!)} size={23} /></span><div><b>{supply.name}</b><small>{supply.description}</small></div><div><b>{money(supply.price)}</b><small>Owned {g.gameState.inventory[supply.id]||0}</small><Button disabled={g.gameState.cash<supply.price} onClick={()=>g.buyBlackMarketItem(supply.id)}>Buy</Button></div></div>)}</div>
       </Panel>
 
       <Panel title="Contraband Production · BETA TEST BALANCE">
         <div className="production-warning"><strong>Temporary beta tuning</strong><span>Setup prices are cheap and timers are 30–75 seconds for testing. Production raises Heat and a separate Attention score; repeated batches can trigger a raid, seizure, charges, and jail.</span></div>
         <div className="production-facilities">
-          {PRODUCTION_FACILITIES.map(f=>{const owned=g.gameState.productionFacilities.includes(f.id);const unlocked=g.gameState.crimeExperience>=f.requiredCrimeExperience;return <article className={`production-card ${owned?"owned":""}`} key={f.id}><span>{f.icon}</span><div><h3>{f.name}</h3><p>{f.description}</p><small>CE {f.requiredCrimeExperience} · {f.capacity} active slot{f.capacity===1?"":"s"} · Heat shielding {f.heatShield}</small></div><div><strong>{owned?"OWNED":money(f.setupCost)}</strong>{!owned&&<Button disabled={!unlocked||g.gameState.cash<f.setupCost} onClick={()=>g.buyProductionFacility(f.id)}>{!unlocked?`Needs CE ${f.requiredCrimeExperience}`:"Set Up"}</Button>}</div></article>})}
+          {PRODUCTION_FACILITIES.map(f=>{const owned=g.gameState.productionFacilities.includes(f.id);const unlocked=g.gameState.crimeExperience>=f.requiredCrimeExperience;return <article className={`production-card ${owned?"owned":""}`} key={f.id}><span className="production-vector-icon"><GameIcon name={f.id.includes("warehouse") ? "warehouse" : f.id.includes("garage") ? "garage" : "lab"} size={27} /></span><div><h3>{f.name}</h3><p>{f.description}</p><small>CE {f.requiredCrimeExperience} · {f.capacity} active slot{f.capacity===1?"":"s"} · Heat shielding {f.heatShield}</small></div><div><strong>{owned?"OWNED":money(f.setupCost)}</strong>{!owned&&<Button disabled={!unlocked||g.gameState.cash<f.setupCost} onClick={()=>g.buyProductionFacility(f.id)}>{!unlocked?`Needs CE ${f.requiredCrimeExperience}`:"Set Up"}</Button>}</div></article>})}
         </div>
 
         <div className="production-recipes">
@@ -295,20 +317,20 @@ export function Park({ g }: { g: Game }) {
     const next = { ...prev, energy: prev.energy - 2, happiness: prev.happiness + 5, heat: Math.max(0, prev.heat - 2) };
     return g.appendActivity(next, "A quiet walk through Central Park improved your mood and cooled some attention.", "system");
   });
-  return <div className="city-service-page"><Panel title="Central Park"><div className="service-hero"><span>🌳</span><div><h2>Central Park</h2><p>A calm pocket in the middle of RiftCity.</p></div></div><div className="data-list"><div className="data-row"><span>Happiness</span><b>{Math.floor(g.gameState.happiness)}</b></div><div className="data-row"><span>Heat</span><b>{g.gameState.heat}</b></div></div><div className="btn-group"><Button disabled={g.gameState.energy < 2} onClick={rest}>Take a Walk (2 ⚡)</Button><BackToCity g={g} /></div></Panel></div>;
+  return <div className="city-service-page"><Panel title="Central Park"><div className="service-hero"><span className="service-vector-icon"><GameIcon name="park" size={29} /></span><div><h2>Central Park</h2><p>A calm pocket in the middle of RiftCity.</p></div></div><div className="data-list"><div className="data-row"><span>Happiness</span><b>{Math.floor(g.gameState.happiness)}</b></div><div className="data-row"><span>Heat</span><b>{g.gameState.heat}</b></div></div><div className="btn-group"><Button disabled={g.gameState.energy < 2} onClick={rest}>Take a Walk (2 Energy)</Button><BackToCity g={g} /></div></Panel></div>;
 }
 
 export function Downtown({ g }: { g: Game }) {
-  const links: Array<[string, string]> = [["shops", "🛒 Shops"], ["jobs", "💼 Employment"], ["market", "📈 Market"], ["bank", "🏦 Bank"], ["missions", "🎯 Missions"]];
-  return <div className="city-service-page"><Panel title="Downtown RiftCity"><div className="service-hero"><span>📍</span><div><h2>Downtown</h2><p>The city's busiest hub. Jump directly to nearby services.</p></div></div><div className="service-link-grid">{links.map(([screen, label]) => <div key={screen}><Button onClick={() => g.setCurrentScreen(screen as any)}>{label}</Button></div>)}</div><BackToCity g={g} /></Panel></div>;
+  const links: Array<[string, string, GameIconName]> = [["shops", "Shops", "shops"], ["jobs", "Employment", "jobs"], ["market", "Market", "market"], ["bank", "Bank", "bank"], ["missions", "Missions", "missions"]];
+  return <div className="city-service-page"><Panel title="Downtown RiftCity"><div className="service-hero"><span className="service-vector-icon"><GameIcon name="pin" size={28} /></span><div><h2>Downtown</h2><p>The city's busiest hub. Jump directly to nearby services.</p></div></div><div className="service-link-grid">{links.map(([screen, label, icon]) => <div key={screen}><Button onClick={() => g.setCurrentScreen(screen as any)}><span className="row-icon-label"><GameIcon name={icon} size={15} /> {label}</span></Button></div>)}</div><BackToCity g={g} /></Panel></div>;
 }
 
 type CasinoGameId = "blackjack" | "poker" | "roulette" | "baccarat" | "craps" | "war" | "wheel" | "racing" | "reels";
 type CasinoCard = { rank: string; suit: string; value: number };
 type PokerStage = "waiting" | "preflop" | "flop" | "turn" | "river" | "showdown";
 type PokerSeat = { name: string; npc: boolean; chips: number; bet: number; folded: boolean; cards: CasinoCard[]; action: string };
-type Horse = { name: string; number: number; speed: number; stamina: number; form: number; consistency: number; style: string; icon: string };
-type SlotMachine = { id: string; name: string; icon: string; subtitle: string; symbols: string[]; jackpot: string; reels: number; baseMult: number };
+type Horse = { name: string; number: number; speed: number; stamina: number; form: number; consistency: number; style: string; icon: GameIconName };
+type SlotMachine = { id: string; name: string; icon: GameIconName; subtitle: string; symbols: string[]; jackpot: string; reels: number; baseMult: number };
 
 const CASINO_CHIP_CAP = 75;
 const CASINO_NPCS = ["Maya Vale", "Vince Romano", "Juno Park", "Theo Knox", "Aria Stone", "Malik Reed"];
@@ -320,12 +342,12 @@ const RACE_BETTING_MS = 75_000;
 const RACE_RUNNING_MS = 35_000;
 
 const SLOT_MACHINES: SlotMachine[] = [
-  { id:"neon", name:"Neon Reels", icon:"⚡", subtitle:"5 reels · wild streaks", symbols:["⚡","◆","★","7","R","♛"], jackpot:"NEON JACKPOT", reels:5, baseMult:8 },
-  { id:"vault", name:"Vault Breaker", icon:"💰", subtitle:"5 reels · vault bonus", symbols:["💰","🔐","💎","🪙","★","7"], jackpot:"VAULT OPEN", reels:5, baseMult:10 },
-  { id:"gold", name:"Gold Rush Mine", icon:"⛏️", subtitle:"6 reels · gold collect · random jackpot", symbols:["⛏️","🪙","💰","💎","🧨","🚋","★"], jackpot:"MOTHERLODE", reels:6, baseMult:12 },
-  { id:"midnight", name:"Midnight Drive", icon:"🏎️", subtitle:"5 reels · boost multiplier", symbols:["🏎️","🌙","💨","🏁","★","7"], jackpot:"NIGHT RUN", reels:5, baseMult:9 },
-  { id:"rift", name:"Rift Reactor", icon:"🌀", subtitle:"6 reels · cascade-style chain bonus", symbols:["🌀","✦","⚛","◆","★","R"], jackpot:"RIFT SURGE", reels:6, baseMult:11 },
-  { id:"crown", name:"Crown & Diamonds", icon:"👑", subtitle:"5 reels · premium symbol boosts", symbols:["👑","💎","♛","★","7","R"], jackpot:"ROYAL DROP", reels:5, baseMult:10 },
+  { id:"neon", name:"Neon Reels", icon:"energy", subtitle:"5 reels · wild streaks", symbols:["BOLT","◆","★","7","R","♛"], jackpot:"NEON JACKPOT", reels:5, baseMult:8 },
+  { id:"vault", name:"Vault Breaker", icon:"lock", subtitle:"5 reels · vault bonus", symbols:["$","LOCK","◆","COIN","★","7"], jackpot:"VAULT OPEN", reels:5, baseMult:10 },
+  { id:"gold", name:"Gold Rush Mine", icon:"mine", subtitle:"6 reels · gold collect · random jackpot", symbols:["PICK","COIN","$","◆","X","CART","★"], jackpot:"MOTHERLODE", reels:6, baseMult:12 },
+  { id:"midnight", name:"Midnight Drive", icon:"car", subtitle:"5 reels · boost multiplier", symbols:["CAR","MOON","BOOST","FLAG","★","7"], jackpot:"NIGHT RUN", reels:5, baseMult:9 },
+  { id:"rift", name:"Rift Reactor", icon:"spark", subtitle:"6 reels · cascade-style chain bonus", symbols:["RIFT","✦","ATOM","◆","★","R"], jackpot:"RIFT SURGE", reels:6, baseMult:11 },
+  { id:"crown", name:"Crown & Diamonds", icon:"crown", subtitle:"5 reels · premium symbol boosts", symbols:["CROWN","◆","♛","★","7","R"], jackpot:"ROYAL DROP", reels:5, baseMult:10 },
 ];
 
 function buildCasinoDeck() {
@@ -435,7 +457,7 @@ function horsesForRace(raceId:number): Horse[] {
       stamina:60+Math.floor(seededRandom(seed+2)*38),
       form:55+Math.floor(seededRandom(seed+3)*43),
       consistency:58+Math.floor(seededRandom(seed+4)*40),
-      style:styles[Math.floor(seededRandom(seed+5)*styles.length)], icon:["🐎","🏇","🐴"][i%3],
+      style:styles[Math.floor(seededRandom(seed+5)*styles.length)], icon:"horse",
     };
   });
 }
@@ -457,7 +479,7 @@ export function Casino({ g }: { g: Game }) {
   const [wheelResult, setWheelResult] = useState<string | null>(null);
   const [wheelSpinning, setWheelSpinning] = useState(false);
   const [slotMachineId, setSlotMachineId] = useState("neon");
-  const [reels, setReels] = useState(["◆","★","7","R","⚡"]);
+  const [reels, setReels] = useState(["◆","★","7","R","BOLT"]);
   const [tableResult,setTableResult]=useState("Choose a bet and play a round.");
   const [reelsSpinning, setReelsSpinning] = useState(false);
 
@@ -690,21 +712,21 @@ export function Casino({ g }: { g: Game }) {
 
       <div className="casino-floor-grid">
         {[
-          ["blackjack","🂡","Blackjack Hall","Dealer Elena · animated felt table","PLAYABLE TABLE"],
-          ["poker","♠","Texas Hold'em Room","5-seat Hold'em · NPCs fill open seats","REAL POKER"],
-          ["roulette","🔴","Roulette Room","Red · black · green zero","TABLE GAME"],
-          ["baccarat","🃏","Baccarat Salon","Player · banker · tie","TABLE GAME"],
-          ["craps","🎲","Craps Pit","Pass line and field bets","TABLE GAME"],
-          ["war","⚔️","Casino War","Fast high-card table","TABLE GAME"],
-          ["wheel","◉","Rift Wheel","Animated wheel · cash multipliers","ARCADE FLOOR"],
-          ["racing","🏇","Rift Downs","Timed races · live horse stats and track","LIVE RACING"],
-          ["reels","🎰","Slots Gallery",`${SLOT_MACHINES.length} animated themed machines`,"ANIMATED SLOTS"],
+          ["blackjack","casino","Blackjack Hall","Dealer Elena · animated felt table","PLAYABLE TABLE"],
+          ["poker","casino","Texas Hold'em Room","5-seat Hold'em · NPCs fill open seats","REAL POKER"],
+          ["roulette","target","Roulette Room","Red · black · green zero","TABLE GAME"],
+          ["baccarat","casino","Baccarat Salon","Player · banker · tie","TABLE GAME"],
+          ["craps","dice","Craps Pit","Pass line and field bets","TABLE GAME"],
+          ["war","combat","Casino War","Fast high-card table","TABLE GAME"],
+          ["wheel","spark","Rift Wheel","Animated wheel · cash multipliers","ARCADE FLOOR"],
+          ["racing","horse","Rift Downs","Timed races · live horse stats and track","LIVE RACING"],
+          ["reels","casino","Slots Gallery",`${SLOT_MACHINES.length} animated themed machines`,"ANIMATED SLOTS"],
         ].map(([id,icon,title,sub,status])=>(
           <button key={id} type="button" className="casino-room casino-room-live" onClick={()=>setGame(id as CasinoGameId)}>
-            <span className="casino-room-icon">{icon}</span><div><small>{status}</small><h3>{title}</h3><p>{sub}</p></div><b>ENTER →</b>
+            <span className="casino-room-icon"><GameIcon name={icon as GameIconName} size={24} /></span><div><small>{status}</small><h3>{title}</h3><p>{sub}</p></div><b>ENTER →</b>
           </button>
         ))}
-        <div className="casino-room locked"><span className="casino-room-icon">💎</span><div><small>Reputation 60</small><h3>VIP Lounge</h3><p>Special NPCs, cosmetics, social events, and future tournaments.</p></div><b>{g.gameState.casinoReputation>=60?"UNLOCKED":"LOCKED"}</b></div>
+        <div className="casino-room locked"><span className="casino-room-icon"><GameIcon name="crown" size={24} /></span><div><small>Reputation 60</small><h3>VIP Lounge</h3><p>Special NPCs, cosmetics, social events, and future tournaments.</p></div><b>{g.gameState.casinoReputation>=60?"UNLOCKED":"LOCKED"}</b></div>
       </div>
 
       <div className="casino-table-strip casino-live-floor">
@@ -718,7 +740,7 @@ export function Casino({ g }: { g: Game }) {
       {game && <div className="casino-game-backdrop" role="dialog" aria-modal="true" aria-label="Casino game">
         <div className={`casino-game-modal casino-game-${game}`}><div className="casino-wager-bar"><label>Cash wager</label><input type="number" min="1" max={Math.max(1,g.gameState.cash)} value={betAmount} onChange={e=>setBetAmount(Math.max(1,Number(e.target.value)||1))}/><b>{money(wager)}</b></div>
           <button type="button" className="casino-game-close" onClick={()=>setGame(null)}>×</button>
-          <div className="casino-game-heading"><span>{game==="blackjack"?"🂡":game==="poker"?"♠":game==="roulette"?"🔴":game==="baccarat"?"🃏":game==="craps"?"🎲":game==="war"?"⚔️":game==="wheel"?"◉":game==="racing"?"🏇":"🎰"}</span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Texas Hold'em":game==="roulette"?"Roulette":game==="baccarat"?"Baccarat":game==="craps"?"Craps":game==="war"?"Casino War":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Slots Gallery"}</h3></div><b>{money(g.gameState.cash)} cash</b></div>
+          <div className="casino-game-heading"><span><GameIcon name={(game==="roulette"?"target":game==="craps"?"dice":game==="war"?"combat":game==="wheel"?"spark":game==="racing"?"horse":"casino") as GameIconName} size={27} /></span><div><small>THE RIFT CASINO</small><h3>{game==="blackjack"?"Blackjack Hall":game==="poker"?"Texas Hold'em":game==="roulette"?"Roulette":game==="baccarat"?"Baccarat":game==="craps"?"Craps":game==="war"?"Casino War":game==="wheel"?"Rift Wheel":game==="racing"?"Rift Downs":"Slots Gallery"}</h3></div><b>{money(g.gameState.cash)} cash</b></div>
 
           {game==="blackjack" && <div className="casino-table-game animated-felt">
             <div className="casino-seat-row"><span className="casino-seat npc">MAYA<br/><small>NPC</small></span><span className="casino-seat npc">VINCE<br/><small>NPC</small></span><span className="casino-seat dealer">ELENA<br/><small>DEALER</small></span><span className="casino-seat npc">JUNO<br/><small>NPC</small></span></div>
@@ -755,7 +777,7 @@ export function Casino({ g }: { g: Game }) {
 
           {game==="roulette" && <div className="casino-table-game animated-felt"><div className="roulette-display"><span>0</span><span>RED</span><span>BLACK</span></div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playRoulette("red")}>Bet Red</Button><Button disabled={!canPlay} onClick={()=>playRoulette("black")}>Bet Black</Button><Button disabled={!canPlay} onClick={()=>playRoulette("green")}>Bet Green 0</Button></div><strong>{tableResult}</strong></div>}
           {game==="baccarat" && <div className="casino-table-game animated-felt"><div className="table-big-label">BACCARAT</div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playBaccarat("player")}>Player</Button><Button disabled={!canPlay} onClick={()=>playBaccarat("banker")}>Banker</Button><Button disabled={!canPlay} onClick={()=>playBaccarat("tie")}>Tie</Button></div><strong>{tableResult}</strong></div>}
-          {game==="craps" && <div className="casino-table-game animated-felt"><div className="dice-stage">🎲 🎲</div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playCraps("pass")}>Pass Line</Button><Button disabled={!canPlay} onClick={()=>playCraps("field")}>Field</Button></div><strong>{tableResult}</strong></div>}
+          {game==="craps" && <div className="casino-table-game animated-felt"><div className="dice-stage"><GameIcon name="dice" size={34} /><GameIcon name="dice" size={34} /></div><div className="btn-group"><Button disabled={!canPlay} onClick={()=>playCraps("pass")}>Pass Line</Button><Button disabled={!canPlay} onClick={()=>playCraps("field")}>Field</Button></div><strong>{tableResult}</strong></div>}
           {game==="war" && <div className="casino-table-game animated-felt"><div className="table-big-label">CASINO WAR</div><Button disabled={!canPlay} onClick={playWar}>Deal Cards</Button><strong>{tableResult}</strong></div>}
 
           {game==="wheel" && <div className="casino-wheel-game"><div className={`rift-wheel ${wheelSpinning?"spinning":""}`}><span>R</span></div><strong>{wheelResult || (wheelSpinning?"SPINNING…":"Ready to spin")}</strong><Button disabled={!canPlay||wheelSpinning} onClick={spinWheel}>Spin Arcade Wheel</Button></div>}
@@ -765,15 +787,15 @@ export function Casino({ g }: { g: Game }) {
             <div className="horse-form-grid">{raceHorses.map((h,i)=><button type="button" disabled={racePhase!=="betting"||raceLockedId===raceId} className={`horse-form-card ${racePick===i?"selected":""}`} key={h.number} onClick={()=>setRacePick(i)}><span className="horse-number">{h.number}</span><div><b>{h.name}</b><small>{h.style}</small></div><dl><div><dt>SPD</dt><dd>{h.speed}</dd></div><div><dt>STA</dt><dd>{h.stamina}</dd></div><div><dt>FORM</dt><dd>{h.form}</dd></div><div><dt>CONS</dt><dd>{h.consistency}</dd></div></dl></button>)}</div>
             <div className="live-race-track">{raceHorses.map((h,i)=>{
               const score=horseFinishScore(h,raceId); const normalized=.78+(score-70)/180; const jitter=Math.sin(raceProgress*16+i*1.7)*1.2; const pos=racePhase==="betting"?2:racePhase==="results"?(orderedFinish.findIndex(x=>x.number===h.number)===0?95:88-orderedFinish.findIndex(x=>x.number===h.number)*5):Math.min(94,3+raceProgress*90*normalized+jitter);
-              return <div className="race-lane" key={h.number}><span className="lane-num">{h.number}</span><div className="lane-line"><span className={`running-horse ${racePhase==="running"?"galloping":""}`} style={{left:`${pos}%`}}>{h.icon}</span></div><b>{h.name}</b></div>;
+              return <div className="race-lane" key={h.number}><span className="lane-num">{h.number}</span><div className="lane-line"><span className={`running-horse ${racePhase==="running"?"galloping":""}`} style={{left:`${pos}%`}}><GameIcon name={h.icon} size={22} /></span></div><b>{h.name}</b></div>;
             })}<div className="finish-line">FINISH</div></div>
             {racePhase==="results"&&<div className="race-results"><b>Official Finish</b>{orderedFinish.slice(0,3).map((h,i)=><span key={h.number}>{i+1}. {h.name}</span>)}</div>}
             <div className="race-actions"><strong>{raceLockedId===raceId?`Prediction locked: ${raceHorses[racePick].name}`:racePhase==="betting"?`Selected: ${raceHorses[racePick].name}`:"Predictions closed"}</strong><Button disabled={!canPlay||racePhase!=="betting"||raceLockedId===raceId} onClick={lockRacePrediction}>Lock Prediction</Button></div>
           </div>}
 
           {game==="reels" && <div className="slots-gallery">
-            <div className="slot-machine-tabs">{SLOT_MACHINES.map(m=><button type="button" key={m.id} className={slotMachineId===m.id?"active":""} onClick={()=>{setSlotMachineId(m.id);setReels(Array.from({length:m.reels},(_,i)=>m.symbols[i%m.symbols.length]));}}><span>{m.icon}</span><b>{m.name}</b><small>{m.subtitle}</small></button>)}</div>
-            <div className={`slot-cabinet theme-${activeMachine.id} ${reelsSpinning?"spinning":""}`}><div className="slot-marquee"><span>{activeMachine.icon}</span><b>{activeMachine.name}</b><small>{activeMachine.jackpot} · Pool {money(g.gameState.casinoJackpotPool)}</small></div><div className="slot-lights">{Array.from({length:18},(_,i)=><i key={i}/>)}</div><div className={`neon-reels reels-${activeMachine.reels}`}>{reels.map((r,i)=><span className={`reel reel-${i}`} key={i}>{r}</span>)}</div><div className="slot-payline">★ PAYLINE ★</div><Button disabled={!canPlay||reelsSpinning} onClick={spinReels}>{reelsSpinning?"SPINNING…":"Spin Machine"}</Button></div>
+            <div className="slot-machine-tabs">{SLOT_MACHINES.map(m=><button type="button" key={m.id} className={slotMachineId===m.id?"active":""} onClick={()=>{setSlotMachineId(m.id);setReels(Array.from({length:m.reels},(_,i)=>m.symbols[i%m.symbols.length]));}}><span className="slot-vector-icon"><GameIcon name={m.icon} size={22} /></span><b>{m.name}</b><small>{m.subtitle}</small></button>)}</div>
+            <div className={`slot-cabinet theme-${activeMachine.id} ${reelsSpinning?"spinning":""}`}><div className="slot-marquee"><span className="slot-vector-icon"><GameIcon name={activeMachine.icon} size={24} /></span><b>{activeMachine.name}</b><small>{activeMachine.jackpot} · Pool {money(g.gameState.casinoJackpotPool)}</small></div><div className="slot-lights">{Array.from({length:18},(_,i)=><i key={i}/>)}</div><div className={`neon-reels reels-${activeMachine.reels}`}>{reels.map((r,i)=><span className={`reel reel-${i}`} key={i}>{r}</span>)}</div><div className="slot-payline">★ PAYLINE ★</div><Button disabled={!canPlay||reelsSpinning} onClick={spinReels}>{reelsSpinning?"SPINNING…":"Spin Machine"}</Button></div>
             <p className="casino-fair-note">5- and 6-reel machines use RiftCity cash, matching-symbol payouts, and a rare random progressive-style jackpot funded by slot wagers.</p>
           </div>}
           <p className="casino-game-message">{message}</p>
@@ -792,9 +814,9 @@ export function Nightclub({ g }: { g: Game }) {
     const next={...prev,energy:prev.energy-cost,happiness:Math.min(g.maxHappiness,prev.happiness+happy),nightclubReputation:prev.nightclubReputation+rep,nightclubVisits:prev.nightclubVisits+1};
     return g.appendActivity(next,`Pulse Nightclub: ${kind==="dj"?"guest DJ set":kind==="dance"?"dance floor session":"VIP lounge visit"}.`,`system`);
   });
-  return <div className="city-service-page nightclub-v1"><section className="nightclub-hero"><div className="club-lasers"/><small>ENTERTAINMENT DISTRICT</small><h2>PULSE</h2><p>Music, dancing, social events, reputation, and VIP progression.</p><div className="club-metrics"><span>Rank <b>{rank}</b></span><span>Rep <b>{g.gameState.nightclubReputation}</b></span><span>Visits <b>{g.gameState.nightclubVisits}</b></span></div></section><div className="nightclub-floor-grid"><button onClick={()=>{action("dance");setMessage("You hit the dance floor and build your nightlife rep.");}}><span>💃</span><b>Main Dance Floor</b><small>2 energy · +2 rep · happiness</small></button><button onClick={()=>{action("dj");setMessage("Your guest DJ set gets the room moving.");}}><span>🎧</span><b>Guest DJ Booth</b><small>4 energy · +4 rep · bigger happiness boost</small></button><button onClick={()=>{action("lounge");setMessage("You network in the lounge and meet new regulars.");}}><span>✨</span><b>Social Lounge</b><small>1 energy · +1 rep · social progression</small></button><div className={`club-vip-card ${g.gameState.nightclubReputation>=60?"open":"locked"}`}><span>👑</span><b>VIP Mezzanine</b><small>{g.gameState.nightclubReputation>=60?"Unlocked — premium social events":"Unlocks at 60 reputation"}</small></div></div><Panel title="Tonight at Pulse"><div className="club-event-line"><span>21:00</span><b>Neon City Set</b><small>Resident DJ rotation</small></div><div className="club-event-line"><span>23:00</span><b>Rift Lights</b><small>Animated floor event</small></div><div className="club-event-line"><span>01:00</span><b>After Hours Mix</b><small>High-rep social event</small></div><p>{message}</p><BackToCity g={g}/></Panel></div>;
+  return <div className="city-service-page nightclub-v1"><section className="nightclub-hero"><div className="club-lasers"/><small>ENTERTAINMENT DISTRICT</small><h2>PULSE</h2><p>Music, dancing, social events, reputation, and VIP progression.</p><div className="club-metrics"><span>Rank <b>{rank}</b></span><span>Rep <b>{g.gameState.nightclubReputation}</b></span><span>Visits <b>{g.gameState.nightclubVisits}</b></span></div></section><div className="nightclub-floor-grid"><button onClick={()=>{action("dance");setMessage("You hit the dance floor and build your nightlife rep.");}}><span className="club-vector-icon"><GameIcon name="music" size={26} /></span><b>Main Dance Floor</b><small>2 energy · +2 rep · happiness</small></button><button onClick={()=>{action("dj");setMessage("Your guest DJ set gets the room moving.");}}><span className="club-vector-icon"><GameIcon name="headphones" size={26} /></span><b>Guest DJ Booth</b><small>4 energy · +4 rep · bigger happiness boost</small></button><button onClick={()=>{action("lounge");setMessage("You network in the lounge and meet new regulars.");}}><span className="club-vector-icon"><GameIcon name="spark" size={26} /></span><b>Social Lounge</b><small>1 energy · +1 rep · social progression</small></button><div className={`club-vip-card ${g.gameState.nightclubReputation>=60?"open":"locked"}`}><span className="club-vector-icon"><GameIcon name="crown" size={26} /></span><b>VIP Mezzanine</b><small>{g.gameState.nightclubReputation>=60?"Unlocked — premium social events":"Unlocks at 60 reputation"}</small></div></div><Panel title="Tonight at Pulse"><div className="club-event-line"><span>21:00</span><b>Neon City Set</b><small>Resident DJ rotation</small></div><div className="club-event-line"><span>23:00</span><b>Rift Lights</b><small>Animated floor event</small></div><div className="club-event-line"><span>01:00</span><b>After Hours Mix</b><small>High-rep social event</small></div><p>{message}</p><BackToCity g={g}/></Panel></div>;
 }
 
 export function Airport({ g }: { g: Game }) {
-  return <div className="city-service-page"><Panel title="RiftCity International Airport"><div className="service-hero"><span>✈️</span><div><h2>Departures</h2><p>The terminal is operational; inter-city destinations are not unlocked yet.</p></div></div><div className="data-list"><div className="data-row"><span>Current location</span><b>{g.gameState.currentLocation}</b></div><div className="data-row"><span>Travel status</span><b>{g.travelLocked ? "Cooldown active" : "Ready"}</b></div></div><BackToCity g={g} /></Panel></div>;
+  return <div className="city-service-page"><Panel title="RiftCity International Airport"><div className="service-hero"><span className="service-vector-icon"><GameIcon name="airport" size={30} /></span><div><h2>Departures</h2><p>The terminal is operational; inter-city destinations are not unlocked yet.</p></div></div><div className="data-list"><div className="data-row"><span>Current location</span><b>{g.gameState.currentLocation}</b></div><div className="data-row"><span>Travel status</span><b>{g.travelLocked ? "Cooldown active" : "Ready"}</b></div></div><BackToCity g={g} /></Panel></div>;
 }

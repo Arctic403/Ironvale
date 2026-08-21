@@ -540,3 +540,51 @@ input,select,textarea { border-radius:6px !important; }
 
 /* HUD values may reach MMO-scale; keep them inside their cells on phones. */
 .hud-metric,.hud-mini{overflow:hidden;text-overflow:ellipsis}
+
+
+/* === PREMIUM UI ICON + SHELL FINAL OVERRIDES === */
+/* 44. RiftCity premium shell + custom vector icon layer */
+.game-icon{display:inline-block;flex:0 0 auto;vertical-align:middle;overflow:visible}
+.nav-icon .game-icon{color:#8094a8;transition:color .16s ease,filter .16s ease}.nav-item:hover .nav-icon .game-icon,.nav-item.active .nav-icon .game-icon{color:#9cc7ff;filter:drop-shadow(0 0 7px rgba(96,165,250,.25))}
+
+/* Persistent status header: one anchored app chrome, never attached to a feature card. */
+.top-status-bar.floating-status-panel.compact-hud-v4{top:0!important;left:0!important;right:0!important;border-width:0 0 1px!important;border-radius:0!important;background:rgba(5,9,13,.965)!important;box-shadow:0 9px 24px rgba(0,0,0,.26)!important;padding-left:86px!important;padding-right:18px!important;min-height:64px!important;justify-content:center}
+.layout-root.ui-shell .screen-container{padding-top:98px!important}
+.floating-ui-stack{top:11px!important;left:12px!important;z-index:150!important;flex-direction:row!important}
+.floating-ui-btn{min-width:34px!important;width:34px!important;height:34px!important;min-height:34px!important;padding:0!important;justify-content:center!important;border-radius:5px!important;background:rgba(13,20,27,.94)!important}
+.floating-ui-btn strong{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.floating-ui-btn .game-icon{color:#a5b6c7}
+
+.hud-metric>.game-icon{margin-right:5px;color:#91a7bb}.hud-metric[aria-label="Health"]>.game-icon{color:#f77f88}.hud-metric[aria-label="Energy"]>.game-icon{color:#f5c45c}.hud-metric[aria-label="Nerve"]>.game-icon{color:#ee845f}.hud-mini>.game-icon{display:inline-block!important;margin-right:4px;color:#7690a7}
+
+/* More game HUD, less generic dashboard. */
+.shell-screen-header{padding-left:12px!important}.shell-screen-header h1{font-weight:850;letter-spacing:-.04em}.location-tag{letter-spacing:.14em!important;font-weight:800!important}
+.card{border-radius:5px!important}.card-header{padding:10px 12px!important}.card-body{padding:12px!important}.btn-primary,.btn-secondary,.btn-danger-ghost{border-radius:4px!important;font-weight:800;letter-spacing:.015em}
+.drawer-nav.nav-rail{background:linear-gradient(180deg,#091119,#070c11)!important;border-right-color:#1f2c37!important}.drawer-nav-list .nav-item{border-radius:3px!important}.drawer-nav-list .nav-item.active{box-shadow:inset 3px 0 0 #60a5fa}
+
+@media(max-width:760px){
+  .top-status-bar.floating-status-panel.compact-hud-v4{top:0!important;left:0!important;right:0!important;padding:calc(6px + env(safe-area-inset-top)) 6px 6px 68px!important;min-height:calc(72px + env(safe-area-inset-top))!important}
+  .layout-root.ui-shell .screen-container{padding-top:calc(92px + env(safe-area-inset-top))!important}
+  .screen-city .screen-container{padding-top:calc(80px + env(safe-area-inset-top))!important}
+  .floating-ui-stack{top:calc(8px + env(safe-area-inset-top))!important;left:7px!important;bottom:auto!important}
+  .floating-ui-stack .floating-ui-btn{width:27px!important;min-width:27px!important;height:27px!important;min-height:27px!important;padding:0!important;flex-direction:row!important}
+  .floating-ui-btn .game-icon{width:14px;height:14px}
+  .hud-line-primary{grid-template-columns:.66fr .72fr 1.16fr 1.16fr 1.16fr 1.55fr!important}
+  .hud-metric>.game-icon{width:11px;height:11px;margin-right:2px}.hud-mini>.game-icon{width:9px;height:9px;margin-right:1px}
+}
+
+
+/* === PREMIUM VISUAL ASSET COMPONENTS === */
+.screen-title-row{display:flex;align-items:center;gap:9px;min-width:0}.screen-title-icon{width:30px;height:30px;display:grid;place-items:center;border:1px solid rgba(var(--game-accent-rgb),.26);background:rgba(var(--game-accent-rgb),.07);color:var(--game-accent);border-radius:5px;box-shadow:inset 0 0 18px rgba(var(--game-accent-rgb),.025)}.screen-title-row h1{margin:0}
+.icon-title,.row-icon-label{display:inline-flex;align-items:center;gap:7px}.icon-title{justify-content:center}.row-icon-label .game-icon{color:#88a5bd}
+.service-vector-icon,.production-vector-icon,.service-item-icon,.auction-item-icon,.club-vector-icon,.slot-vector-icon{display:grid;place-items:center;color:var(--game-accent,#60a5fa)}
+.service-vector-icon{width:46px!important;height:46px;border:1px solid rgba(var(--game-accent-rgb),.2);background:rgba(var(--game-accent-rgb),.055);border-radius:6px;flex:0 0 46px}.production-vector-icon{width:42px;height:42px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.025);border-radius:5px}.club-vector-icon{width:40px;height:40px!important}.slot-vector-icon{height:auto!important}
+.item-visual{width:48px;height:48px;display:grid;place-items:center;margin-bottom:11px;border:1px solid rgba(var(--game-accent-rgb),.18);background:linear-gradient(145deg,rgba(var(--game-accent-rgb),.07),rgba(255,255,255,.018));color:var(--game-accent);border-radius:6px}.item-card:hover .item-visual{border-color:rgba(var(--game-accent-rgb),.36);box-shadow:0 0 24px rgba(var(--game-accent-rgb),.08)}
+.service-item{display:grid!important;grid-template-columns:40px minmax(0,1fr) auto!important;align-items:center!important;gap:12px!important;border-radius:5px!important}.service-item-icon{width:40px;height:40px;border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.02);border-radius:5px}.service-item>div:last-child{justify-self:end}.auction-item-copy{position:relative;padding-left:42px}.auction-item-icon{position:absolute;left:0;top:0;width:32px;height:32px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);border-radius:5px;color:var(--game-accent)}
+.combat-rig-weapon .game-icon,.combat-attack-icon .game-icon{filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}.combat-log-marker .game-icon,.combat-status-icon .game-icon{color:currentColor}.combat-result-icon .game-icon{color:currentColor}
+.train-icon .game-icon{color:#8fb9df}.casino-room-icon .game-icon,.casino-game-heading .game-icon,.slot-vector-icon .game-icon{color:currentColor}.running-horse .game-icon{display:block}.dice-stage .game-icon{color:#e7edf4}
+
+/* Top chrome stays at the viewport top on every route. */
+.top-status-bar.floating-status-panel.compact-hud-v4{position:fixed!important;inset:0 0 auto 0!important;z-index:142!important}.main-wrapper{padding-top:0!important}
+
+@media(max-width:760px){.service-item{grid-template-columns:34px minmax(0,1fr)!important}.service-item-icon{width:34px;height:34px}.service-item>div:last-child{grid-column:1/-1;justify-self:stretch!important;width:100%;justify-content:space-between!important}.auction-item-copy{padding-left:38px}.auction-item-icon{width:30px;height:30px}.item-visual{width:43px;height:43px}.screen-title-icon{width:27px;height:27px}.screen-title-icon .game-icon{width:17px;height:17px}}

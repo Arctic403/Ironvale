@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button } from "../components/ui";
+import { GameIcon, iconFromLegacy } from "../components/GameIcon";
 import {
   CRIMES, Crime, CrimeRunModifiers, applyCrimeEventOption, crimeSuccessChance, crimeUnlocked,
   getCrimeStatBonus, crimeMasteryLevel, emptyCrimeRunModifiers, generateCrimeEvents,
@@ -117,7 +118,7 @@ export function Crimes({ g }: { g: Game }) {
             <article className={`card crime-card crime-card-v2 ${unlocked ? "" : "disabled"}`} key={crime.id}>
               <div className="card-header-split"><div><span className="card-tag">MASTERY {masteryLevel}</span><h3>{crime.name}</h3></div><span className="chance-badge">{unlocked ? `${chance.toFixed(0)}%` : `CE ${crime.crimeExperienceRequired}`}</span></div>
               <p>{crime.description}</p>
-              <div className="crime-meta-row"><span>🔥 {crime.nerve} Nerve</span><span>💵 ${crime.minReward}–${crime.maxReward}</span><span>⚠ Risk {crime.risk}</span><span>🎁 Item drops</span></div>
+              <div className="crime-meta-row"><span><GameIcon name="nerve" size={13} /> {crime.nerve} Nerve</span><span><GameIcon name="cash" size={13} /> ${crime.minReward}–${crime.maxReward}</span><span><GameIcon name="warning" size={13} /> Risk {crime.risk}</span><span><GameIcon name="gift" size={13} /> Item drops</span></div>
               <div className="crime-mastery-line"><span>Mastery XP {masteryXp}</span><div className="bar-track compact"><div className="bar-fill crime" style={{width:`${masteryPercent}%`}} /></div></div>
               {unlocked && <div className="crime-choice-grid">{crime.choices.map((choice) => <button type="button" key={choice.id} className={`crime-choice ${choice.id === selectedChoiceId ? "active" : ""}`} onClick={() => setChoices((prev) => ({...prev,[crime.id]:choice.id}))}><strong>{choice.label}</strong><small>{choice.description}</small><span>{choice.chanceModifier >= 0 ? "+" : ""}{choice.chanceModifier}% chance · ×{choice.rewardMultiplier.toFixed(2)} payout</span></button>)}</div>}
               {unlocked && recommendedTools.length>0 && <div className="crime-tool-picker"><label><span>Recommended one-use tool</span><select value={selectedToolId} onChange={(e)=>setTools(prev=>({...prev,[crime.id]:e.target.value}))}><option value="">No tool</option>{recommendedTools.map(tool=><option key={tool.id} value={tool.id} disabled={(g.gameState.inventory[tool.id]||0)<=0}>{tool.name} · owned {g.gameState.inventory[tool.id]||0} · {(tool.modifiers.chanceModifier??0)>=0?"+":""}{tool.modifiers.chanceModifier??0}%</option>)}</select></label>{selectedTool&&<small>{selectedTool.description} {selectedToolOwned>0?"Consumed when this attempt runs.":"Buy it at the Black Market first."}</small>}</div>}

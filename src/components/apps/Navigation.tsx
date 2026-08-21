@@ -1,5 +1,6 @@
 import React from "react";
 import type { Screen } from "../../types/riftCity";
+import { GameIcon } from "../GameIcon";
 import { getNavigationRoutes, getRouteTitle, screenToPath } from "../../routing/routes";
 
 type NavigationProps = {
@@ -39,7 +40,7 @@ export function Navigation({
 
       <div className="drawer-section drawer-shortcuts">
         <button className="btn-secondary drawer-shortcut-btn" onClick={onExplore}>
-          🗺 Open City Map
+          <GameIcon name="city" size={17} /> Open City Map
         </button>
 
         <button
@@ -69,7 +70,7 @@ export function Navigation({
               onClose();
             }}
           >
-            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-icon"><GameIcon name={item.icon!} size={19} /></span>
             <span className="nav-copy">
               <span className="nav-label">{item.navLabel}</span>
               <small>Open {item.navLabel}</small>

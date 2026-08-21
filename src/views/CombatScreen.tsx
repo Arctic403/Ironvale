@@ -248,8 +248,8 @@ export function Combat({ g }: { g: Game }) {
                   {incapacitated
                     ? "Unavailable"
                     : noEnergy
-                    ? "Need 10 ⚡"
-                    : "Attack (10 ⚡)"}
+                    ? "Need 10 Energy"
+                    : "Attack (10 Energy)"}
                 </Button>
               </div>
             );

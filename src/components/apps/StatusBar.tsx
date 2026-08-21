@@ -1,6 +1,7 @@
 import React from "react";
 import type { ActiveModal } from "../../types/riftCity";
 import type { useRiftCity } from "../../hooks/useRiftCity";
+import { GameIcon } from "../GameIcon";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;
 
@@ -27,18 +28,18 @@ export function StatusBar({ g, setActiveModal }: StatusBarProps) {
       <div className="hud-line hud-line-primary">
         <span className="hud-metric hud-level"><b>LV</b> {g.level}</span>
         <span className="hud-metric"><b>XP</b> {compactNumber(g.gameState.xp)}</span>
-        <button type="button" className="hud-metric hud-vital" onClick={() => setActiveModal("health")} aria-label="Health"><span>❤️</span><strong>{Math.floor(g.gameState.health)}/{g.maxHealth}</strong></button>
-        <button type="button" className="hud-metric hud-vital" onClick={() => setActiveModal("energy")} aria-label="Energy"><span>⚡</span><strong>{g.gameState.energy}/{g.maxEnergy}</strong></button>
-        <button type="button" className="hud-metric hud-vital" onClick={() => setActiveModal("nerve")} aria-label="Nerve"><span>🔥</span><strong>{g.gameState.nerve}/{g.maxNerve}</strong></button>
+        <button type="button" className="hud-metric hud-vital" onClick={() => setActiveModal("health")} aria-label="Health"><GameIcon name="health" size={14} /><strong>{Math.floor(g.gameState.health)}/{g.maxHealth}</strong></button>
+        <button type="button" className="hud-metric hud-vital" onClick={() => setActiveModal("energy")} aria-label="Energy"><GameIcon name="energy" size={14} /><strong>{g.gameState.energy}/{g.maxEnergy}</strong></button>
+        <button type="button" className="hud-metric hud-vital" onClick={() => setActiveModal("nerve")} aria-label="Nerve"><GameIcon name="nerve" size={14} /><strong>{g.gameState.nerve}/{g.maxNerve}</strong></button>
         <span className="hud-metric hud-cash"><b>CASH</b> {compactMoney(g.gameState.cash)}</span>
       </div>
 
       <div className="hud-line hud-line-secondary">
-        <span className="hud-mini"><span className="hud-mini-icon">🏦</span><b>BANK</b> {compactMoney(g.gameState.bank)}</span>
-        <button type="button" className="hud-mini" onClick={() => setActiveModal("happy")} aria-label="Happiness"><span className="hud-mini-icon">😊</span><b>HAP</b> {Math.floor(g.gameState.happiness)}</button>
-        <span className="hud-mini hud-heat"><span className="hud-mini-icon">🌡</span><b>HEAT</b> {g.gameState.heat}</span>
-        <span className="hud-mini"><span className="hud-mini-icon">💎</span><b>PTS</b> {g.gameState.points}</span>
-        <span className="hud-mini"><span className="hud-mini-icon">🏅</span><b>MERIT</b> {g.gameState.merits}</span>
+        <span className="hud-mini"><GameIcon name="bank" size={11} className="hud-mini-icon" /><b>BANK</b> {compactMoney(g.gameState.bank)}</span>
+        <button type="button" className="hud-mini" onClick={() => setActiveModal("happy")} aria-label="Happiness"><GameIcon name="happy" size={11} className="hud-mini-icon" /><b>HAP</b> {Math.floor(g.gameState.happiness)}</button>
+        <span className="hud-mini hud-heat"><GameIcon name="heat" size={11} className="hud-mini-icon" /><b>HEAT</b> {g.gameState.heat}</span>
+        <span className="hud-mini"><GameIcon name="points" size={11} className="hud-mini-icon" /><b>PTS</b> {g.gameState.points}</span>
+        <span className="hud-mini"><GameIcon name="merit" size={11} className="hud-mini-icon" /><b>MERIT</b> {g.gameState.merits}</span>
         <span className="hud-mini"><b>STR</b> {g.gameState.stats.strength.toFixed(1)}</span>
         <span className="hud-mini"><b>DEF</b> {g.gameState.stats.defense.toFixed(1)}</span>
         <span className="hud-mini"><b>SPD</b> {g.gameState.stats.speed.toFixed(1)}</span>

@@ -16,6 +16,7 @@ import {
   calculateHitChance,
   WEAPON_SKILL_LABELS,
 } from "../systems/combatSystem";
+import { GameIcon, iconFromLegacy } from "../components/GameIcon";
 
 type FinishOutcome =
   | "leave"
@@ -137,13 +138,12 @@ function CombatHud({
       </div>
 
       <div className="combat-stage-health-row">
-        <span>
-          ❤️ {Math.max(0, Math.floor(fighter.health))}
-          /{fighter.maxHealth}
+        <span className="row-icon-label">
+          <GameIcon name="health" size={13} /> {Math.max(0, Math.floor(fighter.health))}/{fighter.maxHealth}
         </span>
 
-        <span className="combat-stage-weapon-name">
-          {weapon.icon || "⚔️"} {weapon.name}
+        <span className="combat-stage-weapon-name row-icon-label">
+          <GameIcon name={iconFromLegacy(weapon.icon, weapon.weaponClass === "blade" ? "blade" : weapon.weaponClass === "blunt" ? "blunt" : weapon.weaponClass === "handgun" ? "handgun" : weapon.weaponClass === "smg" ? "smg" : weapon.weaponClass === "shotgun" ? "shotgun" : weapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={13} /> {weapon.name}
         </span>
       </div>
 
@@ -211,7 +211,7 @@ function CombatCharacter({
         <div className="combat-rig-arm combat-rig-arm-back" />
         <div className="combat-rig-arm combat-rig-arm-front">
           <span className="combat-rig-weapon">
-            {weapon.icon || "⚔️"}
+            <GameIcon name={iconFromLegacy(weapon.icon, weapon.weaponClass === "blade" ? "blade" : weapon.weaponClass === "blunt" ? "blunt" : weapon.weaponClass === "handgun" ? "handgun" : weapon.weaponClass === "smg" ? "smg" : weapon.weaponClass === "shotgun" ? "shotgun" : weapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={31} />
           </span>
 
           {firearm && (
@@ -266,7 +266,7 @@ function CombatLog({
 
       {logs.length === 0 ? (
         <div className="combat-log-empty">
-          <span>⚔️</span>
+          <GameIcon name="combat" size={24} />
           <p>
             Combat has not started yet.
           </p>
@@ -292,11 +292,7 @@ function CombatLog({
                 .join(" ")}
             >
               <div className="combat-log-marker">
-                {log.isCrit
-                  ? "💥"
-                  : log.isMiss
-                  ? "〰️"
-                  : "⚔️"}
+                <GameIcon name={log.isCrit ? "shotgun" : log.isMiss ? "target" : "combat"} size={16} />
               </div>
 
               <div className="combat-log-content">
@@ -805,11 +801,7 @@ export function InteractiveCombatView({
                 }`}
               >
                 <div className="combat-status-icon">
-                  {processing
-                    ? "⚡"
-                    : turn === "player"
-                    ? "⚔️"
-                    : "👁️"}
+                  <GameIcon name={processing ? "energy" : turn === "player" ? "combat" : "target"} size={19} />
                 </div>
 
                 <div>
@@ -875,7 +867,7 @@ export function InteractiveCombatView({
                         }
                       >
                         <span className="combat-attack-icon">
-                          {weapon.icon || "⚔️"}
+                          <GameIcon name={iconFromLegacy(weapon.icon, weapon.weaponClass === "blade" ? "blade" : weapon.weaponClass === "blunt" ? "blunt" : weapon.weaponClass === "handgun" ? "handgun" : weapon.weaponClass === "smg" ? "smg" : weapon.weaponClass === "shotgun" ? "shotgun" : weapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={22} />
                         </span>
 
                         <span className="combat-attack-info">
@@ -895,8 +887,8 @@ export function InteractiveCombatView({
 
                 <div className="combat-equipped">
                   <span>Currently equipped</span>
-                  <strong>
-                    {equippedWeapon.icon || "⚔️"} {equippedWeapon.name}
+                  <strong className="row-icon-label">
+                    <GameIcon name={iconFromLegacy(equippedWeapon.icon, equippedWeapon.weaponClass === "blade" ? "blade" : equippedWeapon.weaponClass === "blunt" ? "blunt" : equippedWeapon.weaponClass === "handgun" ? "handgun" : equippedWeapon.weaponClass === "smg" ? "smg" : equippedWeapon.weaponClass === "shotgun" ? "shotgun" : equippedWeapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={15} /> {equippedWeapon.name}
                   </strong>
                 </div>
               </div>
@@ -904,7 +896,7 @@ export function InteractiveCombatView({
 
             {winner === "player" && (
               <div className="combat-result combat-result-victory">
-                <div className="combat-result-icon">🏆</div>
+                <div className="combat-result-icon"><GameIcon name="awards" size={38} /></div>
                 <div className="combat-result-label">
                   VICTORY
                 </div>
@@ -922,7 +914,7 @@ export function InteractiveCombatView({
                           handleFinish("leave")
                         }
                       >
-                        <span>🚶</span>
+                        <GameIcon name="walk" size={24} />
                         <strong>Leave</strong>
                         <small>Take the XP and walk away</small>
                       </button>
@@ -934,7 +926,7 @@ export function InteractiveCombatView({
                           handleFinish("mug")
                         }
                       >
-                        <span>💵</span>
+                        <GameIcon name="cash" size={24} />
                         <strong>Mug</strong>
                         <small>Steal some cash on hand</small>
                       </button>
@@ -946,7 +938,7 @@ export function InteractiveCombatView({
                           handleFinish("hospitalize")
                         }
                       >
-                        <span>🏥</span>
+                        <GameIcon name="hospital" size={24} />
                         <strong>Hospitalize</strong>
                         <small>Send them to the hospital longer</small>
                       </button>
@@ -960,7 +952,7 @@ export function InteractiveCombatView({
 
             {winner === "enemy" && (
               <div className="combat-result combat-result-defeat">
-                <div className="combat-result-icon">🏥</div>
+                <div className="combat-result-icon"><GameIcon name="hospital" size={38} /></div>
                 <div className="combat-result-label">
                   DEFEATED
                 </div>

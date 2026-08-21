@@ -1,6 +1,7 @@
 import React from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Panel, Button } from "../components/ui";
+import { GameIcon } from "../components/GameIcon";
 import {
   TRAINING_STATS,
   TRAINING_PROGRAMS,
@@ -62,7 +63,7 @@ export function GymView({ g }: { g: Game }) {
             const enoughEnergy = g.gameState.energy >= energyCost;
             return (
               <div className="card train-card train-card-v2" key={stat.id}>
-                <div className="train-stat-top"><span className="train-icon">{stat.icon}</span><span className="training-current-stat">{current.toFixed(2)}</span></div>
+                <div className="train-stat-top"><span className="train-icon"><GameIcon name={stat.id === "strength" ? "gym" : stat.id === "defense" ? "shield" : stat.id === "speed" ? "energy" : "target"} size={24} /></span><span className="training-current-stat">{current.toFixed(2)}</span></div>
                 <h3>{stat.name}</h3>
                 <p>{stat.description}</p>
                 <div className="data-list">
@@ -71,7 +72,7 @@ export function GymView({ g }: { g: Game }) {
                   <div className="data-row"><span>Program modifier</span><b>×{program.statMultipliers[stat.id].toFixed(2)}</b></div>
                 </div>
                 <Button disabled={!enoughEnergy || incapacitated} onClick={() => g.train(stat.id)}>
-                  {!enoughEnergy ? `Need ${energyCost} ⚡` : incapacitated ? "Unavailable" : `Train ${stat.name}`}
+                  {!enoughEnergy ? `Need ${energyCost} Energy` : incapacitated ? "Unavailable" : `Train ${stat.name}`}
                 </Button>
               </div>
             );

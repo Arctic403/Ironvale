@@ -24,6 +24,13 @@ import { ResourceModal } from "./apps/ResourceModal";
 import { ScreenContent } from "./apps/ScreenContent";
 import { ActivityLog } from "./apps/ActivityLog";
 import { EncounterModal } from "./apps/EncounterModal";
+import { GameIcon, type GameIconName } from "./GameIcon";
+
+
+const SCREEN_ICONS: Partial<Record<string, GameIconName>> = {
+  character:"character", crimes:"crimes", combat:"combat", gym:"gym", jobs:"jobs", inventory:"inventory", shops:"shops", missions:"missions", education:"education", property:"property", market:"market", faction:"faction", awards:"awards", progression:"progression",
+  bank:"bank", hospital:"hospital", jail:"lock", police:"police", pharmacy:"pharmacy", casino:"casino", nightclub:"music", blackmarket:"disguise", park:"park", downtown:"pin", airport:"airport"
+};
 
 function App() {
   const g = useRiftCity();
@@ -109,7 +116,7 @@ function App() {
             setActivityOpen(false);
           }}
         >
-          <span>☰</span>
+          <GameIcon name="menu" size={17} />
           <strong>Menu</strong>
         </button>
 
@@ -121,7 +128,7 @@ function App() {
             setNavOpen(false);
           }}
         >
-          <span>📝</span>
+          <GameIcon name="log" size={17} />
           <strong>Log</strong>
         </button>
       </div>
@@ -152,19 +159,19 @@ function App() {
                 </button>
               )}
               <span className="location-tag">{g.gameState.currentLocation.toUpperCase()}</span>
-              <h1>{title}</h1>
+              <div className="screen-title-row">{SCREEN_ICONS[g.currentScreen] && <span className="screen-title-icon"><GameIcon name={SCREEN_ICONS[g.currentScreen]!} size={20} /></span>}<h1>{title}</h1></div>
             </div>
 
             <div className="header-quick-status">
               {g.gameState.jailUntil && (
                 <div className="status-alert jail compact">
-                  🔒 {formatTime(timeLeft(g.gameState.jailUntil))}
+                  <GameIcon name="lock" size={14} /> {formatTime(timeLeft(g.gameState.jailUntil))}
                 </div>
               )}
 
               {g.gameState.hospitalUntil && (
                 <div className="status-alert hospital compact">
-                  🏥 {formatTime(timeLeft(g.gameState.hospitalUntil))}
+                  <GameIcon name="hospital" size={14} /> {formatTime(timeLeft(g.gameState.hospitalUntil))}
                 </div>
               )}
             </div>
