@@ -4,6 +4,7 @@ import { GameIcon, type GameIconName } from "../components/GameIcon";
 import { money, formatTime } from "../core/gameCore";
 import { CRIMES } from "../systems/crimeSystem";
 import { CRIME_TOOLS } from "../systems/crimeTools";
+import { CRIME_FAMILY_LABELS, CRIME_OPERATIONS, GRAFFITI_SPOTS } from "../systems/crimeActivities";
 import { DEFAULT_WEAPONS, WEAPON_SKILL_LABELS } from "../systems/combat/combatWeapons";
 import { TRAINING_PROGRAMS } from "../systems/gymSystem";
 import { JOBS } from "../data/jobs";
@@ -122,10 +123,26 @@ export function Wiki({ g }: { g: RiftCityGame }) {
       keywords: "crime nerve mastery heat arrest jail choices branching intel bounty loot odds success",
       summary: "Crime progression, choices, mastery, success odds, Heat and consequences.",
       content: <>
-        <p>Crimes are a major active income path. Each crime has a Nerve cost, crime-experience requirement, reward range, XP reward and risk profile. Your stats, crime experience, crime mastery, location, Heat, world events, selected choice and optional one-use tool can all influence the final outcome.</p>
-        <p>Crime events can branch during a run. Safer decisions may protect the escape or reduce Heat, while aggressive decisions can increase rewards, loot, injuries, arrest odds or bounty exposure. Some routes require enough mastery, intel or a particular stat.</p>
-        <p>Outcomes include normal success, critical success, being spooked, critical failure and arrest. Arrest can remove carried cash, apply charges, send you to jail and interact with contraband possession.</p>
-        <WikiTable headers={["Crime", "Crime XP", "Nerve", "Reward", "Risk"]} rows={CRIMES.map((crime) => [crime.name, crime.crimeExperienceRequired, crime.nerve, `${money(crime.minReward)}–${money(crime.maxReward)}`, crime.risk])} />
+        <p>Crimes are split into different gameplay rhythms instead of forcing every activity through the same three-choice sequence. Pickpocketing, burglary and vehicle theft use rotating target boards with optional scouting. Retail theft, package swipes and cargo theft resolve as quick crimes. Major robberies/heists keep the live branching-event system because the decisions carry more weight there.</p>
+        <p>Crime-family skills now progress separately: Street Theft, Burglary, Vehicle Crime, Fraud, Street Art and Organized Crime. Using a family improves that family over time. Street Reputation is a second progression track earned mainly through graffiti and successful criminal activity; it unlocks more visible graffiti spots and gives a small capped bonus to target work.</p>
+        <p>Outcomes still include normal/critical success, being spooked and arrest. Heat, character stats, family skill, Street Rep, scouting, mastery, location and optional crime tools can all influence the final odds depending on the activity.</p>
+        <WikiTable headers={["Legacy crime", "Crime XP", "Nerve", "Reward", "Risk"]} rows={CRIMES.map((crime) => [crime.name, crime.crimeExperienceRequired, crime.nerve, `${money(crime.minReward)}–${money(crime.maxReward)}`, crime.risk])} />
+      </>,
+    },
+    {
+      id: "crime-careers",
+      title: "Crime Careers, Operations & Graffiti",
+      category: "Crime",
+      icon: "spray",
+      keywords: "pickpocket scout burglary vehicle theft passive operations card skimming email fraud graffiti street reputation skill family",
+      summary: "Rotating targets, passive criminal income, separate skill families and the Street Reputation graffiti ladder.",
+      content: <>
+        <p><b>Targets:</b> Pickpocketing, burglary and vehicle theft show rotating target boards. Scouting costs 1 Nerve, reveals the target's payout/Heat estimate and adds a success bonus. Targets disappear from the board after an attempt and the board rotates every five minutes.</p>
+        <p><b>Operations:</b> Passive/semi-passive crimes consume setup cash and Nerve, then continue on a timer while you use other parts of the game. When finished, you collect the result. Higher matching skill reduces detection risk. These systems are deliberately abstract game mechanics rather than real-world procedures.</p>
+        <p><b>Graffiti:</b> Graffiti is primarily a Street Reputation activity. Better-known players unlock more visible spots, while every successful tag trains Street Art skill, adds Heat and can add a small amount of faction visibility when the character belongs to a faction.</p>
+        <WikiTable headers={["Crime family", "Role"]} rows={Object.entries(CRIME_FAMILY_LABELS).map(([id, label]) => [label, id === "fraud" ? "Passive fraud operations" : id === "street" ? "Graffiti / Street Rep" : id === "organized" ? "Major jobs and late-game operations" : "Target/quick-crime specialization"])} />
+        <WikiTable headers={["Passive operation", "Crime XP", "Setup", "Timer", "Payout"]} rows={CRIME_OPERATIONS.map((operation) => [operation.name, operation.crimeExperienceRequired, money(operation.setupCost), formatTime(operation.durationMs), `${money(operation.minReward)}–${money(operation.maxReward)}`])} />
+        <WikiTable headers={["Graffiti spot", "Street Rep", "Nerve", "Rep gain", "Heat"]} rows={GRAFFITI_SPOTS.map((spot) => [spot.name, spot.reputationRequired, spot.nerve, `+${spot.reputationGain}`, `+${spot.heat}`])} />
       </>,
     },
     {
@@ -388,7 +405,7 @@ export function Wiki({ g }: { g: RiftCityGame }) {
       <section className="wiki-toolbar">
         <label className="wiki-search">
           <GameIcon name="target" size={16} />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search mechanics, combat, bank, Heat…" aria-label="Search the RiftCity wiki" />
+          <input value={query} onChange={(event: React.ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)} placeholder="Search mechanics, combat, bank, Heat…" aria-label="Search the RiftCity wiki" />
           {query && <button type="button" onClick={() => setQuery("")} aria-label="Clear search">×</button>}
         </label>
         <div className="wiki-category-row">

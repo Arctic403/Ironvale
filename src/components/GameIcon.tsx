@@ -7,7 +7,7 @@ export type GameIconName =
   | "weapon" | "blade" | "blunt" | "handgun" | "smg" | "shotgun" | "rifle" | "cash" | "walk" | "target"
   | "warning" | "gift" | "bot" | "phone" | "disguise" | "tools" | "shield" | "info" | "lab" | "garage" | "warehouse"
   | "police" | "pharmacy" | "park" | "airport" | "pin" | "casino" | "dice" | "music" | "headphones" | "spark" | "crown" | "car" | "mine" | "horse"
-  | "armor" | "medkit" | "drink" | "focus" | "candy" | "contraband" | "chip" | "key" | "envelope" | "gloves" | "badge" | "route" | "chemical" | "package" | "plant" | "book" | "building";
+  | "armor" | "medkit" | "drink" | "focus" | "candy" | "contraband" | "chip" | "key" | "envelope" | "gloves" | "badge" | "route" | "chemical" | "package" | "plant" | "book" | "building" | "spray" | "clock";
 
 const paths: Partial<Record<GameIconName, React.ReactNode>> = {
   menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
@@ -90,6 +90,8 @@ const paths: Partial<Record<GameIconName, React.ReactNode>> = {
   plant: <><path d="M12 21V9M12 12c-5 0-7-3-7-7 4 0 7 2 7 7zM12 15c5 0 7-3 7-7-4 0-7 2-7 7z"/></>,
   book: <><path d="M4 4h7a3 3 0 0 1 3 3v13a3 3 0 0 0-3-3H4zM20 4h-7a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h7z"/></>,
   building: <><path d="M5 21V5h14v16M3 21h18M8 9h2M14 9h2M8 13h2M14 13h2M10 21v-4h4v4"/></>,
+  spray: <><path d="M9 5h6l1 3h-8zM8 8h8l2 4v9H6v-9zM10 4V2h5M17 4h3M20 3v2M9 13h6M9 17h6"/></>,
+  clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
 };
 
 export function GameIcon({ name, size = 18, className = "", title }: { name: GameIconName; size?: number; className?: string; title?: string }) {

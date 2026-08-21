@@ -2,6 +2,7 @@ import React from "react";
 import type { useRiftCity } from "../../hooks/useRiftCity";
 import { WORLD_EVENTS } from "../../data/expansion";
 import { formatTime, timeLeft } from "../../core/gameCore";
+import { CRIME_OPERATIONS } from "../../systems/crimeActivities";
 import { GameIcon, type GameIconName } from "../GameIcon";
 
 type RiftCityGame = ReturnType<typeof useRiftCity>;
@@ -129,6 +130,31 @@ export function ActiveEffectsBar({ g, now }: { g: RiftCityGame; now: number }) {
       detail: `${Math.floor(g.gameState.productionAttention)} attention from repeated production`,
       icon: "warning",
       tone: g.gameState.productionAttention >= 50 ? "danger" : "warning",
+    });
+  }
+
+  const readyCrimeOps = g.gameState.activeCrimeOperations.filter((operation) => operation.finishesAt <= now);
+  if (readyCrimeOps.length > 0) {
+    effects.push({
+      id: "crime-ops-ready",
+      label: readyCrimeOps.length === 1 ? "Crime Operation Ready" : `${readyCrimeOps.length} Crime Operations Ready`,
+      detail: "Return to Crimes → Operations to collect the result",
+      icon: "crimes",
+      tone: "positive",
+    });
+  }
+
+  const runningCrimeOps = g.gameState.activeCrimeOperations.filter((operation) => operation.finishesAt > now);
+  if (runningCrimeOps.length > 0) {
+    const soonest = runningCrimeOps.reduce((best, operation) => operation.finishesAt < best.finishesAt ? operation : best, runningCrimeOps[0]);
+    const definition = CRIME_OPERATIONS.find((operation) => operation.id === soonest.operationId);
+    effects.push({
+      id: "crime-ops-running",
+      label: runningCrimeOps.length === 1 ? "Crime Operation Running" : `${runningCrimeOps.length} Crime Operations Running`,
+      detail: definition?.name ?? "Passive criminal operation active",
+      remaining: Math.max(0, soonest.finishesAt - now),
+      icon: "clock",
+      tone: "warning",
     });
   }
 

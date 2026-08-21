@@ -26,6 +26,7 @@ export type AuctionListing = {
 };
 
 export type ActiveProduction = { id:string; recipeId:string; startedAt:number; finishesAt:number; quantity:number; };
+export type ActiveCrimeOperation = { id:string; operationId:string; startedAt:number; finishesAt:number; };
 
 import type { CombatStats } from "../systems/progressionSystem";
 
@@ -63,6 +64,15 @@ export type SaveData = {
   lastHealthUpdate: number;
   crimeExperience: number;
   crimeMastery: Record<string, number>;
+  crimeSkillXp: Record<string, number>;
+  streetReputation: number;
+  scoutedCrimeTargets: string[];
+  resolvedCrimeTargets: string[];
+  activeCrimeOperations: ActiveCrimeOperation[];
+  crimeOperationsCompleted: number;
+  graffitiTags: Record<string, number>;
+  graffitiCooldowns: Record<string, number>;
+  graffitiTotalTags: number;
   stats: CombatStats;
   gymExperience: number;
   gymMemberships: string[];
