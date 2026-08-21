@@ -195,6 +195,19 @@ export function City({ g }: { g: Game }) {
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 2.5;
 
+  /*
+   * Give zoomed maps some controlled overscroll on every side. Without this,
+   * clampPan only allows an edge of the map to reach an edge of the viewport,
+   * which makes locations close to the north/west borders impossible to bring
+   * toward the middle for a close look.
+   *
+   * The extra room ramps in as the player zooms so the 1x map remains locked
+   * neatly in place while a genuinely zoomed map can focus any edge/corner.
+   */
+  const PAN_FOCUS_PADDING_X = MAP_WIDTH * 0.34;
+  const PAN_FOCUS_PADDING_Y = MAP_HEIGHT * 0.34;
+  const PAN_FOCUS_FULL_AT_ZOOM = 1.5;
+
   /* =========================================================
      ZOOM
   ========================================================= */
@@ -221,11 +234,28 @@ export function City({ g }: { g: Game }) {
     next: { x: number; y: number },
     nextZoom: number,
   ) => {
-    const maxX =
+    const baseMaxX =
       ((nextZoom - 1) * MAP_WIDTH) / 2;
 
-    const maxY =
+    const baseMaxY =
       ((nextZoom - 1) * MAP_HEIGHT) / 2;
+
+    const focusProgress = Math.min(
+      1,
+      Math.max(
+        0,
+        (nextZoom - MIN_ZOOM) /
+          (PAN_FOCUS_FULL_AT_ZOOM - MIN_ZOOM),
+      ),
+    );
+
+    const maxX =
+      baseMaxX +
+      PAN_FOCUS_PADDING_X * focusProgress;
+
+    const maxY =
+      baseMaxY +
+      PAN_FOCUS_PADDING_Y * focusProgress;
 
     return {
       x: Math.max(
@@ -1060,7 +1090,7 @@ export function City({ g }: { g: Game }) {
 
           <div className="map-drag-hint">
             <span>✋</span>
-            Tap a location or district · Zoom, then drag to pan · Use the left map scrollbar anytime
+            Tap a location or district · Zoom, then drag to pan
           </div>
 
 
