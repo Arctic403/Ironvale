@@ -211,3 +211,12 @@ button.compact-hud-item {
 .bank-risk-grid span { opacity: .72; font-size: .76rem; line-height: 1.35; }
 @media (max-width: 900px) { .bank-risk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 540px) { .bank-risk-grid { grid-template-columns: 1fr; } }
+
+/* Beta Black Market sell desk */
+.beta-market-callout { display:flex; flex-direction:column; gap:5px; margin:8px 0 12px; padding:11px 12px; border:1px solid rgba(91,214,146,.28); border-radius:12px; background:rgba(91,214,146,.065); }
+.beta-market-callout strong { font-size:10px; letter-spacing:.08em; color:#8ee6b5; }
+.beta-market-callout span { color:var(--muted); font-size:11px; line-height:1.45; }
+.beta-sell-payout { min-height:60px; display:flex; flex-direction:column; justify-content:center; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,.018); }
+.beta-sell-payout span { color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.06em; }
+.beta-sell-payout strong { margin-top:3px; font-size:17px; }
+.beta-sell-payout small { margin-top:2px; color:var(--muted); }

@@ -4,7 +4,7 @@ import { Button, Panel } from "../components/ui";
 import { ITEMS } from "../data/gameData";
 import { formatTime, money, timeLeft } from "../core/gameCore";
 import { BANK_INVESTMENT_TIERS, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE, checkingProtectedCap, savingsProtectedCap } from "../data/banking";
-import { BLACK_MARKET_STATS } from "../systems/auctionSystem";
+import { BLACK_MARKET_STATS, betaNpcAutoBuyCeiling, betaNpcQuickSellPrice, betaNpcSuggestedListingPrice, blackMarketReferenceValue } from "../systems/auctionSystem";
 import { CRIME_TOOLS } from "../systems/crimeTools";
 import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
 import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
@@ -77,7 +77,7 @@ export function Bank({ g }: { g: Game }) {
           <div className="data-list"><div className="data-row"><span>Checking daily interest</span><b>1.0% + perks</b></div><div className="data-row"><span>Savings daily interest</span><b>1.5% + perks</b></div><div className="data-row"><span>Lifetime deposits</span><b>{money(g.gameState.bankLifetimeDeposits)}</b></div><div className="data-row"><span>Interest earned</span><b>{money(g.gameState.bankInterest)}</b></div><div className="data-row"><span>Financial losses</span><b>{money(g.gameState.bankLosses)}</b></div><div className="data-row"><span>Bank seizures</span><b>{g.gameState.bankSeizures}</b></div><div className="data-row"><span>Heat exposure</span><b>{g.gameState.heat}/100</b></div></div>
         </Panel>
         <Panel title="Balance Graph">
-          <div className="bank-chart"><svg viewBox="0 0 100 44" preserveAspectRatio="none"><polyline points={points}/></svg><div><span>{money(min)}</span><b>{money(history.at(-1) || 0)}</b><span>{money(max)}</span></div></div>
+          <div className="bank-chart"><svg viewBox="0 0 100 44" preserveAspectRatio="none"><polyline points={points}/></svg><div><span>{money(min)}</span><b>{money(history[history.length - 1] || 0)}</b><span>{money(max)}</span></div></div>
           <p className="muted-copy">Tracks recent account balance changes, transfers, interest, and investment maturities.</p>
         </Panel>
       </div>
@@ -160,6 +160,8 @@ export function BlackMarket({ g }: { g: Game }) {
   const [itemId, setItemId] = useState("");
   const [price, setPrice] = useState("500");
   const [quantity, setQuantity] = useState("1");
+  const [sellItemId, setSellItemId] = useState("");
+  const [sellQuantity, setSellQuantity] = useState("1");
   const [query, setQuery] = useState("");
   const now = useNow();
 
@@ -175,6 +177,12 @@ export function BlackMarket({ g }: { g: Game }) {
   const selectedOwned = itemId ? (g.gameState.inventory[itemId] || 0) : 0;
   const qty = Math.max(1, Math.floor(Number(quantity) || 1));
   const unitPrice = Math.max(1, Math.floor(Number(price) || 1));
+  const sellOwned = sellItemId ? (g.gameState.inventory[sellItemId] || 0) : 0;
+  const sellQty = Math.max(1, Math.min(sellOwned || 1, Math.floor(Number(sellQuantity) || 1)));
+  const sellReference = sellItemId ? blackMarketReferenceValue(sellItemId) : 0;
+  const sellUnitPrice = sellItemId ? betaNpcQuickSellPrice(sellItemId) : 0;
+  const sellTotal = sellUnitPrice * sellQty;
+  const autoBuyCeiling = itemId ? betaNpcAutoBuyCeiling(itemId) : 0;
   const visibleListings = listings.slice(0, query ? 80 : 45);
 
   return (
@@ -225,6 +233,22 @@ export function BlackMarket({ g }: { g: Game }) {
         {listings.length>visibleListings.length&&<p className="status-text">Showing {visibleListings.length} of {listings.length} matching listings. Search to narrow the exchange.</p>}
       </Panel>
 
+      <Panel title="Sell Inventory · BETA TEST MODE">
+        <div className="beta-market-callout"><strong>🤖 NPC AUTO-BUY ENABLED</strong><span>Temporary beta economy boost: the broker instantly buys inventory at 150% of normal sell value so you can fund and test the rest of RiftCity quickly.</span></div>
+        <div className="auction-create-grid">
+          <label><span>Item to sell</span><select value={sellItemId} onChange={(e)=>{setSellItemId(e.target.value);setSellQuantity("1");}}><option value="">Choose an owned item</option>{ownListable.map((item)=><option key={item.id} value={item.id}>{item.name} ({g.gameState.inventory[item.id]})</option>)}</select></label>
+          <label><span>Quantity</span><input type="number" min="1" max={Math.max(1,sellOwned)} value={sellQuantity} onChange={(e)=>setSellQuantity(e.target.value)} /></label>
+          <div className="beta-sell-payout"><span>Instant payout</span><strong>{sellItemId ? money(sellTotal) : "—"}</strong><small>{sellItemId ? `${money(sellUnitPrice)} each` : "Select an item"}</small></div>
+        </div>
+        <div className="data-list">
+          <div className="data-row"><span>Owned</span><b>{sellOwned}</b></div>
+          <div className="data-row"><span>Normal sell value</span><b>{sellItemId ? money(sellReference) : "—"}</b></div>
+          <div className="data-row"><span>Beta NPC bonus</span><b>+50%</b></div>
+          <div className="data-row"><span>Listing fee</span><b>None for Quick Sell</b></div>
+        </div>
+        <div className="btn-group"><Button disabled={!sellItemId || sellOwned < sellQty} onClick={()=>g.betaQuickSellBlackMarket(sellItemId,sellQty)}>{sellItemId ? `Sell ${sellQty} Now to NPC` : "Choose an Item"}</Button>{sellItemId&&sellOwned>1&&<Button onClick={()=>setSellQuantity(String(sellOwned))}>Sell All</Button>}</div>
+      </Panel>
+
       <Panel title="Crime Tools · One Attempt Each">
         <p>Optional consumables improve selected crime odds, rewards, escape chance, or Heat. Each tool is consumed when the crime attempt begins.</p>
         <div className="service-item-grid">
@@ -251,15 +275,15 @@ export function BlackMarket({ g }: { g: Game }) {
         <div className="data-list"><div className="data-row"><span>Production Attention</span><b>{g.gameState.productionAttention}/100</b></div><div className="data-row"><span>Batches Started</span><b>{g.gameState.productionBatches}</b></div><div className="data-row"><span>Raids</span><b>{g.gameState.productionRaids}</b></div></div>
       </Panel>
 
-      <Panel title="List an Item">
-        <p>Your listings use the same structure as the simulated exchange so the UI can transition to multiplayer-backed sellers later.</p>
+      <Panel title="List for Sale · NPC AUTO-BUY BETA">
+        <div className="beta-market-callout"><strong>FAST BETA LIQUIDITY</strong><span>Listings priced at or below the displayed NPC ceiling are purchased immediately. Higher prices stay on the exchange normally. This auto-buy behavior is beta-only.</span></div>
         <div className="auction-create-grid">
-          <label><span>Item</span><select value={itemId} onChange={(e)=>setItemId(e.target.value)}><option value="">Choose an item</option>{ownListable.map((item)=><option key={item.id} value={item.id}>{item.name} ({g.gameState.inventory[item.id]})</option>)}</select></label>
+          <label><span>Item</span><select value={itemId} onChange={(e)=>{const id=e.target.value;setItemId(id);setQuantity("1");if(id)setPrice(String(betaNpcSuggestedListingPrice(id)));}}><option value="">Choose an item</option>{ownListable.map((item)=><option key={item.id} value={item.id}>{item.name} ({g.gameState.inventory[item.id]})</option>)}</select></label>
           <label><span>Quantity</span><input type="number" min="1" max={Math.max(1,selectedOwned)} value={quantity} onChange={(e)=>setQuantity(e.target.value)} /></label>
           <label><span>Price each</span><input type="number" min="1" value={price} onChange={(e)=>setPrice(e.target.value)} /></label>
         </div>
-        <div className="data-list"><div className="data-row"><span>Owned</span><b>{selectedOwned}</b></div><div className="data-row"><span>Listing total</span><b>{money(unitPrice * qty)}</b></div><div className="data-row"><span>Listing fee</span><b>{money(Math.max(25,Math.floor(unitPrice*qty*.03)))}</b></div></div>
-        <div className="btn-group"><Button disabled={!itemId || selectedOwned < qty} onClick={() => g.createAuctionListing(itemId, unitPrice, qty)}>Create Listing</Button><BackToCity g={g} /></div>
+        <div className="data-list"><div className="data-row"><span>Owned</span><b>{selectedOwned}</b></div><div className="data-row"><span>Listing total</span><b>{money(unitPrice * qty)}</b></div><div className="data-row"><span>Listing fee</span><b>{money(Math.max(25,Math.floor(unitPrice*qty*.03)))}</b></div><div className="data-row"><span>Beta NPC auto-buy ceiling</span><b>{itemId ? `${money(autoBuyCeiling)} each` : "—"}</b></div><div className="data-row"><span>Buyer status</span><b>{!itemId ? "Choose an item" : unitPrice<=autoBuyCeiling ? "Instant NPC buyer ready" : "Above ceiling · stays listed"}</b></div></div>
+        <div className="btn-group"><Button disabled={!itemId || selectedOwned < qty} onClick={() => g.createAuctionListing(itemId, unitPrice, qty)}>{itemId&&unitPrice<=autoBuyCeiling ? "List + Instant NPC Sale" : "Create Listing"}</Button><BackToCity g={g} /></div>
       </Panel>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 
 import { Panel, Button } from "../components/ui";
@@ -23,10 +23,6 @@ type Game = ReturnType<typeof useRiftCity>;
 ========================================================= */
 
 export function Character({ g }: { g: Game }) {
-  const [amount, setAmount] = useState("100");
-
-  const n = Math.max(0, Number(amount) || 0);
-
   const happinessMax =
     (getProperty(g.gameState.ownedProperty)?.maxHappiness ?? 100) +
     (g.gameState.propertyUpgrades["bedroom"] ?? 0) * 10;
@@ -145,40 +141,6 @@ export function Character({ g }: { g: Game }) {
         </div>
       </Panel>
 
-      <Panel title="Bank Vault">
-        <div className="bank-control">
-          <h2 className="bank-balance">
-            {money(g.gameState.bank)}
-          </h2>
-
-          <div className="input-group">
-            <input
-              type="number"
-              min="0"
-              value={amount}
-              onChange={(event) =>
-                setAmount(event.target.value)
-              }
-            />
-
-            <div className="btn-group">
-              <Button
-                disabled={n <= 0}
-                onClick={() => g.bankDeposit(n)}
-              >
-                Deposit
-              </Button>
-
-              <Button
-                disabled={n <= 0}
-                onClick={() => g.bankWithdraw(n)}
-              >
-                Withdraw
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Panel>
     </div>
   );
 }

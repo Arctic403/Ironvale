@@ -34,6 +34,28 @@ export const BLACK_MARKET_STATS={
   activeListings:ALL_NPC_LISTINGS.length+763,
 };
 
+
+export const BETA_NPC_QUICK_SELL_MULTIPLIER=1.5;
+export const BETA_NPC_AUTO_BUY_MAX_MULTIPLIER=4;
+
+export function blackMarketReferenceValue(itemId:string){
+  const item=ITEMS.find(x=>x.id===itemId);
+  if(!item) return 0;
+  return Math.max(25, Math.floor(item.sellValue ?? (item.price>0 ? item.price*.6 : 100)));
+}
+
+export function betaNpcQuickSellPrice(itemId:string){
+  return Math.max(1, Math.floor(blackMarketReferenceValue(itemId)*BETA_NPC_QUICK_SELL_MULTIPLIER));
+}
+
+export function betaNpcAutoBuyCeiling(itemId:string){
+  return Math.max(1, Math.floor(blackMarketReferenceValue(itemId)*BETA_NPC_AUTO_BUY_MAX_MULTIPLIER));
+}
+
+export function betaNpcSuggestedListingPrice(itemId:string){
+  return Math.max(1, Math.floor(blackMarketReferenceValue(itemId)*1.75));
+}
+
 export function listingFee(price:number, quantity:number){
   return Math.max(25, Math.floor(Math.max(1, price) * Math.max(1, quantity) * 0.03));
 }

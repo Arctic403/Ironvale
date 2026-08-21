@@ -25,7 +25,7 @@ import type { Screen, SaveData, ActivityType, Activity, AuctionListing } from ".
 import type { Encounter, EncounterChoice } from "../constants/encounters";
 import { pathToScreen, screenToPath } from "../routing/routes";
 import { PLAYER_PROFILES } from "../data/playerProfiles";
-import { ALL_NPC_LISTINGS, listingFee } from "../systems/auctionSystem";
+import { ALL_NPC_LISTINGS, betaNpcAutoBuyCeiling, betaNpcQuickSellPrice, listingFee } from "../systems/auctionSystem";
 import { getCrimeTool } from "../systems/crimeTools";
 import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFacilityRun } from "../systems/contrabandSystem";
 import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
@@ -695,14 +695,56 @@ export function useRiftCity() {
       if (!item || owned < qty) return appendActivity(prev, "You do not own enough of that item.", "failure");
       const fee = listingFee(unitPrice, qty);
       if (prev.cash < fee) return appendActivity(prev, `You need ${money(fee)} for the listing fee.`, "failure");
+
+      const remaining = owned - qty;
+      const inventory = { ...prev.inventory, [itemId]: remaining };
+      const equippedWeapon = prev.equippedWeapon === itemId && remaining <= 0 ? null : prev.equippedWeapon;
+      const equippedArmor = prev.equippedArmor === itemId && remaining <= 0 ? null : prev.equippedArmor;
+      const autoBuyCeiling = betaNpcAutoBuyCeiling(itemId);
+
+      // BETA TESTING: simulated buyers instantly clear reasonably priced player listings.
+      // Keeping this in the market action (instead of spawning money elsewhere) makes it easy to remove for live multiplayer.
+      if (unitPrice <= autoBuyCeiling) {
+        const gross = unitPrice * qty;
+        const next: SaveData = {
+          ...prev,
+          cash: prev.cash - fee + gross,
+          inventory,
+          equippedWeapon,
+          equippedArmor,
+        };
+        return appendActivity(next, `BETA NPC buyer instantly bought ${qty}× ${item.name} for ${money(gross)}. Listing fee ${money(fee)}.`, "success");
+      }
+
       const listing: AuctionListing = { id:`listing-${Date.now()}-${Math.random()}`, itemId, seller:"You", price:unitPrice, quantity:qty, createdAt:Date.now() };
       const next: SaveData = {
         ...prev,
         cash: prev.cash - fee,
-        inventory: { ...prev.inventory, [itemId]: owned - qty },
+        inventory,
+        equippedWeapon,
+        equippedArmor,
         auctionListings: [listing, ...prev.auctionListings],
       };
-      return appendActivity(next, `Listed ${qty}× ${item.name} for ${money(unitPrice)} each. Fee ${money(fee)}.`, "success");
+      return appendActivity(next, `Listed ${qty}× ${item.name} for ${money(unitPrice)} each. Price is above the current beta NPC auto-buy ceiling, so it remains listed. Fee ${money(fee)}.`, "success");
+    });
+
+  const betaQuickSellBlackMarket = (itemId: string, quantity = 1) =>
+    setGameState((prev) => {
+      const item = getItem(itemId);
+      const qty = Math.max(1, Math.floor(quantity));
+      const owned = prev.inventory[itemId] || 0;
+      if (!item || owned < qty) return appendActivity(prev, "You do not own enough of that item.", "failure");
+      const unitPrice = betaNpcQuickSellPrice(itemId);
+      const total = unitPrice * qty;
+      const remaining = owned - qty;
+      const next: SaveData = {
+        ...prev,
+        cash: prev.cash + total,
+        inventory: { ...prev.inventory, [itemId]: remaining },
+        equippedWeapon: prev.equippedWeapon === itemId && remaining <= 0 ? null : prev.equippedWeapon,
+        equippedArmor: prev.equippedArmor === itemId && remaining <= 0 ? null : prev.equippedArmor,
+      };
+      return appendActivity(next, `BETA quick sale: NPC broker bought ${qty}× ${item.name} for ${money(total)} (${money(unitPrice)} each).`, "success");
     });
 
   const cancelAuctionListing = (listingId: string) =>
@@ -1875,6 +1917,7 @@ export function useRiftCity() {
     useItem,
     equip,
     createAuctionListing,
+    betaQuickSellBlackMarket,
     cancelAuctionListing,
     buyAuctionListing,
     buyBlackMarketItem,
