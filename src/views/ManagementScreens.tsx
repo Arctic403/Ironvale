@@ -47,6 +47,31 @@ export function Character({ g }: { g: Game }) {
         </div>
       </Panel>
 
+      <Panel title="Weapon Skills">
+        <div className="data-list">
+          {[
+            ["unarmed", "👊 Unarmed"],
+            ["blade", "🔪 Blades"],
+            ["blunt", "🏏 Blunt"],
+            ["handgun", "🔫 Handguns"],
+            ["smg", "⚡ SMGs"],
+            ["shotgun", "💥 Shotguns"],
+            ["rifle", "🎯 Rifles"],
+          ].map(([id, label]) => {
+            const xp = g.gameState.weaponSkillXp[id] || 0;
+            const level = Math.min(100, 1 + Math.floor(Math.sqrt(xp / 12)));
+            const nextXp = level >= 100 ? xp : Math.ceil(Math.pow(level, 2) * 12);
+            return (
+              <div className="data-row" key={id}>
+                <span>{label}</span>
+                <b>Lv {level} · {level >= 100 ? "MAX" : `${xp}/${nextXp} XP`}</b>
+              </div>
+            );
+          })}
+        </div>
+        <p className="muted-copy">Weapon skill grows by actually using that class in combat. It improves handling gradually; stats, range, cover, armor and the opponent still matter.</p>
+      </Panel>
+
       <Panel title="Core Resources">
         <div className="data-list">
           <div className="data-row">

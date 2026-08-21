@@ -1,0 +1,21 @@
+/* RiftCity MMO combat presentation upgrade. Logic remains asynchronous / turn based. */
+.combat-arena{position:relative;overflow:hidden;min-height:330px;background:radial-gradient(circle at 50% 115%,rgba(65,120,255,.12),transparent 48%),linear-gradient(180deg,rgba(8,14,24,.98),rgba(7,10,17,.98));border:1px solid rgba(255,255,255,.08);border-radius:22px;padding:22px}
+.combat-arena:before{content:"";position:absolute;left:4%;right:4%;bottom:22%;height:1px;background:linear-gradient(90deg,transparent,rgba(125,170,255,.22),transparent);box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.combat-fighter{position:relative;z-index:2;transition:transform .22s ease,filter .22s ease,opacity .3s ease}
+.combat-avatar{position:relative;overflow:visible;transform-origin:50% 100%}
+.combat-fighter-body{display:inline-block;filter:drop-shadow(0 14px 12px rgba(0,0,0,.42));animation:combatIdle 2.6s ease-in-out infinite}
+.combat-weapon-visual{position:absolute;right:8%;top:43%;font-size:30px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.5));transform:rotate(-12deg);transition:transform .15s ease}
+.combat-fighter-enemy .combat-weapon-visual{right:auto;left:8%;transform:scaleX(-1) rotate(-12deg)}
+.combat-fighter-attacking{animation:combatLungePlayer .46s cubic-bezier(.2,.8,.2,1)}
+.combat-fighter-attacking .combat-weapon-visual{animation:combatWeaponStrike .46s ease}
+.combat-fighter-attacking-enemy{animation-name:combatLungeEnemy}
+.combat-fighter-active{filter:drop-shadow(0 0 14px rgba(84,143,255,.12))}
+.combat-health-fill{transition:width .45s cubic-bezier(.22,.8,.25,1)}
+.combat-attack-button small{line-height:1.35}
+.combat-attack-button{min-height:68px}
+@keyframes combatIdle{0%,100%{transform:translateY(0) rotate(-.5deg)}50%{transform:translateY(-4px) rotate(.5deg)}}
+@keyframes combatLungePlayer{0%{transform:translateX(0)}38%{transform:translateX(34px) scale(1.035)}62%{transform:translateX(28px)}100%{transform:translateX(0)}}
+@keyframes combatLungeEnemy{0%{transform:translateX(0)}38%{transform:translateX(-34px) scale(1.035)}62%{transform:translateX(-28px)}100%{transform:translateX(0)}}
+@keyframes combatWeaponStrike{0%{transform:rotate(-12deg) scale(1)}45%{transform:rotate(24deg) scale(1.18)}100%{transform:rotate(-12deg) scale(1)}}
+@media(max-width:760px){.combat-arena{min-height:235px;padding:12px}.combat-weapon-visual{font-size:22px}.combat-fighter-attacking{animation-name:combatLungePlayerMobile}.combat-fighter-attacking-enemy{animation-name:combatLungeEnemyMobile}@keyframes combatLungePlayerMobile{0%{transform:translateX(0)}45%{transform:translateX(13px)}100%{transform:translateX(0)}}@keyframes combatLungeEnemyMobile{0%{transform:translateX(0)}45%{transform:translateX(-13px)}100%{transform:translateX(0)}}}
+@media(prefers-reduced-motion:reduce){.combat-fighter-body,.combat-fighter-attacking,.combat-fighter-attacking-enemy,.combat-fighter-attacking .combat-weapon-visual{animation:none!important}}

@@ -96,6 +96,9 @@ export function executeCombatTurn(
         isCrit: false,
 
         isMiss: true,
+        weaponId: activeWeapon.id,
+        weaponClass: activeWeapon.weaponClass,
+        hitChance: Math.round(hitChance),
       },
     };
   }
@@ -111,7 +114,8 @@ export function executeCombatTurn(
 
   const isCrit =
     rollCritical(
-      activeWeapon
+      activeWeapon,
+      attacker
     );
 
   /*
@@ -186,6 +190,9 @@ export function executeCombatTurn(
       isCrit,
 
       isMiss: false,
+      weaponId: activeWeapon.id,
+      weaponClass: activeWeapon.weaponClass,
+      hitChance: Math.round(hitChance),
 
       hitPart:
         target.part,

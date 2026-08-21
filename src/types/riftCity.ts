@@ -95,6 +95,7 @@ export type SaveData = {
   productionBatches: number;
   productionRaids: number;
   equippedWeapon: string | null;
+  weaponSkillXp: Record<string, number>;
   equippedArmor: string | null;
   ownedProperty: string;
   propertyHoldings: Record<string, number>;

@@ -11,6 +11,9 @@ import {
   UNARMED_WEAPON,
   resolveEquippedWeapon,
   executeCombatTurn,
+  calculateAccuracy,
+  calculateHitChance,
+  WEAPON_SKILL_LABELS,
 } from "../systems/combatSystem";
 
 type FinishOutcome =
@@ -33,6 +36,8 @@ interface InteractiveCombatViewProps {
   onDefeat: (
     finalPlayerHealth: number
   ) => void;
+
+  onWeaponSkillUse?: (weaponClass: string, hit: boolean) => void;
 }
 
 export function InteractiveCombatView({
@@ -41,6 +46,7 @@ export function InteractiveCombatView({
   onStart,
   onFinish,
   onDefeat,
+  onWeaponSkillUse,
 }: InteractiveCombatViewProps) {
   const [pState, setPState] =
     useState<DynamicFighter>(player);
@@ -63,6 +69,8 @@ export function InteractiveCombatView({
 
   const [processing, setProcessing] =
     useState(false);
+
+  const [actingFighter, setActingFighter] = useState<"player" | "enemy" | null>(null);
 
   const [finishSelected, setFinishSelected] =
     useState(false);
@@ -317,6 +325,7 @@ export function InteractiveCombatView({
     }
 
     setProcessing(true);
+    setActingFighter("player");
 
     /*
      * PLAYER TURN
@@ -342,6 +351,9 @@ export function InteractiveCombatView({
       "enemy",
       playerResult.log
     );
+
+    onWeaponSkillUse?.(playerResult.log.weaponClass, !playerResult.log.isMiss);
+    window.setTimeout(() => mountedRef.current && setActingFighter(null), 460);
 
     /*
      * ENEMY DEFEATED
@@ -371,6 +383,8 @@ export function InteractiveCombatView({
           return;
         }
 
+        setActingFighter("enemy");
+
         const enemyResult =
           executeCombatTurn(
             updatedEnemy,
@@ -392,6 +406,7 @@ export function InteractiveCombatView({
           "player",
           enemyResult.log
         );
+        window.setTimeout(() => mountedRef.current && setActingFighter(null), 460);
 
         /*
          * PLAYER DEFEATED
@@ -466,6 +481,8 @@ export function InteractiveCombatView({
       ? `combat-impact-${impactType}`
       : "",
 
+    actingFighter === "player" ? "combat-fighter-attacking" : "",
+
     pState.health <= 0
       ? "combat-fighter-defeated"
       : "",
@@ -485,6 +502,8 @@ export function InteractiveCombatView({
     impactTarget === "enemy"
       ? `combat-impact-${impactType}`
       : "",
+
+    actingFighter === "enemy" ? "combat-fighter-attacking combat-fighter-attacking-enemy" : "",
 
     eState.health <= 0
       ? "combat-fighter-defeated"
@@ -517,7 +536,7 @@ export function InteractiveCombatView({
             <div>
               <span className="combat-live-badge">
                 <span className="combat-live-dot" />
-                LIVE COMBAT
+                TURN-BASED PVP
               </span>
 
               <h2 className="combat-title">
@@ -602,9 +621,8 @@ export function InteractiveCombatView({
                 </div>
 
                 <div className="combat-avatar combat-avatar-player">
-                  <span>
-                    🧍
-                  </span>
+                  <span className="combat-fighter-body">🧍</span>
+                  <span className="combat-weapon-visual">{equippedWeapon.icon || "⚔️"}</span>
 
                   {impactTarget ===
                     "player" && (
@@ -708,9 +726,8 @@ export function InteractiveCombatView({
                 </div>
 
                 <div className="combat-avatar combat-avatar-enemy">
-                  <span>
-                    👤
-                  </span>
+                  <span className="combat-fighter-body">👤</span>
+                  <span className="combat-weapon-visual">{resolveEquippedWeapon(eState).icon || "⚔️"}</span>
 
                   {impactTarget ===
                     "enemy" && (
@@ -881,10 +898,7 @@ export function InteractiveCombatView({
                               </strong>
 
                               <small>
-                                {
-                                  weapon.baseDamage
-                                }{" "}
-                                base damage
+                                {weapon.baseDamage} dmg · {Math.round(calculateHitChance(calculateAccuracy(pState, eState, weapon)))}% hit · {WEAPON_SKILL_LABELS[weapon.weaponClass]} Lv {pState.weaponSkills?.[weapon.weaponClass] ?? 1}
                               </small>
                             </span>
 

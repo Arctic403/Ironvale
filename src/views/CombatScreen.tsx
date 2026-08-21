@@ -7,9 +7,11 @@ import { InteractiveCombatView } from "./Combat";
 import {
   DEFAULT_WEAPONS,
   calculateWinChance,
+  getWeaponSkillLevelFromXp,
 } from "../systems/combatSystem";
 
 import { PLAYER_PROFILES } from "../data/playerProfiles";
+import { getItem } from "../data/items";
 
 import {
   money,
@@ -37,8 +39,11 @@ export function Combat({ g }: { g: Game }) {
           health: g.gameState.health,
           maxHealth: g.maxHealth,
           stats: g.combatStats,
-          weapons: DEFAULT_WEAPONS,
+          weapons: DEFAULT_WEAPONS.filter((weapon) => weapon.id === "unarmed" || (g.gameState.inventory[weapon.id] || 0) > 0),
           equippedWeaponId: g.gameState.equippedWeapon,
+          weaponSkills: Object.fromEntries(["unarmed","blade","blunt","handgun","smg","shotgun","rifle"].map((skill) => [skill, getWeaponSkillLevelFromXp(g.gameState.weaponSkillXp[skill] || 0)])),
+          armor: g.gameState.equippedArmor ? getItem(g.gameState.equippedArmor)?.name : undefined,
+          armorProtection: g.gameState.equippedArmor ? (getItem(g.gameState.equippedArmor)?.effect || 0) : 0,
         }}
         enemy={{
           id: opponent.id,
@@ -56,6 +61,15 @@ export function Combat({ g }: { g: Game }) {
             opponent.level * 25,
         }}
         onStart={g.beginCombat}
+        onWeaponSkillUse={(weaponClass, hit) => {
+          g.setGameState((previous) => ({
+            ...previous,
+            weaponSkillXp: {
+              ...previous.weaponSkillXp,
+              [weaponClass]: (previous.weaponSkillXp[weaponClass] || 0) + (hit ? 3 : 1),
+            },
+          }));
+        }}
         onFinish={(
           outcome,
           enemy,
