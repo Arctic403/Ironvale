@@ -14,6 +14,8 @@ export type CrimeTarget = {
   heat: number;
   family: CrimeFamily;
   hint: string;
+  specialLootIds?: string[];
+  specialLootChance?: number;
 };
 
 export type CrimeOperationDefinition = {
@@ -31,6 +33,8 @@ export type CrimeOperationDefinition = {
   detectionRisk: number;
   icon: "chip" | "envelope" | "package" | "garage" | "cash" | "badge" | "building" | "route" | "airport" | "dice";
   requiredItems?: string[];
+  cashoutMode?: "timer" | "risk-build";
+  minCashoutProgress?: number;
 };
 
 export type GraffitiSpot = {
@@ -183,7 +187,7 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     id: "underground-gambling",
     name: "Underground Gambling Night",
     description: "Fund a fictional illegal game and collect the result after the event resolves.",
-    family: "organized", crimeExperienceRequired: 250, setupCost: 6000, nerve: 7, durationMs: 10 * 60 * 1000, minReward: 9000, maxReward: 24000, heat: 14, detectionRisk: 28, icon: "dice", requiredItems:["burner-phone"],
+    family: "organized", crimeExperienceRequired: 250, setupCost: 6000, nerve: 7, durationMs: 10 * 60 * 1000, minReward: 9000, maxReward: 24000, heat: 14, detectionRisk: 28, icon: "dice", requiredItems:["burner-phone"], cashoutMode:"risk-build", minCashoutProgress:.2,
   },
   {
     id: "card-skimming",
@@ -200,6 +204,8 @@ export const CRIME_OPERATIONS: CrimeOperationDefinition[] = [
     detectionRisk: 16,
     icon: "chip",
     requiredItems: ["skimmer-device"],
+    cashoutMode: "risk-build",
+    minCashoutProgress: .15,
   },
   {
     id: "email-fraud",

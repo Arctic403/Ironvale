@@ -87,7 +87,7 @@ const action = (value: CrimeCareerAction) => value;
 
 export const CRIME_CAREERS: CrimeCareerDefinition[] = [
   { id:"scavenging", name:"Scavenging", description:"Read live city activity and search different districts for cash, valuables and rare finds.", family:"theft", mode:"scavenge", icon:"cash", unlockCrimeExperience:0, baseNerve:1, risk:"LOW" },
-  { id:"pickpocket", name:"Pickpocketing", description:"Work rotating NPC targets. Higher mastery reveals more information before you commit.", family:"theft", mode:"target", targetKind:"pickpocket", icon:"target", unlockCrimeExperience:0, baseNerve:2, risk:"LOW" },
+  { id:"pickpocket", name:"Pickpocketing", description:"Watch a live city pedestrian stream. People walk, wait, jog and cycle past; Mastery reveals more before you commit.", family:"theft", mode:"target", targetKind:"pickpocket", icon:"target", unlockCrimeExperience:0, baseNerve:2, risk:"LOW" },
   { id:"shoplift", name:"Shoplifting", description:"Choose a live store, build a basket and decide when greed has pushed suspicion too far.", family:"theft", mode:"shoplift", icon:"shops", unlockCrimeExperience:8, baseNerve:2, risk:"MEDIUM" },
   { id:"graffiti", name:"Graffiti", description:"Tag increasingly visible locations to build Street Reputation and Street Art mastery.", family:"street", mode:"graffiti", icon:"spray", unlockCrimeExperience:12, baseNerve:1, risk:"LOW" },
   { id:"package-swipe", name:"Parcel Theft", description:"Watch residential delivery windows and take small item-focused scores instead of pure cash.", family:"theft", mode:"actions", icon:"package", unlockCrimeExperience:22, baseNerve:3, risk:"LOW", actions:[
@@ -315,6 +315,14 @@ export function scavengingOpportunityLabel(value: number) {
   if (value >= 32) return "MODERATE";
   if (value >= 16) return "LOW";
   return "VERY LOW";
+}
+
+export function scavengingOutcomeRates(location: ScavengeLocation, mastery: number, heat: number, opportunity: number) {
+  const restricted = Boolean(location.requiredItems?.length) || location.masteryRequired >= 50;
+  const bustChance = Math.max(restricted ? .8 : .15, Math.min(restricted ? 12 : 3, location.difficulty * .07 + heat * .045 + Math.max(0, 35 - opportunity) * .035));
+  const luckyChance = Math.max(.6, Math.min(10, .7 + opportunity * .025 + mastery * .02 + (location.lootChanceBonus ?? 0) * 34));
+  const jailOnBust = restricted ? Math.min(42, Math.max(4, location.difficulty * .38 + heat * .12 - mastery * .08)) : Math.min(8, heat * .035);
+  return { luckyChance, bustChance, jailOnBust };
 }
 
 export function getShopliftingConditions(store: ShopliftStore, now = Date.now()): ShopliftConditions {
