@@ -396,7 +396,7 @@ export function useRiftCity() {
     });
   };
 
-  const resolveCrimeTarget = (target: CrimeTarget, crimeToolId?: string | null) => {
+  const resolveCrimeTarget = (target: CrimeTarget, crimeToolId?: string | null, attemptModifiers?: {chanceModifier?:number;rewardMultiplier?:number;heatModifier?:number;arrestModifier?:number;story?:string}) => {
     if (blocked()) { log("You cannot attempt a target right now.", "failure"); return; }
     setGameState((prev) => {
       if (prev.resolvedCrimeTargets.includes(target.id)) return appendActivity(prev, "That target is already gone from the board.", "failure");
@@ -410,9 +410,9 @@ export function useRiftCity() {
       const selectedTool = getCrimeTool(crimeToolId);
       const toolUsable = Boolean(selectedTool && (prev.inventory[selectedTool.id] || 0) > 0);
       const toolModifiers = toolUsable ? selectedTool!.modifiers : {};
-      const chance = Math.max(4, Math.min(97, targetSuccessChance(target, skillXp, dexterity, prev.heat, scouted, prev.streetReputation) + (toolModifiers.chanceModifier ?? 0)));
+      const chance = Math.max(4, Math.min(97, targetSuccessChance(target, skillXp, dexterity, prev.heat, scouted, prev.streetReputation) + (toolModifiers.chanceModifier ?? 0) + (attemptModifiers?.chanceModifier ?? 0)));
       const roll = Math.random() * 100;
-      const arrestWindow = Math.max(3, Math.min(20, 5 + target.difficulty * 0.14 + prev.heat * 0.05 + (toolModifiers.arrestModifier ?? 0)));
+      const arrestWindow = Math.max(3, Math.min(28, 5 + target.difficulty * 0.14 + prev.heat * 0.05 + (toolModifiers.arrestModifier ?? 0) + (attemptModifiers?.arrestModifier ?? 0)));
       const skillGain = Math.max(5, Math.round(7 + target.difficulty * 0.32));
       const crimeXpGain = Math.max(4, Math.round(4 + target.difficulty * 0.17));
       const careerId = target.kind === "vehicle" ? "vehicle-theft" : target.kind;
@@ -429,7 +429,7 @@ export function useRiftCity() {
 
       if (roll < chance) {
         const critical = roll < Math.max(1.5, chance * 0.06);
-        const reward = Math.round(randomCrimeReward(target.minReward, target.maxReward) * (toolModifiers.rewardMultiplier ?? 1) * (critical ? 1.55 : 1));
+        const reward = Math.round(randomCrimeReward(target.minReward, target.maxReward) * (toolModifiers.rewardMultiplier ?? 1) * (attemptModifiers?.rewardMultiplier ?? 1) * (critical ? 1.55 : 1));
         const repGain = Math.max(1, Math.round(target.difficulty / (critical ? 12 : 18)));
         let intel = prev.crimeIntel;
         if (target.kind === "pickpocket" && !intel.includes("access-card") && Math.random() < 0.45) intel = [...intel, "access-card"];
@@ -452,9 +452,9 @@ export function useRiftCity() {
           crimesCritical: prev.crimesCritical + (critical ? 1 : 0),
           streetReputation: prev.streetReputation + repGain,
           crimeIntel: intel,
-          heat: Math.min(100, Math.max(0, prev.heat + target.heat + (critical ? 0 : 1) + (toolModifiers.heatModifier ?? 0))),
+          heat: Math.min(100, Math.max(0, prev.heat + target.heat + (critical ? 0 : 1) + (toolModifiers.heatModifier ?? 0) + (attemptModifiers?.heatModifier ?? 0))),
         };
-        return appendActivity(next, `${critical ? "CRITICAL TARGET" : "TARGET COMPLETE"}: ${target.name} paid ${money(reward)}${specialFind} · ${target.family} skill +${skillGain} XP · Street Rep +${repGain}${toolUsable && selectedTool ? ` · ${selectedTool.name} consumed` : ""}.`, critical ? "critical" : "success");
+        return appendActivity(next, `${critical ? "CRITICAL TARGET" : "TARGET COMPLETE"}: ${target.name} paid ${money(reward)}${specialFind} · ${target.family} skill +${skillGain} XP · Street Rep +${repGain}${attemptModifiers?.story ? ` · ${attemptModifiers.story}` : ""}${toolUsable && selectedTool ? ` · ${selectedTool.name} consumed` : ""}.`, critical ? "critical" : "success");
       }
 
       if (roll < chance + arrestWindow) {

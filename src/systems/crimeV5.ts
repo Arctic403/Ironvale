@@ -3,6 +3,36 @@ import type { CrimeTarget } from "./crimeActivities";
 export type PickpocketMovement = "WAITING" | "STROLLING" | "WALKING" | "RUSHING" | "JOGGING" | "CYCLING";
 export type PickpocketWealth = "BROKE" | "LOW" | "AVERAGE" | "COMFORTABLE" | "WEALTHY" | "ELITE";
 export type PickpocketAwareness = "VERY LOW" | "LOW" | "MEDIUM" | "HIGH" | "VERY HIGH";
+export type PickpocketApproachId = "blend" | "crowd" | "distraction" | "quick";
+
+export type PickpocketApproach = {
+  id: PickpocketApproachId;
+  name: string;
+  description: string;
+  chanceModifier: number;
+  rewardMultiplier: number;
+  heatModifier: number;
+  arrestModifier: number;
+  favoredMovements: PickpocketMovement[];
+};
+
+export type PickpocketAttemptRead = {
+  opening: number;
+  openingLabel: string;
+  chanceModifier: number;
+  rewardMultiplier: number;
+  heatModifier: number;
+  arrestModifier: number;
+  suspicion: "LOW" | "RISING" | "HIGH" | "CRITICAL";
+  summary: string;
+};
+
+export const PICKPOCKET_APPROACHES: PickpocketApproach[] = [
+  {id:"blend",name:"Blend In",description:"Low-profile approach. Strongest around slow or stationary pedestrians.",chanceModifier:3,rewardMultiplier:.96,heatModifier:-1,arrestModifier:-1,favoredMovements:["WAITING","STROLLING"]},
+  {id:"crowd",name:"Use the Crowd",description:"Leans on busy foot traffic. Best against ordinary walking or rushing targets.",chanceModifier:1,rewardMultiplier:1.05,heatModifier:0,arrestModifier:0,favoredMovements:["WALKING","RUSHING"]},
+  {id:"distraction",name:"Create a Distraction",description:"Higher-variance game approach that can open better scores but raises attention.",chanceModifier:5,rewardMultiplier:1.12,heatModifier:1,arrestModifier:2,favoredMovements:["WAITING","WALKING"]},
+  {id:"quick",name:"Quick Move",description:"Fast commitment for short windows. Better against fast targets, harsher if mistimed.",chanceModifier:-1,rewardMultiplier:1.16,heatModifier:1,arrestModifier:2,favoredMovements:["RUSHING","JOGGING","CYCLING"]},
+];
 
 export type LivePickpocketNpc = {
   id: string;
@@ -18,6 +48,7 @@ export type LivePickpocketNpc = {
   target: CrimeTarget;
   rare: boolean;
   dangerNote?: string;
+  clues: string[];
 };
 
 type PedestrianTemplate = {
@@ -98,6 +129,50 @@ function torontoClock(now:number){
   return {hour:Number(get("hour"))+Number(get("minute"))/60,weekday:weekdays[get("weekday")]??0};
 }
 
+function awarenessPenalty(value:PickpocketAwareness){
+  return value==="VERY LOW"?5:value==="LOW"?2:value==="MEDIUM"?0:value==="HIGH"?-4:-8;
+}
+
+function pickpocketClues(template:PedestrianTemplate){
+  const clues:string[]=[];
+  if(template.awareness==="VERY LOW"||template.awareness==="LOW") clues.push("Distracted by surroundings");
+  if(template.awareness==="HIGH"||template.awareness==="VERY HIGH") clues.push("Frequently scans the crowd");
+  if(template.movement==="RUSHING"||template.movement==="JOGGING"||template.movement==="CYCLING") clues.push("Very short decision window");
+  if(template.movement==="WAITING"||template.movement==="STROLLING") clues.push("Slow, readable movement");
+  if(template.wealth==="WEALTHY"||template.wealth==="ELITE") clues.push("Expensive belongings visible");
+  if(template.wealth==="BROKE"||template.wealth==="LOW") clues.push("Little obvious value");
+  if(template.rare) clues.push("Unusual target — bigger upside and attention");
+  if(template.dangerNote) clues.push(template.dangerNote);
+  return clues.slice(0,3);
+}
+
+export function getPickpocketOpening(npc:LivePickpocketNpc, now=Date.now()){
+  const elapsed=Math.max(0,now-npc.spawnedAt);
+  const cycle=2350;
+  const phase=(elapsed%cycle)/cycle;
+  const wave=(Math.sin(phase*Math.PI*2-Math.PI/2)+1)/2;
+  const movementPenalty=npc.movement==="CYCLING"?13:npc.movement==="JOGGING"?9:npc.movement==="RUSHING"?5:0;
+  return Math.max(4,Math.min(100,Math.round(wave*100-movementPenalty)));
+}
+
+export function evaluatePickpocketAttempt(npc:LivePickpocketNpc, approachId:PickpocketApproachId, now=Date.now(), crackdown=false):PickpocketAttemptRead{
+  const approach=PICKPOCKET_APPROACHES.find(x=>x.id===approachId)??PICKPOCKET_APPROACHES[0];
+  const opening=getPickpocketOpening(npc,now);
+  const favored=approach.favoredMovements.includes(npc.movement);
+  const timing=opening>=78?10:opening>=58?5:opening>=35?0:opening>=18?-7:-13;
+  const mismatch=favored?4:-3;
+  const crackdownChance=crackdown?-6:0;
+  const chanceModifier=approach.chanceModifier+timing+mismatch+awarenessPenalty(npc.awareness)+crackdownChance;
+  const arrestModifier=approach.arrestModifier+(opening<25?5:opening<45?2:0)+(crackdown?4:0)+(npc.awareness==="VERY HIGH"?3:0);
+  const heatModifier=approach.heatModifier+(crackdown?2:0)+(opening<20?1:0);
+  const rewardMultiplier=Math.max(.75,approach.rewardMultiplier*(opening>=78?1.08:opening<25?.9:1));
+  const suspicionScore=Math.max(0,Math.min(100,45-opening+(npc.awareness==="VERY HIGH"?28:npc.awareness==="HIGH"?17:npc.awareness==="MEDIUM"?8:0)+(favored?-6:7)+(crackdown?18:0)));
+  const suspicion=suspicionScore>=72?"CRITICAL":suspicionScore>=50?"HIGH":suspicionScore>=27?"RISING":"LOW";
+  const openingLabel=opening>=78?"CLEAN OPENING":opening>=58?"GOOD WINDOW":opening>=35?"MIXED":opening>=18?"WATCHED":"BAD WINDOW";
+  const summary=`${approach.name} · ${openingLabel}${favored?" · good fit":" · poor fit"}${crackdown?" · crackdown pressure":""}`;
+  return {opening,openingLabel,chanceModifier,rewardMultiplier,heatModifier,arrestModifier,suspicion,summary};
+}
+
 export function spawnLivePickpocket(now=Date.now(), sequence=0):LivePickpocketNpc{
   const clock=torontoClock(now);
   const night=clock.hour>=19||clock.hour<5;
@@ -130,7 +205,7 @@ export function spawnLivePickpocket(now=Date.now(), sequence=0):LivePickpocketNp
     specialLootIds:template.specialLootIds,
     specialLootChance:template.specialLootChance,
   };
-  return {id:target.id,name:template.name,area:template.area,movement:template.movement,wealth:template.wealth,awareness:template.awareness,description:template.description,windowMs,spawnedAt,expiresAt:spawnedAt+windowMs,target,rare:Boolean(template.rare),dangerNote:template.dangerNote};
+  return {id:target.id,name:template.name,area:template.area,movement:template.movement,wealth:template.wealth,awareness:template.awareness,description:template.description,windowMs,spawnedAt,expiresAt:spawnedAt+windowMs,target,rare:Boolean(template.rare),dangerNote:template.dangerNote,clues:pickpocketClues(template)};
 }
 
 export type CrimeContextPulse={

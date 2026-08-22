@@ -23,7 +23,7 @@ import {
   scavengingOpportunityLabel, scavengingOpportunityTrend, scavengingOutcomeRates, shopliftingSuspicion,
 } from "../systems/crimeCareerSystem";
 import {
-  CRIME_SIGNATURES, getCrimeContextPulse, spawnLivePickpocket, type LivePickpocketNpc,
+  CRIME_SIGNATURES, PICKPOCKET_APPROACHES, evaluatePickpocketAttempt, getCrimeContextPulse, getPickpocketOpening, spawnLivePickpocket, type LivePickpocketNpc, type PickpocketApproachId,
 } from "../systems/crimeV5";
 import { buildCrimeDialogue, type CrimeDialogue } from "../systems/crimeDialogue";
 
@@ -52,6 +52,7 @@ export function Crimes({ g }: { g: Game }) {
   const [run,setRun]=useState<ActiveRun|null>(null);
   const [feedback,setFeedback]=useState<CrimeFeedback|null>(null);
   const [pickpocketNpc,setPickpocketNpc]=useState<LivePickpocketNpc>(()=>spawnLivePickpocket(Date.now(),0));
+  const [pickpocketApproach,setPickpocketApproach]=useState<PickpocketApproachId>("blend");
   const pickpocketSequence=useRef(0);
   const feedbackTimer=useRef<number|null>(null);
   const listScrollRef=useRef(0);
@@ -102,7 +103,7 @@ export function Crimes({ g }: { g: Game }) {
     setFeedback(null);
   };
 
-  const spawnNextPedestrian=()=>{pickpocketSequence.current+=1;setPickpocketNpc(spawnLivePickpocket(Date.now(),pickpocketSequence.current));};
+  const spawnNextPedestrian=()=>{pickpocketSequence.current+=1;setPickpocketNpc(spawnLivePickpocket(Date.now(),pickpocketSequence.current));setPickpocketApproach("blend");};
 
   useEffect(()=>{
     if(selectedId!=="pickpocket")return;
@@ -190,29 +191,38 @@ export function Crimes({ g }: { g: Game }) {
     const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);
     const tool=getCrimeTool(targetTool); const ownedTool=tool?(g.gameState.inventory[tool.id]||0):0;
     const tools=recommendedCrimeTools("pickpocket");
-    const chance=Math.max(4,Math.min(97,targetSuccessChance(pickpocketNpc.target,g.gameState.crimeSkillXp.theft??0,g.combatStats.dexterity,g.gameState.heat,false,g.gameState.streetReputation)+(ownedTool>0&&tool?(tool.modifiers.chanceModifier??0):0)));
+    const crackdown=g.gameState.activeWorldEvent==="guard-crackdown";
+    const read=evaluatePickpocketAttempt(pickpocketNpc,pickpocketApproach,now,crackdown);
+    const baseChance=targetSuccessChance(pickpocketNpc.target,g.gameState.crimeSkillXp.theft??0,g.combatStats.dexterity,g.gameState.heat,false,g.gameState.streetReputation);
+    const chance=Math.max(4,Math.min(97,baseChance+read.chanceModifier+(ownedTool>0&&tool?(tool.modifiers.chanceModifier??0):0)));
     const remaining=Math.max(0,pickpocketNpc.expiresAt-now); const progress=Math.max(0,Math.min(100,remaining/pickpocketNpc.windowMs*100));
+    const opening=getPickpocketOpening(pickpocketNpc,now);
     const revealWealth=mastery>=10, revealAwareness=mastery>=25, revealNumbers=mastery>=50, revealDanger=mastery>=75;
     return <div className="crime-detail-stack pickpocket-live-system">
-      <div className="crime-mechanic-note"><GameIcon name="character" size={16}/><div><strong>LIVE PEDESTRIAN STREAM</strong><span>No scouting and no Nerve cost for waiting. People pass through the city in real time; movement changes how long you have to decide, and the population mix changes with the actual time of day.</span></div></div>
+      <div className="crime-mechanic-note"><GameIcon name="character" size={16}/><div><strong>READ · CHOOSE · TIME IT</strong><span>Pickpocketing is a live decision crime, not scavenging. Read the passerby, choose an approach, watch for an opening, then commit or let them pass. Bad timing raises suspicion instead of simply lowering loot.</span></div></div>
+      {crackdown?<div className="pickpocket-crackdown"><GameIcon name="warning" size={14}/><div><strong>GUARD CRACKDOWN ACTIVE</strong><span>More eyes are on the street: weaker openings, higher arrest pressure and +2 extra Heat on this attempt.</span></div></div>:null}
       <div className="pedestrian-stage">
         <div className="pedestrian-stage-top"><span>LIVE STREET FEED</span><strong>{formatRiftCityTime(now)}</strong></div>
         <div className="pedestrian-lane"><div key={pickpocketNpc.id} className={`pedestrian-figure move-${pickpocketNpc.movement.toLowerCase()}`} style={{["--walk-duration" as string]:`${pickpocketNpc.windowMs}ms`}}><span className="pedestrian-avatar"><GameIcon name={pickpocketNpc.rare?"crown":"character"} size={34}/></span><span className="pedestrian-shadow"/></div></div>
+        <div className="pickpocket-opening"><div className="pickpocket-opening-label"><span>OPENING</span><strong>{read.openingLabel}</strong><b>{opening}%</b></div><div className="pickpocket-opening-track"><i style={{width:`${opening}%`}}/><span style={{left:`${opening}%`}}/></div></div>
         <div className="pedestrian-timer"><i style={{width:`${progress}%`}}/><span>{(remaining/1000).toFixed(1)}s</span></div>
       </div>
       <article className={`live-pedestrian-card ${pickpocketNpc.rare?"rare":""}`}>
         <header><div><small>{pickpocketNpc.area} · {pickpocketNpc.movement}</small><h3>{pickpocketNpc.name}</h3></div><span className="target-state">{pickpocketNpc.rare?"RARE":"PASSING"}</span></header>
         <p>{mastery>=5?pickpocketNpc.description:"You only have a moment to size them up."}</p>
+        <div className="pickpocket-clues"><small>VISIBLE CLUES</small><div>{pickpocketNpc.clues.map((clue)=><span key={clue}>{clue}</span>)}</div></div>
         <div className="pedestrian-intel-grid">
           <span><small>Wealth</small><strong>{revealWealth?pickpocketNpc.wealth:"???"}</strong></span>
           <span><small>Awareness</small><strong>{revealAwareness?pickpocketNpc.awareness:"???"}</strong></span>
-          <span><small>Success</small><strong>{revealNumbers?`${chance.toFixed(0)}%`:"???"}</strong></span>
-          <span><small>Possible cash</small><strong>{revealNumbers?`${money(pickpocketNpc.target.minReward)}–${money(pickpocketNpc.target.maxReward)}`:"???"}</strong></span>
+          <span><small>Projected chance</small><strong>{revealNumbers?`${chance.toFixed(0)}%`:read.openingLabel}</strong></span>
+          <span><small>Suspicion</small><strong className={`suspicion-${read.suspicion.toLowerCase()}`}>{read.suspicion}</strong></span>
         </div>
         {revealDanger&&pickpocketNpc.dangerNote?<div className="pedestrian-warning"><GameIcon name="warning" size={13}/>{pickpocketNpc.dangerNote}</div>:null}
+        <div className="pickpocket-approach-grid">{PICKPOCKET_APPROACHES.map((approach)=><button type="button" key={approach.id} className={pickpocketApproach===approach.id?"active":""} onClick={()=>setPickpocketApproach(approach.id)}><strong>{approach.name}</strong><small>{approach.description}</small></button>)}</div>
+        <div className="pickpocket-readout"><span><small>Current read</small><strong>{read.summary}</strong></span>{revealNumbers?<><span><small>Cash range</small><strong>{money(pickpocketNpc.target.minReward)}–{money(pickpocketNpc.target.maxReward)}</strong></span><span><small>Timing modifier</small><strong>{read.chanceModifier>=0?"+":""}{read.chanceModifier}%</strong></span></>:null}</div>
         {tools.length>0&&<div className="crime-prep-line"><label>Optional one-use prep<select value={targetTool} onChange={(e: React.ChangeEvent<HTMLSelectElement>)=>setTargetTool(e.target.value)}><option value="">No tool</option>{tools.map((entry)=><option key={entry.id} value={entry.id} disabled={(g.gameState.inventory[entry.id]||0)<=0}>{entry.name} · owned {g.gameState.inventory[entry.id]||0}</option>)}</select></label>{tool&&<small>{tool.description}</small>}</div>}
-        <div className="target-actions"><Button disabled={Boolean(feedback&&feedback.phase!=="result")} onClick={spawnNextPedestrian}>Let Them Pass</Button><Button disabled={incapacitated||g.gameState.nerve<pickpocketNpc.target.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:"pickpocket:live",crimeId:"pickpocket",subject:pickpocketNpc.name,actionLabel:"Pickpocket attempt",district:pickpocketNpc.area,label:"MAKING YOUR MOVE…"},()=>g.resolveCrimeTarget(pickpocketNpc.target,ownedTool>0?targetTool:null),spawnNextPedestrian)}>Attempt · {pickpocketNpc.target.nerve} Nerve</Button></div>
-        <small className="pedestrian-mastery-hint">Mastery reveals more: M10 wealth · M25 awareness · M50 odds/value · M75 danger intel.</small>
+        <div className="target-actions"><Button disabled={Boolean(feedback&&feedback.phase!=="result")} onClick={spawnNextPedestrian}>Abort / Let Pass</Button><Button disabled={incapacitated||g.gameState.nerve<pickpocketNpc.target.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>{const lockedRead=evaluatePickpocketAttempt(pickpocketNpc,pickpocketApproach,Date.now(),crackdown);withCrimeFeedback({key:"pickpocket:live",crimeId:"pickpocket",subject:pickpocketNpc.name,actionLabel:`${PICKPOCKET_APPROACHES.find(a=>a.id===pickpocketApproach)?.name??"Pickpocket"} attempt`,district:pickpocketNpc.area,label:"MAKING YOUR MOVE…"},()=>g.resolveCrimeTarget(pickpocketNpc.target,ownedTool>0?targetTool:null,{chanceModifier:lockedRead.chanceModifier,rewardMultiplier:lockedRead.rewardMultiplier,heatModifier:lockedRead.heatModifier,arrestModifier:lockedRead.arrestModifier,story:lockedRead.summary}),spawnNextPedestrian);}}>Commit · {pickpocketNpc.target.nerve} Nerve</Button></div>
+        <small className="pedestrian-mastery-hint">Mastery reveals more: M10 wealth · M25 awareness · M50 exact odds/value · M75 danger intel. Waiting costs no Nerve; committing does.</small>
       </article>
       {renderFeedback("pickpocket:live")}
     </div>;
