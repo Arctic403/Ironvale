@@ -17,8 +17,8 @@ import {
 import {
   CRIME_CAREERS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES, CrimeCareerDefinition,
   careerActionSuccessChance, crimeCareerMasteryLevel, crimeCareerMasteryProgress,
-  crimeCityConditions, getShopliftingConditions, masteryRank, scavengingOpportunity,
-  shopliftingSuspicion,
+  crimeCityConditions, formatRiftCityTime, getShopliftingConditions, masteryRank, scavengingOpportunity,
+  scavengingOpportunityLabel, scavengingOpportunityTrend, shopliftingSuspicion,
 } from "../systems/crimeCareerSystem";
 
 type Game = ReturnType<typeof useRiftCity>;
@@ -95,7 +95,34 @@ export function Crimes({ g }: { g: Game }) {
 
   const renderScavenging=(career:CrimeCareerDefinition)=>{
     const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);
-    return <div className="crime-detail-stack"><div className="crime-mechanic-note"><GameIcon name="clock" size={16}/><div><strong>LIVE OPPORTUNITY PULSE</strong><span>The pulse moves in real time. Stronger opportunity improves expected finds; some districts also peak at specific hours.</span></div></div><div className="scavenge-grid">{SCAVENGE_LOCATIONS.map((location)=>{const opp=scavengingOpportunity(location,now);const locked=mastery<location.masteryRequired;return <article key={location.id} className={`scavenge-card ${locked?"locked":""}`}><header><div><small>{location.district}</small><h4>{location.name}</h4></div><strong>{opp}%</strong></header><p>{location.description}</p><div className="opportunity-meter"><span style={{left:`${opp}%`}}/><i style={{width:`${opp}%`}}/></div><div className="crime-mini-metrics"><span>Mastery {location.masteryRequired}+</span><span>{location.nerve} Nerve</span><span>{money(location.minReward)}–{money(location.maxReward)}</span><span>{location.lootHint}</span></div><Button disabled={locked||incapacitated||g.gameState.nerve<location.nerve} onClick={()=>g.resolveScavenging(location.id)}>{locked?`Mastery ${location.masteryRequired} Required`:`Search at ${opp}% Opportunity`}</Button></article>;})}</div></div>;
+    const clock=formatRiftCityTime(now);
+    return <div className="crime-detail-stack">
+      <div className="crime-mechanic-note"><GameIcon name="clock" size={16}/><div><strong>REAL-TIME OPPORTUNITY</strong><span>Opportunity follows the real clock instead of bouncing randomly. Commuter, nightlife, harbor, casino and premium areas rise and fall on different daily schedules, with small weekday/weekend changes.</span></div></div>
+      <div className="crime-live-row"><span><GameIcon name="clock" size={13}/>Current city time <b>{clock}</b></span><span>Scavenging Mastery <b>{mastery}/100</b></span></div>
+      <div className="scavenge-grid">
+        {SCAVENGE_LOCATIONS.map((location)=>{
+          const opp=scavengingOpportunity(location,now);
+          const trend=scavengingOpportunityTrend(location,now);
+          const opportunityLabel=scavengingOpportunityLabel(opp);
+          const masteryLocked=mastery<location.masteryRequired;
+          const missingItems=(location.requiredItems??[]).filter((id)=>(g.gameState.inventory[id]||0)<=0);
+          const itemLocked=missingItems.length>0;
+          const locked=masteryLocked||itemLocked;
+          const accessLabel=location.requiredItems?.length
+            ? `Requires ${location.requiredItems.map((id)=>getItem(id)?.name??id).join(" + ")}`
+            : location.masteryRequired>1 ? `Mastery ${location.masteryRequired}` : "Open";
+          return <article key={location.id} className={`scavenge-card ${locked?"locked":""}`}>
+            <header><div><small>{location.district}</small><h4>{location.name}</h4></div><div className="scavenge-opportunity-readout"><strong>{opp}%</strong><small>{opportunityLabel} · {trend}</small></div></header>
+            <p>{location.description}</p>
+            <div className="opportunity-meter" aria-label={`${location.name} opportunity ${opp}%`}><span style={{left:`${opp}%`}}/><i style={{width:`${opp}%`}}/></div>
+            <div className="scavenge-schedule-line"><span>Best window <b>{location.peakLabel}</b></span><span>Access <b>{accessLabel}</b></span></div>
+            <div className="crime-mini-metrics"><span>{location.nerve} Nerve</span><span>{money(location.minReward)}–{money(location.maxReward)}</span><span>{location.lootHint}</span></div>
+            {renderRequirement(location.requiredItems)}
+            <Button disabled={locked||incapacitated||g.gameState.nerve<location.nerve} onClick={()=>g.resolveScavenging(location.id)}>{masteryLocked?`Mastery ${location.masteryRequired} Required`:itemLocked?`Need ${missingItems.map((id)=>getItem(id)?.name??id).join(" + ")}`:`Search · ${opportunityLabel}`}</Button>
+          </article>;
+        })}
+      </div>
+    </div>;
   };
 
   const renderShoplifting=()=>{

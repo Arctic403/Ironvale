@@ -633,6 +633,8 @@ export function useRiftCity() {
       const masteryXp = prev.crimeMastery.scavenging ?? 0;
       const mastery = crimeCareerMasteryLevel(masteryXp);
       if (mastery < location.masteryRequired) return appendActivity(prev, `Requires Scavenging Mastery ${location.masteryRequired}.`, "failure");
+      const missingAccessItems = (location.requiredItems ?? []).filter((id) => (prev.inventory[id] || 0) <= 0);
+      if (missingAccessItems.length) return appendActivity(prev, `Scavenging access locked: ${missingAccessItems.map((id) => getItem(id)?.name ?? id).join(", ")} required.`, "failure");
       if (prev.nerve < location.nerve) return appendActivity(prev, `You need ${location.nerve} Nerve.`, "failure");
       const opportunity = scavengingOpportunity(location, Date.now());
       const theftLevel = crimeFamilyLevel(prev.crimeSkillXp.theft ?? 0);
@@ -651,13 +653,18 @@ export function useRiftCity() {
         return appendActivity(next, `SCAVENGING: ${location.name} came up empty. Opportunity was ${opportunity}%.`, "spooked");
       }
       const reward = Math.round(randomCrimeReward(location.minReward, location.maxReward) * (0.65 + opportunity / 125));
-      const lootPool = ["black-envelope","old-city-token","encrypted-chip","sugar-rush","moon-chews"];
+      const lootPool = location.lootIds?.length ? location.lootIds : ["black-envelope","old-city-token","encrypted-chip","sugar-rush","moon-chews"];
       let foundName = "";
       let inventory = prev.inventory;
-      if (Math.random() < Math.min(0.42, 0.08 + opportunity / 260)) {
-        const id = lootPool[Math.floor(Math.random() * lootPool.length)];
-        const found = getItem(id);
-        if (found) { inventory = { ...inventory, [id]:(inventory[id] || 0) + 1 }; foundName = found.name; }
+      if (Math.random() < Math.min(0.62, 0.08 + opportunity / 260 + (location.lootChanceBonus ?? 0))) {
+        const weighted = lootPool
+          .map((id) => getItem(id))
+          .filter((item): item is NonNullable<typeof item> => Boolean(item))
+          .map((item) => ({ item, weight: Math.max(0.002, item.dropChance ?? 0.04) }));
+        const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+        let roll = Math.random() * Math.max(0.001, totalWeight);
+        const selected = weighted.find((entry) => ((roll -= entry.weight) <= 0))?.item ?? weighted[weighted.length - 1]?.item;
+        if (selected) { inventory = { ...inventory, [selected.id]:(inventory[selected.id] || 0) + 1 }; foundName = selected.name; }
       }
       next = {
         ...next,

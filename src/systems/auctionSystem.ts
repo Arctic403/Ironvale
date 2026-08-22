@@ -9,7 +9,7 @@ export const SEEDED_LISTINGS: AuctionListing[] = [
 ];
 
 const NPC_NAMES=["Ghostline","MaraV","NoSignal","ByteRunner","DockRat","Northside","NightShift","ColdWire","Rook","Redline","ZeroDay","Static","HarborKing","Minty","SouthBlock","Drift","Kite","Cipher","Brick","Nova","WestEnd","Ash","Dealer42","GlassFox"];
-const TRADEABLE_IDS=["weed","speed","ecstasy","xanax","cocaine","meth","heroin","lsd","ketamine","neon-dust","rift-tabs","black-envelope","encrypted-chip","thin-gloves","burner-phone","disguise-kit","lock-bypass","signal-jammer","forged-badge","escape-route","inside-tip","plant-material","chemical-pack-a","chemical-pack-b","tablet-base","lab-catalyst","packaging-kit"];
+const TRADEABLE_IDS=["weed","speed","ecstasy","xanax","cocaine","meth","heroin","lsd","ketamine","neon-dust","rift-tabs","black-envelope","encrypted-chip","thin-gloves","burner-phone","disguise-kit","lock-bypass","signal-jammer","forged-badge","escape-route","inside-tip","bolt-cutters","nightclub-ticket","plant-material","chemical-pack-a","chemical-pack-b","tablet-base","lab-catalyst","packaging-kit"];
 
 function seeded01(n:number){
   const x=Math.sin(n*999.91+78.233)*43758.5453;

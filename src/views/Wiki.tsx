@@ -5,7 +5,7 @@ import { money, formatTime } from "../core/gameCore";
 import { CRIMES } from "../systems/crimeSystem";
 import { CRIME_TOOLS } from "../systems/crimeTools";
 import { CRIME_FAMILY_LABELS, CRIME_OPERATIONS, GRAFFITI_SPOTS } from "../systems/crimeActivities";
-import { CRIME_CAREERS, SHOPLIFT_STORES } from "../systems/crimeCareerSystem";
+import { CRIME_CAREERS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES } from "../systems/crimeCareerSystem";
 import { DEFAULT_WEAPONS, WEAPON_SKILL_LABELS } from "../systems/combat/combatWeapons";
 import { TRAINING_PROGRAMS } from "../systems/gymSystem";
 import { JOBS } from "../data/jobs";
@@ -138,7 +138,8 @@ export function Wiki({ g }: { g: RiftCityGame }) {
       keywords: "pickpocket scout burglary vehicle theft passive operations card skimming email fraud graffiti street reputation skill family",
       summary: "Rotating targets, passive criminal income, separate skill families and the Street Reputation graffiti ladder.",
       content: <>
-        <p><b>Scavenging:</b> Locations have a live Opportunity Pulse. Searching at a strong moment improves expected finds, and some districts peak during specific real-world clock hours.</p>
+        <p><b>Scavenging:</b> Opportunity now follows the real clock instead of random bouncing. Transit rises during commuter rushes, nightlife rises after dark, Harbor is strongest overnight, Casino is strongest in the evening, and premium locations have their own daily patterns. The first two locations are open, Abandoned Rail Yard and Nightclub Strip are hard item-gated, then Mastery 50 / 75 / 100 unlocks the late-game routes.</p>
+        <WikiTable headers={["Scavenging location", "Access", "Best window", "Loot identity"]} rows={SCAVENGE_LOCATIONS.map((location) => [location.name, location.requiredItems?.length ? location.requiredItems.map((id) => ITEMS.find((item) => item.id === id)?.name ?? id).join(" + ") : location.masteryRequired > 1 ? `Mastery ${location.masteryRequired}` : "Open", location.peakLabel, location.lootHint])} />
         <p><b>Pickpocketing / Burglary / Vehicle Theft:</b> Rotating target boards support scouting. Scouting costs 1 Nerve, reveals clearer risk/payout information and grants a success bonus.</p>
         <p><b>Shoplifting:</b> Stores rotate through crowd, camera-security and staffing conditions. You build a merchandise basket and choose when to leave; higher Severity raises suspicion, and some premium items require two preparation items.</p>
         <p><b>Operations:</b> Fraud, forgery, chop-shop, deliveries, smuggling and similar activities run on timers while you play elsewhere. They are intentionally abstract game systems and do not model real-world criminal procedures.</p>
