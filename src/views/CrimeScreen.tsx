@@ -58,7 +58,7 @@ export function Crimes({ g }: { g: Game }) {
   const listScrollRef=useRef(0);
   const incapacitated=Boolean(g.gameState.jailUntil||g.gameState.hospitalUntil);
 
-  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),250);return()=>window.clearInterval(timer);},[]);
+  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
 
   const makeFeedbackSnapshot=(crimeId:string):CrimeFeedbackSnapshot=>({
     cash:g.gameState.cash,nerve:g.gameState.nerve,heat:g.gameState.heat,xp:g.gameState.xp,crimeExperience:g.gameState.crimeExperience,

@@ -148,7 +148,7 @@ function pickpocketClues(template:PedestrianTemplate){
 
 export function getPickpocketOpening(npc:LivePickpocketNpc, now=Date.now()){
   const elapsed=Math.max(0,now-npc.spawnedAt);
-  const cycle=2350;
+  const cycle=8000;
   const phase=(elapsed%cycle)/cycle;
   const wave=(Math.sin(phase*Math.PI*2-Math.PI/2)+1)/2;
   const movementPenalty=npc.movement==="CYCLING"?13:npc.movement==="JOGGING"?9:npc.movement==="RUSHING"?5:0;
