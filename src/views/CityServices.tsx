@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { useRiftCity } from "../hooks/useRiftCity";
 import { Button, Panel } from "../components/ui";
-import { GameIcon, iconFromLegacy, type GameIconName } from "../components/GameIcon";
+import { GameIcon, type GameIconName } from "../components/GameIcon";
+import { ItemImage } from "../components/ItemImage";
 import { ITEMS } from "../data/gameData";
 import { formatTime, money, timeLeft } from "../core/gameCore";
 import { BANK_INVESTMENT_TIERS, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE, checkingProtectedCap, savingsProtectedCap } from "../data/banking";
@@ -11,26 +12,6 @@ import { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, PRODUCTION_SUPPLIES, canFaci
 import { OFFSHORE_TIERS, getOffshoreTier } from "../data/wealthRisk";
 
 type Game = ReturnType<typeof useRiftCity>;
-
-function serviceItemIcon(item: (typeof ITEMS)[number]): GameIconName {
-  if (item.id === "knife" || item.id === "machete" || item.id === "syndicate-blade") return "blade";
-  if (item.id === "bat" || item.id === "crowbar") return "blunt";
-  if (item.id === "pistol" || item.id === "heavy-pistol") return "handgun";
-  if (item.id === "machine-pistol" || item.id === "smg") return "smg";
-  if (item.id === "shotgun") return "shotgun";
-  if (item.id === "carbine" || item.id === "rifle") return "rifle";
-  if (item.type === "armor") return "armor";
-  if (item.type === "medical") return "medkit";
-  if (item.type === "energy") return "drink";
-  if (item.type === "nerve") return "focus";
-  if (item.crimeTool) return item.id.includes("phone") ? "phone" : item.id.includes("disguise") ? "disguise" : item.id.includes("glove") ? "gloves" : item.id.includes("badge") ? "badge" : item.id.includes("route") ? "route" : "tools";
-  if (item.productionSupply) return item.id.includes("plant") ? "plant" : item.id.includes("packaging") ? "package" : "chemical";
-  if (item.id.includes("chip")) return "chip";
-  if (item.id.includes("key")) return "key";
-  if (item.id.includes("envelope")) return "envelope";
-  if (item.contraband) return "contraband";
-  return "package";
-}
 
 function useNow() {
   const [now, setNow] = useState(Date.now());
@@ -173,7 +154,7 @@ export function Police({ g }: { g: Game }) {
 
 function ItemShop({ g, ids, title, icon }: { g: Game; ids: string[]; title: string; icon: GameIconName }) {
   const items = useMemo(() => ITEMS.filter((item) => ids.includes(item.id)), [ids]);
-  return <div className="city-service-page"><Panel title={title}><div className="service-hero"><span className="service-vector-icon"><GameIcon name={icon} size={28} /></span><div><h2>{title}</h2><p>Cash: {money(g.gameState.cash)}</p></div></div><div className="service-item-grid">{items.map((item) => <div className="service-item" key={item.id}><span className="service-item-icon"><GameIcon name={serviceItemIcon(item)} size={24} /></span><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><Button disabled={g.gameState.cash < item.price} onClick={() => g.buyItem(item.id)}>Buy</Button></div></div>)}</div><BackToCity g={g} /></Panel></div>;
+  return <div className="city-service-page"><Panel title={title}><div className="service-hero"><span className="service-vector-icon"><GameIcon name={icon} size={28} /></span><div><h2>{title}</h2><p>Cash: {money(g.gameState.cash)}</p></div></div><div className="service-item-grid">{items.map((item) => <div className="service-item has-item-art" key={item.id}><ItemImage itemId={item.id} size={62} /><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><Button disabled={g.gameState.cash < item.price} onClick={() => g.buyItem(item.id)}>Buy</Button></div></div>)}</div><BackToCity g={g} /></Panel></div>;
 }
 
 export function Pharmacy({ g }: { g: Game }) { return <ItemShop g={g} ids={["medkit", "energy-drink", "nerve-tonic"]} title="RiftCare Pharmacy" icon="pharmacy" />; }
@@ -243,8 +224,8 @@ export function BlackMarket({ g }: { g: Game }) {
             const total = listing.price * listing.quantity;
             return (
               <article className="auction-listing" key={listing.id}>
-                <div className="auction-item-copy">
-                  <span className="auction-item-icon"><GameIcon name={serviceItemIcon(item)} size={28} /></span>
+                <div className="auction-item-copy with-art">
+                  <ItemImage itemId={item.id} size={68} />
                   <span className={`rarity-pill ${(item.rarity || "Common").toLowerCase()}`}>{item.rarity || "Common"}</span>
                   <h3>{item.name}</h3><p>{item.description}</p>
                   <small>Seller: <b>{listing.seller}</b> · Qty {listing.quantity}{item.contraband ? " · CONTRABAND" : ""}</small>
@@ -267,6 +248,7 @@ export function BlackMarket({ g }: { g: Game }) {
           <label><span>Quantity</span><input type="number" min="1" max={Math.max(1,sellOwned)} value={sellQuantity} onChange={(e)=>setSellQuantity(e.target.value)} /></label>
           <div className="beta-sell-payout"><span>Instant payout</span><strong>{sellItemId ? money(sellTotal) : "—"}</strong><small>{sellItemId ? `${money(sellUnitPrice)} each` : "Select an item"}</small></div>
         </div>
+        {sellItemId&&<div className="beta-sell-selected-art"><ItemImage itemId={sellItemId} size={58}/><div><b>{ITEMS.find((item)=>item.id===sellItemId)?.name??sellItemId}</b><small>Custom RiftCity item art · {sellOwned} owned</small></div></div>}
         <div className="data-list">
           <div className="data-row"><span>Owned</span><b>{sellOwned}</b></div>
           <div className="data-row"><span>Normal sell value</span><b>{sellItemId ? money(sellReference) : "—"}</b></div>
@@ -279,20 +261,20 @@ export function BlackMarket({ g }: { g: Game }) {
       <Panel title="Crime Tools · One Attempt Each">
         <p>Optional consumables improve selected crime odds, rewards, escape chance, or Heat. Each tool is consumed when the crime attempt begins.</p>
         <div className="service-item-grid">
-          {CRIME_TOOLS.map(tool=><div className="service-item" key={tool.id}><div><b className="row-icon-label"><GameIcon name={iconFromLegacy(tool.icon, "tools")} size={16} /> {tool.name}</b><small>{tool.description}</small><small>Recommended: {tool.recommendedFor.map(x=>x.replace(/-/g," ")).join(", ")}</small></div><div><b>{money(tool.price)}</b><small>Owned {g.gameState.inventory[tool.id]||0}</small><Button disabled={g.gameState.cash<tool.price} onClick={()=>g.buyBlackMarketItem(tool.id)}>Buy</Button></div></div>)}
+          {CRIME_TOOLS.map(tool=><div className="service-item has-item-art" key={tool.id}><ItemImage itemId={tool.id} size={58} /><div><b>{tool.name}</b><small>{tool.description}</small><small>Recommended: {tool.recommendedFor.map(x=>x.replace(/-/g," ")).join(", ")}</small></div><div><b>{money(tool.price)}</b><small>Owned {g.gameState.inventory[tool.id]||0}</small><Button disabled={g.gameState.cash<tool.price} onClick={()=>g.buyBlackMarketItem(tool.id)}>Buy</Button></div></div>)}
         </div>
       </Panel>
 
       <Panel title="Crime Career Prep · Required Gear">
         <p>Required gear unlocks advanced crime actions. Some higher-severity targets need two different prep items. These are fictional game tools and are consumed when the activity uses them.</p>
         <div className="service-item-grid">
-          {careerPrepItems.map((item)=><div className="service-item" key={item.id}><span className="service-item-icon"><GameIcon name={serviceItemIcon(item)} size={23} /></span><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><small>Owned {g.gameState.inventory[item.id]||0}</small><Button disabled={g.gameState.cash<item.price} onClick={()=>g.buyBlackMarketItem(item.id)}>Buy</Button></div></div>)}
+          {careerPrepItems.map((item)=><div className="service-item has-item-art" key={item.id}><ItemImage itemId={item.id} size={58} /><div><b>{item.name}</b><small>{item.description}</small></div><div><b>{money(item.price)}</b><small>Owned {g.gameState.inventory[item.id]||0}</small><Button disabled={g.gameState.cash<item.price} onClick={()=>g.buyBlackMarketItem(item.id)}>Buy</Button></div></div>)}
         </div>
       </Panel>
 
       <Panel title="Production Supplies · BETA">
         <p>These are fictional abstract game resources, not real-world manufacturing ingredients.</p>
-        <div className="service-item-grid">{PRODUCTION_SUPPLIES.map(supply=><div className="service-item" key={supply.id}><span className="service-item-icon"><GameIcon name={serviceItemIcon(ITEMS.find(i=>i.id===supply.id)!)} size={23} /></span><div><b>{supply.name}</b><small>{supply.description}</small></div><div><b>{money(supply.price)}</b><small>Owned {g.gameState.inventory[supply.id]||0}</small><Button disabled={g.gameState.cash<supply.price} onClick={()=>g.buyBlackMarketItem(supply.id)}>Buy</Button></div></div>)}</div>
+        <div className="service-item-grid">{PRODUCTION_SUPPLIES.map(supply=><div className="service-item has-item-art" key={supply.id}><ItemImage itemId={supply.id} size={58} /><div><b>{supply.name}</b><small>{supply.description}</small></div><div><b>{money(supply.price)}</b><small>Owned {g.gameState.inventory[supply.id]||0}</small><Button disabled={g.gameState.cash<supply.price} onClick={()=>g.buyBlackMarketItem(supply.id)}>Buy</Button></div></div>)}</div>
       </Panel>
 
       <Panel title="Contraband Production · BETA TEST BALANCE">
@@ -302,7 +284,7 @@ export function BlackMarket({ g }: { g: Game }) {
         </div>
 
         <div className="production-recipes">
-          {PRODUCTION_RECIPES.map(r=>{const product=ITEMS.find(i=>i.id===r.productId);const capable=canFacilityRun(g.gameState.productionFacilities,r.facilityId);const unlocked=g.gameState.crimeExperience>=r.requiredCrimeExperience;const hasInputs=Object.entries(r.inputs).every(([id,n])=>(g.gameState.inventory[id]||0)>=n);return <article className="production-card recipe" key={r.id}><div><h3>{r.name}</h3><p>{r.description}</p><small>{Object.entries(r.inputs).map(([id,n])=>`${n}× ${ITEMS.find(i=>i.id===id)?.name??id}`).join(" · ")}</small><small>Output {r.output}× {product?.name} · {Math.round(r.durationMs/1000)}s · +{r.heat} base Heat · +{r.attention} Attention</small></div><Button disabled={!capable||!unlocked||!hasInputs} onClick={()=>g.startProduction(r.id)}>{!unlocked?`Needs CE ${r.requiredCrimeExperience}`:!capable?"Need Better Setup":!hasInputs?"Missing Supplies":"Start Batch"}</Button></article>})}
+          {PRODUCTION_RECIPES.map(r=>{const product=ITEMS.find(i=>i.id===r.productId);const capable=canFacilityRun(g.gameState.productionFacilities,r.facilityId);const unlocked=g.gameState.crimeExperience>=r.requiredCrimeExperience;const hasInputs=Object.entries(r.inputs).every(([id,n])=>(g.gameState.inventory[id]||0)>=n);return <article className="production-card recipe" key={r.id}><div className="production-recipe-art">{Object.keys(r.inputs).slice(0,3).map((id)=><ItemImage key={id} itemId={id} size={42}/>) }<span className="recipe-arrow">→</span>{product?<ItemImage itemId={product.id} size={52}/>:null}</div><div><h3>{r.name}</h3><p>{r.description}</p><small>{Object.entries(r.inputs).map(([id,n])=>`${n}× ${ITEMS.find(i=>i.id===id)?.name??id}`).join(" · ")}</small><small>Output {r.output}× {product?.name} · {Math.round(r.durationMs/1000)}s · +{r.heat} base Heat · +{r.attention} Attention</small></div><Button disabled={!capable||!unlocked||!hasInputs} onClick={()=>g.startProduction(r.id)}>{!unlocked?`Needs CE ${r.requiredCrimeExperience}`:!capable?"Need Better Setup":!hasInputs?"Missing Supplies":"Start Batch"}</Button></article>})}
         </div>
 
         {g.gameState.activeProductions.length>0&&<div className="active-production-list"><h3>Active / Finished Batches</h3>{g.gameState.activeProductions.map(job=>{const recipe=PRODUCTION_RECIPES.find(r=>r.id===job.recipeId);const done=job.finishesAt<=now;return <div className="data-row" key={job.id}><span>{recipe?.name??job.recipeId}</span><b>{done?"Ready":formatTime(Math.ceil((job.finishesAt-now)/1000))}</b><Button disabled={!done} onClick={()=>g.claimProduction(job.id)}>{done?"Collect":"Cooking"}</Button></div>})}</div>}

@@ -3,6 +3,7 @@ import type { useRiftCity } from "../hooks/useRiftCity";
 import type { Activity } from "../types/riftCity";
 import { Button } from "../components/ui";
 import { GameIcon } from "../components/GameIcon";
+import { ItemImage } from "../components/ItemImage";
 import { formatTime, money } from "../core/gameCore";
 import { getItem } from "../data/items";
 import {
@@ -29,7 +30,7 @@ import { buildCrimeDialogue, type CrimeDialogue } from "../systems/crimeDialogue
 type Game = ReturnType<typeof useRiftCity>;
 type ActiveRun={crime:Crime;choiceId:string;toolId:string|null;events:ReturnType<typeof generateCrimeEvents>;stage:number;mods:CrimeRunModifiers};
 type CrimeFeedbackSnapshot={cash:number;nerve:number;heat:number;xp:number;crimeExperience:number;streetReputation:number;health:number;jailUntil:number|null;inventory:Record<string,number>;masteryXp:number};
-type CrimeFeedbackDelta={label:string;value:string;tone:"good"|"bad"|"neutral"};
+type CrimeFeedbackDelta={label:string;value:string;tone:"good"|"bad"|"neutral";itemId?:string};
 type CrimeFeedback={
   key:string;crimeId:string;subject:string;actionLabel:string;district?:string;
   phase:"loading"|"awaiting"|"result";label:string;baseline:number|null;snapshot:CrimeFeedbackSnapshot;
@@ -67,7 +68,7 @@ export function Crimes({ g }: { g: Game }) {
   const buildFeedbackDeltas=(before:CrimeFeedbackSnapshot,crimeId:string):CrimeFeedbackDelta[]=>{
     const out:CrimeFeedbackDelta[]=[];
     const signed=(value:number)=>`${value>0?"+":""}${value}`;
-    const add=(label:string,value:string,tone:CrimeFeedbackDelta["tone"])=>out.push({label,value,tone});
+    const add=(label:string,value:string,tone:CrimeFeedbackDelta["tone"],itemId?:string)=>out.push({label,value,tone,itemId});
     const cash=g.gameState.cash-before.cash;if(cash)add("Cash",`${cash>0?"+":"-"}${money(Math.abs(cash))}`,cash>0?"good":"bad");
     const nerve=g.gameState.nerve-before.nerve;if(nerve)add("Nerve",signed(nerve),nerve>0?"good":"neutral");
     const heat=g.gameState.heat-before.heat;if(heat)add("Heat",signed(heat),heat<=0?"good":"bad");
@@ -77,7 +78,7 @@ export function Crimes({ g }: { g: Game }) {
     const health=g.gameState.health-before.health;if(health)add("Health",signed(health),health>0?"good":"bad");
     const mastery=(g.gameState.crimeMastery[crimeId]??0)-before.masteryXp;if(mastery)add("Mastery XP",signed(mastery),"good");
     const itemIds=new Set([...Object.keys(before.inventory),...Object.keys(g.gameState.inventory)]);
-    for(const id of itemIds){const diff=(g.gameState.inventory[id]||0)-(before.inventory[id]||0);if(!diff)continue;const item=getItem(id);add(item?.name??id,signed(diff),diff>0?"good":"neutral");if(out.length>=10)break;}
+    for(const id of itemIds){const diff=(g.gameState.inventory[id]||0)-(before.inventory[id]||0);if(!diff)continue;const item=getItem(id);add(item?.name??id,signed(diff),diff>0?"good":"neutral",id);if(out.length>=10)break;}
     if(g.gameState.jailUntil&&(!before.jailUntil||g.gameState.jailUntil>before.jailUntil))add("Status","JAILED","bad");
     return out;
   };
@@ -143,7 +144,7 @@ export function Crimes({ g }: { g: Game }) {
       {feedback.phase!=="result"?<div className="crime-result-loading"><span className="crime-feedback-spinner"><i/><i/><i/></span><div><small>LIVE ACTION</small><strong>{feedback.label}</strong><p>The result is resolving in the city simulation…</p></div></div>:<>
         <header className="crime-result-dialog-head"><span className="crime-feedback-result-icon"><GameIcon name={tone==="jailed"||tone==="failure"||tone==="spooked"?"warning":tone==="critical"?"crown":"awards"} size={20}/></span><div><small>{feedback.dialogue?.kicker??"The moment resolves."}</small><strong>{activity?feedbackTitle(activity,feedback):"RESULT"}</strong><span>{feedback.subject}</span></div></header>
         {feedback.dialogue?<div className="crime-result-story"><h4>{feedback.dialogue.headline}</h4><p>{feedback.dialogue.body}</p></div>:null}
-        {feedback.deltas?.length?<div className="crime-result-ledger">{feedback.deltas.map((delta:CrimeFeedbackDelta,index:number)=><span key={`${delta.label}-${index}`} className={delta.tone}><small>{delta.label}</small><strong>{delta.value}</strong></span>)}</div>:null}
+        {feedback.deltas?.length?<div className="crime-result-ledger">{feedback.deltas.map((delta:CrimeFeedbackDelta,index:number)=><span key={`${delta.label}-${index}`} className={`${delta.tone} ${delta.itemId?"with-item-art":""}`}>{delta.itemId?<ItemImage itemId={delta.itemId} size={34}/>:null}<small>{delta.label}</small><strong>{delta.value}</strong></span>)}</div>:null}
         {activity?<div className="crime-result-logline"><small>RESULT DETAILS</small><p>{activity.text}</p></div>:null}
       </>}
     </section>;
@@ -182,7 +183,7 @@ export function Crimes({ g }: { g: Game }) {
 
   const renderRequirement=(ids:string[]|undefined)=>{
     if(!ids?.length)return null;
-    return <div className="crime-required-items">{ids.map((id)=>{const item=getItem(id);const owned=g.gameState.inventory[id]||0;return <span key={id} className={owned>0?"owned":"missing"}><GameIcon name={owned>0?"tools":"lock"} size={12}/>{item?.name??id} · {owned}</span>;})}</div>;
+    return <div className="crime-required-items">{ids.map((id)=>{const item=getItem(id);const owned=g.gameState.inventory[id]||0;return <span key={id} className={owned>0?"owned":"missing"}><ItemImage itemId={id} size={28}/><span>{item?.name??id} · {owned}</span>{owned<=0?<GameIcon name="lock" size={11}/>:null}</span>;})}</div>;
   };
 
   const renderPickpocket=(career:CrimeCareerDefinition)=>{

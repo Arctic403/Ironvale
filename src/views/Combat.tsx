@@ -16,7 +16,8 @@ import {
   calculateHitChance,
   WEAPON_SKILL_LABELS,
 } from "../systems/combatSystem";
-import { GameIcon, iconFromLegacy } from "../components/GameIcon";
+import { GameIcon } from "../components/GameIcon";
+import { ItemImage } from "../components/ItemImage";
 
 type FinishOutcome =
   | "leave"
@@ -31,6 +32,11 @@ type ImpactState = {
   kind: ImpactKind;
   damage: number;
 } | null;
+
+function CombatWeaponArt({ weapon, size }: { weapon: WeaponOption; size: number }) {
+  if (weapon.id === "unarmed") return <GameIcon name="combat" size={Math.max(13, Math.round(size * .65))} />;
+  return <ItemImage itemId={weapon.id} size={size} bare fallback="weapon" />;
+}
 
 interface InteractiveCombatViewProps {
   player: DynamicFighter;
@@ -143,7 +149,7 @@ function CombatHud({
         </span>
 
         <span className="combat-stage-weapon-name row-icon-label">
-          <GameIcon name={iconFromLegacy(weapon.icon, weapon.weaponClass === "blade" ? "blade" : weapon.weaponClass === "blunt" ? "blunt" : weapon.weaponClass === "handgun" ? "handgun" : weapon.weaponClass === "smg" ? "smg" : weapon.weaponClass === "shotgun" ? "shotgun" : weapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={13} /> {weapon.name}
+          <CombatWeaponArt weapon={weapon} size={13} /> {weapon.name}
         </span>
       </div>
 
@@ -211,7 +217,7 @@ function CombatCharacter({
         <div className="combat-rig-arm combat-rig-arm-back" />
         <div className="combat-rig-arm combat-rig-arm-front">
           <span className="combat-rig-weapon">
-            <GameIcon name={iconFromLegacy(weapon.icon, weapon.weaponClass === "blade" ? "blade" : weapon.weaponClass === "blunt" ? "blunt" : weapon.weaponClass === "handgun" ? "handgun" : weapon.weaponClass === "smg" ? "smg" : weapon.weaponClass === "shotgun" ? "shotgun" : weapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={31} />
+            <CombatWeaponArt weapon={weapon} size={31} />
           </span>
 
           {firearm && (
@@ -867,7 +873,7 @@ export function InteractiveCombatView({
                         }
                       >
                         <span className="combat-attack-icon">
-                          <GameIcon name={iconFromLegacy(weapon.icon, weapon.weaponClass === "blade" ? "blade" : weapon.weaponClass === "blunt" ? "blunt" : weapon.weaponClass === "handgun" ? "handgun" : weapon.weaponClass === "smg" ? "smg" : weapon.weaponClass === "shotgun" ? "shotgun" : weapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={22} />
+                          <CombatWeaponArt weapon={weapon} size={22} />
                         </span>
 
                         <span className="combat-attack-info">
@@ -888,7 +894,7 @@ export function InteractiveCombatView({
                 <div className="combat-equipped">
                   <span>Currently equipped</span>
                   <strong className="row-icon-label">
-                    <GameIcon name={iconFromLegacy(equippedWeapon.icon, equippedWeapon.weaponClass === "blade" ? "blade" : equippedWeapon.weaponClass === "blunt" ? "blunt" : equippedWeapon.weaponClass === "handgun" ? "handgun" : equippedWeapon.weaponClass === "smg" ? "smg" : equippedWeapon.weaponClass === "shotgun" ? "shotgun" : equippedWeapon.weaponClass === "rifle" ? "rifle" : "weapon")} size={15} /> {equippedWeapon.name}
+                    <CombatWeaponArt weapon={equippedWeapon} size={15} /> {equippedWeapon.name}
                   </strong>
                 </div>
               </div>

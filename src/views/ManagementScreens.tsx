@@ -3,6 +3,7 @@ import type { useRiftCity } from "../hooks/useRiftCity";
 
 import { Panel, Button } from "../components/ui";
 import { GameIcon, type GameIconName } from "../components/GameIcon";
+import { ItemImage } from "../components/ItemImage";
 
 import {
   EDUCATION,
@@ -18,38 +19,6 @@ import { DAILY_CHALLENGES, WEEKLY_CHALLENGES, MERIT_UPGRADES, PROPERTY_UPGRADES,
 import { rentalGrossPerHour, rentalUpkeepPerHour } from "../data/wealthRisk";
 
 type Game = ReturnType<typeof useRiftCity>;
-
-function itemVisualIcon(item: (typeof ITEMS)[number]): GameIconName {
-  if (item.id === "knife" || item.id === "machete" || item.id === "syndicate-blade") return "blade";
-  if (item.id === "bat" || item.id === "crowbar") return "blunt";
-  if (item.id === "pistol" || item.id === "heavy-pistol") return "handgun";
-  if (item.id === "machine-pistol" || item.id === "smg") return "smg";
-  if (item.id === "shotgun") return "shotgun";
-  if (item.id === "carbine" || item.id === "rifle") return "rifle";
-  if (item.type === "armor") return "armor";
-  if (item.type === "medical") return "medkit";
-  if (item.type === "energy") return "drink";
-  if (item.type === "nerve") return "focus";
-  if (item.crimeTool) {
-    if (item.id.includes("glove")) return "gloves";
-    if (item.id.includes("phone")) return "phone";
-    if (item.id.includes("disguise")) return "disguise";
-    if (item.id.includes("badge")) return "badge";
-    if (item.id.includes("route")) return "route";
-    return "tools";
-  }
-  if (item.productionSupply) {
-    if (item.id.includes("plant")) return "plant";
-    if (item.id.includes("packaging")) return "package";
-    return "chemical";
-  }
-  if (item.id.includes("chip")) return "chip";
-  if (item.id.includes("key")) return "key";
-  if (item.id.includes("envelope")) return "envelope";
-  if (item.id.includes("candy") || item.id.includes("chew") || item.id.includes("pops")) return "candy";
-  if (item.contraband) return "contraband";
-  return "package";
-}
 
 /* =========================================================
    CHARACTER
@@ -235,7 +204,7 @@ export function Inventory({ g }: { g: Game }) {
     const equippable=item.type==="weapon"||item.type==="armor";
     const equipped=item.type==="weapon"?g.gameState.equippedWeapon===item.id:item.type==="armor"?g.gameState.equippedArmor===item.id:false;
     return <div className="card item-card" key={item.id}>
-      <div className="item-visual" aria-hidden="true"><GameIcon name={itemVisualIcon(item)} size={32} /></div>
+      <div className="item-visual"><ItemImage itemId={item.id} size={92} /></div>
       <span className="card-tag">{item.rarity ?? "Common"} · {item.type.toUpperCase()}</span>
       <h3>{item.name}</h3><p>{item.description}</p>
       <div className="data-list"><div className="data-row"><span>Owned</span><b>{owned}</b></div>
@@ -302,7 +271,7 @@ export function Shops({ g }: { g: Game }) {
 
                   return (
                     <div className="card item-card" key={item.id}>
-                      <div className="item-visual" aria-hidden="true"><GameIcon name={itemVisualIcon(item)} size={32} /></div>
+                      <div className="item-visual"><ItemImage itemId={item.id} size={92} /></div>
                       <span className="card-tag">{shop.tag}</span>
 
                       <h3>{item.name}</h3>
