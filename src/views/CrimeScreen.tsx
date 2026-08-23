@@ -23,7 +23,7 @@ import {
   scavengingOpportunityLabel, scavengingOpportunityTrend, scavengingOutcomeRates, shopliftingSuspicion,
 } from "../systems/crimeCareerSystem";
 import {
-  CRIME_SIGNATURES, PICKPOCKET_APPROACHES, evaluatePickpocketAttempt, getCrimeContextPulse, getPickpocketOpening, spawnLivePickpocket, type LivePickpocketNpc, type PickpocketApproachId,
+  CRIME_SIGNATURES, getCrimeContextPulse, spawnLivePickpocket, type LivePickpocketNpc,
 } from "../systems/crimeV5";
 import { buildCrimeDialogue, type CrimeDialogue } from "../systems/crimeDialogue";
 
@@ -51,9 +51,16 @@ export function Crimes({ g }: { g: Game }) {
   const [majorTools,setMajorTools]=useState<Record<string,string>>({});
   const [run,setRun]=useState<ActiveRun|null>(null);
   const [feedback,setFeedback]=useState<CrimeFeedback|null>(null);
-  const [pickpocketNpc,setPickpocketNpc]=useState<LivePickpocketNpc>(()=>spawnLivePickpocket(Date.now(),0));
-  const [pickpocketApproach,setPickpocketApproach]=useState<PickpocketApproachId>("blend");
-  const pickpocketSequence=useRef(0);
+  const [pickpocketTargets,setPickpocketTargets]=useState<LivePickpocketNpc[]>(()=>[0,1,2].map((i)=>spawnLivePickpocket(Date.now(),i)));
+  const [pickpocketIndex,setPickpocketIndex]=useState(0);
+  const [pickpocketCrowdUntil,setPickpocketCrowdUntil]=useState(()=>Date.now()+18000);
+  const pickpocketSequence=useRef(3);
+  const pocketNeedleRef=useRef<HTMLSpanElement|null>(null);
+  const [miniAction,setMiniAction]=useState<{crimeId:string;actionId:string}|null>(null);
+  const [memorySequence,setMemorySequence]=useState<number[]>([]);
+  const [memoryInput,setMemoryInput]=useState<number[]>([]);
+  const [memoryShowing,setMemoryShowing]=useState(false);
+  const dialNeedleRef=useRef<HTMLSpanElement|null>(null);
   const feedbackTimer=useRef<number|null>(null);
   const listScrollRef=useRef(0);
   const incapacitated=Boolean(g.gameState.jailUntil||g.gameState.hospitalUntil);
@@ -103,13 +110,30 @@ export function Crimes({ g }: { g: Game }) {
     setFeedback(null);
   };
 
-  const spawnNextPedestrian=()=>{pickpocketSequence.current+=1;setPickpocketNpc(spawnLivePickpocket(Date.now(),pickpocketSequence.current));setPickpocketApproach("blend");};
+  const refreshPickpocketCrowd=()=>{
+    const base=Date.now();
+    const crowd=[0,1,2].map(()=>{pickpocketSequence.current+=1;return spawnLivePickpocket(base,pickpocketSequence.current);});
+    setPickpocketTargets(crowd);setPickpocketIndex(0);setPickpocketCrowdUntil(base+18000);
+  };
 
   useEffect(()=>{
     if(selectedId!=="pickpocket")return;
     if(feedback&&(feedback.phase==="loading"||feedback.phase==="awaiting"))return;
-    if(now>=pickpocketNpc.expiresAt)spawnNextPedestrian();
-  },[now,selectedId,pickpocketNpc.expiresAt,feedback]);
+    if(now>=pickpocketCrowdUntil)refreshPickpocketCrowd();
+  },[now,selectedId,pickpocketCrowdUntil,feedback]);
+
+  const pointerPercent=(ref:React.RefObject<HTMLSpanElement|null>)=>{
+    const needle=ref.current;const track=needle?.parentElement;if(!needle||!track)return 50;
+    const nr=needle.getBoundingClientRect(),tr=track.getBoundingClientRect();
+    return Math.max(0,Math.min(100,((nr.left+nr.width/2-tr.left)/Math.max(1,tr.width))*100));
+  };
+
+  const startMemoryGame=(crimeId:string,actionId:string,difficulty:number)=>{
+    const len=difficulty>=58?5:difficulty>=45?4:3;
+    const seq=Array.from({length:len},()=>Math.floor(Math.random()*4));
+    setMiniAction({crimeId,actionId});setMemorySequence(seq);setMemoryInput([]);setMemoryShowing(true);
+    window.setTimeout(()=>setMemoryShowing(false),Math.max(1500,len*430));
+  };
 
   const withCrimeFeedback=(meta:{key:string;crimeId:string;subject:string;actionLabel:string;district?:string;label:string},action:()=>void,onResolved?:()=>void)=>{
     if(feedback&&(feedback.phase==="loading"||feedback.phase==="awaiting"))return;
@@ -189,40 +213,40 @@ export function Crimes({ g }: { g: Game }) {
 
   const renderPickpocket=(career:CrimeCareerDefinition)=>{
     const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);
+    const npc=pickpocketTargets[pickpocketIndex]??pickpocketTargets[0];
+    if(!npc)return null;
     const tool=getCrimeTool(targetTool); const ownedTool=tool?(g.gameState.inventory[tool.id]||0):0;
     const tools=recommendedCrimeTools("pickpocket");
     const crackdown=g.gameState.activeWorldEvent==="guard-crackdown";
-    const read=evaluatePickpocketAttempt(pickpocketNpc,pickpocketApproach,now,crackdown);
-    const baseChance=targetSuccessChance(pickpocketNpc.target,g.gameState.crimeSkillXp.theft??0,g.combatStats.dexterity,g.gameState.heat,false,g.gameState.streetReputation);
-    const chance=Math.max(4,Math.min(97,baseChance+read.chanceModifier+(ownedTool>0&&tool?(tool.modifiers.chanceModifier??0):0)));
-    const remaining=Math.max(0,pickpocketNpc.expiresAt-now); const progress=Math.max(0,Math.min(100,remaining/pickpocketNpc.windowMs*100));
-    const opening=getPickpocketOpening(pickpocketNpc,now);
-    const revealWealth=mastery>=10, revealAwareness=mastery>=25, revealNumbers=mastery>=50, revealDanger=mastery>=75;
-    return <div className="crime-detail-stack pickpocket-live-system">
-      <div className="crime-mechanic-note"><GameIcon name="character" size={16}/><div><strong>READ · CHOOSE · TIME IT</strong><span>Pickpocketing is a live decision crime, not scavenging. Read the passerby, choose an approach, watch for an opening, then commit or let them pass. Bad timing raises suspicion instead of simply lowering loot.</span></div></div>
-      {crackdown?<div className="pickpocket-crackdown"><GameIcon name="warning" size={14}/><div><strong>GUARD CRACKDOWN ACTIVE</strong><span>More eyes are on the street: weaker openings, higher arrest pressure and +2 extra Heat on this attempt.</span></div></div>:null}
-      <div className="pedestrian-stage">
-        <div className="pedestrian-stage-top"><span>LIVE STREET FEED</span><strong>{formatRiftCityTime(now)}</strong></div>
-        <div className="pedestrian-lane"><div key={pickpocketNpc.id} className={`pedestrian-figure move-${pickpocketNpc.movement.toLowerCase()}`} style={{["--walk-duration" as string]:`${pickpocketNpc.windowMs}ms`}}><span className="pedestrian-avatar"><GameIcon name={pickpocketNpc.rare?"crown":"character"} size={34}/></span><span className="pedestrian-shadow"/></div></div>
-        <div className="pickpocket-opening"><div className="pickpocket-opening-label"><span>OPENING</span><strong>{read.openingLabel}</strong><b>{opening}%</b></div><div className="pickpocket-opening-track"><i style={{width:`${opening}%`}}/><span style={{left:`${opening}%`}}/></div></div>
-        <div className="pedestrian-timer"><i style={{width:`${progress}%`}}/><span>{(remaining/1000).toFixed(1)}s</span></div>
-      </div>
-      <article className={`live-pedestrian-card ${pickpocketNpc.rare?"rare":""}`}>
-        <header><div><small>{pickpocketNpc.area} · {pickpocketNpc.movement}</small><h3>{pickpocketNpc.name}</h3></div><span className="target-state">{pickpocketNpc.rare?"RARE":"PASSING"}</span></header>
-        <p>{mastery>=5?pickpocketNpc.description:"You only have a moment to size them up."}</p>
-        <div className="pickpocket-clues"><small>VISIBLE CLUES</small><div>{pickpocketNpc.clues.map((clue)=><span key={clue}>{clue}</span>)}</div></div>
-        <div className="pedestrian-intel-grid">
-          <span><small>Wealth</small><strong>{revealWealth?pickpocketNpc.wealth:"???"}</strong></span>
-          <span><small>Awareness</small><strong>{revealAwareness?pickpocketNpc.awareness:"???"}</strong></span>
-          <span><small>Projected chance</small><strong>{revealNumbers?`${chance.toFixed(0)}%`:read.openingLabel}</strong></span>
-          <span><small>Suspicion</small><strong className={`suspicion-${read.suspicion.toLowerCase()}`}>{read.suspicion}</strong></span>
+    const remaining=Math.max(0,pickpocketCrowdUntil-now);
+    const baseChance=targetSuccessChance(npc.target,g.gameState.crimeSkillXp.theft??0,g.combatStats.dexterity,g.gameState.heat,false,g.gameState.streetReputation);
+    const revealWealth=mastery>=10,revealAwareness=mastery>=25,revealNumbers=mastery>=50,revealDanger=mastery>=75;
+    const grab=()=>{
+      const pos=pointerPercent(pocketNeedleRef as React.RefObject<HTMLSpanElement|null>);
+      let label="EMPTY POCKET",chanceModifier=-7,rewardMultiplier=.82,heatModifier=0,arrestModifier=1;
+      if(pos>=39&&pos<=61){label="CLEAN LIFT";chanceModifier=13;rewardMultiplier=1.2;arrestModifier=-2;}
+      else if(pos>=29&&pos<=71){label="EDGE GRAB";chanceModifier=4;rewardMultiplier=1.03;heatModifier=1;}
+      else if(pos<15||pos>85){label="DANGER ZONE";chanceModifier=-18;rewardMultiplier=.82;heatModifier=3;arrestModifier=8;}
+      if(crackdown){chanceModifier-=6;heatModifier+=2;arrestModifier+=4;}
+      withCrimeFeedback({key:"pickpocket:live",crimeId:"pickpocket",subject:npc.name,actionLabel:"Pocket grab",district:npc.area,label:`${label}…`},()=>g.resolveCrimeTarget(npc.target,ownedTool>0?targetTool:null,{chanceModifier,rewardMultiplier,heatModifier,arrestModifier,story:`Minigame: ${label}`}),refreshPickpocketCrowd);
+    };
+    return <div className="crime-detail-stack pickpocket-chain-system">
+      <div className="crime-mechanic-note"><GameIcon name="target" size={16}/><div><strong>TARGET CHAIN · POCKET ZONE</strong><span>Pick one of three people, then hit GRAB while the marker crosses the pocket zone. The center is safest and most valuable; the red edges are dangerous.</span></div></div>
+      {crackdown?<div className="pickpocket-crackdown"><GameIcon name="warning" size={14}/><div><strong>GUARD CRACKDOWN ACTIVE</strong><span>Street pressure makes every grab harder and adds extra Heat.</span></div></div>:null}
+      <div className="pickpocket-crowd-head"><span>CROWD REFRESH</span><strong>{Math.ceil(remaining/1000)}s</strong></div>
+      <div className="pickpocket-target-chain">{pickpocketTargets.map((target,i)=><button type="button" key={target.id} className={`${i===pickpocketIndex?"active":""} ${target.rare?"rare":""}`} onClick={()=>setPickpocketIndex(i)}><span><GameIcon name={target.rare?"crown":"character"} size={20}/></span><strong>{target.name}</strong><small>{target.area}</small><em>{revealWealth?target.wealth:"Unknown value"}</em></button>)}</div>
+      <article className="pickpocket-focus-card">
+        <header><div><small>{npc.area} · {npc.movement}</small><h3>{npc.name}</h3></div><span>{npc.rare?"RARE TARGET":"SELECTED"}</span></header>
+        <div className="pickpocket-focus-meta"><span>Wealth <b>{revealWealth?npc.wealth:"???"}</b></span><span>Awareness <b>{revealAwareness?npc.awareness:"???"}</b></span><span>Nerve <b>{npc.target.nerve}</b></span>{revealNumbers?<span>Base odds <b>{baseChance.toFixed(0)}%</b></span>:null}</div>
+        <div className="pickpocket-clues compact"><div>{npc.clues.slice(0,2).map((clue)=><span key={clue}>{clue}</span>)}</div></div>
+        {revealDanger&&npc.dangerNote?<div className="pedestrian-warning"><GameIcon name="warning" size={13}/>{npc.dangerNote}</div>:null}
+        <div className="pocket-minigame">
+          <div className="pocket-zone-track"><i className="zone danger left"/><i className="zone pocket"/><i className="zone danger right"/><span ref={pocketNeedleRef} className={`pocket-needle difficulty-${npc.target.difficulty>=55?"hard":npc.target.difficulty>=38?"medium":"easy"}`}/></div>
+          <div className="pocket-zone-legend"><span>Danger</span><b>POCKET</b><span>Danger</span></div>
         </div>
-        {revealDanger&&pickpocketNpc.dangerNote?<div className="pedestrian-warning"><GameIcon name="warning" size={13}/>{pickpocketNpc.dangerNote}</div>:null}
-        <div className="pickpocket-approach-grid">{PICKPOCKET_APPROACHES.map((approach)=><button type="button" key={approach.id} className={pickpocketApproach===approach.id?"active":""} onClick={()=>setPickpocketApproach(approach.id)}><strong>{approach.name}</strong><small>{approach.description}</small></button>)}</div>
-        <div className="pickpocket-readout"><span><small>Current read</small><strong>{read.summary}</strong></span>{revealNumbers?<><span><small>Cash range</small><strong>{money(pickpocketNpc.target.minReward)}–{money(pickpocketNpc.target.maxReward)}</strong></span><span><small>Timing modifier</small><strong>{read.chanceModifier>=0?"+":""}{read.chanceModifier}%</strong></span></>:null}</div>
-        {tools.length>0&&<div className="crime-prep-line"><label>Optional one-use prep<select value={targetTool} onChange={(e: React.ChangeEvent<HTMLSelectElement>)=>setTargetTool(e.target.value)}><option value="">No tool</option>{tools.map((entry)=><option key={entry.id} value={entry.id} disabled={(g.gameState.inventory[entry.id]||0)<=0}>{entry.name} · owned {g.gameState.inventory[entry.id]||0}</option>)}</select></label>{tool&&<small>{tool.description}</small>}</div>}
-        <div className="target-actions"><Button disabled={Boolean(feedback&&feedback.phase!=="result")} onClick={spawnNextPedestrian}>Abort / Let Pass</Button><Button disabled={incapacitated||g.gameState.nerve<pickpocketNpc.target.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>{const lockedRead=evaluatePickpocketAttempt(pickpocketNpc,pickpocketApproach,Date.now(),crackdown);withCrimeFeedback({key:"pickpocket:live",crimeId:"pickpocket",subject:pickpocketNpc.name,actionLabel:`${PICKPOCKET_APPROACHES.find(a=>a.id===pickpocketApproach)?.name??"Pickpocket"} attempt`,district:pickpocketNpc.area,label:"MAKING YOUR MOVE…"},()=>g.resolveCrimeTarget(pickpocketNpc.target,ownedTool>0?targetTool:null,{chanceModifier:lockedRead.chanceModifier,rewardMultiplier:lockedRead.rewardMultiplier,heatModifier:lockedRead.heatModifier,arrestModifier:lockedRead.arrestModifier,story:lockedRead.summary}),spawnNextPedestrian);}}>Commit · {pickpocketNpc.target.nerve} Nerve</Button></div>
-        <small className="pedestrian-mastery-hint">Mastery reveals more: M10 wealth · M25 awareness · M50 exact odds/value · M75 danger intel. Waiting costs no Nerve; committing does.</small>
+        {tools.length>0&&<div className="crime-prep-line compact"><label>Prep<select value={targetTool} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>setTargetTool(e.target.value)}><option value="">None</option>{tools.map((entry)=><option key={entry.id} value={entry.id} disabled={(g.gameState.inventory[entry.id]||0)<=0}>{entry.name} · {g.gameState.inventory[entry.id]||0}</option>)}</select></label></div>}
+        <Button disabled={incapacitated||g.gameState.nerve<npc.target.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={grab}>GRAB · {npc.target.nerve} Nerve</Button>
+        <small className="pedestrian-mastery-hint">No Let Pass button: the crowd rotates automatically. Mastery reveals more target intel.</small>
       </article>
       {renderFeedback("pickpocket:live")}
     </div>;
@@ -307,10 +331,26 @@ export function Crimes({ g }: { g: Game }) {
   const renderActions=(career:CrimeCareerDefinition)=>{
     const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);const familyLevel=crimeFamilyLevel(g.gameState.crimeSkillXp[career.family]??0);
     const live=getCrimeContextPulse(career.id,now,g.gameState.heat); const signature=CRIME_SIGNATURES[career.id];
+    const runAction=(action:any,bonus?:{chanceModifier:number;rewardMultiplier:number;heatModifier:number},label="WORKING THE OPPORTUNITY…")=>withCrimeFeedback({key:`action:${career.id}:${action.id}`,crimeId:career.id,subject:action.name,actionLabel:action.name,label},()=>g.runCrimeCareerAction(career.id,action.id,{chanceModifier:(live?.chanceModifier??0)+(bonus?.chanceModifier??0),rewardMultiplier:(live?.rewardMultiplier??1)*(bonus?.rewardMultiplier??1),heatModifier:(live?.heatModifier??0)+(bonus?.heatModifier??0)}),()=>setMiniAction(null));
+    const memoryTap=(action:any,index:number)=>{
+      if(memoryShowing)return;const next=[...memoryInput,index];setMemoryInput(next);
+      const wrong=next.some((v,i)=>v!==memorySequence[i]);
+      if(wrong){runAction(action,{chanceModifier:-10,rewardMultiplier:.9,heatModifier:2},"MEMORY TRACE BROKE…");return;}
+      if(next.length===memorySequence.length)runAction(action,{chanceModifier:12,rewardMultiplier:1.15,heatModifier:-1},"MEMORY TRACE LOCKED…");
+    };
+    const lockDial=(action:any)=>{
+      const pos=pointerPercent(dialNeedleRef as React.RefObject<HTMLSpanElement|null>);const d=Math.abs(pos-50);
+      if(d<=8)runAction(action,{chanceModifier:13,rewardMultiplier:1.16,heatModifier:0},"PERFECT DIAL SYNC…");
+      else if(d<=18)runAction(action,{chanceModifier:5,rewardMultiplier:1.04,heatModifier:0},"DIAL SYNC…");
+      else runAction(action,{chanceModifier:-11,rewardMultiplier:.9,heatModifier:1},"DIAL SLIPPED…");
+    };
     return <div className="crime-detail-stack">
       {signature&&<div className="crime-mechanic-note"><GameIcon name="spark" size={16}/><div><strong>{signature.title}</strong><span>{signature.description}</span></div></div>}
-      {live&&<section className="crime-context-pulse"><header><div><small>{live.label}</small><strong>{live.status}</strong></div><b>{live.value}%</b></header><div className="crime-context-meter"><i style={{width:`${live.value}%`}}/></div><p>{live.detail}</p><div className="crime-context-mods"><span>Chance {live.chanceModifier>=0?"+":""}{live.chanceModifier.toFixed(1)}%</span><span>Value ×{live.rewardMultiplier.toFixed(2)}</span>{live.heatModifier?<span>Heat +{live.heatModifier}</span>:null}</div></section>}
-      <div className="crime-action-grid">{(career.actions??[]).map((action)=>{const locked=mastery<(action.masteryRequired??1)||g.gameState.streetReputation<(action.streetRepRequired??0);const missing=(action.requiredItems??[]).filter((id)=>(g.gameState.inventory[id]||0)<=0);const chance=Math.max(4,Math.min(97,careerActionSuccessChance(action,familyLevel,mastery,g.combatStats.dexterity,g.gameState.heat)+(live?.chanceModifier??0)));const minReward=Math.round(action.minReward*(live?.rewardMultiplier??1));const maxReward=Math.round(action.maxReward*(live?.rewardMultiplier??1));return <article key={action.id} className={`career-action-card ${locked?"locked":""}`}><header><div><small>{career.risk} RISK</small><h4>{action.name}</h4></div><strong>{chance.toFixed(0)}%</strong></header><p>{action.description}</p><div className="crime-mini-metrics"><span>{action.nerve} Nerve</span><span>{action.rewardType==="heat-reduction"?`Heat -${minReward}–${maxReward}`:`${money(minReward)}–${money(maxReward)}`}</span><span>Heat +{Math.max(0,action.heat+(live?.heatModifier??0))}</span><span>Mastery {action.masteryRequired??1}+</span></div>{renderRequirement(action.requiredItems)}{action.recommendedItems?.length?<small className="recommended-line">Recommended: {action.recommendedItems.map((id)=>getItem(id)?.name??id).join(", ")}</small>:null}<Button disabled={locked||missing.length>0||incapacitated||g.gameState.nerve<action.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:`action:${career.id}:${action.id}`,crimeId:career.id,subject:action.name,actionLabel:action.name,label:career.id==="safecracking"?"LISTENING FOR THE SYNC…":"WORKING THE OPPORTUNITY…"},()=>g.runCrimeCareerAction(career.id,action.id,live?{chanceModifier:live.chanceModifier,rewardMultiplier:live.rewardMultiplier,heatModifier:live.heatModifier}:undefined))}>{locked?"Mastery / Rep Locked":missing.length?"Missing Required Items":`Attempt · ${chance.toFixed(0)}%`}</Button>{renderFeedback(`action:${career.id}:${action.id}`)}</article>;})}</div>
+      {career.id==="data-breach"?<div className="crime-mechanic-note"><GameIcon name="chip" size={16}/><div><strong>MEMORY TRACE</strong><span>Cyber jobs use an abstract symbol-memory challenge. Memorize the sequence, then repeat it correctly for a strong attempt bonus.</span></div></div>:null}
+      {career.id==="safecracking"?<div className="crime-mechanic-note"><GameIcon name="lock" size={16}/><div><strong>PRECISION DIAL</strong><span>Safe jobs use a fictional timing dial. Lock the moving marker near the center sync zone for the cleanest attempt.</span></div></div>:null}
+      {live&&<section className="crime-context-pulse"><header><div><small>{live.label}</small><strong>{live.status}</strong></div><b>{live.value}%</b></header><div className="crime-context-meter"><i style={{width:`${live.value}%`}}/></div><p>{live.detail}</p></section>}
+      <div className="crime-action-grid">{(career.actions??[]).map((action)=>{const locked=mastery<(action.masteryRequired??1)||g.gameState.streetReputation<(action.streetRepRequired??0);const missing=(action.requiredItems??[]).filter((id)=>(g.gameState.inventory[id]||0)<=0);const chance=Math.max(4,Math.min(97,careerActionSuccessChance(action,familyLevel,mastery,g.combatStats.dexterity,g.gameState.heat)+(live?.chanceModifier??0)));const active=miniAction?.crimeId===career.id&&miniAction?.actionId===action.id;return <article key={action.id} className={`career-action-card ${locked?"locked":""}`}><header><div><small>{career.risk} RISK</small><h4>{action.name}</h4></div><strong>{chance.toFixed(0)}%</strong></header><p>{action.description}</p><div className="crime-mini-metrics"><span>{action.nerve} Nerve</span><span>{money(action.minReward)}–{money(action.maxReward)}</span><span>Heat +{Math.max(0,action.heat+(live?.heatModifier??0))}</span></div>{renderRequirement(action.requiredItems)}
+      {career.id==="data-breach"&&active?<div className="memory-minigame"><small>{memoryShowing?"MEMORIZE":"REPEAT"}</small><div className="memory-display">{memoryShowing?memorySequence.map((v,i)=><b key={i}>{["◆","●","▲","■"][v]}</b>):memorySequence.map((_,i)=><b key={i}>{memoryInput[i]!==undefined?["◆","●","▲","■"][memoryInput[i]]:"?"}</b>)}</div>{!memoryShowing?<div className="memory-pad">{["◆","●","▲","■"].map((sym,i)=><button type="button" key={sym} onClick={()=>memoryTap(action,i)}>{sym}</button>)}</div>:null}</div>:career.id==="safecracking"&&active?<div className="safe-dial-minigame"><div className="safe-dial-track"><i/><span ref={dialNeedleRef}/></div><Button onClick={()=>lockDial(action)}>LOCK IN</Button></div>:<Button disabled={locked||missing.length>0||incapacitated||g.gameState.nerve<action.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>{if(career.id==="data-breach")startMemoryGame(career.id,action.id,action.difficulty);else if(career.id==="safecracking")setMiniAction({crimeId:career.id,actionId:action.id});else runAction(action,undefined,"WORKING THE OPPORTUNITY…");}}>{locked?"Mastery / Rep Locked":missing.length?"Missing Required Items":career.id==="data-breach"?"Start Memory Trace":career.id==="safecracking"?"Start Precision Dial":`Attempt · ${chance.toFixed(0)}%`}</Button>}{renderFeedback(`action:${career.id}:${action.id}`)}</article>;})}</div>
     </div>;
   };
 

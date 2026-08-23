@@ -87,7 +87,7 @@ const action = (value: CrimeCareerAction) => value;
 
 export const CRIME_CAREERS: CrimeCareerDefinition[] = [
   { id:"scavenging", name:"Scavenging", description:"Read live city activity and search different districts for cash, valuables and rare finds.", family:"theft", mode:"scavenge", icon:"cash", unlockCrimeExperience:0, baseNerve:1, risk:"LOW" },
-  { id:"pickpocket", name:"Pickpocketing", description:"Watch a live city pedestrian stream. People walk, wait, jog and cycle past; Mastery reveals more before you commit.", family:"theft", mode:"target", targetKind:"pickpocket", icon:"target", unlockCrimeExperience:0, baseNerve:2, risk:"LOW" },
+  { id:"pickpocket", name:"Pickpocketing", description:"Choose from a rotating crowd, read target value, then time a quick pocket-zone grab. Mastery reveals better intel.", family:"theft", mode:"target", targetKind:"pickpocket", icon:"target", unlockCrimeExperience:0, baseNerve:2, risk:"LOW" },
   { id:"shoplift", name:"Shoplifting", description:"Choose a live store, build a basket and decide when greed has pushed suspicion too far.", family:"theft", mode:"shoplift", icon:"shops", unlockCrimeExperience:8, baseNerve:2, risk:"MEDIUM" },
   { id:"graffiti", name:"Graffiti", description:"Tag increasingly visible locations to build Street Reputation and Street Art mastery.", family:"street", mode:"graffiti", icon:"spray", unlockCrimeExperience:12, baseNerve:1, risk:"LOW" },
   { id:"package-swipe", name:"Parcel Theft", description:"Watch residential delivery windows and take small item-focused scores instead of pure cash.", family:"theft", mode:"actions", icon:"package", unlockCrimeExperience:22, baseNerve:3, risk:"LOW", actions:[
