@@ -1,0 +1,32 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #080b10;
+  color: #f5f7fb;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #131a25 0, #080b10 46%); }
+button, input { font: inherit; }
+.shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
+.hero { margin-bottom: 24px; }
+.hero h1 { margin: 4px 0 8px; font-size: clamp(2rem, 6vw, 4rem); letter-spacing: -.04em; }
+.hero p { margin: 0; color: #9aa6b6; }
+.eyebrow { color: #79a8ff; font-size: .75rem; font-weight: 800; letter-spacing: .16em; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin-top: 16px; }
+.card, .status-card { border: 1px solid #263142; background: rgba(16,21,30,.88); border-radius: 18px; box-shadow: 0 18px 60px rgba(0,0,0,.25); }
+.card { padding: 20px; }
+.status-card { padding: 14px 16px; color: #b9c4d2; }
+h2 { margin: 0 0 16px; font-size: 1.2rem; }
+label { display: grid; gap: 7px; margin: 13px 0; color: #aab6c5; font-size: .9rem; }
+input { width: 100%; border: 1px solid #2e3a4d; border-radius: 12px; padding: 12px 13px; background: #0c1119; color: #fff; outline: none; }
+input:focus { border-color: #5d8ef7; box-shadow: 0 0 0 3px rgba(93,142,247,.14); }
+button { width: 100%; border: 0; border-radius: 12px; padding: 12px 14px; margin-top: 8px; background: #5d8ef7; color: white; font-weight: 800; cursor: pointer; }
+button.secondary { background: #202a38; }
+.account-head { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.badge { border: 1px solid #35578f; color:#9fc0ff; background:#13233b; padding:7px 10px; border-radius:999px; font-size:.8rem; font-weight:800; text-transform:uppercase; }
+dl { display:grid; grid-template-columns: 130px 1fr; gap: 10px 14px; margin: 18px 0; }
+dt { color:#7f8b9b; } dd { margin:0; word-break:break-word; }
+.message { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); width: min(560px, calc(100% - 32px)); padding: 13px 16px; border-radius: 12px; background:#121a25; border:1px solid #2c394c; box-shadow:0 16px 50px rgba(0,0,0,.38); }
+.message.error { border-color:#6c3037; color:#ffc0c6; }
+.hidden { display:none !important; }
+@media (max-width: 700px) { .shell{padding-top:28px}.grid{grid-template-columns:1fr} dl{grid-template-columns:1fr;gap:2px} dd{margin-bottom:10px} }

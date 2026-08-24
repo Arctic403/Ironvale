@@ -1,40 +1,52 @@
-# RiftCity Core v4
+# RiftCity V2 — Phase 1
 
-A standalone original browser crime/RPG core inspired by the broad genre of persistent text-based city RPGs.
+Fresh-start Phase 1 foundation for RiftCity.
 
-## Patched in this build
+## Included
 
-- Replaced the incomplete `App.tsx` with a working React game shell.
-- Fixed the missing `jobSystem` dependency by moving job logic into the core state layer.
-- Added persistent localStorage saves with backwards-safe defaults.
-- Added passive Energy, Nerve, Happiness, health, jail and hospital timers.
-- Added City locations and random interactive encounters with branching outcomes.
-- Added explicit crime outcomes: success, failure, spooked, jail, critical success and critical failure.
-- Added crime progression, crime XP, rewards and stat influence.
-- Added combat opponent selection, estimated win chance, weapon/armor effects, victory/defeat outcomes and hospital state.
-- Added gym memberships, gym EXP, stat-specific training and happiness-based gains.
-- Added jobs and timed salary payments.
-- Added inventory, buying, using, equipping and item effects.
-- Added missions with tracked progress and claimable rewards.
-- Added education courses and completion tracking.
-- Added property progression with health, nerve and happiness effects.
-- Added bank deposit/withdrawal mechanics.
-- Added responsive desktop/mobile UI and a dedicated activity feed.
-- Removed broken `print()` usage and stale imports.
+- Cloudflare Worker backend
+- Cloudflare D1 database schema
+- Register
+- Login
+- Logout
+- Persistent 7-day HttpOnly sessions
+- Player IDs
+- Username validation
+- Password hashing using PBKDF2-SHA256 via Web Crypto
+- Roles: player / moderator / admin / developer
+- Created date
+- Last active tracking
+- Online session state
+- Ban fields ready for later admin tooling
+- Audit log table
+- Minimal responsive test UI
 
-## Scope
+## Setup
 
-RiftCity is an original project. This package does not copy Torn's proprietary source code, assets, text, branding, or private server logic. It implements original systems with similar high-level genre concepts rather than a 1:1 reproduction.
+1. Install Node.js 20+.
+2. Run `npm install`.
+3. Sign in to Cloudflare with `npx wrangler login`.
+4. Create the database:
+   `npx wrangler d1 create riftcity-v2`
+5. Copy the returned database ID into `wrangler.toml` in place of `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
+6. Apply the schema:
+   `npm run db:migrate:remote`
+7. Deploy:
+   `npm run deploy`
 
-## Run
+For local development after configuring D1:
 
-```bash
-npm install
-npm run dev
-```
+- `npm run db:migrate:local`
+- `npm run dev`
 
-Then open the Vite development URL.
+## API
 
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `GET /api/health`
 
-## World foundation
-See `RIFTCITY_WORLD_BIBLE.md` and `src/lore/` for the original RiftCity setting foundation.
+## Phase boundary
+
+This ZIP intentionally does NOT add stats, inventory, crimes, money, city map, casino, combat, market, or other gameplay systems. Those belong to later phases so the authentication/account foundation stays clean.

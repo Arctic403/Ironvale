@@ -1,6 +1,0 @@
-/* 34. MOBILE MAP STABILITY */
-.riftcity-map{position:relative;overflow:hidden;contain:layout paint;}
-.riftcity-map-svg{display:block;width:100%;height:auto;max-width:100%;touch-action:none;user-select:none;-webkit-user-select:none;overscroll-behavior:contain;}
-.riftcity-map-svg *{-webkit-tap-highlight-color:transparent;}
-.interactive-map.is-dragging,.interactive-map.is-dragging *{cursor:grabbing!important;}
-@media (max-width:700px){.riftcity-map{min-height:0;aspect-ratio:10/7}.riftcity-map-svg{height:100%;width:100%;}.city-map-tools{flex-wrap:wrap;gap:6px}.map-drag-hint{pointer-events:none}.map-location-label{font-size:18px}.map-road-labels text{font-size:13px}}

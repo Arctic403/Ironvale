@@ -1,4 +1,0 @@
-import { ENCOUNTERS,getAvailableEncounter } from "../constants/encounters"; import { LOCATIONS } from "../constants/locations"; import { GAME_CONFIG,SAVE_KEY,DEFAULT_MARKET_PRICES } from "../constants/gameConfig";
-export {freshSave,loadSave} from "./saveSystem"; export {formatTime,timeLeft} from "./gameClock"; export {money,randomMarketPrice} from "./economy"; export {getLocationName} from "./world";
-export const {ENERGY_REGEN_INTERVAL,MAX_ENERGY,NERVE_REGEN_INTERVAL,HAPPINESS_TICK,HEALTH_REGEN_INTERVAL,JAIL_MINUTES,HOSPITAL_MINUTES,BASE_HAPPINESS,BANK_INTEREST_INTERVAL,DAILY_INTERVAL,TRAVEL_COOLDOWN,TRAVEL_COST,MARKET_UPDATE_INTERVAL,JOB_PAY_INTERVAL}=GAME_CONFIG;
-export const JOB_SKILL_INTERVAL=24*60*60*1000; export {SAVE_KEY,DEFAULT_MARKET_PRICES,ENCOUNTERS,LOCATIONS,getAvailableEncounter};
