@@ -19,8 +19,11 @@
       </div>
 
       <nav class="rail-nav">
-        <a class="rail-link active" href="/" aria-current="page">
+        <a class="rail-link active" href="#overview" data-view-link="overview" aria-current="page">
           <span class="rail-icon">▦</span><span>Overview</span>
+        </a>
+        <a class="rail-link" href="#city" data-view-link="city">
+          <span class="rail-icon">⌂</span><span>City</span>
         </a>
         <a class="rail-link" href="/admin/logs">
           <span class="rail-icon">⌁</span><span>Dev logs</span>
@@ -29,7 +32,7 @@
 
       <div class="rail-footer">
         <span class="phase-dot"></span>
-        <span>Phase 2.2 UI</span>
+        <span>Phase 3 World</span>
       </div>
     </aside>
 
@@ -40,8 +43,8 @@
           <strong>RiftCity</strong>
         </div>
         <div class="page-title">
-          <span class="eyebrow">PLAYER CORE</span>
-          <h1>Overview</h1>
+          <span id="page-eyebrow" class="eyebrow">PLAYER CORE</span>
+          <h1 id="page-title-text">Overview</h1>
         </div>
         <a class="topbar-link" href="/admin/logs">Dev logs</a>
       </header>
@@ -52,7 +55,7 @@
         <div class="auth-copy">
           <span class="eyebrow">RIFTCITY V2</span>
           <h2>Enter the city.</h2>
-          <p>Create a player or sign back in. Your account and player state are stored persistently.</p>
+          <p>Create a player or sign back in. Your account, player state and current city location are stored persistently.</p>
         </div>
 
         <div class="auth-forms">
@@ -102,46 +105,79 @@
           </article>
         </section>
 
-        <section class="dashboard-layout">
-          <article class="panel progression-panel">
-            <div class="panel-heading split-heading">
-              <div>
-                <span class="eyebrow">PROGRESSION</span>
-                <h2>Level <span id="level-value">1</span></h2>
+        <section id="overview-view" class="game-view">
+          <section class="dashboard-layout">
+            <article class="panel progression-panel">
+              <div class="panel-heading split-heading">
+                <div>
+                  <span class="eyebrow">PROGRESSION</span>
+                  <h2>Level <span id="level-value">1</span></h2>
+                </div>
+                <span id="player-status-badge" class="badge status-active">ACTIVE</span>
               </div>
-              <span id="player-status-badge" class="badge status-active">ACTIVE</span>
-            </div>
-            <div class="xp-row"><span>XP</span><strong><span id="xp-value">0</span> / <span id="xp-next">100</span></strong></div>
-            <div class="meter xp-meter"><span id="xp-meter"></span></div>
-            <p id="status-detail" class="muted">Player is active in RiftCity.</p>
-          </article>
+              <div class="xp-row"><span>XP</span><strong><span id="xp-value">0</span> / <span id="xp-next">100</span></strong></div>
+              <div class="meter xp-meter"><span id="xp-meter"></span></div>
+              <p id="status-detail" class="muted">Player is active in RiftCity.</p>
+            </article>
 
-          <article class="panel stats-panel">
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">CORE STATS</span>
-                <h2>Attributes</h2>
+            <article class="panel stats-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">CORE STATS</span>
+                  <h2>Attributes</h2>
+                </div>
               </div>
-            </div>
-            <div class="combat-stats">
-              <div><span>Strength</span><strong id="strength-value">1</strong></div>
-              <div><span>Defense</span><strong id="defense-value">1</strong></div>
-              <div><span>Speed</span><strong id="speed-value">1</strong></div>
-              <div><span>Dexterity</span><strong id="dexterity-value">1</strong></div>
-            </div>
-          </article>
+              <div class="combat-stats">
+                <div><span>Strength</span><strong id="strength-value">1</strong></div>
+                <div><span>Defense</span><strong id="defense-value">1</strong></div>
+                <div><span>Speed</span><strong id="speed-value">1</strong></div>
+                <div><span>Dexterity</span><strong id="dexterity-value">1</strong></div>
+              </div>
+            </article>
 
-          <article id="account-card" class="panel account-panel">
-            <div class="panel-heading split-heading">
-              <div>
-                <span class="eyebrow">ACCOUNT</span>
-                <h2 id="account-name">Player</h2>
+            <article id="account-card" class="panel account-panel">
+              <div class="panel-heading split-heading">
+                <div>
+                  <span class="eyebrow">ACCOUNT</span>
+                  <h2 id="account-name">Player</h2>
+                </div>
+                <span id="account-role" class="badge">player</span>
               </div>
-              <span id="account-role" class="badge">player</span>
+              <dl id="account-details"></dl>
+              <button id="logout-btn" class="ghost-button">Logout</button>
+            </article>
+          </section>
+        </section>
+
+        <section id="city-view" class="game-view hidden">
+          <div class="world-header">
+            <div>
+              <span class="eyebrow">WORLD NETWORK / RC-01</span>
+              <h2>RiftCity</h2>
+              <p>Choose a district, inspect its locations, then enter a location. The world is data-driven so future features can attach to these locations without rebuilding navigation.</p>
             </div>
-            <dl id="account-details"></dl>
-            <button id="logout-btn" class="ghost-button">Logout</button>
-          </article>
+            <div class="current-location-block">
+              <span class="system-label">CURRENT POSITION</span>
+              <strong id="current-location-name">Central Plaza</strong>
+              <small id="current-district-name">Downtown</small>
+            </div>
+          </div>
+
+          <div class="world-browser">
+            <aside class="district-browser" aria-label="City districts">
+              <div class="browser-heading">
+                <span>DISTRICTS</span>
+                <small id="district-count">05</small>
+              </div>
+              <div id="district-list" class="district-list">
+                <div class="world-loading">Loading city network…</div>
+              </div>
+            </aside>
+
+            <section id="district-detail" class="district-detail">
+              <div class="world-loading">Select a district.</div>
+            </section>
+          </div>
         </section>
       </section>
 
@@ -150,7 +186,8 @@
   </div>
 
   <nav class="mobile-nav" aria-label="Mobile navigation">
-    <a class="mobile-nav-link active" href="/" aria-current="page"><span>▦</span><small>Overview</small></a>
+    <a class="mobile-nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span>▦</span><small>Overview</small></a>
+    <a class="mobile-nav-link" href="#city" data-view-link="city"><span>⌂</span><small>City</small></a>
     <a class="mobile-nav-link" href="/admin/logs"><span>⌁</span><small>Logs</small></a>
   </nav>
 

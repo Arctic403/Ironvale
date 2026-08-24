@@ -87,3 +87,14 @@ CREATE TABLE IF NOT EXISTS system_logs (
 CREATE INDEX IF NOT EXISTS idx_system_logs_created ON system_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity);
 CREATE INDEX IF NOT EXISTS idx_system_logs_error_id ON system_logs(error_id);
+
+CREATE TABLE IF NOT EXISTS player_location (
+  user_id TEXT PRIMARY KEY,
+  district_id TEXT NOT NULL DEFAULT 'downtown',
+  location_id TEXT NOT NULL DEFAULT 'central-plaza',
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_location_district ON player_location(district_id);
+CREATE INDEX IF NOT EXISTS idx_player_location_location ON player_location(location_id);

@@ -45,6 +45,155 @@ const PLAYER_STATE_TABLE_SQL = `
   )
 `;
 
+const PLAYER_LOCATION_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS player_location (
+    user_id TEXT PRIMARY KEY,
+    district_id TEXT NOT NULL DEFAULT 'downtown',
+    location_id TEXT NOT NULL DEFAULT 'central-plaza',
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`;
+
+const WORLD_DISTRICTS = [
+  {
+    id: 'downtown', code: 'DT-01', name: 'Downtown',
+    description: 'The commercial core of RiftCity. Crowded streets, transit links, offices and back alleys all meet here.',
+    risk: 'LOW', policeActivity: 'NORMAL'
+  },
+  {
+    id: 'harbour', code: 'HB-02', name: 'Harbour',
+    description: 'Cargo traffic, warehouses and waterfront businesses keep the district moving long after dark.',
+    risk: 'MEDIUM', policeActivity: 'LOW'
+  },
+  {
+    id: 'industrial', code: 'IN-03', name: 'Industrial',
+    description: 'Factories, service yards and scrap operations dominate the eastern industrial belt.',
+    risk: 'MEDIUM', policeActivity: 'NORMAL'
+  },
+  {
+    id: 'residential', code: 'RS-04', name: 'Residential',
+    description: 'Dense apartment blocks give way to quieter streets and high-value private estates.',
+    risk: 'LOW', policeActivity: 'ELEVATED'
+  },
+  {
+    id: 'casino', code: 'CS-05', name: 'Casino District',
+    description: 'Hotels, nightlife and high-stakes venues make this the brightest part of RiftCity after sundown.',
+    risk: 'MEDIUM', policeActivity: 'HIGH'
+  }
+];
+
+const WORLD_LOCATIONS = [
+  {
+    id: 'central-plaza', districtId: 'downtown', code: 'DT-A', name: 'Central Plaza', status: 'OPEN',
+    shortDescription: 'Main downtown concourse and public meeting point.',
+    description: 'A wide public concourse surrounded by offices, storefronts and transit access. This is the default arrival point for new players.',
+    tags: ['PUBLIC', 'TRANSIT'], requirements: [],
+    actions: [
+      { id: 'look-around', label: 'Look around', type: 'inspect', enabled: true },
+      { id: 'crimes', label: 'Local crimes', type: 'crime', enabled: false, note: 'Crime framework arrives in a later phase.' }
+    ]
+  },
+  {
+    id: 'metro-exchange', districtId: 'downtown', code: 'DT-B', name: 'Metro Exchange', status: 'OPEN',
+    shortDescription: 'Busy transit platforms connecting the city core.',
+    description: 'Platforms, service corridors and a constant flow of commuters make the exchange one of Downtown\'s busiest locations.',
+    tags: ['TRANSIT', 'CROWDED'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'back-streets', districtId: 'downtown', code: 'DT-C', name: 'Back Streets', status: 'OPEN',
+    shortDescription: 'Narrow service lanes behind the commercial blocks.',
+    description: 'Loading bays, service alleys and older buildings create a quieter route behind Downtown\'s main streets.',
+    tags: ['ALLEY', 'LOW-TRAFFIC'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'cargo-docks', districtId: 'harbour', code: 'HB-A', name: 'Cargo Docks', status: 'OPEN',
+    shortDescription: 'Container yards and active freight piers.',
+    description: 'Freight moves through the docks day and night. Containers, crews and service vehicles constantly rotate through the waterfront.',
+    tags: ['FREIGHT', 'WATERFRONT'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'warehouse-row', districtId: 'harbour', code: 'HB-B', name: 'Warehouse Row', status: 'OPEN',
+    shortDescription: 'A strip of storage buildings behind the docks.',
+    description: 'Rows of loading doors and fenced storage lots sit between the working harbour and the industrial belt.',
+    tags: ['WAREHOUSE', 'FREIGHT'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'fish-market', districtId: 'harbour', code: 'HB-C', name: 'Harbour Market', status: 'OPEN',
+    shortDescription: 'A public market beside the older marina.',
+    description: 'Small vendors, delivery vans and dock workers fill the market during its busiest hours.',
+    tags: ['MARKET', 'PUBLIC'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'foundry-yard', districtId: 'industrial', code: 'IN-A', name: 'Foundry Yard', status: 'OPEN',
+    shortDescription: 'Heavy industrial yard surrounded by old plants.',
+    description: 'A rough network of fenced compounds, old machinery and active service roads in the middle of the industrial district.',
+    tags: ['INDUSTRIAL', 'HEAVY'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'scrap-depot', districtId: 'industrial', code: 'IN-B', name: 'Scrap Depot', status: 'OPEN',
+    shortDescription: 'Metal, machinery and salvage move through this yard.',
+    description: 'Stacks of reusable material and stripped machinery make the depot a natural future home for scavenging and material systems.',
+    tags: ['SCRAP', 'SALVAGE'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'service-tunnels', districtId: 'industrial', code: 'IN-C', name: 'Service Tunnels', status: 'RESTRICTED',
+    shortDescription: 'Utility access beneath the industrial blocks.',
+    description: 'Old maintenance passages connect several industrial sites. Access systems will be added when item requirements exist.',
+    tags: ['UTILITY', 'RESTRICTED'], requirements: ['Future access item'],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'east-blocks', districtId: 'residential', code: 'RS-A', name: 'East Blocks', status: 'OPEN',
+    shortDescription: 'Dense apartment blocks and local storefronts.',
+    description: 'A busy residential zone with apartment towers, parking courts and small neighborhood businesses.',
+    tags: ['RESIDENTIAL', 'PUBLIC'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'luxury-estate', districtId: 'residential', code: 'RS-B', name: 'Luxury Estate', status: 'OPEN',
+    shortDescription: 'Private homes along quieter guarded streets.',
+    description: 'Large properties and lower foot traffic make the estate feel completely different from the crowded East Blocks.',
+    tags: ['RESIDENTIAL', 'HIGH-VALUE'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'corner-row', districtId: 'residential', code: 'RS-C', name: 'Corner Row', status: 'OPEN',
+    shortDescription: 'Small shops and services at the edge of the neighborhood.',
+    description: 'Convenience stores, laundromats and low-rise apartments sit along a well-traveled neighborhood strip.',
+    tags: ['SHOPS', 'PUBLIC'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'grand-strip', districtId: 'casino', code: 'CS-A', name: 'Grand Strip', status: 'OPEN',
+    shortDescription: 'The main nightlife corridor through the casino district.',
+    description: 'Large signs, hotels and crowds dominate the strip. The casino systems themselves will plug into this location engine later.',
+    tags: ['NIGHTLIFE', 'CROWDED'], requirements: [],
+    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+  },
+  {
+    id: 'casino-lobby', districtId: 'casino', code: 'CS-B', name: 'Rift Casino', status: 'COMING SOON',
+    shortDescription: 'Future home of RiftCity casino games.',
+    description: 'The location is registered in the world now so the casino feature can be added later without rebuilding city navigation.',
+    tags: ['CASINO', 'ENTERTAINMENT'], requirements: [],
+    actions: [{ id: 'casino', label: 'Casino floor', type: 'casino', enabled: false, note: 'Casino gameplay is not installed yet.' }]
+  },
+  {
+    id: 'nightclub-row', districtId: 'casino', code: 'CS-C', name: 'Nightclub Row', status: 'COMING SOON',
+    shortDescription: 'Late-night venues behind the main strip.',
+    description: 'A dense cluster of clubs and late-night businesses reserved for future nightlife systems and events.',
+    tags: ['NIGHTLIFE', 'EVENTS'], requirements: [],
+    actions: [{ id: 'nightlife', label: 'Nightlife', type: 'nightlife', enabled: false, note: 'Nightlife gameplay is not installed yet.' }]
+  }
+];
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -89,6 +238,10 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'POST' && url.pathname === '/api/auth/logout') return logout(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/auth/me') return me(request, env);
   if (method === 'GET' && url.pathname === '/api/player/state') return getPlayerState(request, env);
+  if (method === 'GET' && url.pathname === '/api/world') return getWorld(request, env);
+  if (method === 'GET' && url.pathname.startsWith('/api/world/districts/')) return getDistrict(request, env, url);
+  if (method === 'GET' && url.pathname.startsWith('/api/world/locations/')) return getLocation(request, env, url);
+  if (method === 'POST' && url.pathname === '/api/world/travel') return travelToLocation(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
   if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
   if (method === 'POST' && url.pathname.startsWith('/api/admin/logs/') && url.pathname.endsWith('/resolve')) {
@@ -116,6 +269,7 @@ async function register(request, env, requestId) {
   const now = Date.now();
 
   await ensurePlayerStateTable(env);
+  await ensurePlayerLocationTable(env);
   await env.DB.batch([
     env.DB.prepare(`
       INSERT INTO users (id, username, password_hash, password_salt, role, created_at, last_active_at)
@@ -124,7 +278,11 @@ async function register(request, env, requestId) {
     env.DB.prepare(`
       INSERT INTO player_state (user_id, created_at, updated_at)
       VALUES (?, ?, ?)
-    `).bind(userId, now, now)
+    `).bind(userId, now, now),
+    env.DB.prepare(`
+      INSERT INTO player_location (user_id, district_id, location_id, updated_at)
+      VALUES (?, 'downtown', 'central-plaza', ?)
+    `).bind(userId, now)
   ]);
 
   const playerState = await getPlayerStateRow(env, userId);
@@ -216,6 +374,7 @@ async function me(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, authenticated: false }, 401);
   const playerState = await ensurePlayerState(env, auth.user.id);
+  const playerLocation = await ensurePlayerLocation(env, auth.user.id);
   return json({
     ok: true,
     authenticated: true,
@@ -227,7 +386,8 @@ async function me(request, env) {
       lastActiveAt: auth.user.last_active_at,
       online: true
     },
-    player: toPublicPlayerState(playerState)
+    player: toPublicPlayerState(playerState),
+    location: toPublicPlayerLocation(playerLocation)
   });
 }
 
@@ -238,8 +398,88 @@ async function getPlayerState(request, env) {
   return json({ ok: true, player: toPublicPlayerState(playerState) });
 }
 
+async function getWorld(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const current = await ensurePlayerLocation(env, auth.user.id);
+  return json({
+    ok: true,
+    world: {
+      districts: WORLD_DISTRICTS.map(district => ({
+        ...district,
+        locationCount: WORLD_LOCATIONS.filter(location => location.districtId === district.id).length
+      })),
+      current: toPublicPlayerLocation(current)
+    }
+  });
+}
+
+async function getDistrict(request, env, url) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const id = decodeURIComponent(url.pathname.slice('/api/world/districts/'.length));
+  const district = WORLD_DISTRICTS.find(item => item.id === id);
+  if (!district) return json({ ok: false, error: 'District not found' }, 404);
+  const current = await ensurePlayerLocation(env, auth.user.id);
+  return json({
+    ok: true,
+    district: {
+      ...district,
+      locations: WORLD_LOCATIONS.filter(location => location.districtId === district.id)
+    },
+    current: toPublicPlayerLocation(current)
+  });
+}
+
+async function getLocation(request, env, url) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const id = decodeURIComponent(url.pathname.slice('/api/world/locations/'.length));
+  const location = WORLD_LOCATIONS.find(item => item.id === id);
+  if (!location) return json({ ok: false, error: 'Location not found' }, 404);
+  const district = WORLD_DISTRICTS.find(item => item.id === location.districtId);
+  const current = await ensurePlayerLocation(env, auth.user.id);
+  return json({ ok: true, location, district, current: toPublicPlayerLocation(current) });
+}
+
+async function travelToLocation(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const body = await readJson(request);
+  const locationId = typeof body?.locationId === 'string' ? body.locationId.trim() : '';
+  const location = WORLD_LOCATIONS.find(item => item.id === locationId);
+  if (!location) return json({ ok: false, error: 'Unknown location' }, 400);
+
+  await ensurePlayerLocationTable(env);
+  const now = Date.now();
+  await env.DB.prepare(`
+    INSERT INTO player_location (user_id, district_id, location_id, updated_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      district_id = excluded.district_id,
+      location_id = excluded.location_id,
+      updated_at = excluded.updated_at
+  `).bind(auth.user.id, location.districtId, location.id, now).run();
+
+  await writeAudit(env, auth.user.id, 'world.travel', auth.user.id, {
+    districtId: location.districtId,
+    locationId: location.id
+  });
+
+  return json({
+    ok: true,
+    current: {
+      districtId: location.districtId,
+      districtName: WORLD_DISTRICTS.find(item => item.id === location.districtId)?.name || location.districtId,
+      locationId: location.id,
+      locationName: location.name,
+      updatedAt: now
+    }
+  });
+}
+
 async function health(env) {
-  const result = { ok: true, service: 'riftcity-v2-phase2', database: 'unknown' };
+  const result = { ok: true, service: 'riftcity-v2-phase3', database: 'unknown' };
   try {
     await env.DB.prepare('SELECT 1 AS ok').first();
     result.database = 'connected';
@@ -446,6 +686,39 @@ function toPublicPlayerState(row) {
 
 function xpNeededForLevel(level) {
   return Math.max(100, Math.floor(100 * Math.pow(Math.max(1, Number(level) || 1), 1.35)));
+}
+
+async function ensurePlayerLocationTable(env) {
+  await env.DB.prepare(PLAYER_LOCATION_TABLE_SQL).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_location_district ON player_location(district_id)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_location_location ON player_location(location_id)').run();
+}
+
+async function ensurePlayerLocation(env, userId) {
+  await ensurePlayerLocationTable(env);
+  const now = Date.now();
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO player_location (user_id, district_id, location_id, updated_at)
+    VALUES (?, 'downtown', 'central-plaza', ?)
+  `).bind(userId, now).run();
+  const row = await env.DB.prepare(`
+    SELECT user_id, district_id, location_id, updated_at
+    FROM player_location WHERE user_id = ?
+  `).bind(userId).first();
+  if (!row) throw new Error('Could not create or load player location');
+  return row;
+}
+
+function toPublicPlayerLocation(row) {
+  const district = WORLD_DISTRICTS.find(item => item.id === row.district_id);
+  const location = WORLD_LOCATIONS.find(item => item.id === row.location_id);
+  return {
+    districtId: row.district_id,
+    districtName: district?.name || row.district_id,
+    locationId: row.location_id,
+    locationName: location?.name || row.location_id,
+    updatedAt: row.updated_at
+  };
 }
 
 async function ensureLogTable(env) {
