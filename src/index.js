@@ -71,6 +71,116 @@ const PLAYER_INVENTORY_TABLE_SQL = `
   )
 `;
 
+const PLAYER_CRIME_PROGRESS_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS player_crime_progress (
+    user_id TEXT NOT NULL,
+    crime_id TEXT NOT NULL,
+    mastery INTEGER NOT NULL DEFAULT 0 CHECK (mastery >= 0 AND mastery <= 100),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    successes INTEGER NOT NULL DEFAULT 0 CHECK (successes >= 0),
+    failures INTEGER NOT NULL DEFAULT 0 CHECK (failures >= 0),
+    last_attempt_at INTEGER,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, crime_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`;
+
+const CRIME_HISTORY_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS crime_history (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    crime_id TEXT NOT NULL,
+    success INTEGER NOT NULL CHECK (success IN (0,1)),
+    chance REAL NOT NULL,
+    nerve_spent INTEGER NOT NULL CHECK (nerve_spent >= 0),
+    cash_delta INTEGER NOT NULL DEFAULT 0,
+    xp_delta INTEGER NOT NULL DEFAULT 0,
+    mastery_delta INTEGER NOT NULL DEFAULT 0,
+    item_reward_id TEXT,
+    item_reward_quantity INTEGER NOT NULL DEFAULT 0,
+    consequence_status TEXT,
+    consequence_until INTEGER,
+    result_text TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`;
+
+// Crime definitions are server-owned. The browser receives only safe display data
+// and a calculated success chance; it never chooses rewards or outcomes.
+const CRIME_REGISTRY = Object.freeze([
+  {
+    id: 'street_scavenging',
+    name: 'Street Scavenging',
+    category: 'Scavenging',
+    description: 'Search overlooked corners of RiftCity for loose cash and useful items.',
+    nerveCost: 1,
+    baseChance: 0.86,
+    cashMin: 2,
+    cashMax: 12,
+    xpMin: 4,
+    xpMax: 8,
+    requiredItemId: null,
+    requiredLocationId: null,
+    itemChance: 0.34,
+    itemPool: [
+      { itemId: 'candy_bar', weight: 40, quantity: 1 },
+      { itemId: 'cheap_watch', weight: 26, quantity: 1 },
+      { itemId: 'energy_drink', weight: 20, quantity: 1 },
+      { itemId: 'screwdriver', weight: 10, quantity: 1 },
+      { itemId: 'first_aid_kit', weight: 4, quantity: 1 }
+    ],
+    failure: { jailChance: 0.02, hospitalChance: 0.01, minSeconds: 30, maxSeconds: 60 }
+  },
+  {
+    id: 'parcel_theft',
+    name: 'Parcel Theft',
+    category: 'Theft',
+    description: 'Grab an unattended delivery before anyone notices it is gone.',
+    nerveCost: 2,
+    baseChance: 0.69,
+    cashMin: 8,
+    cashMax: 30,
+    xpMin: 8,
+    xpMax: 14,
+    requiredItemId: null,
+    requiredLocationId: null,
+    itemChance: 0.58,
+    itemPool: [
+      { itemId: 'candy_bar', weight: 28, quantity: 1 },
+      { itemId: 'energy_drink', weight: 24, quantity: 1 },
+      { itemId: 'cheap_watch', weight: 24, quantity: 1 },
+      { itemId: 'ticket', weight: 14, quantity: 1 },
+      { itemId: 'first_aid_kit', weight: 10, quantity: 1 }
+    ],
+    failure: { jailChance: 0.10, hospitalChance: 0.02, minSeconds: 45, maxSeconds: 100 }
+  },
+  {
+    id: 'service_alley_breakin',
+    name: 'Service Alley Break-In',
+    category: 'Burglary',
+    description: 'Work a locked service entrance for a shot at better loot.',
+    nerveCost: 3,
+    baseChance: 0.55,
+    cashMin: 18,
+    cashMax: 58,
+    xpMin: 12,
+    xpMax: 22,
+    requiredItemId: 'screwdriver',
+    requiredLocationId: null,
+    itemChance: 0.70,
+    itemPool: [
+      { itemId: 'cheap_watch', weight: 35, quantity: 1 },
+      { itemId: 'first_aid_kit', weight: 25, quantity: 1 },
+      { itemId: 'energy_drink', weight: 18, quantity: 1 },
+      { itemId: 'key', weight: 12, quantity: 1 },
+      { itemId: 'ticket', weight: 10, quantity: 1 }
+    ],
+    failure: { jailChance: 0.18, hospitalChance: 0.04, minSeconds: 60, maxSeconds: 150 }
+  }
+]);
+
 const WORLD_CATEGORIES = [
   { id: 'services', code: 'SV', name: 'Services', description: 'Core city institutions, training and public services.' },
   { id: 'shops', code: 'SH', name: 'Shops', description: 'Retail stores for equipment, supplies and valuables.' },
@@ -311,6 +421,8 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'POST' && url.pathname === '/api/inventory/use') return useInventoryItem(request, env, requestId);
   if (method === 'POST' && url.pathname === '/api/inventory/equip') return equipInventoryItem(request, env, requestId);
   if (method === 'POST' && url.pathname === '/api/inventory/unequip') return unequipInventoryItem(request, env, requestId);
+  if (method === 'GET' && url.pathname === '/api/crimes') return getCrimes(request, env);
+  if (method === 'POST' && url.pathname === '/api/crimes/execute') return executeCrime(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/world') return getWorld(request, env);
   if (method === 'GET' && url.pathname.startsWith('/api/world/districts/')) return getDistrict(request, env, url);
   if (method === 'GET' && url.pathname.startsWith('/api/world/locations/')) return getLocation(request, env, url);
@@ -446,7 +558,7 @@ async function logout(request, env, requestId) {
 async function me(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, authenticated: false }, 401);
-  const playerState = await ensurePlayerState(env, auth.user.id);
+  const playerState = await ensureActivePlayerState(env, auth.user.id);
   const playerLocation = await ensurePlayerLocation(env, auth.user.id);
   return json({
     ok: true,
@@ -467,10 +579,226 @@ async function me(request, env) {
 async function getPlayerState(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
-  const playerState = await ensurePlayerState(env, auth.user.id);
+  const playerState = await ensureActivePlayerState(env, auth.user.id);
   return json({ ok: true, player: toPublicPlayerState(playerState) });
 }
 
+
+async function getCrimes(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+
+  await ensureCrimeTables(env);
+  const player = await ensureActivePlayerState(env, auth.user.id);
+  const location = await ensurePlayerLocation(env, auth.user.id);
+  const progressRows = await env.DB.prepare(`
+    SELECT crime_id, mastery, attempts, successes, failures, last_attempt_at, updated_at
+    FROM player_crime_progress WHERE user_id = ?
+  `).bind(auth.user.id).all();
+  const progressById = new Map((progressRows.results || []).map(row => [row.crime_id, row]));
+  const ownedRows = await env.DB.prepare(`
+    SELECT item_id, quantity FROM player_inventory WHERE user_id = ? AND quantity > 0
+  `).bind(auth.user.id).all();
+  const owned = new Map((ownedRows.results || []).map(row => [row.item_id, Number(row.quantity) || 0]));
+  const historyRows = await env.DB.prepare(`
+    SELECT id, crime_id, success, cash_delta, xp_delta, mastery_delta, item_reward_id,
+      item_reward_quantity, consequence_status, consequence_until, result_text, created_at
+    FROM crime_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 8
+  `).bind(auth.user.id).all();
+
+  const crimes = CRIME_REGISTRY.map(crime => {
+    const progress = normalizeCrimeProgress(progressById.get(crime.id), crime.id);
+    return toPublicCrime(crime, progress, player, location, owned);
+  });
+
+  return json({
+    ok: true,
+    crimes,
+    player: toPublicPlayerState(player),
+    history: (historyRows.results || []).map(toPublicCrimeHistory)
+  });
+}
+
+async function executeCrime(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+
+  const body = await readJson(request);
+  const crimeId = typeof body?.crimeId === 'string' ? body.crimeId.trim() : '';
+  const crime = CRIME_REGISTRY.find(entry => entry.id === crimeId);
+  if (!crime) return json({ ok: false, error: 'Unknown crime' }, 404);
+
+  await ensureCrimeTables(env);
+  await ensureInventoryTable(env);
+  const player = await ensureActivePlayerState(env, auth.user.id);
+  const location = await ensurePlayerLocation(env, auth.user.id);
+  const progressRow = await env.DB.prepare(`
+    SELECT crime_id, mastery, attempts, successes, failures, last_attempt_at, updated_at
+    FROM player_crime_progress WHERE user_id = ? AND crime_id = ?
+  `).bind(auth.user.id, crime.id).first();
+  const progress = normalizeCrimeProgress(progressRow, crime.id);
+  const now = Date.now();
+
+  if (player.status !== 'active') {
+    const untilText = player.status_until ? ` until ${new Date(player.status_until).toISOString()}` : '';
+    return json({ ok: false, error: `You cannot commit crimes while ${player.status}${untilText}.`, player: toPublicPlayerState(player) }, 409);
+  }
+  if (Number(player.nerve) < crime.nerveCost) {
+    return json({ ok: false, error: `You need ${crime.nerveCost} nerve for ${crime.name}.`, player: toPublicPlayerState(player) }, 409);
+  }
+  if (progress.lastAttemptAt && now - progress.lastAttemptAt < 1200) {
+    return json({ ok: false, error: 'Crime request received too quickly. Try again in a moment.' }, 429);
+  }
+  if (crime.requiredLocationId && location.location_id !== crime.requiredLocationId) {
+    const required = WORLD_LOCATIONS.find(item => item.id === crime.requiredLocationId);
+    return json({ ok: false, error: `You must be at ${required?.name || crime.requiredLocationId} for this crime.` }, 409);
+  }
+
+  let requiredItem = null;
+  if (crime.requiredItemId) {
+    requiredItem = await getOwnedItemRow(env, auth.user.id, crime.requiredItemId);
+    if (!requiredItem || Number(requiredItem.quantity) < 1) {
+      const definition = getItemDefinition(crime.requiredItemId);
+      return json({ ok: false, error: `${definition?.name || crime.requiredItemId} is required for ${crime.name}.` }, 409);
+    }
+  }
+
+  const chance = calculateCrimeChance(crime, progress, player);
+  const success = randomFloat() < chance;
+  const masteryDelta = success ? 2 : 1;
+  const nextMastery = Math.min(100, progress.mastery + masteryDelta);
+  const nerveAfter = Math.max(0, Number(player.nerve) - crime.nerveCost);
+  let cashDelta = 0;
+  let xpDelta = 0;
+  let itemReward = null;
+  let consequenceStatus = null;
+  let consequenceUntil = null;
+  let resultText = '';
+
+  if (success) {
+    cashDelta = randomInt(crime.cashMin, crime.cashMax);
+    xpDelta = randomInt(crime.xpMin, crime.xpMax);
+    if (crime.itemPool.length && randomFloat() < crime.itemChance) {
+      const rewardChoice = weightedPick(crime.itemPool);
+      if (rewardChoice) {
+        const definition = getItemDefinition(rewardChoice.itemId);
+        if (definition) itemReward = { definition, quantity: Math.max(1, Number(rewardChoice.quantity) || 1) };
+      }
+    }
+    resultText = itemReward
+      ? `Success. You made $${cashDelta} and found ${itemReward.definition.name}.`
+      : `Success. You made $${cashDelta}.`;
+  } else {
+    const failRoll = randomFloat();
+    const jailCutoff = Number(crime.failure?.jailChance) || 0;
+    const hospitalCutoff = jailCutoff + (Number(crime.failure?.hospitalChance) || 0);
+    if (failRoll < jailCutoff) consequenceStatus = 'jailed';
+    else if (failRoll < hospitalCutoff) consequenceStatus = 'hospitalized';
+
+    if (consequenceStatus) {
+      const seconds = randomInt(crime.failure.minSeconds, crime.failure.maxSeconds);
+      consequenceUntil = now + seconds * 1000;
+      resultText = consequenceStatus === 'jailed'
+        ? `Failed. You were caught and sent to Blackridge for ${seconds} seconds.`
+        : `Failed. You were injured and hospitalized for ${seconds} seconds.`;
+    } else {
+      resultText = 'Failed. You got away, but came back empty-handed.';
+    }
+  }
+
+  const levelResult = applyXpAndLevels(Number(player.level), Number(player.xp), xpDelta);
+  const historyId = crypto.randomUUID();
+  const statements = [
+    env.DB.prepare(`
+      UPDATE player_state
+      SET nerve = ?, cash = cash + ?, level = ?, xp = ?, status = ?, status_until = ?, status_reason = ?, updated_at = ?
+      WHERE user_id = ?
+    `).bind(
+      nerveAfter,
+      cashDelta,
+      levelResult.level,
+      levelResult.xp,
+      consequenceStatus || 'active',
+      consequenceUntil,
+      consequenceStatus ? `${crime.name} consequence` : null,
+      now,
+      auth.user.id
+    ),
+    env.DB.prepare(`
+      INSERT INTO player_crime_progress
+        (user_id, crime_id, mastery, attempts, successes, failures, last_attempt_at, updated_at)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+      ON CONFLICT(user_id, crime_id) DO UPDATE SET
+        mastery = excluded.mastery,
+        attempts = player_crime_progress.attempts + 1,
+        successes = player_crime_progress.successes + excluded.successes,
+        failures = player_crime_progress.failures + excluded.failures,
+        last_attempt_at = excluded.last_attempt_at,
+        updated_at = excluded.updated_at
+    `).bind(auth.user.id, crime.id, nextMastery, success ? 1 : 0, success ? 0 : 1, now, now),
+    env.DB.prepare(`
+      INSERT INTO crime_history
+        (id, user_id, crime_id, success, chance, nerve_spent, cash_delta, xp_delta, mastery_delta,
+         item_reward_id, item_reward_quantity, consequence_status, consequence_until, result_text, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      historyId, auth.user.id, crime.id, success ? 1 : 0, chance, crime.nerveCost, cashDelta, xpDelta,
+      masteryDelta, itemReward?.definition.id || null, itemReward?.quantity || 0,
+      consequenceStatus, consequenceUntil, resultText, now
+    )
+  ];
+
+  if (itemReward) {
+    const maxStack = itemReward.definition.stackable ? itemReward.definition.maxStack : 1;
+    statements.push(env.DB.prepare(`
+      INSERT INTO player_inventory (user_id, item_id, quantity, equipped_slot, created_at, updated_at)
+      VALUES (?, ?, ?, NULL, ?, ?)
+      ON CONFLICT(user_id, item_id) DO UPDATE SET
+        quantity = MIN(?, player_inventory.quantity + excluded.quantity),
+        updated_at = excluded.updated_at
+    `).bind(auth.user.id, itemReward.definition.id, itemReward.quantity, now, now, maxStack));
+  }
+
+  await env.DB.batch(statements);
+  const updatedPlayer = await ensureActivePlayerState(env, auth.user.id);
+  const updatedProgressRow = await env.DB.prepare(`
+    SELECT crime_id, mastery, attempts, successes, failures, last_attempt_at, updated_at
+    FROM player_crime_progress WHERE user_id = ? AND crime_id = ?
+  `).bind(auth.user.id, crime.id).first();
+  const updatedProgress = normalizeCrimeProgress(updatedProgressRow, crime.id);
+
+  await writeAudit(env, auth.user.id, 'crime.executed', auth.user.id, {
+    crimeId: crime.id, success, cashDelta, xpDelta, masteryDelta,
+    itemRewardId: itemReward?.definition.id || null, consequenceStatus
+  });
+  await safeWriteSystemLog(env, {
+    severity: 'INFO', eventType: 'CRIME_EXECUTED', message: `${auth.user.username}: ${crime.name} — ${success ? 'success' : 'failure'}`,
+    route: '/api/crimes/execute', method: 'POST', requestId, userId: auth.user.id,
+    context: { crimeId: crime.id, success, cashDelta, xpDelta, masteryDelta, consequenceStatus }
+  });
+
+  return json({
+    ok: true,
+    result: {
+      id: historyId,
+      crimeId: crime.id,
+      crimeName: crime.name,
+      success,
+      chance,
+      nerveSpent: crime.nerveCost,
+      cashDelta,
+      xpDelta,
+      masteryDelta,
+      levelUps: levelResult.levelUps,
+      itemReward: itemReward ? { ...toPublicItemDefinition(itemReward.definition), quantity: itemReward.quantity } : null,
+      consequence: consequenceStatus ? { status: consequenceStatus, until: consequenceUntil } : null,
+      text: resultText,
+      createdAt: now
+    },
+    progress: updatedProgress,
+    player: toPublicPlayerState(updatedPlayer)
+  });
+}
 
 async function getItemCatalog(request, env) {
   const auth = await authenticate(request, env);
@@ -721,6 +1049,128 @@ async function removeItemFromInventory(env, userId, itemId, quantity = 1) {
       .bind(remaining, Date.now(), userId, itemId).run();
   }
   return { removed, quantity: remaining };
+}
+
+async function ensureCrimeTables(env) {
+  await ensureInventoryTable(env);
+  await env.DB.prepare(PLAYER_CRIME_PROGRESS_TABLE_SQL).run();
+  await env.DB.prepare(CRIME_HISTORY_TABLE_SQL).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_crime_progress_user ON player_crime_progress(user_id)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_crime_progress_mastery ON player_crime_progress(user_id, mastery)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_crime_history_user_created ON crime_history(user_id, created_at DESC)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_crime_history_crime ON crime_history(user_id, crime_id, created_at DESC)').run();
+}
+
+async function ensureActivePlayerState(env, userId) {
+  let player = await ensurePlayerState(env, userId);
+  if (player.status !== 'active' && player.status_until && Number(player.status_until) <= Date.now()) {
+    const now = Date.now();
+    await env.DB.prepare(`
+      UPDATE player_state SET status = 'active', status_until = NULL, status_reason = NULL, updated_at = ? WHERE user_id = ?
+    `).bind(now, userId).run();
+    player = await getPlayerStateRow(env, userId);
+  }
+  return player;
+}
+
+function normalizeCrimeProgress(row, crimeId) {
+  return {
+    crimeId,
+    mastery: Math.max(0, Math.min(100, Number(row?.mastery) || 0)),
+    attempts: Number(row?.attempts) || 0,
+    successes: Number(row?.successes) || 0,
+    failures: Number(row?.failures) || 0,
+    lastAttemptAt: row?.last_attempt_at || null,
+    updatedAt: row?.updated_at || null
+  };
+}
+
+function calculateCrimeChance(crime, progress, player) {
+  const masteryBonus = (progress.mastery / 100) * 0.12;
+  const dexterityBonus = Math.min(0.04, Math.max(0, (Number(player.dexterity) - 1) * 0.002));
+  return Math.max(0.05, Math.min(0.97, crime.baseChance + masteryBonus + dexterityBonus));
+}
+
+function toPublicCrime(crime, progress, player, location, owned) {
+  const requiredItem = crime.requiredItemId ? getItemDefinition(crime.requiredItemId) : null;
+  const requiredLocation = crime.requiredLocationId ? WORLD_LOCATIONS.find(item => item.id === crime.requiredLocationId) : null;
+  const lockedReasons = [];
+  if (Number(player.nerve) < crime.nerveCost) lockedReasons.push(`Needs ${crime.nerveCost} nerve`);
+  if (player.status !== 'active') lockedReasons.push(`Unavailable while ${player.status}`);
+  if (requiredItem && (owned.get(requiredItem.id) || 0) < 1) lockedReasons.push(`Requires ${requiredItem.name}`);
+  if (requiredLocation && location.location_id !== requiredLocation.id) lockedReasons.push(`Requires ${requiredLocation.name}`);
+
+  return {
+    id: crime.id,
+    name: crime.name,
+    category: crime.category,
+    description: crime.description,
+    nerveCost: crime.nerveCost,
+    successChance: calculateCrimeChance(crime, progress, player),
+    mastery: progress.mastery,
+    attempts: progress.attempts,
+    successes: progress.successes,
+    failures: progress.failures,
+    requiredItem: requiredItem ? { id: requiredItem.id, name: requiredItem.name, owned: owned.get(requiredItem.id) || 0 } : null,
+    requiredLocation: requiredLocation ? { id: requiredLocation.id, name: requiredLocation.name, current: location.location_id === requiredLocation.id } : null,
+    available: lockedReasons.length === 0,
+    lockedReasons
+  };
+}
+
+function toPublicCrimeHistory(row) {
+  const crime = CRIME_REGISTRY.find(entry => entry.id === row.crime_id);
+  const item = row.item_reward_id ? getItemDefinition(row.item_reward_id) : null;
+  return {
+    id: row.id,
+    crimeId: row.crime_id,
+    crimeName: crime?.name || row.crime_id,
+    success: Boolean(row.success),
+    cashDelta: Number(row.cash_delta) || 0,
+    xpDelta: Number(row.xp_delta) || 0,
+    masteryDelta: Number(row.mastery_delta) || 0,
+    itemReward: item ? { id: item.id, name: item.name, quantity: Number(row.item_reward_quantity) || 0 } : null,
+    consequence: row.consequence_status ? { status: row.consequence_status, until: row.consequence_until } : null,
+    text: row.result_text,
+    createdAt: row.created_at
+  };
+}
+
+function applyXpAndLevels(level, xp, xpGain) {
+  let currentLevel = Math.max(1, Number(level) || 1);
+  let currentXp = Math.max(0, Number(xp) || 0) + Math.max(0, Number(xpGain) || 0);
+  let levelUps = 0;
+  while (currentXp >= xpNeededForLevel(currentLevel) && levelUps < 50) {
+    currentXp -= xpNeededForLevel(currentLevel);
+    currentLevel += 1;
+    levelUps += 1;
+  }
+  return { level: currentLevel, xp: currentXp, levelUps };
+}
+
+function randomFloat() {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return values[0] / 0x100000000;
+}
+
+function randomInt(minimum, maximum) {
+  const min = Math.ceil(Number(minimum) || 0);
+  const max = Math.floor(Number(maximum) || min);
+  if (max <= min) return min;
+  return min + Math.floor(randomFloat() * (max - min + 1));
+}
+
+function weightedPick(entries) {
+  const valid = (entries || []).filter(entry => Number(entry.weight) > 0);
+  const total = valid.reduce((sum, entry) => sum + Number(entry.weight), 0);
+  if (!total) return null;
+  let roll = randomFloat() * total;
+  for (const entry of valid) {
+    roll -= Number(entry.weight);
+    if (roll <= 0) return entry;
+  }
+  return valid[valid.length - 1] || null;
 }
 
 async function getWorld(request, env) {

@@ -113,3 +113,42 @@ CREATE TABLE IF NOT EXISTS player_inventory (
 
 CREATE INDEX IF NOT EXISTS idx_player_inventory_user ON player_inventory(user_id);
 CREATE INDEX IF NOT EXISTS idx_player_inventory_equipped ON player_inventory(user_id, equipped_slot);
+
+CREATE TABLE IF NOT EXISTS player_crime_progress (
+  user_id TEXT NOT NULL,
+  crime_id TEXT NOT NULL,
+  mastery INTEGER NOT NULL DEFAULT 0 CHECK (mastery >= 0 AND mastery <= 100),
+  attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  successes INTEGER NOT NULL DEFAULT 0 CHECK (successes >= 0),
+  failures INTEGER NOT NULL DEFAULT 0 CHECK (failures >= 0),
+  last_attempt_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, crime_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_crime_progress_user ON player_crime_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_player_crime_progress_mastery ON player_crime_progress(user_id, mastery);
+
+CREATE TABLE IF NOT EXISTS crime_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  crime_id TEXT NOT NULL,
+  success INTEGER NOT NULL CHECK (success IN (0,1)),
+  chance REAL NOT NULL,
+  nerve_spent INTEGER NOT NULL CHECK (nerve_spent >= 0),
+  cash_delta INTEGER NOT NULL DEFAULT 0,
+  xp_delta INTEGER NOT NULL DEFAULT 0,
+  mastery_delta INTEGER NOT NULL DEFAULT 0,
+  item_reward_id TEXT,
+  item_reward_quantity INTEGER NOT NULL DEFAULT 0,
+  consequence_status TEXT,
+  consequence_until INTEGER,
+  result_text TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_crime_history_user_created ON crime_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_crime_history_crime ON crime_history(user_id, crime_id, created_at DESC);
+

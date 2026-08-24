@@ -65,3 +65,13 @@ This repository is intentionally JavaScript-only end to end:
 - `npm run build` runs a JS-only guard first and fails if TypeScript is introduced later.
 
 Wrangler still bundles the Worker for Cloudflare deployment, but RiftCity's source code and project configuration remain JavaScript-only.
+
+## Phase 5 — Server-authoritative crime engine
+
+- Persistent D1 player crime mastery and attempt history.
+- `GET /api/crimes` returns server-calculated availability/chances.
+- `POST /api/crimes/execute` spends nerve and resolves success/failure entirely in the Worker.
+- Cash, XP/level progress, item drops and jail/hospital consequences are committed server-side.
+- Crime rewards write directly into the existing D1 inventory engine.
+- Client JavaScript only renders the server result; it does not choose outcomes or reward amounts.
+

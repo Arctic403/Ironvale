@@ -15,6 +15,8 @@ let worldState = null;
 let activeLocationId = null;
 let inventoryState = null;
 let selectedInventoryItemId = null;
+let crimeState = null;
+let crimeRequestInFlight = false;
 
 $('#register-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -32,6 +34,8 @@ $('#logout-btn').addEventListener('click', async () => {
   const result = await api('/api/auth/logout', { method: 'POST' });
   if (result.ok) {
     worldState = null;
+    inventoryState = null;
+    crimeState = null;
     authenticated = false;
     showMessage('Logged out.');
     window.location.hash = '#overview';
@@ -109,6 +113,7 @@ function getRequestedView() {
   if (hash.startsWith('#city/')) return 'location';
   if (hash === '#city') return 'city';
   if (hash === '#inventory') return 'inventory';
+  if (hash === '#crimes') return 'crimes';
   return 'overview';
 }
 
@@ -125,10 +130,11 @@ function getRequestedLocationId() {
 }
 
 async function switchView(view) {
-  currentView = ['overview', 'city', 'location', 'inventory'].includes(view) ? view : 'overview';
+  currentView = ['overview', 'city', 'location', 'inventory', 'crimes'].includes(view) ? view : 'overview';
   $('#overview-view').classList.toggle('hidden', currentView !== 'overview');
   $('#city-view').classList.toggle('hidden', currentView !== 'city');
   $('#inventory-view').classList.toggle('hidden', currentView !== 'inventory');
+  $('#crimes-view').classList.toggle('hidden', currentView !== 'crimes');
   $('#location-view').classList.toggle('hidden', currentView !== 'location');
 
   $$('[data-view-link]').forEach((link) => {
@@ -150,6 +156,14 @@ async function switchView(view) {
     $('#page-eyebrow').textContent = 'PLAYER STORAGE';
     $('#page-title-text').textContent = 'Inventory';
     if (authenticated) await loadInventory();
+    return;
+  }
+
+
+  if (currentView === 'crimes') {
+    $('#page-eyebrow').textContent = 'SERVER ACTIONS';
+    $('#page-title-text').textContent = 'Crimes';
+    if (authenticated) await loadCrimes();
     return;
   }
 
@@ -226,6 +240,108 @@ function renderPlayer(player) {
   setText('#status-detail', detail);
 }
 
+
+async function loadCrimes(force = false) {
+  if (crimeState && !force) {
+    renderCrimes();
+    return;
+  }
+  setText('#crime-count', '00');
+  $('#crime-list').innerHTML = '<div class="world-loading">Loading crime engine…</div>';
+  $('#crime-history').innerHTML = '<div class="world-loading">Loading attempt history…</div>';
+  const result = await api('/api/crimes');
+  if (!result.ok) {
+    $('#crime-list').innerHTML = '<div class="world-loading error-text">Could not load crimes.</div>';
+    return showMessage(result.error || 'Could not load crimes.', true);
+  }
+  crimeState = result;
+  if (result.player) renderPlayer(result.player);
+  renderCrimes();
+}
+
+function renderCrimes() {
+  if (!crimeState) return;
+  const crimes = crimeState.crimes || [];
+  const history = crimeState.history || [];
+  setText('#crime-count', String(crimes.length).padStart(2, '0'));
+
+  $('#crime-list').innerHTML = crimes.length ? crimes.map(crime => {
+    const chance = Math.round((Number(crime.successChance) || 0) * 100);
+    const requirement = crime.requiredItem
+      ? `<span class="crime-requirement ${crime.requiredItem.owned > 0 ? 'met' : 'missing'}">${escapeHtml(crime.requiredItem.name)} · ${crime.requiredItem.owned > 0 ? 'OWNED' : 'REQUIRED'}</span>`
+      : '<span class="crime-requirement met">NO TOOL REQUIRED</span>';
+    const lockText = (crime.lockedReasons || []).join(' · ');
+    return `
+      <article class="crime-card ${crime.available ? '' : 'locked'}" data-crime-id="${escapeHtml(crime.id)}">
+        <div class="crime-card-top">
+          <div>
+            <span class="eyebrow">${escapeHtml(crime.category.toUpperCase())}</span>
+            <h3>${escapeHtml(crime.name)}</h3>
+          </div>
+          <span class="crime-chance">${chance}%</span>
+        </div>
+        <p>${escapeHtml(crime.description)}</p>
+        <div class="crime-metrics">
+          <span><small>NERVE</small><strong>${escapeHtml(crime.nerveCost)}</strong></span>
+          <span><small>MASTERY</small><strong>${escapeHtml(crime.mastery)}/100</strong></span>
+          <span><small>ATTEMPTS</small><strong>${escapeHtml(crime.attempts)}</strong></span>
+          <span><small>RECORD</small><strong>${escapeHtml(crime.successes)}W / ${escapeHtml(crime.failures)}L</strong></span>
+        </div>
+        <div class="crime-card-bottom">
+          ${requirement}
+          <button class="crime-run-button" data-run-crime="${escapeHtml(crime.id)}" ${crime.available || !(crime.lockedReasons || []).length ? '' : 'disabled'}>
+            ${crime.available ? `Attempt · ${escapeHtml(crime.nerveCost)} nerve` : escapeHtml(lockText || 'Unavailable')}
+          </button>
+        </div>
+      </article>
+    `;
+  }).join('') : '<div class="world-loading">No crimes installed.</div>';
+
+  $('#crime-history').innerHTML = history.length ? history.map(entry => `
+    <article class="crime-history-row ${entry.success ? 'success' : 'failure'}">
+      <div>
+        <strong>${escapeHtml(entry.crimeName)}</strong>
+        <small>${new Date(entry.createdAt).toLocaleString()}</small>
+      </div>
+      <span>${entry.success ? 'SUCCESS' : 'FAILED'}</span>
+      <p>${escapeHtml(entry.text)}</p>
+    </article>
+  `).join('') : '<div class="world-loading">No crime attempts yet.</div>';
+
+  $$('[data-run-crime]').forEach(button => {
+    button.addEventListener('click', () => runCrime(button.dataset.runCrime));
+  });
+}
+
+async function runCrime(crimeId) {
+  if (crimeRequestInFlight) return;
+  crimeRequestInFlight = true;
+  const button = $(`[data-run-crime="${cssEscape(crimeId)}"]`);
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Resolving on server…';
+  }
+
+  const result = await api('/api/crimes/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ crimeId })
+  });
+  crimeRequestInFlight = false;
+
+  if (!result.ok) {
+    if (result.player) renderPlayer(result.player);
+    crimeState = null;
+    await loadCrimes(true);
+    return showMessage(result.error || 'Crime attempt failed.', true);
+  }
+
+  if (result.player) renderPlayer(result.player);
+  inventoryState = null;
+  crimeState = null;
+  showMessage(result.result?.text || (result.result?.success ? 'Crime succeeded.' : 'Crime failed.'), !result.result?.success);
+  await loadCrimes(true);
+}
 
 async function loadInventory(force = false) {
   if (inventoryState && !force) {
