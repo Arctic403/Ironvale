@@ -19,7 +19,7 @@ async function loadLogs() {
 
   if (!response.ok) {
     list.innerHTML = '';
-    status.innerHTML = `${escapeHtml(data.error || 'Could not load logs')}. <strong>You must be signed in as an admin or developer.</strong>`;
+    status.textContent = data.error || 'Could not load logs';
     return;
   }
 

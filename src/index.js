@@ -204,8 +204,8 @@ async function health(env) {
 }
 
 async function getSystemLogs(request, env, url) {
-  const auth = await requireAdmin(request, env);
-  if (auth.response) return auth.response;
+  // TEMPORARY: public dev-log access during early RiftCity V2 development.
+  // Restore requireAdmin() before opening the game to other users.
   await ensureLogTable(env);
 
   const severity = (url.searchParams.get('severity') || '').toUpperCase();
@@ -231,8 +231,8 @@ async function getSystemLogs(request, env, url) {
 }
 
 async function resolveSystemLog(request, env, url) {
-  const auth = await requireAdmin(request, env);
-  if (auth.response) return auth.response;
+  // TEMPORARY: public dev-log access during early RiftCity V2 development.
+  // Restore requireAdmin() before opening the game to other users.
   await ensureLogTable(env);
   const match = url.pathname.match(/^\/api\/admin\/logs\/([^/]+)\/resolve$/);
   if (!match) return json({ ok: false, error: 'Invalid log ID' }, 400);
