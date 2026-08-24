@@ -3,101 +3,157 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>RiftCity V2 — Phase 2</title>
+  <meta name="theme-color" content="#090c11" />
+  <title>RiftCity V2</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <main class="shell">
-    <header class="hero">
-      <div class="eyebrow">RIFTCITY V2</div>
-      <h1>Phase 2 Player State</h1>
-      <p>Persistent player resources, progression, combat stats, and status.</p>
-      <p><a class="link-button" href="/admin/logs">Developer logs</a></p>
-    </header>
-
-    <section id="status" class="status-card">Checking session…</section>
-
-    <section id="auth-grid" class="grid">
-      <form id="register-form" class="card">
-        <h2>Create account</h2>
-        <label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" required /></label>
-        <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
-        <button>Create player</button>
-      </form>
-
-      <form id="login-form" class="card">
-        <h2>Login</h2>
-        <label>Username<input name="username" autocomplete="username" required /></label>
-        <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
-        <button>Enter RiftCity</button>
-      </form>
-    </section>
-
-    <section id="player-dashboard" class="hidden">
-      <section class="top-stat-grid" aria-label="Player resources">
-        <article class="stat-tile resource-health">
-          <div class="stat-label">Health</div>
-          <div class="stat-value"><span id="health-value">100</span><small>/ <span id="health-max">100</span></small></div>
-          <div class="meter"><span id="health-meter"></span></div>
-        </article>
-        <article class="stat-tile resource-nerve">
-          <div class="stat-label">Nerve</div>
-          <div class="stat-value"><span id="nerve-value">10</span><small>/ <span id="nerve-max">10</span></small></div>
-          <div class="meter"><span id="nerve-meter"></span></div>
-        </article>
-        <article class="stat-tile resource-energy">
-          <div class="stat-label">Energy</div>
-          <div class="stat-value"><span id="energy-value">100</span><small>/ <span id="energy-max">100</span></small></div>
-          <div class="meter"><span id="energy-meter"></span></div>
-        </article>
-        <article class="stat-tile resource-cash">
-          <div class="stat-label">Cash</div>
-          <div id="cash-value" class="stat-value">$0</div>
-          <div class="stat-sub">On hand</div>
-        </article>
-      </section>
-
-      <section class="grid dashboard-grid">
-        <article class="card progression-card">
-          <div class="account-head">
-            <div>
-              <div class="eyebrow">PROGRESSION</div>
-              <h2>Level <span id="level-value">1</span></h2>
-            </div>
-            <span id="player-status-badge" class="badge status-active">ACTIVE</span>
-          </div>
-          <div class="xp-row"><span>XP</span><strong><span id="xp-value">0</span> / <span id="xp-next">100</span></strong></div>
-          <div class="meter xp-meter"><span id="xp-meter"></span></div>
-          <p id="status-detail" class="muted">Player is active in RiftCity.</p>
-        </article>
-
-        <article class="card">
-          <div class="eyebrow">CORE STATS</div>
-          <h2>Combat attributes</h2>
-          <div class="combat-stats">
-            <div><span>Strength</span><strong id="strength-value">1</strong></div>
-            <div><span>Defense</span><strong id="defense-value">1</strong></div>
-            <div><span>Speed</span><strong id="speed-value">1</strong></div>
-            <div><span>Dexterity</span><strong id="dexterity-value">1</strong></div>
-          </div>
-        </article>
-      </section>
-
-      <section id="account-card" class="card account-card">
-        <div class="account-head">
-          <div>
-            <div class="eyebrow">ACTIVE SESSION</div>
-            <h2 id="account-name">Player</h2>
-          </div>
-          <span id="account-role" class="badge">player</span>
+  <div class="app-shell">
+    <aside class="desktop-rail" aria-label="RiftCity navigation">
+      <div class="brand-lockup">
+        <span class="brand-mark">R</span>
+        <div>
+          <strong>RiftCity</strong>
+          <small>V2</small>
         </div>
-        <dl id="account-details"></dl>
-        <button id="logout-btn" class="secondary">Logout</button>
-      </section>
-    </section>
+      </div>
 
-    <div id="message" class="message hidden" role="status"></div>
-  </main>
+      <nav class="rail-nav">
+        <a class="rail-link active" href="/" aria-current="page">
+          <span class="rail-icon">▦</span><span>Overview</span>
+        </a>
+        <a class="rail-link" href="/admin/logs">
+          <span class="rail-icon">⌁</span><span>Dev logs</span>
+        </a>
+      </nav>
+
+      <div class="rail-footer">
+        <span class="phase-dot"></span>
+        <span>Phase 2.1</span>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div class="mobile-brand">
+          <span class="brand-mark">R</span>
+          <strong>RiftCity</strong>
+        </div>
+        <div class="page-title">
+          <span class="eyebrow">PLAYER CORE</span>
+          <h1>Overview</h1>
+        </div>
+        <a class="topbar-link" href="/admin/logs">Dev logs</a>
+      </header>
+
+      <section id="status" class="session-status">Checking session…</section>
+
+      <section id="auth-grid" class="auth-layout">
+        <div class="auth-copy">
+          <span class="eyebrow">RIFTCITY V2</span>
+          <h2>Enter the city.</h2>
+          <p>Create a player or sign back in. Your account and player state are stored persistently.</p>
+        </div>
+
+        <div class="auth-forms">
+          <form id="login-form" class="panel auth-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">RETURNING PLAYER</span>
+                <h2>Login</h2>
+              </div>
+            </div>
+            <label>Username<input name="username" autocomplete="username" required /></label>
+            <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+            <button>Enter RiftCity</button>
+          </form>
+
+          <form id="register-form" class="panel auth-panel secondary-auth">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">NEW PLAYER</span>
+                <h2>Create account</h2>
+              </div>
+            </div>
+            <label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" required /></label>
+            <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <button class="secondary">Create player</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="player-dashboard" class="hidden">
+        <section class="resource-strip" aria-label="Player resources">
+          <article class="resource-item resource-health">
+            <div class="resource-top"><span>Health</span><strong><span id="health-value">100</span><small>/<span id="health-max">100</span></small></strong></div>
+            <div class="meter"><span id="health-meter"></span></div>
+          </article>
+          <article class="resource-item resource-nerve">
+            <div class="resource-top"><span>Nerve</span><strong><span id="nerve-value">10</span><small>/<span id="nerve-max">10</span></small></strong></div>
+            <div class="meter"><span id="nerve-meter"></span></div>
+          </article>
+          <article class="resource-item resource-energy">
+            <div class="resource-top"><span>Energy</span><strong><span id="energy-value">100</span><small>/<span id="energy-max">100</span></small></strong></div>
+            <div class="meter"><span id="energy-meter"></span></div>
+          </article>
+          <article class="resource-item resource-cash">
+            <div class="resource-top"><span>Cash</span><strong id="cash-value">$0</strong></div>
+            <div class="resource-caption">On hand</div>
+          </article>
+        </section>
+
+        <section class="dashboard-layout">
+          <article class="panel progression-panel">
+            <div class="panel-heading split-heading">
+              <div>
+                <span class="eyebrow">PROGRESSION</span>
+                <h2>Level <span id="level-value">1</span></h2>
+              </div>
+              <span id="player-status-badge" class="badge status-active">ACTIVE</span>
+            </div>
+            <div class="xp-row"><span>XP</span><strong><span id="xp-value">0</span> / <span id="xp-next">100</span></strong></div>
+            <div class="meter xp-meter"><span id="xp-meter"></span></div>
+            <p id="status-detail" class="muted">Player is active in RiftCity.</p>
+          </article>
+
+          <article class="panel stats-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">CORE STATS</span>
+                <h2>Attributes</h2>
+              </div>
+            </div>
+            <div class="combat-stats">
+              <div><span>Strength</span><strong id="strength-value">1</strong></div>
+              <div><span>Defense</span><strong id="defense-value">1</strong></div>
+              <div><span>Speed</span><strong id="speed-value">1</strong></div>
+              <div><span>Dexterity</span><strong id="dexterity-value">1</strong></div>
+            </div>
+          </article>
+
+          <article id="account-card" class="panel account-panel">
+            <div class="panel-heading split-heading">
+              <div>
+                <span class="eyebrow">ACCOUNT</span>
+                <h2 id="account-name">Player</h2>
+              </div>
+              <span id="account-role" class="badge">player</span>
+            </div>
+            <dl id="account-details"></dl>
+            <button id="logout-btn" class="ghost-button">Logout</button>
+          </article>
+        </section>
+      </section>
+
+      <div id="message" class="message hidden" role="status"></div>
+    </main>
+  </div>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a class="mobile-nav-link active" href="/" aria-current="page"><span>▦</span><small>Overview</small></a>
+    <a class="mobile-nav-link" href="/admin/logs"><span>⌁</span><small>Logs</small></a>
+  </nav>
+
   <script type="module" src="/app.js"></script>
 </body>
 </html>

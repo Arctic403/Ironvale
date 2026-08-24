@@ -1,6 +1,19 @@
-# RiftCity V2 — Phase 2
+# RiftCity V2 — Phase 2.1 UI Refactor
 
 Phase 2 builds persistent player state on top of the working Phase 1 authentication/session foundation.
+
+
+## Phase 2.1 UI refactor
+
+- Compact desktop sidebar and workspace instead of a large hero layout
+- Thin resource strip for Health, Nerve, Energy, and Cash
+- Tighter progression, attributes, and account panels
+- Reduced padding, border radius, and visual weight throughout
+- Dedicated mobile layout with two-column resource strip and compact single-column panels
+- Fixed mobile bottom navigation for Overview and Dev Logs
+- iPhone safe-area support
+- Authentication screen redesigned into a cleaner split desktop layout and compact mobile stack
+- No Phase 2 backend APIs or player-state behavior changed
 
 ## Phase 1 foundation retained
 
