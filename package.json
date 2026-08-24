@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node --check src/index.js && node --check src/items.js && node --check public/app.js && node --check public/admin-logs.js",
+    "build": "npm run verify:js-only && node --check src/index.js && node --check src/items.js && node --check public/app.js && node --check public/admin-logs.js && node --check scripts/verify-js-only.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",
     "db:migrate:local": "wrangler d1 execute riftcity-v2 --local --file=./schema.sql",
-    "db:migrate:remote": "wrangler d1 execute riftcity-v2 --remote --file=./schema.sql"
+    "db:migrate:remote": "wrangler d1 execute riftcity-v2 --remote --file=./schema.sql",
+    "verify:js-only": "node scripts/verify-js-only.js"
   },
   "devDependencies": {
     "wrangler": "^4.30.0"

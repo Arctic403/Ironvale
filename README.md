@@ -53,3 +53,15 @@ New API routes:
 The `player_inventory` D1 table self-creates on the first inventory request. `schema.sql` also contains the table for clean deployments.
 
 The backend includes generic `addItemToInventory()` and `removeItemFromInventory()` helpers for future shops, crimes, rewards, drops and admin tools. They are intentionally not exposed as public grant endpoints.
+
+## JavaScript-only architecture
+
+This repository is intentionally JavaScript-only end to end:
+
+- Cloudflare Worker/API: `src/*.js`
+- Browser client: `public/*.js`
+- Wrangler entry point: `src/index.js`
+- No TypeScript source files, declaration files, `tsconfig`, TypeScript compiler, `ts-node`, `tsx`, or `@types/*` packages are required.
+- `npm run build` runs a JS-only guard first and fails if TypeScript is introduced later.
+
+Wrangler still bundles the Worker for Cloudflare deployment, but RiftCity's source code and project configuration remain JavaScript-only.
