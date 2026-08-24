@@ -12,7 +12,7 @@ const message = $('#message');
 let authenticated = false;
 let currentView = 'overview';
 let worldState = null;
-let selectedLocationId = null;
+let activeLocationId = null;
 
 $('#register-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -103,25 +103,59 @@ async function refreshSession() {
 }
 
 function getRequestedView() {
-  return window.location.hash === '#city' ? 'city' : 'overview';
+  const hash = window.location.hash || '#overview';
+  if (hash.startsWith('#city/')) return 'location';
+  if (hash === '#city') return 'city';
+  return 'overview';
+}
+
+function getRequestedLocationId() {
+  const hash = window.location.hash || '';
+  if (!hash.startsWith('#city/')) return null;
+  const encoded = hash.slice('#city/'.length);
+  if (!encoded) return null;
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return encoded;
+  }
 }
 
 async function switchView(view) {
-  currentView = view === 'city' ? 'city' : 'overview';
+  currentView = view === 'location' ? 'location' : (view === 'city' ? 'city' : 'overview');
   $('#overview-view').classList.toggle('hidden', currentView !== 'overview');
   $('#city-view').classList.toggle('hidden', currentView !== 'city');
+  $('#location-view').classList.toggle('hidden', currentView !== 'location');
 
   $$('[data-view-link]').forEach((link) => {
-    const active = link.dataset.viewLink === currentView;
+    const linkView = link.dataset.viewLink;
+    const active = linkView === currentView || (linkView === 'city' && currentView === 'location');
     link.classList.toggle('active', active);
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   });
 
-  $('#page-eyebrow').textContent = currentView === 'city' ? 'WORLD NETWORK' : 'PLAYER CORE';
-  $('#page-title-text').textContent = currentView === 'city' ? 'City' : 'Overview';
+  if (currentView === 'city') {
+    $('#page-eyebrow').textContent = 'WORLD NETWORK';
+    $('#page-title-text').textContent = 'City';
+    if (authenticated) await loadWorld();
+    return;
+  }
 
-  if (currentView === 'city' && authenticated) await loadWorld();
+  if (currentView === 'location') {
+    $('#page-eyebrow').textContent = 'CITY LOCATION';
+    $('#page-title-text').textContent = 'Location';
+    const locationId = getRequestedLocationId();
+    if (!locationId) {
+      window.location.hash = '#city';
+      return;
+    }
+    if (authenticated) await renderLocationPage(locationId);
+    return;
+  }
+
+  $('#page-eyebrow').textContent = 'PLAYER CORE';
+  $('#page-title-text').textContent = 'Overview';
 }
 
 function renderAccount(user) {
@@ -188,7 +222,6 @@ async function loadWorld(force = false) {
   }
 
   $('#city-directory').innerHTML = '<div class="world-loading">Loading city directory…</div>';
-  $('#location-inspector').innerHTML = '<div class="world-loading">Select a location.</div>';
   const result = await api('/api/world');
 
   if (!result.ok) {
@@ -197,7 +230,6 @@ async function loadWorld(force = false) {
   }
 
   worldState = result.world;
-  selectedLocationId ||= worldState.current?.locationId || worldState.locations?.[0]?.id || null;
   renderCurrentLocation(worldState.current);
   renderWorld();
 }
@@ -228,17 +260,14 @@ function renderWorld() {
   }).join('');
 
   $$('.city-location-tile').forEach((button) => {
-    button.addEventListener('click', () => inspectLocation(button.dataset.locationId));
+    button.addEventListener('click', () => openLocation(button.dataset.locationId));
   });
-
-  if (selectedLocationId) inspectLocation(selectedLocationId);
 }
 
 function renderLocationTile(location, current) {
   const currentHere = current?.locationId === location.id;
-  const selected = selectedLocationId === location.id;
   return `
-    <button class="city-location-tile ${selected ? 'selected' : ''} ${currentHere ? 'current' : ''}" data-location-id="${escapeHtml(location.id)}">
+    <button class="city-location-tile ${currentHere ? 'current' : ''}" data-location-id="${escapeHtml(location.id)}" aria-label="Open ${escapeHtml(location.name)}">
       <span class="tile-topline">
         <span class="location-code">${escapeHtml(location.code)}</span>
         <span class="tile-state">${currentHere ? 'HERE' : escapeHtml(location.status)}</span>
@@ -250,91 +279,144 @@ function renderLocationTile(location, current) {
   `;
 }
 
-async function inspectLocation(locationId) {
+async function openLocation(locationId) {
   if (!locationId) return;
-  selectedLocationId = locationId;
-  $$('.city-location-tile').forEach((button) => {
-    button.classList.toggle('selected', button.dataset.locationId === locationId);
-  });
 
-  const inspector = $('#location-inspector');
-  if (!inspector) return;
-  inspector.innerHTML = '<div class="world-loading">Opening location…</div>';
+  const currentHere = worldState?.current?.locationId === locationId;
+  if (!currentHere) {
+    const tile = $(`.city-location-tile[data-location-id="${cssEscape(locationId)}"]`);
+    if (tile) {
+      tile.disabled = true;
+      tile.classList.add('opening');
+    }
 
+    const result = await api('/api/world/travel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId })
+    });
+
+    if (!result.ok) {
+      if (tile) {
+        tile.disabled = false;
+        tile.classList.remove('opening');
+      }
+      return showMessage(result.error || 'Could not open location.', true);
+    }
+
+    if (worldState) worldState.current = result.current;
+    renderCurrentLocation(result.current);
+  }
+
+  activeLocationId = locationId;
+  window.location.hash = `#city/${encodeURIComponent(locationId)}`;
+}
+
+async function renderLocationPage(locationId) {
+  activeLocationId = locationId;
+  const container = $('#location-page-content');
+  if (!container) return;
+
+  container.innerHTML = '<div class="world-loading">Opening location…</div>';
   const result = await api(`/api/world/locations/${encodeURIComponent(locationId)}`);
+
   if (!result.ok) {
-    inspector.innerHTML = '<div class="world-loading error-text">Location unavailable.</div>';
+    container.innerHTML = `
+      <div class="location-page-error">
+        <span class="eyebrow">LOCATION ERROR</span>
+        <h2>Location unavailable</h2>
+        <p>${escapeHtml(result.error || 'This location could not be loaded.')}</p>
+        <a class="location-back-link" href="#city">← Return to City</a>
+      </div>
+    `;
     return;
   }
 
   const location = result.location;
   const category = result.category;
+
+  if (result.current?.locationId !== location.id) {
+    const travelResult = await api('/api/world/travel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: location.id })
+    });
+
+    if (!travelResult.ok) {
+      container.innerHTML = `
+        <div class="location-page-error">
+          <span class="eyebrow">LOCATION ERROR</span>
+          <h2>Could not enter location</h2>
+          <p>${escapeHtml(travelResult.error || 'This location could not be opened.')}</p>
+          <a class="location-back-link" href="#city">← Return to City</a>
+        </div>
+      `;
+      return;
+    }
+    result.current = travelResult.current;
+  }
+
   const currentHere = result.current?.locationId === location.id;
   const tags = (location.tags || []).map(tag => `<span class="world-tag">${escapeHtml(tag)}</span>`).join('');
   const requirements = location.requirements?.length
     ? `<div class="location-requirements"><span>REQUIREMENTS</span><strong>${location.requirements.map(escapeHtml).join(' · ')}</strong></div>`
     : '';
 
-  inspector.innerHTML = `
-    <div class="inspector-head">
-      <div>
+  if (result.current) {
+    if (worldState) worldState.current = result.current;
+    renderCurrentLocation(result.current);
+  }
+
+  $('#page-title-text').textContent = location.name;
+
+  container.innerHTML = `
+    <div class="location-page-head">
+      <a class="location-back-link" href="#city">← City</a>
+      <div class="location-page-meta">
         <span class="location-code">${escapeHtml(location.code)}</span>
-        <span class="inspector-category">${escapeHtml(category?.name || location.categoryId || '')}</span>
+        <span>${escapeHtml(category?.name || location.categoryId || 'RiftCity')}</span>
+        <span>${escapeHtml(location.type)}</span>
       </div>
       <span class="location-status">${currentHere ? 'CURRENT LOCATION' : escapeHtml(location.status)}</span>
     </div>
-    <span class="location-kind">${escapeHtml(location.type)}</span>
-    <h4>${escapeHtml(location.name)}</h4>
-    <p>${escapeHtml(location.description)}</p>
-    <div class="world-tags">${tags}</div>
-    ${requirements}
-    <div class="location-actions">
-      <button id="enter-location-btn" ${currentHere ? 'disabled' : ''}>${currentHere ? 'You are here' : 'Open location'}</button>
-      ${(location.actions || []).map(action => `
-        <button class="secondary location-action" data-action-label="${escapeHtml(action.label)}" data-action-note="${escapeHtml(action.note || '')}" ${action.enabled ? '' : 'disabled'}>
-          ${escapeHtml(action.label)}${action.enabled ? '' : ' · LOCKED'}
-        </button>
-      `).join('')}
+
+    <div class="location-page-body">
+      <span class="eyebrow">${escapeHtml(location.type)}</span>
+      <h2>${escapeHtml(location.name)}</h2>
+      <p>${escapeHtml(location.description)}</p>
+      <div class="world-tags">${tags}</div>
+      ${requirements}
+
+      <div class="location-module-shell">
+        <div class="browser-heading">
+          <span>AVAILABLE SERVICES</span>
+          <small>${String((location.actions || []).length).padStart(2, '0')}</small>
+        </div>
+        <div class="location-module-list">
+          ${(location.actions || []).length ? (location.actions || []).map(action => `
+            <button class="location-service-button" data-action-label="${escapeHtml(action.label)}" data-action-note="${escapeHtml(action.note || '')}" ${action.enabled ? '' : 'disabled'}>
+              <span>
+                <strong>${escapeHtml(action.label)}</strong>
+                <small>${escapeHtml(action.note || 'Service available.')}</small>
+              </span>
+              <b>${action.enabled ? 'OPEN' : 'LOCKED'}</b>
+            </button>
+          `).join('') : '<div class="world-loading">No services are installed at this location yet.</div>'}
+        </div>
+      </div>
     </div>
-    ${(location.actions || []).some(action => action.note) ? `
-      <div class="future-note">SYSTEM HOOKS READY — gameplay modules can attach here without changing the city directory.</div>
-    ` : ''}
   `;
 
-  const enterButton = $('#enter-location-btn');
-  if (enterButton && !currentHere) enterButton.addEventListener('click', () => travelTo(location.id));
-
-  $$('.location-action:not([disabled])').forEach((button) => {
-    button.addEventListener('click', () => showMessage(`${button.dataset.actionLabel}: ${location.shortDescription}`));
+  $$('.location-service-button:not([disabled])').forEach((button) => {
+    button.addEventListener('click', () => {
+      showMessage(`${button.dataset.actionLabel}: ${button.dataset.actionNote || location.shortDescription}`);
+    });
   });
 }
 
-async function travelTo(locationId) {
-  const button = $('#enter-location-btn');
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Opening…';
-  }
-
-  const result = await api('/api/world/travel', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ locationId })
-  });
-
-  if (!result.ok) {
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Open location';
-    }
-    return showMessage(result.error || 'Could not open location.', true);
-  }
-
-  worldState.current = result.current;
-  selectedLocationId = result.current.locationId;
-  renderCurrentLocation(result.current);
-  showMessage(`Opened ${result.current.locationName}.`);
-  renderWorld();
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(String(value));
+  return String(value).replace(/(["\\])/g, '\\$1');
 }
 
 function renderCurrentLocation(current) {

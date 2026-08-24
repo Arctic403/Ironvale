@@ -32,7 +32,7 @@
 
       <div class="rail-footer">
         <span class="phase-dot"></span>
-        <span>Phase 3 World</span>
+        <span>Phase 3.2 World</span>
       </div>
     </aside>
 
@@ -163,21 +163,23 @@
             </div>
           </div>
 
-          <div class="city-hub">
+          <div class="city-hub city-hub-direct">
             <section class="city-directory-shell" aria-label="RiftCity locations">
               <div class="browser-heading city-directory-heading">
-                <span>LOCATIONS</span>
+                <span>LOCATIONS — TAP TO OPEN</span>
                 <small id="location-count">00</small>
               </div>
               <div id="city-directory" class="city-directory">
                 <div class="world-loading">Loading city directory…</div>
               </div>
             </section>
-
-            <aside id="location-inspector" class="location-inspector city-inspector">
-              <div class="world-loading">Select a location.</div>
-            </aside>
           </div>
+        </section>
+
+        <section id="location-view" class="game-view hidden">
+          <section id="location-page-content" class="location-page">
+            <div class="world-loading">Opening location…</div>
+          </section>
         </section>
       </section>
 
