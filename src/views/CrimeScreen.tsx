@@ -19,7 +19,7 @@ import {
 import {
   CRIME_CAREERS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES, CrimeCareerDefinition,
   careerActionSuccessChance, crimeCareerMasteryLevel, crimeCareerMasteryProgress,
-  crimeCityConditions, formatRiftCityTime, getShopliftingConditions, masteryRank, scavengingOpportunity,
+  crimeCityConditions, formatRiftCityTime, getCrimePlugin, getShopliftingConditions, masteryRank, scavengingOpportunity,
   scavengingOpportunityLabel, scavengingOpportunityTrend, scavengingOutcomeRates, shopliftingSuspicion,
 } from "../systems/crimeCareerSystem";
 import {
@@ -362,14 +362,19 @@ export function Crimes({ g }: { g: Game }) {
 
   const renderSelected=()=>{
     if(!selected)return null;
-    if(selected.mode==="scavenge")return renderScavenging(selected);
-    if(selected.id==="pickpocket")return renderPickpocket(selected);
-    if(selected.mode==="target")return renderTargetCrime(selected);
-    if(selected.mode==="shoplift")return renderShoplifting();
-    if(selected.mode==="graffiti")return renderGraffiti();
-    if(selected.mode==="operation")return renderOperations(selected);
-    if(selected.mode==="actions")return renderActions(selected);
-    return renderMajor(selected);
+    const plugin=getCrimePlugin(selected.id);
+    const uiKind=plugin?.uiKind??selected.mode;
+    const renderers={
+      scavenge:()=>renderScavenging(selected),
+      pickpocket:()=>renderPickpocket(selected),
+      target:()=>renderTargetCrime(selected),
+      shoplift:()=>renderShoplifting(),
+      graffiti:()=>renderGraffiti(),
+      operation:()=>renderOperations(selected),
+      actions:()=>renderActions(selected),
+      major:()=>renderMajor(selected),
+    } as const;
+    return renderers[uiKind]();
   };
 
   if(selected){const masteryXp=g.gameState.crimeMastery[selected.id]??0;const mastery=crimeCareerMasteryLevel(masteryXp);const familyLevel=crimeFamilyLevel(g.gameState.crimeSkillXp[selected.family]??0);const careerLocked=g.gameState.crimeExperience<selected.unlockCrimeExperience;return <div className="crime-career-v4"><button type="button" className="crime-back-button" onClick={backToCrimes}>‹ All Crimes</button><section className={`crime-career-header ${riskClass(selected.risk)}`}><span className="crime-career-icon"><GameIcon name={selected.icon} size={25}/></span><div><small>{CRIME_FAMILY_LABELS[selected.family]} · {selected.risk} RISK</small><h2>{selected.name}</h2><p>{selected.description}</p></div><div className="crime-career-level"><span>MASTERY</span><strong>{mastery}</strong><small>{masteryRank(mastery)}</small></div></section><div className="career-progress-wide"><span>Mastery {mastery} / 100</span><div className="bar-track"><div className="bar-fill crime" style={{width:`${crimeCareerMasteryProgress(masteryXp)}%`}}/></div><span>{CRIME_FAMILY_LABELS[selected.family]} Lv {familyLevel}</span></div>{careerLocked?<section className="crime-career-locked"><GameIcon name="lock" size={28}/><div><strong>Crime locked</strong><span>Requires {selected.unlockCrimeExperience} Crime Experience · you have {g.gameState.crimeExperience}.</span></div></section>:renderSelected()}</div>;}
