@@ -1,4 +1,4 @@
-name = "riftcity-v2-phase1"
+name = "riftcityv1"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
 

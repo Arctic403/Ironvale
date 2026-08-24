@@ -55,3 +55,35 @@ pre { overflow:auto; white-space:pre-wrap; word-break:break-word; background:#09
 .resolve-btn { width:auto; margin-top:14px; }
 .empty-state { color:#9aa6b6; }
 @media (max-width:700px) { .log-toolbar{grid-template-columns:1fr}.log-toolbar button{width:100%}.logs-head{align-items:center}.log-entry-head{align-items:flex-start;flex-direction:column}.log-entry-head time{text-align:left}.log-meta{grid-template-columns:1fr} }
+
+/* Phase 2 player-state dashboard */
+#player-dashboard { margin-top: 16px; }
+.top-stat-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.stat-tile { border:1px solid #263142; background:rgba(16,21,30,.92); border-radius:16px; padding:16px; min-width:0; }
+.stat-label { color:#8f9cad; font-size:.78rem; text-transform:uppercase; letter-spacing:.09em; font-weight:800; }
+.stat-value { margin-top:7px; font-size:1.55rem; line-height:1; font-weight:900; letter-spacing:-.03em; }
+.stat-value small { color:#7f8b9b; font-size:.72rem; font-weight:700; }
+.stat-sub { margin-top:9px; color:#7f8b9b; font-size:.78rem; }
+.meter { height:7px; margin-top:13px; border-radius:999px; background:#080c12; border:1px solid #222c3b; overflow:hidden; }
+.meter > span { display:block; width:0; height:100%; background:currentColor; border-radius:inherit; transition:width .25s ease; }
+.resource-health { color:#ec7580; }
+.resource-nerve { color:#d49cf5; }
+.resource-energy { color:#6fa7ff; }
+.resource-cash { color:#75d69e; }
+.dashboard-grid { margin-top:12px; }
+.progression-card { min-height:190px; }
+.xp-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:18px; color:#9aa6b6; font-size:.86rem; }
+.xp-row strong { color:#eef3fb; }
+.xp-meter { color:#79a8ff; margin-top:9px; }
+.muted { color:#8f9cad; font-size:.86rem; line-height:1.5; margin:16px 0 0; }
+.combat-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
+.combat-stats > div { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid #263142; background:#0c1119; border-radius:12px; padding:12px; color:#9aa6b6; }
+.combat-stats strong { color:#fff; font-size:1.15rem; }
+.account-card { margin-top:12px; }
+.status-active { border-color:#2f6f51; color:#91e6b4; background:#11291e; }
+
+@media (max-width:700px) {
+  .top-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .stat-tile { padding:14px; }
+  .stat-value { font-size:1.35rem; }
+}

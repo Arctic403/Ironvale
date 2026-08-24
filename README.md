@@ -1,81 +1,61 @@
-# RiftCity V2 — Phase 1
+# RiftCity V2 — Phase 2
 
-Fresh-start Phase 1 foundation for RiftCity.
+Phase 2 builds persistent player state on top of the working Phase 1 authentication/session foundation.
 
-## Included
+## Phase 1 foundation retained
 
 - Cloudflare Worker backend
-- Cloudflare D1 database schema
-- Register
-- Login
-- Logout
-- Persistent 7-day HttpOnly sessions
-- Player IDs
-- Username validation
-- Password hashing using PBKDF2-SHA256 via Web Crypto
-- Roles: player / moderator / admin / developer
-- Created date
-- Last active tracking
-- Online session state
-- Ban fields ready for later admin tooling
-- Audit log table
-- Minimal responsive test UI
+- Cloudflare D1
+- Register / login / logout
+- 7-day HttpOnly sessions
+- Player IDs and roles
+- PBKDF2-SHA256 password hashing using Cloudflare-supported iterations
+- Audit logging
+- Built-in RiftCity developer/error logs at `/admin/logs`
 
-## Setup
+## Phase 2 added
 
-1. Install Node.js 20+.
-2. Run `npm install`.
-3. `npm run build` can be used by Cloudflare as the build command. It validates the Worker and browser JavaScript without producing a separate frontend bundle.
-4. Sign in to Cloudflare with `npx wrangler login`.
-5. Create the database:
-   `npx wrangler d1 create riftcity-v2`
-6. Copy the returned database ID into `wrangler.toml` in place of `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
-7. Apply the schema:
-   `npm run db:migrate:remote`
-8. Deploy:
-   `npm run deploy`
+Each player now has a persistent `player_state` record containing:
 
-For local development after configuring D1:
+- Health: 100 / 100
+- Nerve: 10 / 10
+- Energy: 100 / 100
+- Cash: $0
+- Level: 1
+- XP: 0
+- Strength: 1
+- Defense: 1
+- Speed: 1
+- Dexterity: 1
+- Status: `active`
+- Optional status end time/reason fields for future jail, hospital, travel, and combat systems
 
-- `npm run db:migrate:local`
-- `npm run dev`
+Existing accounts are supported. On the first authenticated request after Phase 2 deploys, RiftCity automatically creates the `player_state` table if needed and creates the missing state row for that user. No manual D1 SQL migration is required for the existing deployment.
+
+`schema.sql` is also updated so fresh databases get the full Phase 1 + Phase 2 schema.
 
 ## API
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
-- `GET /api/auth/me`
+- `GET /api/auth/me` — now returns both account and player state
+- `GET /api/player/state` — authenticated player-state endpoint
 - `GET /api/health`
+- `GET /api/admin/logs` — temporarily public during development
 
-## Phase boundary
-
-This ZIP intentionally does NOT add stats, inventory, crimes, money, city map, casino, combat, market, or other gameplay systems. Those belong to later phases so the authentication/account foundation stays clean.
-
-## Cloudflare Git build settings
+## Cloudflare Git deployment
 
 - Build command: `npm run build`
 - Deploy command: `npx wrangler deploy`
 - Root directory: repository root
 
-Before the first deploy, create the D1 database and replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` in `wrangler.toml` with the real database ID.
+The Worker name is set to `riftcityv1` to match the currently connected Cloudflare build project. The existing D1 binding is preserved.
 
-## Built-in RiftCity system logs
+## Development note
 
-Phase 1 now stores backend events/errors in D1 and exposes an admin/developer-only viewer at:
+The developer log viewer is still intentionally public while RiftCity is private development-only. Lock `/admin/logs` back to admin/developer roles before giving other people access to the game.
 
-`/admin/logs`
+## Phase boundary
 
-Unhandled API errors return a short ID such as `RC-8F2A91C0`. Search the log viewer for the matching entry to see the route, request ID, error message, context, and stack trace.
-
-The logger creates its own `system_logs` table automatically on first use. Running `schema.sql` is still recommended for the full Phase 1 database schema.
-
-### Give your account developer access
-
-Accounts are intentionally created with the `player` role. In the Cloudflare D1 SQL console, run this once after creating your account (replace the username):
-
-```sql
-UPDATE users SET role = 'developer' WHERE username = 'YOUR_USERNAME';
-```
-
-Log out and back in afterward so the developer log viewer reflects the updated role.
+Phase 2 only establishes player state. It does not yet add regeneration timers, training, crimes, inventory, banking, combat actions, or economy transactions. Those systems can now build against one consistent persistent player model.

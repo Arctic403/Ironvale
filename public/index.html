@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>RiftCity V2 — Phase 1</title>
+  <title>RiftCity V2 — Phase 2</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <main class="shell">
     <header class="hero">
       <div class="eyebrow">RIFTCITY V2</div>
-      <h1>Phase 1 Foundation</h1>
-      <p>Account, session, and role system test console.</p>
+      <h1>Phase 2 Player State</h1>
+      <p>Persistent player resources, progression, combat stats, and status.</p>
       <p><a class="link-button" href="/admin/logs">Developer logs</a></p>
     </header>
 
@@ -33,16 +33,67 @@
       </form>
     </section>
 
-    <section id="account-card" class="card hidden">
-      <div class="account-head">
-        <div>
-          <div class="eyebrow">ACTIVE SESSION</div>
-          <h2 id="account-name">Player</h2>
+    <section id="player-dashboard" class="hidden">
+      <section class="top-stat-grid" aria-label="Player resources">
+        <article class="stat-tile resource-health">
+          <div class="stat-label">Health</div>
+          <div class="stat-value"><span id="health-value">100</span><small>/ <span id="health-max">100</span></small></div>
+          <div class="meter"><span id="health-meter"></span></div>
+        </article>
+        <article class="stat-tile resource-nerve">
+          <div class="stat-label">Nerve</div>
+          <div class="stat-value"><span id="nerve-value">10</span><small>/ <span id="nerve-max">10</span></small></div>
+          <div class="meter"><span id="nerve-meter"></span></div>
+        </article>
+        <article class="stat-tile resource-energy">
+          <div class="stat-label">Energy</div>
+          <div class="stat-value"><span id="energy-value">100</span><small>/ <span id="energy-max">100</span></small></div>
+          <div class="meter"><span id="energy-meter"></span></div>
+        </article>
+        <article class="stat-tile resource-cash">
+          <div class="stat-label">Cash</div>
+          <div id="cash-value" class="stat-value">$0</div>
+          <div class="stat-sub">On hand</div>
+        </article>
+      </section>
+
+      <section class="grid dashboard-grid">
+        <article class="card progression-card">
+          <div class="account-head">
+            <div>
+              <div class="eyebrow">PROGRESSION</div>
+              <h2>Level <span id="level-value">1</span></h2>
+            </div>
+            <span id="player-status-badge" class="badge status-active">ACTIVE</span>
+          </div>
+          <div class="xp-row"><span>XP</span><strong><span id="xp-value">0</span> / <span id="xp-next">100</span></strong></div>
+          <div class="meter xp-meter"><span id="xp-meter"></span></div>
+          <p id="status-detail" class="muted">Player is active in RiftCity.</p>
+        </article>
+
+        <article class="card">
+          <div class="eyebrow">CORE STATS</div>
+          <h2>Combat attributes</h2>
+          <div class="combat-stats">
+            <div><span>Strength</span><strong id="strength-value">1</strong></div>
+            <div><span>Defense</span><strong id="defense-value">1</strong></div>
+            <div><span>Speed</span><strong id="speed-value">1</strong></div>
+            <div><span>Dexterity</span><strong id="dexterity-value">1</strong></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="account-card" class="card account-card">
+        <div class="account-head">
+          <div>
+            <div class="eyebrow">ACTIVE SESSION</div>
+            <h2 id="account-name">Player</h2>
+          </div>
+          <span id="account-role" class="badge">player</span>
         </div>
-        <span id="account-role" class="badge">player</span>
-      </div>
-      <dl id="account-details"></dl>
-      <button id="logout-btn" class="secondary">Logout</button>
+        <dl id="account-details"></dl>
+        <button id="logout-btn" class="secondary">Logout</button>
+      </section>
     </section>
 
     <div id="message" class="message hidden" role="status"></div>

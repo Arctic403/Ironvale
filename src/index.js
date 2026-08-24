@@ -20,6 +20,31 @@ const LOG_TABLE_SQL = `
   )
 `;
 
+const PLAYER_STATE_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS player_state (
+    user_id TEXT PRIMARY KEY,
+    health INTEGER NOT NULL DEFAULT 100 CHECK (health >= 0),
+    max_health INTEGER NOT NULL DEFAULT 100 CHECK (max_health > 0),
+    nerve INTEGER NOT NULL DEFAULT 10 CHECK (nerve >= 0),
+    max_nerve INTEGER NOT NULL DEFAULT 10 CHECK (max_nerve > 0),
+    energy INTEGER NOT NULL DEFAULT 100 CHECK (energy >= 0),
+    max_energy INTEGER NOT NULL DEFAULT 100 CHECK (max_energy > 0),
+    cash INTEGER NOT NULL DEFAULT 0 CHECK (cash >= 0),
+    level INTEGER NOT NULL DEFAULT 1 CHECK (level >= 1),
+    xp INTEGER NOT NULL DEFAULT 0 CHECK (xp >= 0),
+    strength INTEGER NOT NULL DEFAULT 1 CHECK (strength >= 0),
+    defense INTEGER NOT NULL DEFAULT 1 CHECK (defense >= 0),
+    speed INTEGER NOT NULL DEFAULT 1 CHECK (speed >= 0),
+    dexterity INTEGER NOT NULL DEFAULT 1 CHECK (dexterity >= 0),
+    status TEXT NOT NULL DEFAULT 'active',
+    status_until INTEGER,
+    status_reason TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -63,6 +88,7 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'POST' && url.pathname === '/api/auth/login') return login(request, env, requestId);
   if (method === 'POST' && url.pathname === '/api/auth/logout') return logout(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/auth/me') return me(request, env);
+  if (method === 'GET' && url.pathname === '/api/player/state') return getPlayerState(request, env);
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
   if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
   if (method === 'POST' && url.pathname.startsWith('/api/admin/logs/') && url.pathname.endsWith('/resolve')) {
@@ -89,11 +115,19 @@ async function register(request, env, requestId) {
   const passwordHash = await hashPassword(password, saltBytes);
   const now = Date.now();
 
-  await env.DB.prepare(`
-    INSERT INTO users (id, username, password_hash, password_salt, role, created_at, last_active_at)
-    VALUES (?, ?, ?, ?, 'player', ?, ?)
-  `).bind(userId, username, passwordHash, salt, now, now).run();
+  await ensurePlayerStateTable(env);
+  await env.DB.batch([
+    env.DB.prepare(`
+      INSERT INTO users (id, username, password_hash, password_salt, role, created_at, last_active_at)
+      VALUES (?, ?, ?, ?, 'player', ?, ?)
+    `).bind(userId, username, passwordHash, salt, now, now),
+    env.DB.prepare(`
+      INSERT INTO player_state (user_id, created_at, updated_at)
+      VALUES (?, ?, ?)
+    `).bind(userId, now, now)
+  ]);
 
+  const playerState = await getPlayerStateRow(env, userId);
   await writeAudit(env, userId, 'user.registered', userId, { username });
   await safeWriteSystemLog(env, {
     severity: 'INFO', eventType: 'ACCOUNT_CREATED', message: `Account created: ${username}`,
@@ -103,7 +137,8 @@ async function register(request, env, requestId) {
   const session = await createSession(env, request, userId);
   return json({
     ok: true,
-    user: { id: userId, username, role: 'player', createdAt: now, lastActiveAt: now }
+    user: { id: userId, username, role: 'player', createdAt: now, lastActiveAt: now },
+    player: toPublicPlayerState(playerState)
   }, 201, { 'Set-Cookie': session.cookie });
 }
 
@@ -148,10 +183,12 @@ async function login(request, env, requestId) {
     route: '/api/auth/login', method: 'POST', requestId, userId: user.id, context: { username: user.username }
   });
 
+  const playerState = await ensurePlayerState(env, user.id);
   const session = await createSession(env, request, user.id);
   return json({
     ok: true,
-    user: { id: user.id, username: user.username, role: user.role, createdAt: user.created_at, lastActiveAt: now }
+    user: { id: user.id, username: user.username, role: user.role, createdAt: user.created_at, lastActiveAt: now },
+    player: toPublicPlayerState(playerState)
   }, 200, { 'Set-Cookie': session.cookie });
 }
 
@@ -178,6 +215,7 @@ async function logout(request, env, requestId) {
 async function me(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, authenticated: false }, 401);
+  const playerState = await ensurePlayerState(env, auth.user.id);
   return json({
     ok: true,
     authenticated: true,
@@ -188,12 +226,20 @@ async function me(request, env) {
       createdAt: auth.user.created_at,
       lastActiveAt: auth.user.last_active_at,
       online: true
-    }
+    },
+    player: toPublicPlayerState(playerState)
   });
 }
 
+async function getPlayerState(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const playerState = await ensurePlayerState(env, auth.user.id);
+  return json({ ok: true, player: toPublicPlayerState(playerState) });
+}
+
 async function health(env) {
-  const result = { ok: true, service: 'riftcity-v2-phase1', database: 'unknown' };
+  const result = { ok: true, service: 'riftcity-v2-phase2', database: 'unknown' };
   try {
     await env.DB.prepare('SELECT 1 AS ok').first();
     result.database = 'connected';
@@ -351,6 +397,55 @@ async function writeAudit(env, actorUserId, action, targetUserId, details) {
     INSERT INTO audit_log (id, actor_user_id, action, target_user_id, details_json, created_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).bind(crypto.randomUUID(), actorUserId || null, action, targetUserId || null, JSON.stringify(details || {}), Date.now()).run();
+}
+
+async function ensurePlayerStateTable(env) {
+  await env.DB.prepare(PLAYER_STATE_TABLE_SQL).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_state_status ON player_state(status)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_state_level ON player_state(level)').run();
+}
+
+async function ensurePlayerState(env, userId) {
+  await ensurePlayerStateTable(env);
+  const now = Date.now();
+  await env.DB.prepare(`
+    INSERT OR IGNORE INTO player_state (user_id, created_at, updated_at)
+    VALUES (?, ?, ?)
+  `).bind(userId, now, now).run();
+  return getPlayerStateRow(env, userId);
+}
+
+async function getPlayerStateRow(env, userId) {
+  const row = await env.DB.prepare(`
+    SELECT user_id, health, max_health, nerve, max_nerve, energy, max_energy, cash,
+      level, xp, strength, defense, speed, dexterity, status, status_until, status_reason,
+      created_at, updated_at
+    FROM player_state WHERE user_id = ?
+  `).bind(userId).first();
+
+  if (!row) throw new Error('Could not create or load player state');
+  return row;
+}
+
+function toPublicPlayerState(row) {
+  return {
+    userId: row.user_id,
+    resources: {
+      health: row.health, maxHealth: row.max_health,
+      nerve: row.nerve, maxNerve: row.max_nerve,
+      energy: row.energy, maxEnergy: row.max_energy,
+      cash: row.cash
+    },
+    progression: { level: row.level, xp: row.xp, xpToNextLevel: xpNeededForLevel(row.level) },
+    stats: { strength: row.strength, defense: row.defense, speed: row.speed, dexterity: row.dexterity },
+    status: { type: row.status, until: row.status_until, reason: row.status_reason },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function xpNeededForLevel(level) {
+  return Math.max(100, Math.floor(100 * Math.pow(Math.max(1, Number(level) || 1), 1.35)));
 }
 
 async function ensureLogTable(env) {
