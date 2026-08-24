@@ -1,0 +1,21 @@
+import React, { useState } from "react";
+import { Button } from "../../components/ui";
+import { GameIcon } from "../../components/GameIcon";
+import { money } from "../../core/gameCore";
+import { SHOPLIFT_STORES } from "../modules/theft";
+import { crimeCareerMasteryLevel, getShopliftingConditions, shopliftingSuspicion } from "../../systems/crimeCareerSystem";
+import { CrimeRequiredItems } from "./CrimeRequiredItems";
+import type { CrimeGame, FeedbackRenderer, WithCrimeFeedback } from "./types";
+const severityRoman=["","I","II","III","IV","V"] as const;
+
+export function ShopliftingCrime({g,now,incapacitated,feedbackBusy,withCrimeFeedback,renderFeedback}:{g:CrimeGame;now:number;incapacitated:boolean;feedbackBusy:boolean;withCrimeFeedback:WithCrimeFeedback;renderFeedback:FeedbackRenderer}) {
+  const [baskets,setBaskets]=useState<Record<string,string[]>>({}); const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery.shoplift??0);
+  return <div className="crime-detail-stack"><div className="crime-mechanic-note"><GameIcon name="shops" size={16}/><div><strong>LIVE STORE CONDITIONS + GREED</strong><span>Crowd, cameras and staffing rotate every few minutes. Add merchandise to your basket; value rises, but so does suspicion. Severity IV–V targets often require two prep items.</span></div></div>
+    <div className="shoplift-store-grid">{SHOPLIFT_STORES.map((store)=>{const live=getShopliftingConditions(store,now);const basketIds=baskets[store.id]??[];const basket=store.items.filter((item)=>basketIds.includes(item.id));const suspicion=shopliftingSuspicion(store,basket,live);const basketValue=basket.reduce((sum,item)=>sum+item.value,0);const locked=mastery<store.masteryRequired;const required=Array.from(new Set(basket.flatMap((item)=>item.requiredItems??[])));const missing=required.filter((id)=>(g.gameState.inventory[id]||0)<=0);const toggle=(id:string)=>setBaskets((prev)=>({...prev,[store.id]:(prev[store.id]??[]).includes(id)?(prev[store.id]??[]).filter((x)=>x!==id):[...(prev[store.id]??[]),id]}));const key=`shoplift:${store.id}`;return <article key={store.id} className={`shoplift-store ${locked?"locked":""}`}>
+      <header><div><small>{store.district}</small><h3>{store.name}</h3></div><span className={`shop-opportunity ${live.opportunity>68?"good":live.opportunity<35?"bad":""}`}>{live.opportunity}% OPPORTUNITY</span></header><p>{store.description}</p><div className="store-condition-row"><span>Crowd <b>{live.crowd}</b></span><span>Security <b>{live.security}</b></span><span>Staff <b>{live.staffing}</b></span></div>
+      <div className="shop-items">{store.items.map((item)=>{const itemLocked=mastery<item.masteryRequired;const selected=basketIds.includes(item.id);return <button type="button" key={item.id} className={`${selected?"selected":""} ${itemLocked?"locked":""}`} disabled={locked||itemLocked} onClick={()=>toggle(item.id)}><span className="severity">SEVERITY {severityRoman[item.severity]}</span><strong>{item.name}</strong><small>{money(item.value)} · Mastery {item.masteryRequired}+</small>{item.requiredItems?.length?<em>{item.requiredItems.length} required item{item.requiredItems.length===1?"":"s"}</em>:null}</button>;})}</div>
+      <div className="shoplift-risk-panel"><div><small>BASKET</small><strong>{basket.length} items · {money(basketValue)}</strong></div><div><small>SUSPICION</small><strong className={suspicion>=70?"danger":suspicion>=45?"warn":""}>{basket.length?suspicion:0}%</strong></div></div><CrimeRequiredItems ids={required} inventory={g.gameState.inventory}/>
+      <div className="target-actions"><Button disabled={!basket.length} onClick={()=>setBaskets((prev)=>({...prev,[store.id]:[]}))}>Clear Basket</Button><Button disabled={locked||!basket.length||missing.length>0||incapacitated||feedbackBusy} onClick={()=>withCrimeFeedback({key,crimeId:"shoplift",subject:store.name,actionLabel:`Leave with ${basketIds.length} item${basketIds.length===1?"":"s"}`,district:store.district,label:"SLIPPING OUT…"},()=>g.resolveShoplifting(store.id,basketIds),()=>setBaskets((prev)=>({...prev,[store.id]:[]})))}>Leave With Basket</Button></div>{renderFeedback(key)}{locked&&<small className="crime-lock-line"><GameIcon name="lock" size={12}/>Requires Shoplifting Mastery {store.masteryRequired}</small>}
+    </article>;})}</div>
+  </div>;
+}

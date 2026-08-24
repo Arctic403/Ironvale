@@ -13,19 +13,22 @@ import {
 import { getCrimeTool, recommendedCrimeTools } from "../systems/crimeTools";
 import {
   CRIME_FAMILY_LABELS, CRIME_OPERATIONS, GRAFFITI_SPOTS, CrimeFamily,
-  buildCrimeTargets, crimeFamilyLevel, crimeFamilyProgress, crimeTargetBoardSeed,
-  graffitiRank, graffitiSuccessChance, targetSuccessChance,
+  crimeFamilyLevel, crimeFamilyProgress, crimeTargetBoardSeed,
+  graffitiRank, graffitiSuccessChance,
 } from "../systems/crimeActivities";
 import {
-  CRIME_PLUGINS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES, CrimeCareerDefinition,
+  CRIME_PLUGINS, CrimeCareerDefinition,
   careerActionSuccessChance, crimeCareerMasteryLevel, crimeCareerMasteryProgress,
-  crimeCityConditions, formatRiftCityTime, getCrimePlugin, getShopliftingConditions, masteryRank, scavengingOpportunity,
-  scavengingOpportunityLabel, scavengingOpportunityTrend, scavengingOutcomeRates, shopliftingSuspicion,
+  crimeCityConditions, getCrimePlugin, masteryRank,
 } from "../systems/crimeCareerSystem";
-import {
-  CRIME_SIGNATURES, getCrimeContextPulse, spawnLivePickpocket, type LivePickpocketNpc,
-} from "../systems/crimeV5";
+import { CRIME_SIGNATURES, getCrimeContextPulse } from "../systems/crimeV5";
 import { buildCrimeDialogue, type CrimeDialogue } from "../systems/crimeDialogue";
+import { ScavengingCrime } from "../crimes/ui/ScavengingCrime";
+import { PickpocketCrime } from "../crimes/ui/PickpocketCrime";
+import { TargetCrime } from "../crimes/ui/TargetCrime";
+import { ShopliftingCrime } from "../crimes/ui/ShopliftingCrime";
+import { GraffitiCrime } from "../crimes/ui/GraffitiCrime";
+import { OperationsCrime } from "../crimes/ui/OperationsCrime";
 
 type Game = ReturnType<typeof useRiftCity>;
 type ActiveRun={crime:Crime;choiceId:string;toolId:string|null;events:ReturnType<typeof generateCrimeEvents>;stage:number;mods:CrimeRunModifiers};
@@ -45,17 +48,10 @@ const severityRoman=["","I","II","III","IV","V"] as const;
 export function Crimes({ g }: { g: Game }) {
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [now,setNow]=useState(()=>Date.now());
-  const [targetTool,setTargetTool]=useState("");
-  const [shopBaskets,setShopBaskets]=useState<Record<string,string[]>>({});
   const [choices,setChoices]=useState<Record<string,string>>({});
   const [majorTools,setMajorTools]=useState<Record<string,string>>({});
   const [run,setRun]=useState<ActiveRun|null>(null);
   const [feedback,setFeedback]=useState<CrimeFeedback|null>(null);
-  const [pickpocketTargets,setPickpocketTargets]=useState<LivePickpocketNpc[]>(()=>[0,1,2].map((i)=>spawnLivePickpocket(Date.now(),i)));
-  const [pickpocketIndex,setPickpocketIndex]=useState(0);
-  const [pickpocketCrowdUntil,setPickpocketCrowdUntil]=useState(()=>Date.now()+18000);
-  const pickpocketSequence=useRef(3);
-  const pocketNeedleRef=useRef<HTMLSpanElement|null>(null);
   const [miniAction,setMiniAction]=useState<{crimeId:string;actionId:string}|null>(null);
   const [memorySequence,setMemorySequence]=useState<number[]>([]);
   const [memoryInput,setMemoryInput]=useState<number[]>([]);
@@ -108,24 +104,6 @@ export function Crimes({ g }: { g: Game }) {
   const closeFeedback=()=>{
     if(feedbackTimer.current){window.clearTimeout(feedbackTimer.current);feedbackTimer.current=null;}
     setFeedback(null);
-  };
-
-  const refreshPickpocketCrowd=()=>{
-    const base=Date.now();
-    const crowd=[0,1,2].map(()=>{pickpocketSequence.current+=1;return spawnLivePickpocket(base,pickpocketSequence.current);});
-    setPickpocketTargets(crowd);setPickpocketIndex(0);setPickpocketCrowdUntil(base+18000);
-  };
-
-  useEffect(()=>{
-    if(selectedId!=="pickpocket")return;
-    if(feedback&&(feedback.phase==="loading"||feedback.phase==="awaiting"))return;
-    if(now>=pickpocketCrowdUntil)refreshPickpocketCrowd();
-  },[now,selectedId,pickpocketCrowdUntil,feedback]);
-
-  const pointerPercent=(ref:React.RefObject<HTMLSpanElement|null>)=>{
-    const needle=ref.current;const track=needle?.parentElement;if(!needle||!track)return 50;
-    const nr=needle.getBoundingClientRect(),tr=track.getBoundingClientRect();
-    return Math.max(0,Math.min(100,((nr.left+nr.width/2-tr.left)/Math.max(1,tr.width))*100));
   };
 
   const startMemoryGame=(crimeId:string,actionId:string,difficulty:number)=>{
@@ -212,123 +190,6 @@ export function Crimes({ g }: { g: Game }) {
     return <div className="crime-required-items">{ids.map((id)=>{const item=getItem(id);const owned=g.gameState.inventory[id]||0;return <span key={id} className={owned>0?"owned":"missing"}><ItemImage itemId={id} size={28}/><span>{item?.name??id} · {owned}</span>{owned<=0?<GameIcon name="lock" size={11}/>:null}</span>;})}</div>;
   };
 
-  const renderPickpocket=(career:CrimeCareerDefinition)=>{
-    const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);
-    const npc=pickpocketTargets[pickpocketIndex]??pickpocketTargets[0];
-    if(!npc)return null;
-    const tool=getCrimeTool(targetTool); const ownedTool=tool?(g.gameState.inventory[tool.id]||0):0;
-    const tools=recommendedCrimeTools("pickpocket");
-    const crackdown=g.gameState.activeWorldEvent==="guard-crackdown";
-    const remaining=Math.max(0,pickpocketCrowdUntil-now);
-    const baseChance=targetSuccessChance(npc.target,g.gameState.crimeSkillXp.theft??0,g.combatStats.dexterity,g.gameState.heat,false,g.gameState.streetReputation);
-    const revealWealth=mastery>=10,revealAwareness=mastery>=25,revealNumbers=mastery>=50,revealDanger=mastery>=75;
-    const grab=()=>{
-      const pos=pointerPercent(pocketNeedleRef as React.RefObject<HTMLSpanElement|null>);
-      let label="EMPTY POCKET",chanceModifier=-7,rewardMultiplier=.82,heatModifier=0,arrestModifier=1;
-      if(pos>=39&&pos<=61){label="CLEAN LIFT";chanceModifier=13;rewardMultiplier=1.2;arrestModifier=-2;}
-      else if(pos>=29&&pos<=71){label="EDGE GRAB";chanceModifier=4;rewardMultiplier=1.03;heatModifier=1;}
-      else if(pos<15||pos>85){label="DANGER ZONE";chanceModifier=-18;rewardMultiplier=.82;heatModifier=3;arrestModifier=8;}
-      if(crackdown){chanceModifier-=6;heatModifier+=2;arrestModifier+=4;}
-      withCrimeFeedback({key:"pickpocket:live",crimeId:"pickpocket",subject:npc.name,actionLabel:"Pocket grab",district:npc.area,label:`${label}…`},()=>g.resolveCrimeTarget(npc.target,ownedTool>0?targetTool:null,{chanceModifier,rewardMultiplier,heatModifier,arrestModifier,story:`Minigame: ${label}`}),refreshPickpocketCrowd);
-    };
-    return <div className="crime-detail-stack pickpocket-chain-system">
-      <div className="crime-mechanic-note"><GameIcon name="target" size={16}/><div><strong>TARGET CHAIN · POCKET ZONE</strong><span>Pick one of three people, then hit GRAB while the marker crosses the pocket zone. The center is safest and most valuable; the red edges are dangerous.</span></div></div>
-      {crackdown?<div className="pickpocket-crackdown"><GameIcon name="warning" size={14}/><div><strong>GUARD CRACKDOWN ACTIVE</strong><span>Street pressure makes every grab harder and adds extra Heat.</span></div></div>:null}
-      <div className="pickpocket-crowd-head"><span>CROWD REFRESH</span><strong>{Math.ceil(remaining/1000)}s</strong></div>
-      <div className="pickpocket-target-chain">{pickpocketTargets.map((target,i)=><button type="button" key={target.id} className={`${i===pickpocketIndex?"active":""} ${target.rare?"rare":""}`} onClick={()=>setPickpocketIndex(i)}><span><GameIcon name={target.rare?"crown":"character"} size={20}/></span><strong>{target.name}</strong><small>{target.area}</small><em>{revealWealth?target.wealth:"Unknown value"}</em></button>)}</div>
-      <article className="pickpocket-focus-card">
-        <header><div><small>{npc.area} · {npc.movement}</small><h3>{npc.name}</h3></div><span>{npc.rare?"RARE TARGET":"SELECTED"}</span></header>
-        <div className="pickpocket-focus-meta"><span>Wealth <b>{revealWealth?npc.wealth:"???"}</b></span><span>Awareness <b>{revealAwareness?npc.awareness:"???"}</b></span><span>Nerve <b>{npc.target.nerve}</b></span>{revealNumbers?<span>Base odds <b>{baseChance.toFixed(0)}%</b></span>:null}</div>
-        <div className="pickpocket-clues compact"><div>{npc.clues.slice(0,2).map((clue)=><span key={clue}>{clue}</span>)}</div></div>
-        {revealDanger&&npc.dangerNote?<div className="pedestrian-warning"><GameIcon name="warning" size={13}/>{npc.dangerNote}</div>:null}
-        <div className="pocket-minigame">
-          <div className="pocket-zone-track"><i className="zone danger left"/><i className="zone pocket"/><i className="zone danger right"/><span ref={pocketNeedleRef} className={`pocket-needle difficulty-${npc.target.difficulty>=55?"hard":npc.target.difficulty>=38?"medium":"easy"}`}/></div>
-          <div className="pocket-zone-legend"><span>Danger</span><b>POCKET</b><span>Danger</span></div>
-        </div>
-        {tools.length>0&&<div className="crime-prep-line compact"><label>Prep<select value={targetTool} onChange={(e:React.ChangeEvent<HTMLSelectElement>)=>setTargetTool(e.target.value)}><option value="">None</option>{tools.map((entry)=><option key={entry.id} value={entry.id} disabled={(g.gameState.inventory[entry.id]||0)<=0}>{entry.name} · {g.gameState.inventory[entry.id]||0}</option>)}</select></label></div>}
-        <Button disabled={incapacitated||g.gameState.nerve<npc.target.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={grab}>GRAB · {npc.target.nerve} Nerve</Button>
-        <small className="pedestrian-mastery-hint">No Let Pass button: the crowd rotates automatically. Mastery reveals more target intel.</small>
-      </article>
-      {renderFeedback("pickpocket:live")}
-    </div>;
-  };
-
-  const renderTargetCrime=(career:CrimeCareerDefinition)=>{
-    if(!career.targetKind)return null;
-    const targets=buildCrimeTargets(career.targetKind,boardSeed);
-    const legacyId=career.targetKind==="vehicle"?"vehicle-theft":career.targetKind;
-    const tools=recommendedCrimeTools(legacyId);
-    const tool=getCrimeTool(targetTool);
-    const ownedTool=tool?(g.gameState.inventory[tool.id]||0):0;
-    const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);
-    return <div className="crime-detail-stack">
-      <div className="crime-live-row"><span><GameIcon name="clock" size={13}/>Targets refresh in <b>{formatTime(boardRefreshRemaining)}</b></span><span>Scout = <b>1 Nerve</b> + clearer intel + success bonus</span></div>
-      {tools.length>0&&<div className="crime-prep-line"><label>Optional one-use prep<select value={targetTool} onChange={(e: React.ChangeEvent<HTMLSelectElement>)=>setTargetTool(e.target.value)}><option value="">No tool</option>{tools.map((entry)=><option key={entry.id} value={entry.id} disabled={(g.gameState.inventory[entry.id]||0)<=0}>{entry.name} · owned {g.gameState.inventory[entry.id]||0}</option>)}</select></label>{tool&&<small>{tool.description} {ownedTool>0?"Consumed on attempt.":"Not owned."}</small>}</div>}
-      <div className="crime-target-grid career-target-grid">{targets.map((target)=>{
-        const scouted=g.gameState.scoutedCrimeTargets.includes(target.id);
-        const resolved=g.gameState.resolvedCrimeTargets.includes(target.id);
-        const chance=targetSuccessChance(target,g.gameState.crimeSkillXp[target.family]??0,g.combatStats.dexterity,g.gameState.heat,scouted,g.gameState.streetReputation)+(ownedTool>0&&tool?(tool.modifiers.chanceModifier??0):0);
-        const feedbackKey=`target:${target.id}`;
-        return <article key={target.id} className={`crime-target-card ${scouted?"scouted":""} ${resolved?"resolved":""}`}>
-          <header><span className="target-icon"><GameIcon name={career.icon} size={18}/></span><div><small>{target.area}</small><h4>{target.name}</h4></div><span className="target-state">{resolved?"GONE":scouted?"SCOUTED":"LIVE"}</span></header>
-          <p>{scouted?target.hint:"Scout this target to reveal the full payout, Heat and difficulty profile."}</p>
-          <div className="target-intel-grid"><span><small>Mastery</small><strong>{mastery}</strong></span><span><small>Chance</small><strong>{scouted?`${Math.max(4,Math.min(97,chance)).toFixed(0)}%`:"???"}</strong></span><span><small>Reward</small><strong>{scouted?`${money(target.minReward)}–${money(target.maxReward)}`:"???"}</strong></span><span><small>Heat</small><strong>{scouted?`+${target.heat}`:"???"}</strong></span></div>
-          <div className="target-actions">
-            <Button disabled={resolved||scouted||incapacitated||g.gameState.nerve<1||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:feedbackKey,crimeId:career.id,subject:target.name,actionLabel:"Scout target",district:target.area,label:"SCOUTING THE TARGET…"},()=>g.scoutCrimeTarget(target.id))}>Scout</Button>
-            <Button disabled={resolved||incapacitated||g.gameState.nerve<target.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:feedbackKey,crimeId:career.id,subject:target.name,actionLabel:`Attempt ${career.name}`,district:target.area,label:"MAKING THE ATTEMPT…"},()=>g.resolveCrimeTarget(target,ownedTool>0?targetTool:null))}>Attempt · {target.nerve} Nerve</Button>
-          </div>
-          {renderFeedback(feedbackKey)}
-        </article>;
-      })}</div>
-    </div>;
-  };
-
-  const renderScavenging=(career:CrimeCareerDefinition)=>{
-    const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);
-    const clock=formatRiftCityTime(now);
-    return <div className="crime-detail-stack">
-      <div className="crime-mechanic-note"><GameIcon name="clock" size={16}/><div><strong>REAL-TIME OPPORTUNITY</strong><span>Opportunity follows the real clock instead of bouncing randomly. Commuter, nightlife, harbor, casino and premium areas rise and fall on different daily schedules, with small weekday/weekend changes.</span></div></div>
-      <div className="crime-live-row"><span><GameIcon name="clock" size={13}/>Current city time <b>{clock}</b></span><span>Scavenging Mastery <b>{mastery}/100</b></span></div>
-      <div className="scavenge-grid">
-        {SCAVENGE_LOCATIONS.map((location)=>{
-          const opp=scavengingOpportunity(location,now);
-          const trend=scavengingOpportunityTrend(location,now);
-          const opportunityLabel=scavengingOpportunityLabel(opp);
-          const masteryLocked=mastery<location.masteryRequired;
-          const missingItems=(location.requiredItems??[]).filter((id)=>(g.gameState.inventory[id]||0)<=0);
-          const itemLocked=missingItems.length>0;
-          const locked=masteryLocked||itemLocked;
-          const outcomeRates=scavengingOutcomeRates(location,mastery,g.gameState.heat,opp);
-          const accessLabel=location.requiredItems?.length
-            ? `Requires ${location.requiredItems.map((id)=>getItem(id)?.name??id).join(" + ")}`
-            : location.masteryRequired>1 ? `Mastery ${location.masteryRequired}` : "Open";
-          return <article key={location.id} className={`scavenge-card ${locked?"locked":""}`}>
-            <header><div><small>{location.district}</small><h4>{location.name}</h4></div><div className="scavenge-opportunity-readout"><strong>{opp}%</strong><small>{opportunityLabel} · {trend}</small></div></header>
-            <p>{location.description}</p>
-            <div className="opportunity-meter" aria-label={`${location.name} opportunity ${opp}%`}><span style={{left:`${opp}%`}}/><i style={{width:`${opp}%`}}/></div>
-            <div className="scavenge-schedule-line"><span>Best window <b>{location.peakLabel}</b></span><span>Access <b>{accessLabel}</b></span><span>Lucky find <b>{outcomeRates.luckyChance.toFixed(1)}%</b></span><span>Bust risk <b>{outcomeRates.bustChance.toFixed(1)}%</b></span></div>
-            <div className="crime-mini-metrics"><span>{location.nerve} Nerve</span><span>{money(location.minReward)}–{money(location.maxReward)}</span><span>{location.lootHint}</span></div>
-            {renderRequirement(location.requiredItems)}
-            <Button disabled={locked||incapacitated||g.gameState.nerve<location.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:`scavenge:${location.id}`,crimeId:"scavenging",subject:location.name,actionLabel:"Search area",district:location.district,label:"SEARCHING…"},()=>g.resolveScavenging(location.id))}>{masteryLocked?`Mastery ${location.masteryRequired} Required`:itemLocked?`Need ${missingItems.map((id)=>getItem(id)?.name??id).join(" + ")}`:`Search · ${opportunityLabel}`}</Button>
-            {renderFeedback(`scavenge:${location.id}`)}
-          </article>;
-        })}
-      </div>
-    </div>;
-  };
-
-  const renderShoplifting=()=>{
-    const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery.shoplift??0);
-    return <div className="crime-detail-stack"><div className="crime-mechanic-note"><GameIcon name="shops" size={16}/><div><strong>LIVE STORE CONDITIONS + GREED</strong><span>Crowd, cameras and staffing rotate every few minutes. Add merchandise to your basket; value rises, but so does suspicion. Severity IV–V targets often require two prep items.</span></div></div><div className="shoplift-store-grid">{SHOPLIFT_STORES.map((store)=>{const live=getShopliftingConditions(store,now);const basketIds=shopBaskets[store.id]??[];const basket=store.items.filter((item)=>basketIds.includes(item.id));const suspicion=shopliftingSuspicion(store,basket,live);const basketValue=basket.reduce((sum,item)=>sum+item.value,0);const locked=mastery<store.masteryRequired;const required=Array.from(new Set(basket.flatMap((item)=>item.requiredItems??[])));const missing=required.filter((id)=>(g.gameState.inventory[id]||0)<=0);const toggle=(id:string)=>setShopBaskets((prev)=>({...prev,[store.id]:(prev[store.id]??[]).includes(id)?(prev[store.id]??[]).filter((x)=>x!==id):[...(prev[store.id]??[]),id]}));return <article key={store.id} className={`shoplift-store ${locked?"locked":""}`}><header><div><small>{store.district}</small><h3>{store.name}</h3></div><span className={`shop-opportunity ${live.opportunity>68?"good":live.opportunity<35?"bad":""}`}>{live.opportunity}% OPPORTUNITY</span></header><p>{store.description}</p><div className="store-condition-row"><span>Crowd <b>{live.crowd}</b></span><span>Security <b>{live.security}</b></span><span>Staff <b>{live.staffing}</b></span></div><div className="shop-items">{store.items.map((item)=>{const itemLocked=mastery<item.masteryRequired;const selected=basketIds.includes(item.id);return <button type="button" key={item.id} className={`${selected?"selected":""} ${itemLocked?"locked":""}`} disabled={locked||itemLocked} onClick={()=>toggle(item.id)}><span className="severity">SEVERITY {severityRoman[item.severity]}</span><strong>{item.name}</strong><small>{money(item.value)} · Mastery {item.masteryRequired}+</small>{item.requiredItems?.length?<em>{item.requiredItems.length} required item{item.requiredItems.length===1?"":"s"}</em>:null}</button>;})}</div><div className="shoplift-risk-panel"><div><small>BASKET</small><strong>{basket.length} items · {money(basketValue)}</strong></div><div><small>SUSPICION</small><strong className={suspicion>=70?"danger":suspicion>=45?"warn":""}>{basket.length?suspicion:0}%</strong></div></div>{renderRequirement(required)}<div className="target-actions"><Button disabled={!basket.length} onClick={()=>setShopBaskets((prev)=>({...prev,[store.id]:[]}))}>Clear Basket</Button><Button disabled={locked||!basket.length||missing.length>0||incapacitated||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:`shoplift:${store.id}`,crimeId:"shoplift",subject:store.name,actionLabel:`Leave with ${basketIds.length} item${basketIds.length===1?"":"s"}`,district:store.district,label:"SLIPPING OUT…"},()=>g.resolveShoplifting(store.id,basketIds),()=>setShopBaskets((prev)=>({...prev,[store.id]:[]})))}>Leave With Basket</Button></div>{renderFeedback(`shoplift:${store.id}`)}{locked&&<small className="crime-lock-line"><GameIcon name="lock" size={12}/>Requires Shoplifting Mastery {store.masteryRequired}</small>}</article>;})}</div></div>;
-  };
-
-  const renderGraffiti=()=> <div className="crime-detail-stack"><div className="graffiti-rep-banner"><div><GameIcon name="spray" size={28}/><div><span>STREET REPUTATION</span><strong>{g.gameState.streetReputation}</strong><small>{graffitiRank(g.gameState.streetReputation)}</small></div></div><p>Graffiti is a reputation career. Higher-profile walls create more Heat but build your name much faster.</p><div><span>Total tags</span><strong>{g.gameState.graffitiTotalTags}</strong></div></div><div className="graffiti-spot-grid">{GRAFFITI_SPOTS.map((spot)=>{const repLocked=g.gameState.streetReputation<spot.reputationRequired;const cooldown=Math.max(0,(g.gameState.graffitiCooldowns[spot.id]||0)-now);const chance=graffitiSuccessChance(spot,g.gameState.crimeSkillXp.street??0,g.combatStats.dexterity,g.gameState.heat,g.gameState.streetReputation);return <article key={spot.id} className={`graffiti-spot-card ${repLocked?"locked":""}`}><header><span className="graffiti-mark"><GameIcon name="spray" size={18}/></span><div><small>{spot.district}</small><h4>{spot.name}</h4></div><span className="graffiti-rep-reward">+{spot.reputationGain} REP</span></header><p>{spot.description}</p><div className="graffiti-metrics"><span>{spot.nerve} Nerve</span><span>1 Street Paint Pack</span><span>{money(spot.paintCost)} setup</span><span>{chance.toFixed(0)}% success</span><span>Heat +{spot.heat}</span></div>{renderRequirement(["spray-can"])}<Button disabled={repLocked||cooldown>0||incapacitated||g.gameState.nerve<spot.nerve||g.gameState.cash<spot.paintCost||(g.gameState.inventory["spray-can"]||0)<=0||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:`graffiti:${spot.id}`,crimeId:"graffiti",subject:spot.name,actionLabel:"Leave your mark",district:spot.district,label:"LEAVING YOUR MARK…"},()=>g.tagGraffiti(spot.id))}>{repLocked?`Rep ${spot.reputationRequired} Required`:cooldown>0?`Hot · ${formatTime(cooldown)}`:(g.gameState.inventory["spray-can"]||0)<=0?"Need Street Paint Pack":"Leave Your Mark"}</Button>{renderFeedback(`graffiti:${spot.id}`)}</article>;})}</div></div>;
-
-  const renderOperations=(career:CrimeCareerDefinition)=>{
-    const operations=(career.operationIds??[]).map(operationById).filter((item):item is NonNullable<typeof item>=>Boolean(item));
-    return <div className="crime-detail-stack"><div className="crime-mechanic-note"><GameIcon name="clock" size={16}/><div><strong>PASSIVE OPERATION</strong><span>These keep running while you leave the page. Some have fixed completion timers; risk-build operations let you cash out early while value and detection pressure climb together.</span></div></div>{operations.map((operation)=>{const active=g.gameState.activeCrimeOperations.find((job)=>job.operationId===operation.id);const remaining=active?Math.max(0,active.finishesAt-now):0;const progress=active?Math.max(0,Math.min(1,(now-active.startedAt)/Math.max(1,active.finishesAt-active.startedAt))):0;const ready=Boolean(active&&remaining<=0);const riskBuild=operation.cashoutMode==="risk-build";const canCash=Boolean(active&&riskBuild&&progress>=(operation.minCashoutProgress??.15));const liveDetection=Math.max(1,Math.round(operation.detectionRisk*(riskBuild?(.35+progress*.9):1)));const accruedMin=Math.round(operation.minReward*(riskBuild?(.22+progress*.78):1));const accruedMax=Math.round(operation.maxReward*(riskBuild?(.22+progress*.78):1));const missing=(operation.requiredItems??[]).filter((id)=>(g.gameState.inventory[id]||0)<=0);return <article key={operation.id} className={`crime-operation-card career-operation ${ready?"ready":""}`}><header><span><GameIcon name={operation.icon} size={19}/></span><div><small>{CRIME_FAMILY_LABELS[operation.family]}</small><h4>{operation.name}</h4></div></header><p>{operation.description}</p><div className="operation-metrics"><span><small>Setup</small><strong>{money(operation.setupCost)}</strong></span><span><small>{riskBuild?"Value built":"Timer"}</small><strong>{active&&riskBuild?`${Math.round(progress*100)}%`:formatTime(operation.durationMs)}</strong></span><span><small>{active&&riskBuild?"Accrued range":"Payout"}</small><strong>{money(active&&riskBuild?accruedMin:operation.minReward)}–{money(active&&riskBuild?accruedMax:operation.maxReward)}</strong></span><span><small>Detection</small><strong>{active&&riskBuild?`${liveDetection}% live`:`${operation.detectionRisk}% base`}</strong></span></div>{active&&riskBuild?<div className="operation-risk-build"><div><i style={{width:`${progress*100}%`}}/></div><small>Waiting longer increases the possible payout, but detection pressure also grows.</small></div>:null}{renderRequirement(operation.requiredItems)}{active?<Button disabled={(riskBuild?!canCash:!ready)||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:`operation:${operation.id}`,crimeId:career.id,subject:operation.name,actionLabel:riskBuild&&remaining>0?"Cash out operation":"Collect operation",label:riskBuild&&remaining>0?"CASHING OUT…":"COLLECTING RESULT…"},()=>g.claimCrimeOperation(active.id))}>{riskBuild?(canCash?(remaining>0?"Cash Out Now":"Collect Full Run"):`Building Value · ${Math.round(progress*100)}%`):(ready?"Collect Result":`Running · ${formatTime(remaining)}`)}</Button>:<Button disabled={missing.length>0||incapacitated||g.gameState.cash<operation.setupCost||g.gameState.nerve<operation.nerve||Boolean(feedback&&feedback.phase!=="result")} onClick={()=>withCrimeFeedback({key:`operation:${operation.id}`,crimeId:career.id,subject:operation.name,actionLabel:"Launch operation",label:"SETTING UP OPERATION…"},()=>g.startCrimeOperation(operation.id))}>Launch Operation</Button>}{renderFeedback(`operation:${operation.id}`)}</article>;})}</div>;
-  };
-
   const renderActions=(career:CrimeCareerDefinition)=>{
     const mastery=crimeCareerMasteryLevel(g.gameState.crimeMastery[career.id]??0);const familyLevel=crimeFamilyLevel(g.gameState.crimeSkillXp[career.family]??0);
     const live=getCrimeContextPulse(career.id,now,g.gameState.heat); const signature=CRIME_SIGNATURES[career.id];
@@ -365,12 +226,12 @@ export function Crimes({ g }: { g: Game }) {
     if(!selected)return null;
     const uiKind=selectedPlugin?.uiKind??selected.mode;
     const renderers={
-      scavenge:()=>renderScavenging(selected),
-      pickpocket:()=>renderPickpocket(selected),
-      target:()=>renderTargetCrime(selected),
-      shoplift:()=>renderShoplifting(),
-      graffiti:()=>renderGraffiti(),
-      operation:()=>renderOperations(selected),
+      scavenge:()=> <ScavengingCrime g={g} career={selected} now={now} incapacitated={incapacitated} feedbackBusy={Boolean(feedback&&feedback.phase!=="result")} withCrimeFeedback={withCrimeFeedback} renderFeedback={renderFeedback}/>,
+      pickpocket:()=> <PickpocketCrime g={g} career={selected} now={now} incapacitated={incapacitated} feedbackBusy={Boolean(feedback&&feedback.phase!=="result")} withCrimeFeedback={withCrimeFeedback} renderFeedback={renderFeedback}/>,
+      target:()=> <TargetCrime g={g} career={selected} boardSeed={boardSeed} boardRefreshRemaining={boardRefreshRemaining} incapacitated={incapacitated} feedbackBusy={Boolean(feedback&&feedback.phase!=="result")} withCrimeFeedback={withCrimeFeedback} renderFeedback={renderFeedback}/>,
+      shoplift:()=> <ShopliftingCrime g={g} now={now} incapacitated={incapacitated} feedbackBusy={Boolean(feedback&&feedback.phase!=="result")} withCrimeFeedback={withCrimeFeedback} renderFeedback={renderFeedback}/> ,
+      graffiti:()=> <GraffitiCrime g={g} now={now} incapacitated={incapacitated} feedbackBusy={Boolean(feedback&&feedback.phase!=="result")} withCrimeFeedback={withCrimeFeedback} renderFeedback={renderFeedback}/>,
+      operation:()=> <OperationsCrime g={g} career={selected} now={now} incapacitated={incapacitated} feedbackBusy={Boolean(feedback&&feedback.phase!=="result")} withCrimeFeedback={withCrimeFeedback} renderFeedback={renderFeedback}/>,
       actions:()=>renderActions(selected),
       major:()=>renderMajor(selected),
     } as const;

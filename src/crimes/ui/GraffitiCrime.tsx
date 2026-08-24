@@ -1,0 +1,13 @@
+import React from "react";
+import { Button } from "../../components/ui";
+import { GameIcon } from "../../components/GameIcon";
+import { formatTime, money } from "../../core/gameCore";
+import { GRAFFITI_SPOTS, graffitiRank, graffitiSuccessChance } from "../../systems/crimeActivities";
+import { CrimeRequiredItems } from "./CrimeRequiredItems";
+import type { CrimeGame, FeedbackRenderer, WithCrimeFeedback } from "./types";
+
+export function GraffitiCrime({g,now,incapacitated,feedbackBusy,withCrimeFeedback,renderFeedback}:{g:CrimeGame;now:number;incapacitated:boolean;feedbackBusy:boolean;withCrimeFeedback:WithCrimeFeedback;renderFeedback:FeedbackRenderer}) {
+  return <div className="crime-detail-stack"><div className="graffiti-rep-banner"><div><GameIcon name="spray" size={28}/><div><span>STREET REPUTATION</span><strong>{g.gameState.streetReputation}</strong><small>{graffitiRank(g.gameState.streetReputation)}</small></div></div><p>Graffiti is a reputation career. Higher-profile walls create more Heat but build your name much faster.</p><div><span>Total tags</span><strong>{g.gameState.graffitiTotalTags}</strong></div></div>
+    <div className="graffiti-spot-grid">{GRAFFITI_SPOTS.map((spot)=>{const repLocked=g.gameState.streetReputation<spot.reputationRequired;const cooldown=Math.max(0,(g.gameState.graffitiCooldowns[spot.id]||0)-now);const chance=graffitiSuccessChance(spot,g.gameState.crimeSkillXp.street??0,g.combatStats.dexterity,g.gameState.heat,g.gameState.streetReputation);const key=`graffiti:${spot.id}`;return <article key={spot.id} className={`graffiti-spot-card ${repLocked?"locked":""}`}><header><span className="graffiti-mark"><GameIcon name="spray" size={18}/></span><div><small>{spot.district}</small><h4>{spot.name}</h4></div><span className="graffiti-rep-reward">+{spot.reputationGain} REP</span></header><p>{spot.description}</p><div className="graffiti-metrics"><span>{spot.nerve} Nerve</span><span>1 Street Paint Pack</span><span>{money(spot.paintCost)} setup</span><span>{chance.toFixed(0)}% success</span><span>Heat +{spot.heat}</span></div><CrimeRequiredItems ids={["spray-can"]} inventory={g.gameState.inventory}/><Button disabled={repLocked||cooldown>0||incapacitated||g.gameState.nerve<spot.nerve||g.gameState.cash<spot.paintCost||(g.gameState.inventory["spray-can"]||0)<=0||feedbackBusy} onClick={()=>withCrimeFeedback({key,crimeId:"graffiti",subject:spot.name,actionLabel:"Leave your mark",district:spot.district,label:"LEAVING YOUR MARK…"},()=>g.tagGraffiti(spot.id))}>{repLocked?`Rep ${spot.reputationRequired} Required`:cooldown>0?`Hot · ${formatTime(cooldown)}`:(g.gameState.inventory["spray-can"]||0)<=0?"Need Street Paint Pack":"Leave Your Mark"}</Button>{renderFeedback(key)}</article>;})}</div>
+  </div>;
+}
