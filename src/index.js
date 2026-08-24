@@ -1,47 +1,77 @@
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const PASSWORD_ITERATIONS = 210_000;
+const LOG_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS system_logs (
+    id TEXT PRIMARY KEY,
+    error_id TEXT UNIQUE,
+    severity TEXT NOT NULL CHECK (severity IN ('INFO','WARNING','ERROR')),
+    event_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    stack TEXT,
+    route TEXT,
+    method TEXT,
+    request_id TEXT,
+    user_id TEXT,
+    context_json TEXT,
+    resolved INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )
+`;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const requestId = request.headers.get('cf-ray') || crypto.randomUUID();
 
     if (url.pathname.startsWith('/api/')) {
       try {
-        return await handleApi(request, env, url);
+        return await handleApi(request, env, url, requestId);
       } catch (error) {
-        console.error(error);
-        return json({ ok: false, error: 'Internal server error' }, 500);
+        const errorId = makeErrorId();
+        console.error(`[${errorId}] [${requestId}]`, error);
+        await safeWriteSystemLog(env, {
+          errorId,
+          severity: 'ERROR',
+          eventType: 'API_ERROR',
+          message: safeErrorMessage(error),
+          stack: safeStack(error),
+          route: url.pathname,
+          method: request.method,
+          requestId,
+          userId: null,
+          context: { search: url.search || null }
+        });
+        return json({ ok: false, error: 'Internal server error', errorId }, 500, { 'X-RiftCity-Request-ID': requestId });
       }
+    }
+
+    if (url.pathname === '/admin/logs' || url.pathname === '/admin/logs/') {
+      const adminUrl = new URL('/admin-logs.html', request.url);
+      return env.ASSETS.fetch(new Request(adminUrl, request));
     }
 
     return env.ASSETS.fetch(request);
   }
 };
 
-async function handleApi(request, env, url) {
+async function handleApi(request, env, url, requestId) {
   const method = request.method.toUpperCase();
 
-  if (method === 'POST' && url.pathname === '/api/auth/register') {
-    return register(request, env);
-  }
-  if (method === 'POST' && url.pathname === '/api/auth/login') {
-    return login(request, env);
-  }
-  if (method === 'POST' && url.pathname === '/api/auth/logout') {
-    return logout(request, env);
-  }
-  if (method === 'GET' && url.pathname === '/api/auth/me') {
-    return me(request, env);
-  }
-  if (method === 'GET' && url.pathname === '/api/health') {
-    return json({ ok: true, service: 'riftcity-v2-phase1' });
+  if (method === 'POST' && url.pathname === '/api/auth/register') return register(request, env, requestId);
+  if (method === 'POST' && url.pathname === '/api/auth/login') return login(request, env, requestId);
+  if (method === 'POST' && url.pathname === '/api/auth/logout') return logout(request, env, requestId);
+  if (method === 'GET' && url.pathname === '/api/auth/me') return me(request, env);
+  if (method === 'GET' && url.pathname === '/api/health') return health(env);
+  if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
+  if (method === 'POST' && url.pathname.startsWith('/api/admin/logs/') && url.pathname.endsWith('/resolve')) {
+    return resolveSystemLog(request, env, url);
   }
 
   return json({ ok: false, error: 'Not found' }, 404);
 }
 
-async function register(request, env) {
+async function register(request, env, requestId) {
   const body = await readJson(request);
   const username = normalizeUsername(body?.username);
   const password = typeof body?.password === 'string' ? body.password : '';
@@ -64,6 +94,10 @@ async function register(request, env) {
   `).bind(userId, username, passwordHash, salt, now, now).run();
 
   await writeAudit(env, userId, 'user.registered', userId, { username });
+  await safeWriteSystemLog(env, {
+    severity: 'INFO', eventType: 'ACCOUNT_CREATED', message: `Account created: ${username}`,
+    route: '/api/auth/register', method: 'POST', requestId, userId, context: { username }
+  });
 
   const session = await createSession(env, request, userId);
   return json({
@@ -72,7 +106,7 @@ async function register(request, env) {
   }, 201, { 'Set-Cookie': session.cookie });
 }
 
-async function login(request, env) {
+async function login(request, env, requestId) {
   const body = await readJson(request);
   const username = normalizeUsername(body?.username);
   const password = typeof body?.password === 'string' ? body.password : '';
@@ -84,42 +118,55 @@ async function login(request, env) {
     FROM users WHERE username = ?
   `).bind(username).first();
 
-  if (!user) return json({ ok: false, error: 'Invalid username or password' }, 401);
+  if (!user) {
+    await safeWriteSystemLog(env, {
+      severity: 'WARNING', eventType: 'LOGIN_FAILED', message: `Login failed for username: ${username}`,
+      route: '/api/auth/login', method: 'POST', requestId, context: { username, reason: 'unknown_user' }
+    });
+    return json({ ok: false, error: 'Invalid username or password' }, 401);
+  }
 
   const saltBytes = base64ToBytes(user.password_salt);
   const suppliedHash = await hashPassword(password, saltBytes);
   if (!constantTimeEqual(suppliedHash, user.password_hash)) {
+    await safeWriteSystemLog(env, {
+      severity: 'WARNING', eventType: 'LOGIN_FAILED', message: `Login failed for username: ${username}`,
+      route: '/api/auth/login', method: 'POST', requestId, userId: user.id,
+      context: { username, reason: 'invalid_password' }
+    });
     return json({ ok: false, error: 'Invalid username or password' }, 401);
   }
 
-  if (user.is_banned) {
-    return json({ ok: false, error: user.ban_reason || 'This account is banned' }, 403);
-  }
+  if (user.is_banned) return json({ ok: false, error: user.ban_reason || 'This account is banned' }, 403);
 
   const now = Date.now();
   await env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(now, user.id).run();
   await writeAudit(env, user.id, 'user.login', user.id, {});
+  await safeWriteSystemLog(env, {
+    severity: 'INFO', eventType: 'LOGIN_SUCCESS', message: `Login successful: ${user.username}`,
+    route: '/api/auth/login', method: 'POST', requestId, userId: user.id, context: { username: user.username }
+  });
 
   const session = await createSession(env, request, user.id);
   return json({
     ok: true,
-    user: {
-      id: user.id,
-      username: user.username,
-      role: user.role,
-      createdAt: user.created_at,
-      lastActiveAt: now
-    }
+    user: { id: user.id, username: user.username, role: user.role, createdAt: user.created_at, lastActiveAt: now }
   }, 200, { 'Set-Cookie': session.cookie });
 }
 
-async function logout(request, env) {
+async function logout(request, env, requestId) {
   const rawToken = getCookie(request, SESSION_COOKIE);
   if (rawToken) {
     const tokenHash = await sha256(rawToken);
     const session = await env.DB.prepare('SELECT user_id FROM sessions WHERE token_hash = ?').bind(tokenHash).first();
     await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
-    if (session?.user_id) await writeAudit(env, session.user_id, 'user.logout', session.user_id, {});
+    if (session?.user_id) {
+      await writeAudit(env, session.user_id, 'user.logout', session.user_id, {});
+      await safeWriteSystemLog(env, {
+        severity: 'INFO', eventType: 'LOGOUT', message: 'Player logged out', route: '/api/auth/logout',
+        method: 'POST', requestId, userId: session.user_id
+      });
+    }
   }
 
   return json({ ok: true }, 200, {
@@ -130,7 +177,6 @@ async function logout(request, env) {
 async function me(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, authenticated: false }, 401);
-
   return json({
     ok: true,
     authenticated: true,
@@ -145,27 +191,75 @@ async function me(request, env) {
   });
 }
 
+async function health(env) {
+  const result = { ok: true, service: 'riftcity-v2-phase1', database: 'unknown' };
+  try {
+    await env.DB.prepare('SELECT 1 AS ok').first();
+    result.database = 'connected';
+  } catch {
+    result.ok = false;
+    result.database = 'error';
+  }
+  return json(result, result.ok ? 200 : 503);
+}
+
+async function getSystemLogs(request, env, url) {
+  const auth = await requireAdmin(request, env);
+  if (auth.response) return auth.response;
+  await ensureLogTable(env);
+
+  const severity = (url.searchParams.get('severity') || '').toUpperCase();
+  const resolved = url.searchParams.get('resolved');
+  const limit = Math.max(1, Math.min(Number(url.searchParams.get('limit')) || 100, 250));
+  const clauses = [];
+  const values = [];
+
+  if (['INFO', 'WARNING', 'ERROR'].includes(severity)) {
+    clauses.push('severity = ?');
+    values.push(severity);
+  }
+  if (resolved === '0' || resolved === '1') {
+    clauses.push('resolved = ?');
+    values.push(Number(resolved));
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const query = `SELECT * FROM system_logs ${where} ORDER BY created_at DESC LIMIT ?`;
+  values.push(limit);
+  const result = await env.DB.prepare(query).bind(...values).all();
+  return json({ ok: true, logs: result.results || [] });
+}
+
+async function resolveSystemLog(request, env, url) {
+  const auth = await requireAdmin(request, env);
+  if (auth.response) return auth.response;
+  await ensureLogTable(env);
+  const match = url.pathname.match(/^\/api\/admin\/logs\/([^/]+)\/resolve$/);
+  if (!match) return json({ ok: false, error: 'Invalid log ID' }, 400);
+  const id = decodeURIComponent(match[1]);
+  await env.DB.prepare('UPDATE system_logs SET resolved = 1 WHERE id = ?').bind(id).run();
+  return json({ ok: true });
+}
+
+async function requireAdmin(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return { response: json({ ok: false, error: 'Authentication required' }, 401) };
+  if (!['admin', 'developer'].includes(auth.user.role)) {
+    return { response: json({ ok: false, error: 'Admin or developer access required' }, 403) };
+  }
+  return { auth };
+}
+
 async function authenticate(request, env) {
   const rawToken = getCookie(request, SESSION_COOKIE);
   if (!rawToken) return null;
-
   const tokenHash = await sha256(rawToken);
   const now = Date.now();
 
   const row = await env.DB.prepare(`
-    SELECT
-      s.id AS session_id,
-      s.expires_at,
-      u.id,
-      u.username,
-      u.role,
-      u.created_at,
-      u.last_active_at,
-      u.is_banned,
-      u.ban_reason
-    FROM sessions s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = ?
+    SELECT s.id AS session_id, s.expires_at, u.id, u.username, u.role, u.created_at,
+      u.last_active_at, u.is_banned, u.ban_reason
+    FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?
   `).bind(tokenHash).first();
 
   if (!row) return null;
@@ -179,7 +273,6 @@ async function authenticate(request, env) {
     env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(now, row.id)
   ]);
   row.last_active_at = now;
-
   return { user: row, sessionId: row.session_id };
 }
 
@@ -197,9 +290,7 @@ async function createSession(env, request, userId) {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).bind(sessionId, userId, tokenHash, now, expiresAt, now, userAgent).run();
 
-  return {
-    cookie: `${SESSION_COOKIE}=${rawToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`
-  };
+  return { cookie: `${SESSION_COOKIE}=${rawToken}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}` };
 }
 
 function validateCredentials(username, password) {
@@ -210,22 +301,12 @@ function validateCredentials(username, password) {
   return null;
 }
 
-function normalizeUsername(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
+function normalizeUsername(value) { return typeof value === 'string' ? value.trim() : ''; }
 
 async function hashPassword(password, saltBytes) {
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: PASSWORD_ITERATIONS },
-    keyMaterial,
-    256
+    { name: 'PBKDF2', hash: 'SHA-256', salt: saltBytes, iterations: PASSWORD_ITERATIONS }, keyMaterial, 256
   );
   return bytesToBase64(new Uint8Array(bits));
 }
@@ -260,11 +341,7 @@ async function readJson(request) {
 function json(payload, status = 200, headers = {}) {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
-      ...headers
-    }
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers }
   });
 }
 
@@ -272,33 +349,51 @@ async function writeAudit(env, actorUserId, action, targetUserId, details) {
   await env.DB.prepare(`
     INSERT INTO audit_log (id, actor_user_id, action, target_user_id, details_json, created_at)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(
-    crypto.randomUUID(),
-    actorUserId || null,
-    action,
-    targetUserId || null,
-    JSON.stringify(details || {}),
-    Date.now()
-  ).run();
+  `).bind(crypto.randomUUID(), actorUserId || null, action, targetUserId || null, JSON.stringify(details || {}), Date.now()).run();
 }
+
+async function ensureLogTable(env) {
+  await env.DB.prepare(LOG_TABLE_SQL).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_system_logs_created ON system_logs(created_at)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_system_logs_error_id ON system_logs(error_id)').run();
+}
+
+async function safeWriteSystemLog(env, entry) {
+  try {
+    await ensureLogTable(env);
+    await env.DB.prepare(`
+      INSERT INTO system_logs
+        (id, error_id, severity, event_type, message, stack, route, method, request_id, user_id, context_json, resolved, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+    `).bind(
+      crypto.randomUUID(), entry.errorId || null, entry.severity || 'INFO', entry.eventType || 'SYSTEM',
+      String(entry.message || '').slice(0, 2000), entry.stack ? String(entry.stack).slice(0, 8000) : null,
+      entry.route || null, entry.method || null, entry.requestId || null, entry.userId || null,
+      JSON.stringify(entry.context || {}), Date.now()
+    ).run();
+  } catch (logError) {
+    console.error('RiftCity logger failed:', logError);
+  }
+}
+
+function makeErrorId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(4));
+  return `RC-${Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+function safeErrorMessage(error) { return error instanceof Error ? error.message : String(error || 'Unknown error'); }
+function safeStack(error) { return error instanceof Error && error.stack ? error.stack : null; }
 
 function bytesToBase64(bytes) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
-
-function bytesToBase64Url(bytes) {
-  return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
+function bytesToBase64Url(bytes) { return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, ''); }
 function base64ToBytes(base64) {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
-
-function bytesToHex(bytes) {
-  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-}
+function bytesToHex(bytes) { return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''); }

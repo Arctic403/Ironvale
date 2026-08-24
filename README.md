@@ -59,3 +59,23 @@ This ZIP intentionally does NOT add stats, inventory, crimes, money, city map, c
 - Root directory: repository root
 
 Before the first deploy, create the D1 database and replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` in `wrangler.toml` with the real database ID.
+
+## Built-in RiftCity system logs
+
+Phase 1 now stores backend events/errors in D1 and exposes an admin/developer-only viewer at:
+
+`/admin/logs`
+
+Unhandled API errors return a short ID such as `RC-8F2A91C0`. Search the log viewer for the matching entry to see the route, request ID, error message, context, and stack trace.
+
+The logger creates its own `system_logs` table automatically on first use. Running `schema.sql` is still recommended for the full Phase 1 database schema.
+
+### Give your account developer access
+
+Accounts are intentionally created with the `player` role. In the Cloudflare D1 SQL console, run this once after creating your account (replace the username):
+
+```sql
+UPDATE users SET role = 'developer' WHERE username = 'YOUR_USERNAME';
+```
+
+Log out and back in afterward so the developer log viewer reflects the updated role.

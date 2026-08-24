@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node --check src/index.js && node --check public/app.js",
+    "build": "node --check src/index.js && node --check public/app.js && node --check public/admin-logs.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",

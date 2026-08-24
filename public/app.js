@@ -35,7 +35,7 @@ async function submitAuth(path, data) {
     body: JSON.stringify({ username: data.get('username'), password: data.get('password') })
   });
 
-  if (!result.ok) return showMessage(result.error || 'Request failed', true);
+  if (!result.ok) return showMessage(result.errorId ? `${result.error || 'Request failed'} — Error ID: ${result.errorId}` : (result.error || 'Request failed'), true);
   showMessage(path.endsWith('register') ? 'Account created.' : 'Logged in.');
   await refreshSession();
 }

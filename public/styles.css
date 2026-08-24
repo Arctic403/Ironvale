@@ -30,3 +30,28 @@ dt { color:#7f8b9b; } dd { margin:0; word-break:break-word; }
 .message.error { border-color:#6c3037; color:#ffc0c6; }
 .hidden { display:none !important; }
 @media (max-width: 700px) { .shell{padding-top:28px}.grid{grid-template-columns:1fr} dl{grid-template-columns:1fr;gap:2px} dd{margin-bottom:10px} }
+
+.logs-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.logs-head h1 { font-size:clamp(2rem,6vw,3.2rem); }
+.link-button { display:inline-flex; align-items:center; justify-content:center; text-decoration:none; border-radius:12px; padding:10px 14px; background:#202a38; color:#fff; font-weight:800; }
+.log-toolbar { display:grid; grid-template-columns:1fr 1fr auto; gap:10px; margin-bottom:16px; }
+.log-toolbar button { width:auto; margin:0; }
+select { width:100%; border:1px solid #2e3a4d; border-radius:12px; padding:12px 13px; background:#0c1119; color:#fff; font:inherit; }
+.logs-list { display:grid; gap:12px; margin-top:16px; }
+.log-entry { border-left-width:4px; }
+.log-entry.severity-error { border-left-color:#ef6470; }
+.log-entry.severity-warning { border-left-color:#e6b95c; }
+.log-entry.severity-info { border-left-color:#6c9cff; }
+.log-entry-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.log-entry-head > div { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.log-entry-head time { color:#7f8b9b; font-size:.78rem; text-align:right; }
+.log-level { font-size:.68rem; letter-spacing:.08em; font-weight:900; padding:5px 7px; border:1px solid #344258; border-radius:999px; }
+.error-id { display:inline-block; margin-top:13px; padding:6px 9px; background:#241418; border:1px solid #6c3037; color:#ffc0c6; border-radius:8px; font:700 .8rem ui-monospace,SFMono-Regular,Menlo,monospace; }
+.log-message { margin:13px 0; line-height:1.5; }
+.log-meta { grid-template-columns:90px 1fr; font-size:.86rem; }
+details { margin-top:10px; border-top:1px solid #263142; padding-top:10px; }
+summary { cursor:pointer; color:#aab6c5; font-weight:700; }
+pre { overflow:auto; white-space:pre-wrap; word-break:break-word; background:#090d13; border:1px solid #222c3b; padding:12px; border-radius:10px; font-size:.75rem; }
+.resolve-btn { width:auto; margin-top:14px; }
+.empty-state { color:#9aa6b6; }
+@media (max-width:700px) { .log-toolbar{grid-template-columns:1fr}.log-toolbar button{width:100%}.logs-head{align-items:center}.log-entry-head{align-items:flex-start;flex-direction:column}.log-entry-head time{text-align:left}.log-meta{grid-template-columns:1fr} }

@@ -40,3 +40,23 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log(actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+
+CREATE TABLE IF NOT EXISTS system_logs (
+  id TEXT PRIMARY KEY,
+  error_id TEXT UNIQUE,
+  severity TEXT NOT NULL CHECK (severity IN ('INFO','WARNING','ERROR')),
+  event_type TEXT NOT NULL,
+  message TEXT NOT NULL,
+  stack TEXT,
+  route TEXT,
+  method TEXT,
+  request_id TEXT,
+  user_id TEXT,
+  context_json TEXT,
+  resolved INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_logs_created ON system_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity);
+CREATE INDEX IF NOT EXISTS idx_system_logs_error_id ON system_logs(error_id);
