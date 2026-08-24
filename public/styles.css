@@ -2802,3 +2802,400 @@ pre { border-color: rgba(255,255,255,.07); border-radius: 10px; background: rgba
   .city-location-tile { min-height: 108px; }
   .resource-top strong { font-size: .88rem; }
 }
+
+/* --------------------------------------------------------------------------
+   RiftCity mobile hardening pass — 2026-08-24
+   Real phone layout: never squeeze desktop dashboard columns into a handset.
+   -------------------------------------------------------------------------- */
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell,
+  .workspace,
+  #player-dashboard,
+  .game-view,
+  .dashboard-layout,
+  .dashboard-layout > .panel,
+  .resource-strip {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace {
+    width: 100%;
+    margin: 0;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: 28px;
+  }
+
+  .topbar {
+    min-height: 58px;
+    padding: 4px 2px;
+  }
+
+  .mobile-brand {
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .mobile-brand strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .98rem;
+    letter-spacing: .055em;
+  }
+
+  .mobile-brand .brand-mark {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .session-status {
+    min-height: 0;
+    margin: 8px 0 0;
+    padding: 7px 9px;
+    border-radius: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .57rem;
+  }
+
+  #player-dashboard {
+    margin-top: 10px;
+  }
+
+  /* 2 x 2 resource deck. No clipping and no accidental horizontal strip. */
+  .resource-strip {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100%;
+    margin: 0;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .resource-item,
+  .resource-item:first-child,
+  .resource-item:last-child,
+  .resource-item:nth-child(1),
+  .resource-item:nth-child(2),
+  .resource-item:nth-child(3),
+  .resource-item:nth-child(4) {
+    width: auto;
+    min-width: 0;
+    min-height: 68px;
+    padding: 11px 12px 10px;
+    border: 1px solid rgba(255,255,255,.075) !important;
+    border-radius: 13px;
+  }
+
+  .resource-top {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .resource-top > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .49rem;
+  }
+
+  .resource-top strong {
+    flex: 0 0 auto;
+    max-width: 62%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: .96rem;
+  }
+
+  .resource-caption {
+    margin-top: 6px;
+    font-size: .5rem;
+  }
+
+  /* Important: force real phone stacking regardless of any earlier desktop CSS. */
+  #overview-view .dashboard-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    align-items: stretch !important;
+    gap: 9px !important;
+    width: 100% !important;
+    margin-top: 9px;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  #overview-view .dashboard-layout > .panel,
+  #overview-view .progression-panel,
+  #overview-view .stats-panel,
+  #overview-view .account-panel {
+    display: block;
+    grid-column: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 14px !important;
+    overflow: hidden;
+    border-radius: 14px;
+  }
+
+  #overview-view .panel::before {
+    left: 14px;
+    right: auto;
+    width: 42px;
+    margin-top: -15px;
+    margin-bottom: 11px;
+  }
+
+  #overview-view .panel-heading {
+    min-width: 0;
+    margin-bottom: 10px;
+  }
+
+  #overview-view .split-heading {
+    align-items: center;
+    min-width: 0;
+  }
+
+  #overview-view .split-heading > div {
+    min-width: 0;
+  }
+
+  #overview-view .panel-heading h2 {
+    max-width: 100%;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.08rem;
+    line-height: 1.1;
+  }
+
+  #overview-view .eyebrow {
+    font-size: .47rem;
+    letter-spacing: .16em;
+  }
+
+  #overview-view .badge {
+    flex: 0 0 auto;
+    max-width: 42%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .xp-row {
+    margin-top: 9px;
+  }
+
+  .progression-panel .muted {
+    margin-top: 10px;
+    font-size: .68rem;
+    line-height: 1.45;
+  }
+
+  /* Stats become four purpose-built tiles instead of squashed label/value rows. */
+  #overview-view .combat-stats {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    width: 100%;
+    border: 0 !important;
+  }
+
+  #overview-view .combat-stats > div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 5px;
+    min-width: 0;
+    min-height: 66px;
+    padding: 10px 11px;
+    border: 1px solid rgba(255,255,255,.065) !important;
+    border-radius: 11px;
+    background: rgba(255,255,255,.022);
+  }
+
+  #overview-view .combat-stats > div span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #74808d;
+    font-size: .52rem;
+    letter-spacing: .09em;
+  }
+
+  #overview-view .combat-stats strong {
+    font-size: 1.18rem;
+    line-height: 1;
+  }
+
+  /* Account data must wrap inside its own card, especially long user IDs. */
+  #account-card dl {
+    display: grid !important;
+    grid-template-columns: minmax(72px, .34fr) minmax(0, 1fr) !important;
+    gap: 0 !important;
+    width: 100%;
+    margin: 6px 0 11px;
+    font-size: .59rem;
+  }
+
+  #account-card dt,
+  #account-card dd {
+    min-width: 0;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+
+  #account-card dt {
+    padding-right: 10px;
+  }
+
+  #account-card dd {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-align: right;
+  }
+
+  #account-card .ghost-button {
+    min-height: 38px;
+    margin-top: 2px;
+  }
+
+  /* The fixed nav gets its own safe zone instead of covering page cards. */
+  .mobile-nav {
+    left: max(10px, env(safe-area-inset-left)) !important;
+    right: max(10px, env(safe-area-inset-right)) !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    height: 62px !important;
+    padding: 5px !important;
+    gap: 2px;
+    border-radius: 18px;
+  }
+
+  .mobile-nav-link {
+    min-width: 0 !important;
+    min-height: 50px;
+    padding: 5px 3px;
+    border: 0 !important;
+  }
+
+  .mobile-nav-link span {
+    font-size: .84rem;
+  }
+
+  .mobile-nav-link small {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .48rem;
+    letter-spacing: .055em;
+  }
+
+  /* Keep every other primary view inside the viewport too. */
+  .world-header,
+  .city-hub,
+  .city-hub-direct,
+  .inventory-layout,
+  .inventory-header,
+  .location-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .world-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .city-location-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .city-location-tile {
+    min-width: 0;
+  }
+
+  .inventory-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .inventory-browser,
+  .inventory-detail {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .message {
+    bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 430px) {
+  .workspace {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  .resource-strip {
+    gap: 7px !important;
+  }
+
+  .resource-item,
+  .resource-item:first-child,
+  .resource-item:last-child,
+  .resource-item:nth-child(n) {
+    min-height: 64px;
+    padding: 10px;
+  }
+
+  #overview-view .dashboard-layout > .panel,
+  #overview-view .progression-panel,
+  #overview-view .stats-panel,
+  #overview-view .account-panel {
+    padding: 13px !important;
+  }
+
+  #overview-view .combat-stats > div {
+    min-height: 61px;
+    padding: 9px 10px;
+  }
+
+  #account-card dl {
+    grid-template-columns: 68px minmax(0, 1fr) !important;
+  }
+
+  .city-location-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .mobile-nav {
+    left: max(8px, env(safe-area-inset-left)) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+  }
+}
