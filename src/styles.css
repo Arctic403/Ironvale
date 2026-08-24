@@ -770,3 +770,82 @@ input,select,textarea { border-radius:6px !important; }
   .top-status-bar.floating-status-panel.compact-hud-v4{padding-left:3px!important;padding-right:3px!important}
   .effect-chip small{display:none}.effect-chip{max-width:none}.active-effects-bar{min-height:36px}
 }
+
+/* =========================================================
+   RiftCity internal developer console
+   ========================================================= */
+.dev-admin-root{
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);
+  min-width:0;
+  min-height:0;
+  background:#0a0d10;
+  color:#d7e2eb;
+}
+.dev-admin-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-height:48px;
+  padding:7px 10px calc(7px + env(safe-area-inset-top));
+  border-bottom:1px solid rgba(255,255,255,.09);
+  background:#11171d;
+}
+.dev-admin-title{display:grid;gap:1px;min-width:0}
+.dev-admin-kicker{font-size:7px;font-weight:950;letter-spacing:.15em;color:#5c7890}
+.dev-admin-title strong{font-size:13px;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev-admin-actions{display:flex;gap:5px;align-items:center;overflow-x:auto;scrollbar-width:none}
+.dev-admin-actions::-webkit-scrollbar{display:none}
+.dev-admin-actions button,
+.dev-admin-disabled-card button{
+  min-height:31px;
+  padding:6px 9px;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:5px;
+  background:#18222b;
+  color:#b9cad8;
+  font:inherit;
+  font-size:8px;
+  font-weight:850;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.dev-admin-actions .dev-admin-exit{border-color:rgba(248,113,113,.22);background:rgba(248,113,113,.08);color:#efaaaa}
+.dev-admin-notice{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-bottom:1px solid rgba(245,158,11,.16);
+  background:rgba(245,158,11,.055);
+  color:#a99b7b;
+  font-size:8px;
+  line-height:1.35;
+}
+.dev-admin-notice strong{color:#dec995;white-space:nowrap}
+.dev-admin-frame-shell{min-width:0;min-height:0;overflow:hidden;background:#1e1e1e}
+.dev-admin-frame{display:block;width:100%;height:100%;border:0;background:#1e1e1e}
+.dev-admin-disabled{
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:#090d11;
+  color:#d8e4ee;
+}
+.dev-admin-disabled-card{width:min(440px,100%);padding:24px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:#11171d}
+.dev-admin-disabled-card>span{font-size:8px;font-weight:950;letter-spacing:.16em;color:#60798e}
+.dev-admin-disabled-card h1{margin:5px 0 8px;font-size:22px}
+.dev-admin-disabled-card p{margin:0 0 16px;color:#8498a9;font-size:10px;line-height:1.55}
+@media(max-width:600px){
+  .dev-admin-bar{align-items:center;min-height:46px;padding-left:7px;padding-right:7px}
+  .dev-admin-kicker{display:none}
+  .dev-admin-title strong{font-size:10px}
+  .dev-admin-actions{gap:3px}
+  .dev-admin-actions button{min-height:29px;padding:5px 7px;font-size:7px}
+  .dev-admin-notice{align-items:flex-start;flex-direction:column;gap:2px;padding:6px 8px}
+}
