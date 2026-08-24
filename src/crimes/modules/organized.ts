@@ -1,4 +1,5 @@
 import type { CrimeCareerAction, CrimeCareerDefinition } from "../core/types";
+import { defineCrimePlugins } from "../core/plugin";
 
 const action = (value: CrimeCareerAction) => value;
 
@@ -20,3 +21,6 @@ export const ORGANIZED_CRIMES: CrimeCareerDefinition[] = [
   { id:"bank-job", name:"Bank Job", description:"A late-game prepared score that keeps RiftCity's branching live-job system.", family:"organized", mode:"major", icon:"bank", unlockCrimeExperience:290, baseNerve:11, risk:"EXTREME", legacyCrimeId:"bank-job" },
   { id:"major-heist", name:"Major Heist", description:"City-scale end-game criminal project; future crew play will plug into this structure.", family:"organized", mode:"major", icon:"crown", unlockCrimeExperience:390, baseNerve:13, risk:"EXTREME", legacyCrimeId:"major-heist" }
 ];
+
+// Plugin export: the registry consumes plugins, while the *_CRIMES array remains a compatibility/data export.
+export const ORGANIZED_CRIME_PLUGINS = defineCrimePlugins(ORGANIZED_CRIMES);

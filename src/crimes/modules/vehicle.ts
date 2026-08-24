@@ -1,4 +1,5 @@
 import type { CrimeCareerAction, CrimeCareerDefinition } from "../core/types";
+import { defineCrimePlugins } from "../core/plugin";
 
 const action = (value: CrimeCareerAction) => value;
 
@@ -10,3 +11,6 @@ export const VEHICLE_CRIMES: CrimeCareerDefinition[] = [
   ]},
   { id:"chop-shop", name:"Chop Shop", description:"Run stolen-vehicle processing as a passive operation while you do other activities.", family:"vehicle", mode:"operation", icon:"garage", unlockCrimeExperience:190, baseNerve:6, risk:"HIGH", operationIds:["chop-shop"] }
 ];
+
+// Plugin export: the registry consumes plugins, while the *_CRIMES array remains a compatibility/data export.
+export const VEHICLE_CRIME_PLUGINS = defineCrimePlugins(VEHICLE_CRIMES);

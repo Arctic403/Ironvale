@@ -1,4 +1,5 @@
 import type { CrimeCareerAction, CrimeCareerDefinition } from "../core/types";
+import { defineCrimePlugins } from "../core/plugin";
 
 const action = (value: CrimeCareerAction) => value;
 
@@ -10,3 +11,6 @@ export const FRAUD_CRIMES: CrimeCareerDefinition[] = [
   { id:"identity-fraud", name:"Identity Fraud", description:"A high-tier abstract fraud operation with expensive setup and stronger investigation pressure.", family:"fraud", mode:"operation", icon:"character", unlockCrimeExperience:220, baseNerve:7, risk:"HIGH", operationIds:["identity-fraud"] },
   { id:"corporate-fraud", name:"Corporate Fraud", description:"Late-game passive financial crime with large setup capital, big returns and serious Heat exposure.", family:"fraud", mode:"operation", icon:"building", unlockCrimeExperience:360, baseNerve:10, risk:"EXTREME", operationIds:["corporate-fraud"] }
 ];
+
+// Plugin export: the registry consumes plugins, while the *_CRIMES array remains a compatibility/data export.
+export const FRAUD_CRIME_PLUGINS = defineCrimePlugins(FRAUD_CRIMES);

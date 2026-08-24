@@ -1,4 +1,5 @@
 import type { CrimeCareerAction, CrimeCareerDefinition } from "../core/types";
+import { defineCrimePlugins } from "../core/plugin";
 
 const action = (value: CrimeCareerAction) => value;
 
@@ -17,3 +18,6 @@ export const BURGLARY_CRIMES: CrimeCareerDefinition[] = [
     action({id:"collector-vault",name:"Collector Vault",description:"Extremely rare collector inventory protected by multiple abstract security layers.",nerve:11,difficulty:72,minReward:4200,maxReward:11000,heat:16,masteryRequired:75,requiredItems:["advanced-entry-kit","security-bypass-module"],recommendedItems:["escape-route"]}),
   ]}
 ];
+
+// Plugin export: the registry consumes plugins, while the *_CRIMES array remains a compatibility/data export.
+export const BURGLARY_CRIME_PLUGINS = defineCrimePlugins(BURGLARY_CRIMES);

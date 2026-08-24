@@ -17,7 +17,7 @@ import {
   graffitiRank, graffitiSuccessChance, targetSuccessChance,
 } from "../systems/crimeActivities";
 import {
-  CRIME_CAREERS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES, CrimeCareerDefinition,
+  CRIME_PLUGINS, SCAVENGE_LOCATIONS, SHOPLIFT_STORES, CrimeCareerDefinition,
   careerActionSuccessChance, crimeCareerMasteryLevel, crimeCareerMasteryProgress,
   crimeCityConditions, formatRiftCityTime, getCrimePlugin, getShopliftingConditions, masteryRank, scavengingOpportunity,
   scavengingOpportunityLabel, scavengingOpportunityTrend, scavengingOutcomeRates, shopliftingSuspicion,
@@ -178,7 +178,8 @@ export function Crimes({ g }: { g: Game }) {
   const openCrime=(id:string)=>{listScrollRef.current=window.scrollY;setSelectedId(id);window.requestAnimationFrame(()=>window.scrollTo({top:0,behavior:"auto"}));};
   const backToCrimes=()=>{setSelectedId(null);setRun(null);setTargetTool("");closeFeedback();window.requestAnimationFrame(()=>window.scrollTo({top:listScrollRef.current,behavior:"auto"}));};
 
-  const selected=CRIME_CAREERS.find((crime)=>crime.id===selectedId)??null;
+  const selectedPlugin=selectedId?getCrimePlugin(selectedId)??null:null;
+  const selected=selectedPlugin?.definition??null;
   const conditions=crimeCityConditions(now);
   const boardSeed=crimeTargetBoardSeed(now);
   const boardRefreshRemaining=5*60*1000-(now%(5*60*1000));
@@ -362,8 +363,7 @@ export function Crimes({ g }: { g: Game }) {
 
   const renderSelected=()=>{
     if(!selected)return null;
-    const plugin=getCrimePlugin(selected.id);
-    const uiKind=plugin?.uiKind??selected.mode;
+    const uiKind=selectedPlugin?.uiKind??selected.mode;
     const renderers={
       scavenge:()=>renderScavenging(selected),
       pickpocket:()=>renderPickpocket(selected),
@@ -383,6 +383,6 @@ export function Crimes({ g }: { g: Game }) {
     <section className="crime-career-overview"><div><span className="card-tag">CRIMES</span><h2>One list. Different criminal careers.</h2><p>Every crime has Mastery 1–100. Open one to see its own targets, timing, scouting, store conditions, passive operation or major-job decisions.</p></div><div className="crime-overview-stats"><span>Nerve <b>{g.gameState.nerve}/{g.maxNerve}</b></span><span>Heat <b>{g.gameState.heat}/100</b></span><span>Street Rep <b>{g.gameState.streetReputation}</b></span><span>Crime XP <b>{g.gameState.crimeExperience}</b></span></div></section>
     <section className="city-crime-conditions"><span><small>POLICE</small><b>{conditions.policeLabel}</b></span><span><small>NIGHTLIFE</small><b>{conditions.nightlifeLabel}</b></span><span><small>RETAIL</small><b>{conditions.retailLabel}</b></span><span><small>INDUSTRIAL</small><b>{conditions.industrialLabel}</b></span><em>City conditions rotate every few minutes and individual crime screens react to their own live conditions.</em></section>
     <section className="crime-family-strip">{(Object.entries(CRIME_FAMILY_LABELS) as Array<[CrimeFamily,string]>).map(([family,label])=>{const xp=g.gameState.crimeSkillXp[family]??0;return <div key={family}><span>{label}</span><strong>Lv {crimeFamilyLevel(xp)}</strong><div className="bar-track compact"><div className="bar-fill crime" style={{width:`${crimeFamilyProgress(xp)}%`}}/></div></div>;})}</section>
-    <div className="single-crime-list">{CRIME_CAREERS.map((crime)=>{const masteryXp=g.gameState.crimeMastery[crime.id]??0;const mastery=crimeCareerMasteryLevel(masteryXp);const locked=g.gameState.crimeExperience<crime.unlockCrimeExperience;const activeCount=(crime.operationIds??[]).filter((id)=>g.gameState.activeCrimeOperations.some((job)=>job.operationId===id)).length;return <button type="button" key={crime.id} className={`single-crime-row ${locked?"locked":""}`} onClick={()=>openCrime(crime.id)}><span className="single-crime-icon"><GameIcon name={crime.icon} size={21}/></span><span className="single-crime-main"><span><strong>{crime.name}</strong><small>{crime.description}</small></span><span className="single-crime-progress"><i><b style={{width:`${crimeCareerMasteryProgress(masteryXp)}%`}}/></i><small>Mastery {mastery} · {masteryRank(mastery)}</small></span></span><span className="single-crime-meta"><small>{crime.baseNerve} Nerve+</small><b className={riskClass(crime.risk)}>{crime.risk}</b>{activeCount>0?<em>{activeCount} ACTIVE</em>:null}</span><span className="single-crime-open">{locked?<><GameIcon name="lock" size={14}/><small>CE {crime.unlockCrimeExperience}</small></>:"›"}</span></button>;})}</div>
+    <div className="single-crime-list">{CRIME_PLUGINS.map((plugin)=>{const crime=plugin.definition;const masteryXp=g.gameState.crimeMastery[crime.id]??0;const mastery=crimeCareerMasteryLevel(masteryXp);const locked=g.gameState.crimeExperience<crime.unlockCrimeExperience;const activeCount=(crime.operationIds??[]).filter((id)=>g.gameState.activeCrimeOperations.some((job)=>job.operationId===id)).length;return <button type="button" key={crime.id} className={`single-crime-row ${locked?"locked":""}`} onClick={()=>openCrime(crime.id)}><span className="single-crime-icon"><GameIcon name={crime.icon} size={21}/></span><span className="single-crime-main"><span><strong>{crime.name}</strong><small>{crime.description}</small></span><span className="single-crime-progress"><i><b style={{width:`${crimeCareerMasteryProgress(masteryXp)}%`}}/></i><small>Mastery {mastery} · {masteryRank(mastery)}</small></span></span><span className="single-crime-meta"><small>{crime.baseNerve} Nerve+</small><b className={riskClass(crime.risk)}>{crime.risk}</b>{activeCount>0?<em>{activeCount} ACTIVE</em>:null}</span><span className="single-crime-open">{locked?<><GameIcon name="lock" size={14}/><small>CE {crime.unlockCrimeExperience}</small></>:"›"}</span></button>;})}</div>
   </div>;
 }

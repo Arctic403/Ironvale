@@ -1,4 +1,5 @@
 import type { CrimeCareerAction, CrimeCareerDefinition } from "../core/types";
+import { defineCrimePlugins } from "../core/plugin";
 
 const action = (value: CrimeCareerAction) => value;
 
@@ -54,3 +55,6 @@ export const SHOPLIFT_STORES: ShopliftStore[] = [
   ]},
 
 ];
+
+// Plugin export: the registry consumes plugins, while the *_CRIMES array remains a compatibility/data export.
+export const THEFT_CRIME_PLUGINS = defineCrimePlugins(THEFT_CRIMES);

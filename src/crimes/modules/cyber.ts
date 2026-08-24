@@ -1,4 +1,5 @@
 import type { CrimeCareerAction, CrimeCareerDefinition } from "../core/types";
+import { defineCrimePlugins } from "../core/plugin";
 
 const action = (value: CrimeCareerAction) => value;
 
@@ -8,3 +9,6 @@ export const CYBER_CRIMES: CrimeCareerDefinition[] = [
     action({id:"corporate-node",name:"Corporate Node",description:"A high-security game target with valuable fictional data packages.",nerve:9,difficulty:62,minReward:1800,maxReward:5200,heat:11,masteryRequired:45,requiredItems:["cyber-rig","access-token"]}),
   ]}
 ];
+
+// Plugin export: the registry consumes plugins, while the *_CRIMES array remains a compatibility/data export.
+export const CYBER_CRIME_PLUGINS = defineCrimePlugins(CYBER_CRIMES);
