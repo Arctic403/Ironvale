@@ -1,6 +1,7 @@
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
-const PASSWORD_ITERATIONS = 210_000;
+// Cloudflare Workers currently supports PBKDF2 iteration counts up to 100,000.
+const PASSWORD_ITERATIONS = 100_000;
 const LOG_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS system_logs (
     id TEXT PRIMARY KEY,
