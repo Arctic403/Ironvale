@@ -7,4 +7,4 @@ assets = { directory = "./public", binding = "ASSETS" }
 [[d1_databases]]
 binding = "DB"
 database_name = "riftcity-v2"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "118e392b-e9d4-4d81-9a4f-ee2a2b3865cc"
