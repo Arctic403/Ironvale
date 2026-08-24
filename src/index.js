@@ -1,3 +1,5 @@
+import { ITEM_REGISTRY, getItemDefinition, toPublicItemDefinition } from './items.js';
+
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 // Cloudflare Workers currently supports PBKDF2 iteration counts up to 100,000.
@@ -51,6 +53,20 @@ const PLAYER_LOCATION_TABLE_SQL = `
     district_id TEXT NOT NULL DEFAULT 'services',
     location_id TEXT NOT NULL DEFAULT 'rift-civic-hall',
     updated_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )
+`;
+
+
+const PLAYER_INVENTORY_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS player_inventory (
+    user_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+    equipped_slot TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, item_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )
 `;
@@ -289,6 +305,12 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'POST' && url.pathname === '/api/auth/logout') return logout(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/auth/me') return me(request, env);
   if (method === 'GET' && url.pathname === '/api/player/state') return getPlayerState(request, env);
+  if (method === 'GET' && url.pathname === '/api/items') return getItemCatalog(request, env);
+  if (method === 'GET' && url.pathname.startsWith('/api/items/')) return getItem(request, env, url);
+  if (method === 'GET' && url.pathname === '/api/inventory') return getInventory(request, env);
+  if (method === 'POST' && url.pathname === '/api/inventory/use') return useInventoryItem(request, env, requestId);
+  if (method === 'POST' && url.pathname === '/api/inventory/equip') return equipInventoryItem(request, env, requestId);
+  if (method === 'POST' && url.pathname === '/api/inventory/unequip') return unequipInventoryItem(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/world') return getWorld(request, env);
   if (method === 'GET' && url.pathname.startsWith('/api/world/districts/')) return getDistrict(request, env, url);
   if (method === 'GET' && url.pathname.startsWith('/api/world/locations/')) return getLocation(request, env, url);
@@ -449,6 +471,258 @@ async function getPlayerState(request, env) {
   return json({ ok: true, player: toPublicPlayerState(playerState) });
 }
 
+
+async function getItemCatalog(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  return json({
+    ok: true,
+    items: ITEM_REGISTRY.map(toPublicItemDefinition),
+    count: ITEM_REGISTRY.length
+  });
+}
+
+async function getItem(request, env, url) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const id = decodeURIComponent(url.pathname.slice('/api/items/'.length));
+  const item = getItemDefinition(id);
+  if (!item) return json({ ok: false, error: 'Item not found' }, 404);
+  return json({ ok: true, item: toPublicItemDefinition(item) });
+}
+
+async function getInventory(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  await ensureInventoryTable(env);
+
+  const result = await env.DB.prepare(`
+    SELECT item_id, quantity, equipped_slot, created_at, updated_at
+    FROM player_inventory
+    WHERE user_id = ? AND quantity > 0
+    ORDER BY updated_at DESC, item_id ASC
+  `).bind(auth.user.id).all();
+
+  const inventory = (result.results || [])
+    .map(row => {
+      const definition = getItemDefinition(row.item_id);
+      if (!definition) return null;
+      return {
+        ...toPublicItemDefinition(definition),
+        quantity: Number(row.quantity) || 0,
+        equipped: Boolean(row.equipped_slot),
+        equippedSlot: row.equipped_slot || null,
+        acquiredAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    })
+    .filter(Boolean);
+
+  return json({
+    ok: true,
+    inventory,
+    catalog: ITEM_REGISTRY.map(toPublicItemDefinition),
+    summary: {
+      uniqueItems: inventory.length,
+      totalQuantity: inventory.reduce((sum, item) => sum + item.quantity, 0),
+      registryItems: ITEM_REGISTRY.length
+    }
+  });
+}
+
+async function useInventoryItem(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const body = await readJson(request);
+  const itemId = typeof body?.itemId === 'string' ? body.itemId.trim() : '';
+  const item = getItemDefinition(itemId);
+  if (!item) return json({ ok: false, error: 'Unknown item' }, 404);
+  if (!item.usable) return json({ ok: false, error: `${item.name} cannot be used directly` }, 400);
+
+  const owned = await getOwnedItemRow(env, auth.user.id, itemId);
+  if (!owned || owned.quantity < 1) return json({ ok: false, error: `You do not own ${item.name}` }, 400);
+
+  const player = await ensurePlayerState(env, auth.user.id);
+  const effectResult = calculateResourceEffects(player, item.effects || {});
+  if (!effectResult.changed) return json({ ok: false, error: effectResult.reason || 'That item would have no effect right now' }, 409);
+
+  const now = Date.now();
+  const statements = [
+    env.DB.prepare(`
+      UPDATE player_state SET health = ?, nerve = ?, energy = ?, updated_at = ? WHERE user_id = ?
+    `).bind(effectResult.health, effectResult.nerve, effectResult.energy, now, auth.user.id)
+  ];
+
+  if (item.consumable) {
+    if (owned.quantity <= 1) {
+      statements.push(env.DB.prepare('DELETE FROM player_inventory WHERE user_id = ? AND item_id = ?').bind(auth.user.id, itemId));
+    } else {
+      statements.push(env.DB.prepare(`
+        UPDATE player_inventory SET quantity = quantity - 1, updated_at = ? WHERE user_id = ? AND item_id = ?
+      `).bind(now, auth.user.id, itemId));
+    }
+  }
+
+  await env.DB.batch(statements);
+  await writeAudit(env, auth.user.id, 'inventory.item_used', auth.user.id, { itemId, effects: effectResult.applied });
+  await safeWriteSystemLog(env, {
+    severity: 'INFO', eventType: 'ITEM_USED', message: `${auth.user.username} used ${item.name}`,
+    route: '/api/inventory/use', method: 'POST', requestId, userId: auth.user.id,
+    context: { itemId, effects: effectResult.applied }
+  });
+
+  const updatedPlayer = await getPlayerStateRow(env, auth.user.id);
+  return json({
+    ok: true,
+    message: `${item.name} used`,
+    player: toPublicPlayerState(updatedPlayer),
+    itemId,
+    consumed: item.consumable
+  });
+}
+
+async function equipInventoryItem(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const body = await readJson(request);
+  const itemId = typeof body?.itemId === 'string' ? body.itemId.trim() : '';
+  const item = getItemDefinition(itemId);
+  if (!item) return json({ ok: false, error: 'Unknown item' }, 404);
+  if (!item.equipable || !item.equipmentSlot) return json({ ok: false, error: `${item.name} cannot be equipped` }, 400);
+
+  const owned = await getOwnedItemRow(env, auth.user.id, itemId);
+  if (!owned || owned.quantity < 1) return json({ ok: false, error: `You do not own ${item.name}` }, 400);
+
+  await ensureInventoryTable(env);
+  const now = Date.now();
+  await env.DB.batch([
+    env.DB.prepare('UPDATE player_inventory SET equipped_slot = NULL, updated_at = ? WHERE user_id = ? AND equipped_slot = ?')
+      .bind(now, auth.user.id, item.equipmentSlot),
+    env.DB.prepare('UPDATE player_inventory SET equipped_slot = ?, updated_at = ? WHERE user_id = ? AND item_id = ?')
+      .bind(item.equipmentSlot, now, auth.user.id, itemId)
+  ]);
+
+  await writeAudit(env, auth.user.id, 'inventory.item_equipped', auth.user.id, { itemId, slot: item.equipmentSlot });
+  await safeWriteSystemLog(env, {
+    severity: 'INFO', eventType: 'ITEM_EQUIPPED', message: `${auth.user.username} equipped ${item.name}`,
+    route: '/api/inventory/equip', method: 'POST', requestId, userId: auth.user.id,
+    context: { itemId, slot: item.equipmentSlot }
+  });
+  return json({ ok: true, message: `${item.name} equipped`, itemId, slot: item.equipmentSlot });
+}
+
+async function unequipInventoryItem(request, env, requestId) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const body = await readJson(request);
+  const itemId = typeof body?.itemId === 'string' ? body.itemId.trim() : '';
+  const item = getItemDefinition(itemId);
+  if (!item) return json({ ok: false, error: 'Unknown item' }, 404);
+
+  const owned = await getOwnedItemRow(env, auth.user.id, itemId);
+  if (!owned || !owned.equipped_slot) return json({ ok: false, error: `${item.name} is not equipped` }, 400);
+  const now = Date.now();
+  await env.DB.prepare('UPDATE player_inventory SET equipped_slot = NULL, updated_at = ? WHERE user_id = ? AND item_id = ?')
+    .bind(now, auth.user.id, itemId).run();
+
+  await writeAudit(env, auth.user.id, 'inventory.item_unequipped', auth.user.id, { itemId });
+  await safeWriteSystemLog(env, {
+    severity: 'INFO', eventType: 'ITEM_UNEQUIPPED', message: `${auth.user.username} unequipped ${item.name}`,
+    route: '/api/inventory/unequip', method: 'POST', requestId, userId: auth.user.id,
+    context: { itemId }
+  });
+  return json({ ok: true, message: `${item.name} unequipped`, itemId });
+}
+
+function calculateResourceEffects(player, effects) {
+  const start = {
+    health: Number(player.health) || 0,
+    nerve: Number(player.nerve) || 0,
+    energy: Number(player.energy) || 0
+  };
+  const max = {
+    health: Number(player.max_health) || 100,
+    nerve: Number(player.max_nerve) || 10,
+    energy: Number(player.max_energy) || 100
+  };
+  const next = { ...start };
+  const applied = {};
+
+  for (const resource of ['health', 'nerve', 'energy']) {
+    const amount = Number(effects?.[resource]) || 0;
+    if (!amount) continue;
+    const target = Math.max(0, Math.min(max[resource], start[resource] + amount));
+    const delta = target - start[resource];
+    next[resource] = target;
+    if (delta !== 0) applied[resource] = delta;
+  }
+
+  const changed = Object.keys(applied).length > 0;
+  return {
+    changed,
+    health: next.health,
+    nerve: next.nerve,
+    energy: next.energy,
+    applied,
+    reason: changed ? null : 'Your affected resources are already full'
+  };
+}
+
+async function ensureInventoryTable(env) {
+  try {
+    await env.DB.prepare(PLAYER_INVENTORY_TABLE_SQL).run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_inventory_user ON player_inventory(user_id)').run();
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_inventory_equipped ON player_inventory(user_id, equipped_slot)').run();
+  } catch (error) {
+    throw new Error(`Could not initialize player inventory: ${safeErrorMessage(error)}`);
+  }
+}
+
+async function getOwnedItemRow(env, userId, itemId) {
+  await ensureInventoryTable(env);
+  return env.DB.prepare(`
+    SELECT item_id, quantity, equipped_slot, created_at, updated_at
+    FROM player_inventory WHERE user_id = ? AND item_id = ?
+  `).bind(userId, itemId).first();
+}
+
+// Server-side core helpers for future shops, crimes, rewards and admin tools.
+async function addItemToInventory(env, userId, itemId, quantity = 1) {
+  const item = getItemDefinition(itemId);
+  if (!item) throw new Error(`Unknown item: ${itemId}`);
+  const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+  await ensureInventoryTable(env);
+  const existing = await getOwnedItemRow(env, userId, itemId);
+  const currentQuantity = Number(existing?.quantity) || 0;
+  const maximum = item.stackable ? item.maxStack : 1;
+  const nextQuantity = Math.min(maximum, currentQuantity + amount);
+  if (nextQuantity <= currentQuantity) return { added: 0, quantity: currentQuantity };
+  const now = Date.now();
+
+  await env.DB.prepare(`
+    INSERT INTO player_inventory (user_id, item_id, quantity, equipped_slot, created_at, updated_at)
+    VALUES (?, ?, ?, NULL, ?, ?)
+    ON CONFLICT(user_id, item_id) DO UPDATE SET quantity = excluded.quantity, updated_at = excluded.updated_at
+  `).bind(userId, itemId, nextQuantity, existing?.created_at || now, now).run();
+  return { added: nextQuantity - currentQuantity, quantity: nextQuantity };
+}
+
+async function removeItemFromInventory(env, userId, itemId, quantity = 1) {
+  const owned = await getOwnedItemRow(env, userId, itemId);
+  if (!owned) return { removed: 0, quantity: 0 };
+  const amount = Math.max(1, Math.floor(Number(quantity) || 1));
+  const current = Number(owned.quantity) || 0;
+  const removed = Math.min(current, amount);
+  const remaining = current - removed;
+  if (remaining <= 0) {
+    await env.DB.prepare('DELETE FROM player_inventory WHERE user_id = ? AND item_id = ?').bind(userId, itemId).run();
+  } else {
+    await env.DB.prepare('UPDATE player_inventory SET quantity = ?, updated_at = ? WHERE user_id = ? AND item_id = ?')
+      .bind(remaining, Date.now(), userId, itemId).run();
+  }
+  return { removed, quantity: remaining };
+}
+
 async function getWorld(request, env) {
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
@@ -543,7 +817,7 @@ async function travelToLocation(request, env, requestId) {
 }
 
 async function health(env) {
-  const result = { ok: true, service: 'riftcity-v2-phase3', database: 'unknown' };
+  const result = { ok: true, service: 'riftcity-v2-phase4', database: 'unknown' };
   try {
     await env.DB.prepare('SELECT 1 AS ok').first();
     result.database = 'connected';

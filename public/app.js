@@ -13,6 +13,8 @@ let authenticated = false;
 let currentView = 'overview';
 let worldState = null;
 let activeLocationId = null;
+let inventoryState = null;
+let selectedInventoryItemId = null;
 
 $('#register-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -106,6 +108,7 @@ function getRequestedView() {
   const hash = window.location.hash || '#overview';
   if (hash.startsWith('#city/')) return 'location';
   if (hash === '#city') return 'city';
+  if (hash === '#inventory') return 'inventory';
   return 'overview';
 }
 
@@ -122,9 +125,10 @@ function getRequestedLocationId() {
 }
 
 async function switchView(view) {
-  currentView = view === 'location' ? 'location' : (view === 'city' ? 'city' : 'overview');
+  currentView = ['overview', 'city', 'location', 'inventory'].includes(view) ? view : 'overview';
   $('#overview-view').classList.toggle('hidden', currentView !== 'overview');
   $('#city-view').classList.toggle('hidden', currentView !== 'city');
+  $('#inventory-view').classList.toggle('hidden', currentView !== 'inventory');
   $('#location-view').classList.toggle('hidden', currentView !== 'location');
 
   $$('[data-view-link]').forEach((link) => {
@@ -139,6 +143,13 @@ async function switchView(view) {
     $('#page-eyebrow').textContent = 'WORLD NETWORK';
     $('#page-title-text').textContent = 'City';
     if (authenticated) await loadWorld();
+    return;
+  }
+
+  if (currentView === 'inventory') {
+    $('#page-eyebrow').textContent = 'PLAYER STORAGE';
+    $('#page-title-text').textContent = 'Inventory';
+    if (authenticated) await loadInventory();
     return;
   }
 
@@ -213,6 +224,159 @@ function renderPlayer(player) {
     if (playerStatus.until) detail += ` Until ${new Date(playerStatus.until).toLocaleString()}.`;
   }
   setText('#status-detail', detail);
+}
+
+
+async function loadInventory(force = false) {
+  if (inventoryState && !force) {
+    renderInventory();
+    return;
+  }
+
+  $('#inventory-owned-list').innerHTML = '<div class="world-loading">Loading inventory…</div>';
+  $('#inventory-catalog-list').innerHTML = '<div class="world-loading">Loading item registry…</div>';
+  const result = await api('/api/inventory');
+  if (!result.ok) {
+    $('#inventory-owned-list').innerHTML = '<div class="world-loading error-text">Could not load inventory.</div>';
+    return showMessage(result.error || 'Could not load inventory.', true);
+  }
+
+  inventoryState = result;
+  renderInventory();
+}
+
+function renderInventory() {
+  if (!inventoryState) return;
+  const owned = inventoryState.inventory || [];
+  const catalog = inventoryState.catalog || [];
+  const summary = inventoryState.summary || {};
+
+  setText('#inventory-unique-count', String(summary.uniqueItems || 0).padStart(2, '0'));
+  setText('#inventory-total-count', String(summary.totalQuantity || 0).padStart(2, '0'));
+  setText('#inventory-registry-count', String(summary.registryItems || catalog.length || 0).padStart(2, '0'));
+  setText('#inventory-owned-label', `${summary.uniqueItems || 0} OWNED`);
+
+  $('#inventory-owned-list').innerHTML = owned.length
+    ? owned.map(item => renderInventoryRow(item, true)).join('')
+    : `<div class="inventory-empty-row">
+        <strong>Inventory empty</strong>
+        <span>Shops, crimes and rewards will add items here in later phases.</span>
+      </div>`;
+
+  $('#inventory-catalog-list').innerHTML = catalog.map(item => {
+    const ownedItem = owned.find(entry => entry.id === item.id);
+    return renderInventoryRow({ ...item, quantity: ownedItem?.quantity || 0, equipped: ownedItem?.equipped || false, equippedSlot: ownedItem?.equippedSlot || null }, false);
+  }).join('');
+
+  $$('.inventory-item-row').forEach(button => {
+    button.addEventListener('click', () => selectInventoryItem(button.dataset.itemId));
+  });
+
+  if (selectedInventoryItemId && catalog.some(item => item.id === selectedInventoryItemId)) {
+    selectInventoryItem(selectedInventoryItemId, false);
+  }
+}
+
+function renderInventoryRow(item, ownedList) {
+  const quantity = Number(item.quantity) || 0;
+  const categoryCode = inventoryCategoryCode(item.category);
+  const stateLabel = item.equipped ? 'EQUIPPED' : (ownedList ? `x${quantity}` : (quantity > 0 ? `OWNED x${quantity}` : 'REGISTRY'));
+  return `
+    <button class="inventory-item-row ${item.equipped ? 'equipped' : ''}" data-item-id="${escapeHtml(item.id)}">
+      <span class="item-code">${escapeHtml(categoryCode)}</span>
+      <span class="item-row-main">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(item.category)} · ${escapeHtml(item.rarity)}</small>
+      </span>
+      <span class="item-row-state">${escapeHtml(stateLabel)}</span>
+    </button>
+  `;
+}
+
+function selectInventoryItem(itemId, updateSelection = true) {
+  if (!inventoryState) return;
+  const catalogItem = (inventoryState.catalog || []).find(item => item.id === itemId);
+  if (!catalogItem) return;
+  const ownedItem = (inventoryState.inventory || []).find(item => item.id === itemId);
+  const item = { ...catalogItem, ...(ownedItem || {}), quantity: ownedItem?.quantity || 0 };
+  if (updateSelection) selectedInventoryItemId = itemId;
+
+  $$('.inventory-item-row').forEach(row => row.classList.toggle('selected', row.dataset.itemId === itemId));
+  renderInventoryDetail(item);
+}
+
+function renderInventoryDetail(item) {
+  const detail = $('#inventory-detail');
+  if (!detail) return;
+  const owned = Number(item.quantity) > 0;
+  const effectEntries = Object.entries(item.effects || {}).filter(([, value]) => Number(value));
+  const effectMarkup = effectEntries.length
+    ? effectEntries.map(([resource, value]) => `<span>${escapeHtml(resource.toUpperCase())} <strong>+${escapeHtml(value)}</strong></span>`).join('')
+    : '<span>NO DIRECT EFFECT</span>';
+  const tags = (item.tags || []).map(tag => `<span class="world-tag">${escapeHtml(tag)}</span>`).join('');
+
+  let actions = '';
+  if (owned && item.usable) actions += `<button class="inventory-action primary" data-item-action="use" data-item-id="${escapeHtml(item.id)}">Use item</button>`;
+  if (owned && item.equipable && !item.equipped) actions += `<button class="inventory-action" data-item-action="equip" data-item-id="${escapeHtml(item.id)}">Equip${item.equipmentSlot ? ` · ${escapeHtml(item.equipmentSlot)}` : ''}</button>`;
+  if (owned && item.equipable && item.equipped) actions += `<button class="inventory-action" data-item-action="unequip" data-item-id="${escapeHtml(item.id)}">Unequip</button>`;
+  if (!owned) actions = '<div class="inventory-not-owned">NOT CURRENTLY OWNED</div>';
+  if (owned && !actions) actions = '<div class="inventory-not-owned">NO DIRECT ACTION</div>';
+
+  detail.innerHTML = `
+    <div class="item-detail-head">
+      <span class="item-code large">${escapeHtml(inventoryCategoryCode(item.category))}</span>
+      <div>
+        <span class="eyebrow">${escapeHtml(item.category.toUpperCase())} / ${escapeHtml(item.rarity.toUpperCase())}</span>
+        <h3>${escapeHtml(item.name)}</h3>
+      </div>
+    </div>
+    <p class="item-detail-description">${escapeHtml(item.description)}</p>
+    <div class="world-tags">${tags}</div>
+    <dl class="item-spec-grid">
+      <dt>Quantity</dt><dd>${owned ? escapeHtml(item.quantity) : '0'}</dd>
+      <dt>Value</dt><dd>${formatMoney(item.baseValue || 0)}</dd>
+      <dt>Stack</dt><dd>${item.stackable ? `YES / ${escapeHtml(item.maxStack)}` : 'NO'}</dd>
+      <dt>Tradeable</dt><dd>${item.tradeable ? 'YES' : 'NO'}</dd>
+      <dt>Consumable</dt><dd>${item.consumable ? 'YES' : 'NO'}</dd>
+      <dt>Equipment</dt><dd>${item.equipable ? escapeHtml((item.equipmentSlot || 'YES').toUpperCase()) : 'NO'}</dd>
+    </dl>
+    <div class="item-effects">
+      <span class="system-label">EFFECTS</span>
+      <div>${effectMarkup}</div>
+    </div>
+    <div class="inventory-actions">${actions}</div>
+  `;
+
+  $$('.inventory-action').forEach(button => {
+    button.addEventListener('click', () => runInventoryAction(button.dataset.itemAction, button.dataset.itemId));
+  });
+}
+
+async function runInventoryAction(action, itemId) {
+  const endpoint = action === 'use' ? '/api/inventory/use' : action === 'equip' ? '/api/inventory/equip' : '/api/inventory/unequip';
+  const result = await api(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ itemId })
+  });
+
+  if (!result.ok) {
+    return showMessage(result.errorId ? `${result.error || 'Item action failed'} — ${result.errorId}` : (result.error || 'Item action failed'), true);
+  }
+
+  if (result.player) renderPlayer(result.player);
+  showMessage(result.message || 'Inventory updated.');
+  inventoryState = null;
+  selectedInventoryItemId = itemId;
+  await loadInventory(true);
+}
+
+function inventoryCategoryCode(category) {
+  const codes = {
+    medical: 'MED', weapon: 'WPN', drink: 'DRK', food: 'FOD',
+    valuable: 'VAL', tool: 'TLS', key: 'KEY', ticket: 'TKT'
+  };
+  return codes[String(category || '').toLowerCase()] || 'ITM';
 }
 
 async function loadWorld(force = false) {

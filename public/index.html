@@ -25,6 +25,9 @@
         <a class="rail-link" href="#city" data-view-link="city">
           <span class="rail-icon">⌂</span><span>City</span>
         </a>
+        <a class="rail-link" href="#inventory" data-view-link="inventory">
+          <span class="rail-icon">▤</span><span>Inventory</span>
+        </a>
         <a class="rail-link" href="/admin/logs">
           <span class="rail-icon">⌁</span><span>Dev logs</span>
         </a>
@@ -32,7 +35,7 @@
 
       <div class="rail-footer">
         <span class="phase-dot"></span>
-        <span>Phase 3.2 World</span>
+        <span>Phase 4 Inventory</span>
       </div>
     </aside>
 
@@ -176,6 +179,49 @@
           </div>
         </section>
 
+        <section id="inventory-view" class="game-view hidden">
+          <div class="inventory-header">
+            <div>
+              <span class="eyebrow">ITEM SYSTEM / PHASE 4</span>
+              <h2>Inventory</h2>
+              <p>Your owned items are stored persistently in D1. Item definitions come from the shared RiftCity item registry.</p>
+            </div>
+            <div class="inventory-summary" aria-label="Inventory summary">
+              <div><span>OWNED TYPES</span><strong id="inventory-unique-count">00</strong></div>
+              <div><span>TOTAL ITEMS</span><strong id="inventory-total-count">00</strong></div>
+              <div><span>REGISTRY</span><strong id="inventory-registry-count">08</strong></div>
+            </div>
+          </div>
+
+          <div class="inventory-layout">
+            <section class="inventory-browser">
+              <div class="browser-heading">
+                <span>YOUR ITEMS</span>
+                <small id="inventory-owned-label">0 OWNED</small>
+              </div>
+              <div id="inventory-owned-list" class="inventory-list">
+                <div class="world-loading">Loading inventory…</div>
+              </div>
+
+              <div class="browser-heading registry-heading">
+                <span>ITEM REGISTRY</span>
+                <small>STARTER SET</small>
+              </div>
+              <div id="inventory-catalog-list" class="inventory-list catalog-list">
+                <div class="world-loading">Loading item registry…</div>
+              </div>
+            </section>
+
+            <aside id="inventory-detail" class="inventory-detail" aria-live="polite">
+              <div class="inventory-empty-detail">
+                <span class="eyebrow">ITEM INSPECTOR</span>
+                <h3>Select an item</h3>
+                <p>Choose an owned item or a registry entry to inspect its properties.</p>
+              </div>
+            </aside>
+          </div>
+        </section>
+
         <section id="location-view" class="game-view hidden">
           <section id="location-page-content" class="location-page">
             <div class="world-loading">Opening location…</div>
@@ -190,6 +236,7 @@
   <nav class="mobile-nav" aria-label="Mobile navigation">
     <a class="mobile-nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span>▦</span><small>Overview</small></a>
     <a class="mobile-nav-link" href="#city" data-view-link="city"><span>⌂</span><small>City</small></a>
+    <a class="mobile-nav-link" href="#inventory" data-view-link="inventory"><span>▤</span><small>Items</small></a>
     <a class="mobile-nav-link" href="/admin/logs"><span>⌁</span><small>Logs</small></a>
   </nav>
 

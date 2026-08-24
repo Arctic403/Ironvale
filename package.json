@@ -1,10 +1,10 @@
 {
-  "name": "riftcity-v2-phase3",
-  "version": "0.3.2",
+  "name": "riftcity-v2-phase4",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node --check src/index.js && node --check public/app.js && node --check public/admin-logs.js",
+    "build": "node --check src/index.js && node --check src/items.js && node --check public/app.js && node --check public/admin-logs.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",

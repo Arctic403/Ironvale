@@ -98,3 +98,18 @@ CREATE TABLE IF NOT EXISTS player_location (
 
 CREATE INDEX IF NOT EXISTS idx_player_location_district ON player_location(district_id);
 CREATE INDEX IF NOT EXISTS idx_player_location_location ON player_location(location_id);
+
+
+CREATE TABLE IF NOT EXISTS player_inventory (
+  user_id TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+  equipped_slot TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (user_id, item_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_inventory_user ON player_inventory(user_id);
+CREATE INDEX IF NOT EXISTS idx_player_inventory_equipped ON player_inventory(user_id, equipped_slot);
