@@ -48,149 +48,200 @@ const PLAYER_STATE_TABLE_SQL = `
 const PLAYER_LOCATION_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS player_location (
     user_id TEXT PRIMARY KEY,
-    district_id TEXT NOT NULL DEFAULT 'downtown',
-    location_id TEXT NOT NULL DEFAULT 'central-plaza',
+    district_id TEXT NOT NULL DEFAULT 'services',
+    location_id TEXT NOT NULL DEFAULT 'rift-civic-hall',
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )
 `;
 
-const WORLD_DISTRICTS = [
-  {
-    id: 'downtown', code: 'DT-01', name: 'Downtown',
-    description: 'The commercial core of RiftCity. Crowded streets, transit links, offices and back alleys all meet here.',
-    risk: 'LOW', policeActivity: 'NORMAL'
-  },
-  {
-    id: 'harbour', code: 'HB-02', name: 'Harbour',
-    description: 'Cargo traffic, warehouses and waterfront businesses keep the district moving long after dark.',
-    risk: 'MEDIUM', policeActivity: 'LOW'
-  },
-  {
-    id: 'industrial', code: 'IN-03', name: 'Industrial',
-    description: 'Factories, service yards and scrap operations dominate the eastern industrial belt.',
-    risk: 'MEDIUM', policeActivity: 'NORMAL'
-  },
-  {
-    id: 'residential', code: 'RS-04', name: 'Residential',
-    description: 'Dense apartment blocks give way to quieter streets and high-value private estates.',
-    risk: 'LOW', policeActivity: 'ELEVATED'
-  },
-  {
-    id: 'casino', code: 'CS-05', name: 'Casino District',
-    description: 'Hotels, nightlife and high-stakes venues make this the brightest part of RiftCity after sundown.',
-    risk: 'MEDIUM', policeActivity: 'HIGH'
-  }
+const WORLD_CATEGORIES = [
+  { id: 'services', code: 'SV', name: 'Services', description: 'Core city institutions, training and public services.' },
+  { id: 'shops', code: 'SH', name: 'Shops', description: 'Retail stores for equipment, supplies and valuables.' },
+  { id: 'entertainment', code: 'EN', name: 'Entertainment', description: 'Nightlife, gambling and recreation.' },
+  { id: 'transport', code: 'TR', name: 'Transport', description: 'Travel, shipping and vehicle-related locations.' },
+  { id: 'other', code: 'OT', name: 'Other', description: 'Special locations and city destinations.' }
 ];
 
 const WORLD_LOCATIONS = [
   {
-    id: 'central-plaza', districtId: 'downtown', code: 'DT-A', name: 'Central Plaza', status: 'OPEN',
-    shortDescription: 'Main downtown concourse and public meeting point.',
-    description: 'A wide public concourse surrounded by offices, storefronts and transit access. This is the default arrival point for new players.',
-    tags: ['PUBLIC', 'TRANSIT'], requirements: [],
-    actions: [
-      { id: 'look-around', label: 'Look around', type: 'inspect', enabled: true },
-      { id: 'crimes', label: 'Local crimes', type: 'crime', enabled: false, note: 'Crime framework arrives in a later phase.' }
-    ]
+    id: 'mercy-point-medical', categoryId: 'services', code: 'SV-01', name: 'Mercy Point Medical', type: 'Hospital', status: 'OPEN',
+    shortDescription: 'RiftCity\'s main hospital and emergency center.',
+    description: 'The city\'s primary medical center. Hospitalized players, recovery timers and future treatment services will live here.',
+    tags: ['HOSPITAL', 'RECOVERY', 'PUBLIC'], requirements: [],
+    actions: [{ id: 'hospital', label: 'Hospital services', type: 'hospital', enabled: false, note: 'Hospital gameplay arrives in a later phase.' }]
   },
   {
-    id: 'metro-exchange', districtId: 'downtown', code: 'DT-B', name: 'Metro Exchange', status: 'OPEN',
-    shortDescription: 'Busy transit platforms connecting the city core.',
-    description: 'Platforms, service corridors and a constant flow of commuters make the exchange one of Downtown\'s busiest locations.',
-    tags: ['TRANSIT', 'CROWDED'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'blackridge-detention', categoryId: 'services', code: 'SV-02', name: 'Blackridge Detention Center', type: 'Jail', status: 'OPEN',
+    shortDescription: 'City jail for detained and sentenced players.',
+    description: 'RiftCity\'s detention center. Sentences, inmate lists, bail and future busting systems will operate from Blackridge.',
+    tags: ['JAIL', 'LAW', 'PUBLIC'], requirements: [],
+    actions: [{ id: 'jail', label: 'View detention center', type: 'jail', enabled: false, note: 'Jail gameplay arrives in a later phase.' }]
   },
   {
-    id: 'back-streets', districtId: 'downtown', code: 'DT-C', name: 'Back Streets', status: 'OPEN',
-    shortDescription: 'Narrow service lanes behind the commercial blocks.',
-    description: 'Loading bays, service alleys and older buildings create a quieter route behind Downtown\'s main streets.',
-    tags: ['ALLEY', 'LOW-TRAFFIC'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'rift-metropolitan-institute', categoryId: 'services', code: 'SV-03', name: 'Rift Metropolitan Institute', type: 'Education', status: 'OPEN',
+    shortDescription: 'Courses, qualifications and long-term unlocks.',
+    description: 'A city education center built for future courses, certifications, stat bonuses and specialized progression paths.',
+    tags: ['EDUCATION', 'PROGRESSION'], requirements: [],
+    actions: [{ id: 'education', label: 'Browse courses', type: 'education', enabled: false, note: 'Education gameplay is not installed yet.' }]
   },
   {
-    id: 'cargo-docks', districtId: 'harbour', code: 'HB-A', name: 'Cargo Docks', status: 'OPEN',
-    shortDescription: 'Container yards and active freight piers.',
-    description: 'Freight moves through the docks day and night. Containers, crews and service vehicles constantly rotate through the waterfront.',
-    tags: ['FREIGHT', 'WATERFRONT'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'rift-civic-hall', categoryId: 'services', code: 'SV-04', name: 'Rift Civic Hall', type: 'City Hall', status: 'OPEN',
+    shortDescription: 'Municipal records, licenses and city administration.',
+    description: 'The administrative center of RiftCity. Public records, licenses, civic systems and future reputation features will be based here.',
+    tags: ['CITY HALL', 'CIVIC', 'PUBLIC'], requirements: [],
+    actions: [{ id: 'records', label: 'City records', type: 'civic', enabled: false, note: 'Civic services arrive later.' }]
   },
   {
-    id: 'warehouse-row', districtId: 'harbour', code: 'HB-B', name: 'Warehouse Row', status: 'OPEN',
-    shortDescription: 'A strip of storage buildings behind the docks.',
-    description: 'Rows of loading doors and fenced storage lots sit between the working harbour and the industrial belt.',
-    tags: ['WAREHOUSE', 'FREIGHT'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'rift-national-bank', categoryId: 'services', code: 'SV-05', name: 'Rift National Bank', type: 'Bank', status: 'OPEN',
+    shortDescription: 'Deposits, investments and financial services.',
+    description: 'RiftCity\'s primary financial institution. Accounts, deposits, investments and transfers will plug into this location.',
+    tags: ['BANK', 'FINANCE'], requirements: [],
+    actions: [{ id: 'bank', label: 'Banking', type: 'bank', enabled: false, note: 'Banking arrives in a later phase.' }]
   },
   {
-    id: 'fish-market', districtId: 'harbour', code: 'HB-C', name: 'Harbour Market', status: 'OPEN',
-    shortDescription: 'A public market beside the older marina.',
-    description: 'Small vendors, delivery vans and dock workers fill the market during its busiest hours.',
-    tags: ['MARKET', 'PUBLIC'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'forge-athletics', categoryId: 'services', code: 'SV-06', name: 'Forge Athletics', type: 'Gym', status: 'OPEN',
+    shortDescription: 'Train physical stats and unlock specialized routines.',
+    description: 'A hard-edged training facility planned as the home of RiftCity\'s strength, defense, speed and dexterity training systems.',
+    tags: ['GYM', 'TRAINING'], requirements: [],
+    actions: [{ id: 'train', label: 'Train', type: 'gym', enabled: false, note: 'Gym gameplay is not installed yet.' }]
   },
   {
-    id: 'foundry-yard', districtId: 'industrial', code: 'IN-A', name: 'Foundry Yard', status: 'OPEN',
-    shortDescription: 'Heavy industrial yard surrounded by old plants.',
-    description: 'A rough network of fenced compounds, old machinery and active service roads in the middle of the industrial district.',
-    tags: ['INDUSTRIAL', 'HEAVY'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'rift-employment-bureau', categoryId: 'services', code: 'SV-07', name: 'Rift Employment Bureau', type: 'Employment', status: 'OPEN',
+    shortDescription: 'Find work, careers and starter income opportunities.',
+    description: 'A public employment office for future jobs, career progression and work-related unlocks.',
+    tags: ['JOBS', 'CAREERS'], requirements: [],
+    actions: [{ id: 'jobs', label: 'View jobs', type: 'jobs', enabled: false, note: 'Employment gameplay is not installed yet.' }]
   },
   {
-    id: 'scrap-depot', districtId: 'industrial', code: 'IN-B', name: 'Scrap Depot', status: 'OPEN',
-    shortDescription: 'Metal, machinery and salvage move through this yard.',
-    description: 'Stacks of reusable material and stripped machinery make the depot a natural future home for scavenging and material systems.',
-    tags: ['SCRAP', 'SALVAGE'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'rift-central-precinct', categoryId: 'services', code: 'SV-08', name: 'Rift Central Precinct', type: 'Police Station', status: 'OPEN',
+    shortDescription: 'Law enforcement headquarters and bounty services.',
+    description: 'Central police headquarters. Bounties, reports, warrants and future law-related systems can connect here.',
+    tags: ['POLICE', 'LAW'], requirements: [],
+    actions: [{ id: 'precinct', label: 'Precinct services', type: 'police', enabled: false, note: 'Police systems arrive later.' }]
   },
   {
-    id: 'service-tunnels', districtId: 'industrial', code: 'IN-C', name: 'Service Tunnels', status: 'RESTRICTED',
-    shortDescription: 'Utility access beneath the industrial blocks.',
-    description: 'Old maintenance passages connect several industrial sites. Access systems will be added when item requirements exist.',
-    tags: ['UTILITY', 'RESTRICTED'], requirements: ['Future access item'],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'keystone-realty', categoryId: 'services', code: 'SV-09', name: 'Keystone Realty', type: 'Property Agency', status: 'OPEN',
+    shortDescription: 'Purchase, rent and manage property.',
+    description: 'RiftCity\'s property brokerage. Housing, businesses and property management will eventually be accessed here.',
+    tags: ['PROPERTY', 'REAL ESTATE'], requirements: [],
+    actions: [{ id: 'property', label: 'Browse property', type: 'property', enabled: false, note: 'Property gameplay is not installed yet.' }]
   },
   {
-    id: 'east-blocks', districtId: 'residential', code: 'RS-A', name: 'East Blocks', status: 'OPEN',
-    shortDescription: 'Dense apartment blocks and local storefronts.',
-    description: 'A busy residential zone with apartment towers, parking courts and small neighborhood businesses.',
-    tags: ['RESIDENTIAL', 'PUBLIC'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'redline-garage', categoryId: 'services', code: 'SV-10', name: 'Redline Garage', type: 'Mechanic', status: 'OPEN',
+    shortDescription: 'Vehicle repairs, maintenance and future upgrades.',
+    description: 'A full-service garage reserved for the future vehicle repair, maintenance and modification systems.',
+    tags: ['VEHICLES', 'REPAIR'], requirements: [],
+    actions: [{ id: 'garage', label: 'Garage services', type: 'vehicle', enabled: false, note: 'Vehicles arrive later.' }]
+  },
+
+  {
+    id: 'ironline-armory', categoryId: 'shops', code: 'SH-01', name: 'Ironline Armory', type: 'Gun Store', status: 'OPEN',
+    shortDescription: 'Licensed weapons, ammunition and protective equipment.',
+    description: 'A heavily secured retailer for legal weapons, ammunition and combat equipment. The inventory engine will power its stock later.',
+    tags: ['WEAPONS', 'AMMO', 'RETAIL'], requirements: [],
+    actions: [{ id: 'shop', label: 'Browse armory', type: 'shop', enabled: false, note: 'Item shops arrive after the inventory engine.' }]
   },
   {
-    id: 'luxury-estate', districtId: 'residential', code: 'RS-B', name: 'Luxury Estate', status: 'OPEN',
-    shortDescription: 'Private homes along quieter guarded streets.',
-    description: 'Large properties and lower foot traffic make the estate feel completely different from the crowded East Blocks.',
-    tags: ['RESIDENTIAL', 'HIGH-VALUE'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'cornerstone-market', categoryId: 'shops', code: 'SH-02', name: 'Cornerstone Market', type: 'Grocery Store', status: 'OPEN',
+    shortDescription: 'Food, drinks and everyday consumables.',
+    description: 'A busy city grocery market planned for food, drinks, candy and basic consumable items.',
+    tags: ['GROCERY', 'FOOD', 'RETAIL'], requirements: [],
+    actions: [{ id: 'shop', label: 'Browse market', type: 'shop', enabled: false, note: 'Item shops arrive after the inventory engine.' }]
   },
   {
-    id: 'corner-row', districtId: 'residential', code: 'RS-C', name: 'Corner Row', status: 'OPEN',
-    shortDescription: 'Small shops and services at the edge of the neighborhood.',
-    description: 'Convenience stores, laundromats and low-rise apartments sit along a well-traveled neighborhood strip.',
-    tags: ['SHOPS', 'PUBLIC'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'aurelia-jewelers', categoryId: 'shops', code: 'SH-03', name: 'Aurelia Jewelers', type: 'Jewelry Store', status: 'OPEN',
+    shortDescription: 'High-value jewelry, watches and gemstones.',
+    description: 'An upscale jewelry retailer selling valuable goods. Its stock will eventually tie into shops, theft opportunities and the player economy.',
+    tags: ['JEWELRY', 'VALUABLES', 'SECURITY'], requirements: [],
+    actions: [{ id: 'shop', label: 'Browse jewelry', type: 'shop', enabled: false, note: 'Item shops arrive after the inventory engine.' }]
   },
   {
-    id: 'grand-strip', districtId: 'casino', code: 'CS-A', name: 'Grand Strip', status: 'OPEN',
-    shortDescription: 'The main nightlife corridor through the casino district.',
-    description: 'Large signs, hotels and crowds dominate the strip. The casino systems themselves will plug into this location engine later.',
-    tags: ['NIGHTLIFE', 'CROWDED'], requirements: [],
-    actions: [{ id: 'look-around', label: 'Look around', type: 'inspect', enabled: true }]
+    id: 'northside-pharmacy', categoryId: 'shops', code: 'SH-04', name: 'Northside Pharmacy', type: 'Pharmacy', status: 'OPEN',
+    shortDescription: 'Medical supplies and recovery items.',
+    description: 'A neighborhood pharmacy intended for legitimate medical consumables and recovery-related items.',
+    tags: ['MEDICAL', 'RETAIL'], requirements: [],
+    actions: [{ id: 'shop', label: 'Browse pharmacy', type: 'shop', enabled: false, note: 'Item shops arrive after the inventory engine.' }]
   },
   {
-    id: 'casino-lobby', districtId: 'casino', code: 'CS-B', name: 'Rift Casino', status: 'COMING SOON',
-    shortDescription: 'Future home of RiftCity casino games.',
-    description: 'The location is registered in the world now so the casino feature can be added later without rebuilding city navigation.',
-    tags: ['CASINO', 'ENTERTAINMENT'], requirements: [],
+    id: 'circuit-house', categoryId: 'shops', code: 'SH-05', name: 'Circuit House', type: 'Electronics Store', status: 'OPEN',
+    shortDescription: 'Electronics, devices and technical equipment.',
+    description: 'A specialist electronics retailer planned for devices, tools and equipment used by future hacking and crime systems.',
+    tags: ['ELECTRONICS', 'TOOLS', 'RETAIL'], requirements: [],
+    actions: [{ id: 'shop', label: 'Browse electronics', type: 'shop', enabled: false, note: 'Item shops arrive after the inventory engine.' }]
+  },
+  {
+    id: 'district-supply-co', categoryId: 'shops', code: 'SH-06', name: 'District Supply Co.', type: 'Clothing Store', status: 'OPEN',
+    shortDescription: 'Clothing, accessories and future cosmetics.',
+    description: 'A practical city outfitter that can later sell clothing, accessories and cosmetic items.',
+    tags: ['CLOTHING', 'RETAIL'], requirements: [],
+    actions: [{ id: 'shop', label: 'Browse clothing', type: 'shop', enabled: false, note: 'Item shops arrive after the inventory engine.' }]
+  },
+  {
+    id: 'second-chance-exchange', categoryId: 'shops', code: 'SH-07', name: 'Second Chance Exchange', type: 'Pawn Shop', status: 'OPEN',
+    shortDescription: 'Quick sales and miscellaneous second-hand goods.',
+    description: 'A no-frills pawn shop where players will eventually be able to sell miscellaneous items quickly for cash.',
+    tags: ['PAWN', 'RESALE', 'RETAIL'], requirements: [],
+    actions: [{ id: 'pawn', label: 'Pawn items', type: 'shop', enabled: false, note: 'Selling arrives after the inventory and economy systems.' }]
+  },
+
+  {
+    id: 'meridian-casino', categoryId: 'entertainment', code: 'EN-01', name: 'The Meridian Casino', type: 'Casino', status: 'COMING SOON',
+    shortDescription: 'RiftCity\'s flagship casino and gaming floor.',
+    description: 'The future home of blackjack, poker, roulette, slots, horse betting and other casino systems.',
+    tags: ['CASINO', 'GAMBLING', 'NIGHTLIFE'], requirements: [],
     actions: [{ id: 'casino', label: 'Casino floor', type: 'casino', enabled: false, note: 'Casino gameplay is not installed yet.' }]
   },
   {
-    id: 'nightclub-row', districtId: 'casino', code: 'CS-C', name: 'Nightclub Row', status: 'COMING SOON',
-    shortDescription: 'Late-night venues behind the main strip.',
-    description: 'A dense cluster of clubs and late-night businesses reserved for future nightlife systems and events.',
-    tags: ['NIGHTLIFE', 'EVENTS'], requirements: [],
-    actions: [{ id: 'nightlife', label: 'Nightlife', type: 'nightlife', enabled: false, note: 'Nightlife gameplay is not installed yet.' }]
+    id: 'afterdark', categoryId: 'entertainment', code: 'EN-02', name: 'Afterdark', type: 'Nightclub', status: 'COMING SOON',
+    shortDescription: 'A late-night club for events, nightlife and special opportunities.',
+    description: 'One of RiftCity\'s best-known nightlife venues. Future events, NPC encounters and nightclub-specific systems will live here.',
+    tags: ['NIGHTCLUB', 'EVENTS', 'NIGHTLIFE'], requirements: [],
+    actions: [{ id: 'nightclub', label: 'Enter club', type: 'nightlife', enabled: false, note: 'Nightlife gameplay is not installed yet.' }]
+  },
+
+  {
+    id: 'greywater-docks', categoryId: 'transport', code: 'TR-01', name: 'Greywater Docks', type: 'Docks', status: 'OPEN',
+    shortDescription: 'Freight terminals, shipping lanes and waterfront access.',
+    description: 'RiftCity\'s working docks. Cargo, shipping, smuggling opportunities and waterfront crimes can plug into Greywater later.',
+    tags: ['DOCKS', 'FREIGHT', 'WATERFRONT'], requirements: [],
+    actions: [{ id: 'docks', label: 'Dock services', type: 'transport', enabled: false, note: 'Dock gameplay arrives later.' }]
+  },
+  {
+    id: 'rift-international-airport', categoryId: 'transport', code: 'TR-02', name: 'Rift International Airport', type: 'Airport', status: 'OPEN',
+    shortDescription: 'International travel and future offshore destinations.',
+    description: 'The main gateway out of RiftCity. Travel, foreign destinations and future offshore banking access will begin here.',
+    tags: ['AIRPORT', 'TRAVEL'], requirements: [],
+    actions: [{ id: 'travel', label: 'Travel terminal', type: 'travel', enabled: false, note: 'Travel gameplay is not installed yet.' }]
+  },
+  {
+    id: 'blacktop-motors', categoryId: 'transport', code: 'TR-03', name: 'Blacktop Motors', type: 'Car Dealer', status: 'OPEN',
+    shortDescription: 'Vehicle sales and future transportation upgrades.',
+    description: 'A city vehicle dealership reserved for cars, ownership and future transportation systems.',
+    tags: ['VEHICLES', 'DEALER'], requirements: [],
+    actions: [{ id: 'dealer', label: 'Browse vehicles', type: 'vehicle', enabled: false, note: 'Vehicles arrive later.' }]
+  },
+
+  {
+    id: 'saint-vesper-cemetery', categoryId: 'other', code: 'OT-01', name: 'Saint Vesper Cemetery', type: 'Cemetery', status: 'OPEN',
+    shortDescription: 'An old cemetery on the edge of the city.',
+    description: 'A quiet historic cemetery reserved for special events, rare opportunities and future key-gated activities.',
+    tags: ['CEMETERY', 'SPECIAL'], requirements: [],
+    actions: [{ id: 'explore', label: 'Explore', type: 'special', enabled: false, note: 'Special activities arrive later.' }]
+  },
+  {
+    id: 'breakwater-beach', categoryId: 'other', code: 'OT-02', name: 'Breakwater Beach', type: 'Beach', status: 'OPEN',
+    shortDescription: 'Public shoreline along RiftCity\'s outer breakwater.',
+    description: 'A stretch of city shoreline intended for scavenging, seasonal events and future metal-detector opportunities.',
+    tags: ['BEACH', 'PUBLIC', 'SCAVENGING'], requirements: [],
+    actions: [{ id: 'beach', label: 'Explore beach', type: 'special', enabled: false, note: 'Beach activities arrive later.' }]
+  },
+  {
+    id: 'the-exchange', categoryId: 'other', code: 'OT-03', name: 'The Exchange', type: 'Player Market', status: 'COMING SOON',
+    shortDescription: 'RiftCity\'s player-run market for buying and selling items.',
+    description: 'A neutral trading hub planned as the player marketplace. Listings, auctions and transaction fees will eventually operate here.',
+    tags: ['MARKET', 'PLAYER TRADE'], requirements: [],
+    actions: [{ id: 'market', label: 'Open market', type: 'market', enabled: false, note: 'The player marketplace arrives after the item and economy engines.' }]
   }
 ];
 
@@ -281,7 +332,7 @@ async function register(request, env, requestId) {
     `).bind(userId, now, now),
     env.DB.prepare(`
       INSERT INTO player_location (user_id, district_id, location_id, updated_at)
-      VALUES (?, 'downtown', 'central-plaza', ?)
+      VALUES (?, 'services', 'rift-civic-hall', ?)
     `).bind(userId, now)
   ]);
 
@@ -405,9 +456,18 @@ async function getWorld(request, env) {
   return json({
     ok: true,
     world: {
-      districts: WORLD_DISTRICTS.map(district => ({
-        ...district,
-        locationCount: WORLD_LOCATIONS.filter(location => location.districtId === district.id).length
+      categories: WORLD_CATEGORIES.map(category => ({
+        ...category,
+        locationCount: WORLD_LOCATIONS.filter(location => location.categoryId === category.id).length
+      })),
+      locations: WORLD_LOCATIONS.map(location => ({
+        id: location.id,
+        categoryId: location.categoryId,
+        code: location.code,
+        name: location.name,
+        type: location.type,
+        status: location.status,
+        shortDescription: location.shortDescription
       })),
       current: toPublicPlayerLocation(current)
     }
@@ -415,17 +475,18 @@ async function getWorld(request, env) {
 }
 
 async function getDistrict(request, env, url) {
+  // Backward-compatible category endpoint retained while the V2 API settles.
   const auth = await authenticate(request, env);
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
   const id = decodeURIComponent(url.pathname.slice('/api/world/districts/'.length));
-  const district = WORLD_DISTRICTS.find(item => item.id === id);
-  if (!district) return json({ ok: false, error: 'District not found' }, 404);
+  const category = WORLD_CATEGORIES.find(item => item.id === id);
+  if (!category) return json({ ok: false, error: 'Category not found' }, 404);
   const current = await ensurePlayerLocation(env, auth.user.id);
   return json({
     ok: true,
     district: {
-      ...district,
-      locations: WORLD_LOCATIONS.filter(location => location.districtId === district.id)
+      ...category,
+      locations: WORLD_LOCATIONS.filter(location => location.categoryId === category.id)
     },
     current: toPublicPlayerLocation(current)
   });
@@ -437,9 +498,9 @@ async function getLocation(request, env, url) {
   const id = decodeURIComponent(url.pathname.slice('/api/world/locations/'.length));
   const location = WORLD_LOCATIONS.find(item => item.id === id);
   if (!location) return json({ ok: false, error: 'Location not found' }, 404);
-  const district = WORLD_DISTRICTS.find(item => item.id === location.districtId);
+  const category = WORLD_CATEGORIES.find(item => item.id === location.categoryId);
   const current = await ensurePlayerLocation(env, auth.user.id);
-  return json({ ok: true, location, district, current: toPublicPlayerLocation(current) });
+  return json({ ok: true, location, category, current: toPublicPlayerLocation(current) });
 }
 
 async function travelToLocation(request, env, requestId) {
@@ -459,18 +520,21 @@ async function travelToLocation(request, env, requestId) {
       district_id = excluded.district_id,
       location_id = excluded.location_id,
       updated_at = excluded.updated_at
-  `).bind(auth.user.id, location.districtId, location.id, now).run();
+  `).bind(auth.user.id, location.categoryId, location.id, now).run();
 
   await writeAudit(env, auth.user.id, 'world.travel', auth.user.id, {
-    districtId: location.districtId,
+    categoryId: location.categoryId,
     locationId: location.id
   });
 
+  const category = WORLD_CATEGORIES.find(item => item.id === location.categoryId);
   return json({
     ok: true,
     current: {
-      districtId: location.districtId,
-      districtName: WORLD_DISTRICTS.find(item => item.id === location.districtId)?.name || location.districtId,
+      categoryId: location.categoryId,
+      categoryName: category?.name || location.categoryId,
+      districtId: location.categoryId,
+      districtName: category?.name || location.categoryId,
       locationId: location.id,
       locationName: location.name,
       updatedAt: now
@@ -699,22 +763,38 @@ async function ensurePlayerLocation(env, userId) {
   const now = Date.now();
   await env.DB.prepare(`
     INSERT OR IGNORE INTO player_location (user_id, district_id, location_id, updated_at)
-    VALUES (?, 'downtown', 'central-plaza', ?)
+    VALUES (?, 'services', 'rift-civic-hall', ?)
   `).bind(userId, now).run();
-  const row = await env.DB.prepare(`
+
+  let row = await env.DB.prepare(`
     SELECT user_id, district_id, location_id, updated_at
     FROM player_location WHERE user_id = ?
   `).bind(userId).first();
   if (!row) throw new Error('Could not create or load player location');
+
+  // Phase 3.1 migration: old district-based locations are automatically moved
+  // to City Hall, so existing players do not need a manual D1 migration.
+  if (!WORLD_LOCATIONS.some(item => item.id === row.location_id)) {
+    await env.DB.prepare(`
+      UPDATE player_location
+      SET district_id = 'services', location_id = 'rift-civic-hall', updated_at = ?
+      WHERE user_id = ?
+    `).bind(now, userId).run();
+    row = { ...row, district_id: 'services', location_id: 'rift-civic-hall', updated_at: now };
+  }
   return row;
 }
 
 function toPublicPlayerLocation(row) {
-  const district = WORLD_DISTRICTS.find(item => item.id === row.district_id);
   const location = WORLD_LOCATIONS.find(item => item.id === row.location_id);
+  const categoryId = location?.categoryId || row.district_id || 'services';
+  const category = WORLD_CATEGORIES.find(item => item.id === categoryId);
   return {
-    districtId: row.district_id,
-    districtName: district?.name || row.district_id,
+    categoryId,
+    categoryName: category?.name || categoryId,
+    // Backward-compatible fields for older clients.
+    districtId: categoryId,
+    districtName: category?.name || categoryId,
     locationId: row.location_id,
     locationName: location?.name || row.location_id,
     updatedAt: row.updated_at

@@ -152,31 +152,31 @@
         <section id="city-view" class="game-view hidden">
           <div class="world-header">
             <div>
-              <span class="eyebrow">WORLD NETWORK / RC-01</span>
+              <span class="eyebrow">CITY DIRECTORY / RC-01</span>
               <h2>RiftCity</h2>
-              <p>Choose a district, inspect its locations, then enter a location. The world is data-driven so future features can attach to these locations without rebuilding navigation.</p>
+              <p>All major city locations are available directly from this hub. Shops, services, travel, entertainment and future gameplay systems plug into these locations.</p>
             </div>
             <div class="current-location-block">
-              <span class="system-label">CURRENT POSITION</span>
-              <strong id="current-location-name">Central Plaza</strong>
-              <small id="current-district-name">Downtown</small>
+              <span class="system-label">CURRENT LOCATION</span>
+              <strong id="current-location-name">Rift Civic Hall</strong>
+              <small id="current-location-category">Services</small>
             </div>
           </div>
 
-          <div class="world-browser">
-            <aside class="district-browser" aria-label="City districts">
-              <div class="browser-heading">
-                <span>DISTRICTS</span>
-                <small id="district-count">05</small>
+          <div class="city-hub">
+            <section class="city-directory-shell" aria-label="RiftCity locations">
+              <div class="browser-heading city-directory-heading">
+                <span>LOCATIONS</span>
+                <small id="location-count">00</small>
               </div>
-              <div id="district-list" class="district-list">
-                <div class="world-loading">Loading city network…</div>
+              <div id="city-directory" class="city-directory">
+                <div class="world-loading">Loading city directory…</div>
               </div>
-            </aside>
-
-            <section id="district-detail" class="district-detail">
-              <div class="world-loading">Select a district.</div>
             </section>
+
+            <aside id="location-inspector" class="location-inspector city-inspector">
+              <div class="world-loading">Select a location.</div>
+            </aside>
           </div>
         </section>
       </section>

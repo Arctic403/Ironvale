@@ -12,7 +12,6 @@ const message = $('#message');
 let authenticated = false;
 let currentView = 'overview';
 let worldState = null;
-let selectedDistrictId = null;
 let selectedLocationId = null;
 
 $('#register-form').addEventListener('submit', async (event) => {
@@ -188,114 +187,65 @@ async function loadWorld(force = false) {
     return;
   }
 
-  $('#district-list').innerHTML = '<div class="world-loading">Loading city network…</div>';
-  $('#district-detail').innerHTML = '<div class="world-loading">Syncing locations…</div>';
+  $('#city-directory').innerHTML = '<div class="world-loading">Loading city directory…</div>';
+  $('#location-inspector').innerHTML = '<div class="world-loading">Select a location.</div>';
   const result = await api('/api/world');
 
   if (!result.ok) {
-    $('#district-list').innerHTML = '<div class="world-loading error-text">Could not load city network.</div>';
-    $('#district-detail').innerHTML = '';
+    $('#city-directory').innerHTML = '<div class="world-loading error-text">Could not load RiftCity.</div>';
     return showMessage(result.error || 'Could not load city.', true);
   }
 
   worldState = result.world;
-  selectedDistrictId ||= worldState.current?.districtId || worldState.districts?.[0]?.id;
+  selectedLocationId ||= worldState.current?.locationId || worldState.locations?.[0]?.id || null;
   renderCurrentLocation(worldState.current);
   renderWorld();
 }
 
 function renderWorld() {
   if (!worldState) return;
-  const districts = worldState.districts || [];
-  setText('#district-count', String(districts.length).padStart(2, '0'));
+  const categories = worldState.categories || [];
+  const locations = worldState.locations || [];
+  setText('#location-count', String(locations.length).padStart(2, '0'));
 
-  $('#district-list').innerHTML = districts.map((district) => {
-    const isSelected = district.id === selectedDistrictId;
-    const isCurrent = district.id === worldState.current?.districtId;
+  $('#city-directory').innerHTML = categories.map((category) => {
+    const categoryLocations = locations.filter(location => location.categoryId === category.id);
+    if (!categoryLocations.length) return '';
     return `
-      <button class="district-item ${isSelected ? 'selected' : ''}" data-district-id="${escapeHtml(district.id)}">
-        <span class="district-code">${escapeHtml(district.code)}</span>
-        <span class="district-name">${escapeHtml(district.name)}</span>
-        <span class="district-meta">${district.locationCount} LOC${isCurrent ? ' · HERE' : ''}</span>
-      </button>
+      <section class="city-category" data-category-id="${escapeHtml(category.id)}">
+        <div class="category-heading">
+          <div>
+            <span class="category-code">${escapeHtml(category.code)}</span>
+            <h3>${escapeHtml(category.name)}</h3>
+          </div>
+          <small>${String(categoryLocations.length).padStart(2, '0')}</small>
+        </div>
+        <div class="city-location-grid">
+          ${categoryLocations.map(location => renderLocationTile(location, worldState.current)).join('')}
+        </div>
+      </section>
     `;
   }).join('');
 
-  $$('.district-item').forEach((button) => {
-    button.addEventListener('click', () => selectDistrict(button.dataset.districtId));
-  });
-
-  selectDistrict(selectedDistrictId, true);
-}
-
-async function selectDistrict(districtId, fromRender = false) {
-  if (!districtId) return;
-  selectedDistrictId = districtId;
-
-  $$('.district-item').forEach((button) => {
-    button.classList.toggle('selected', button.dataset.districtId === districtId);
-  });
-
-  $('#district-detail').innerHTML = '<div class="world-loading">Loading district…</div>';
-  const result = await api(`/api/world/districts/${encodeURIComponent(districtId)}`);
-  if (!result.ok) {
-    $('#district-detail').innerHTML = '<div class="world-loading error-text">District unavailable.</div>';
-    return;
-  }
-
-  const district = result.district;
-  if (result.current) {
-    worldState.current = result.current;
-    renderCurrentLocation(result.current);
-  }
-
-  const locations = district.locations || [];
-  if (!selectedLocationId || !locations.some((location) => location.id === selectedLocationId)) {
-    selectedLocationId = result.current?.districtId === district.id
-      ? result.current.locationId
-      : locations[0]?.id || null;
-  }
-
-  $('#district-detail').innerHTML = `
-    <div class="district-summary">
-      <div>
-        <span class="district-code large-code">${escapeHtml(district.code)}</span>
-        <h3>${escapeHtml(district.name)}</h3>
-        <p>${escapeHtml(district.description)}</p>
-      </div>
-      <div class="district-signals">
-        <div><span>RISK</span><strong>${escapeHtml(district.risk)}</strong></div>
-        <div><span>POLICE</span><strong>${escapeHtml(district.policeActivity)}</strong></div>
-      </div>
-    </div>
-    <div class="location-layout">
-      <div class="location-list-wrap">
-        <div class="browser-heading"><span>LOCATIONS</span><small>${String(locations.length).padStart(2, '0')}</small></div>
-        <div id="location-list" class="location-list">
-          ${locations.map((location) => renderLocationRow(location, result.current)).join('')}
-        </div>
-      </div>
-      <div id="location-inspector" class="location-inspector"></div>
-    </div>
-  `;
-
-  $$('.location-item').forEach((button) => {
+  $$('.city-location-tile').forEach((button) => {
     button.addEventListener('click', () => inspectLocation(button.dataset.locationId));
   });
 
-  if (selectedLocationId) inspectLocation(selectedLocationId, fromRender);
+  if (selectedLocationId) inspectLocation(selectedLocationId);
 }
 
-function renderLocationRow(location, current) {
+function renderLocationTile(location, current) {
   const currentHere = current?.locationId === location.id;
   const selected = selectedLocationId === location.id;
   return `
-    <button class="location-item ${selected ? 'selected' : ''}" data-location-id="${escapeHtml(location.id)}">
-      <span class="location-row-main">
-        <strong>${escapeHtml(location.name)}</strong>
-        <small>${escapeHtml(location.shortDescription)}</small>
+    <button class="city-location-tile ${selected ? 'selected' : ''} ${currentHere ? 'current' : ''}" data-location-id="${escapeHtml(location.id)}">
+      <span class="tile-topline">
+        <span class="location-code">${escapeHtml(location.code)}</span>
+        <span class="tile-state">${currentHere ? 'HERE' : escapeHtml(location.status)}</span>
       </span>
-      <span class="location-row-state">${currentHere ? 'HERE' : escapeHtml(location.status)}</span>
+      <strong>${escapeHtml(location.name)}</strong>
+      <small class="location-type">${escapeHtml(location.type)}</small>
+      <span class="tile-description">${escapeHtml(location.shortDescription)}</span>
     </button>
   `;
 }
@@ -303,13 +253,13 @@ function renderLocationRow(location, current) {
 async function inspectLocation(locationId) {
   if (!locationId) return;
   selectedLocationId = locationId;
-  $$('.location-item').forEach((button) => {
+  $$('.city-location-tile').forEach((button) => {
     button.classList.toggle('selected', button.dataset.locationId === locationId);
   });
 
   const inspector = $('#location-inspector');
   if (!inspector) return;
-  inspector.innerHTML = '<div class="world-loading">Inspecting location…</div>';
+  inspector.innerHTML = '<div class="world-loading">Opening location…</div>';
 
   const result = await api(`/api/world/locations/${encodeURIComponent(locationId)}`);
   if (!result.ok) {
@@ -318,6 +268,7 @@ async function inspectLocation(locationId) {
   }
 
   const location = result.location;
+  const category = result.category;
   const currentHere = result.current?.locationId === location.id;
   const tags = (location.tags || []).map(tag => `<span class="world-tag">${escapeHtml(tag)}</span>`).join('');
   const requirements = location.requirements?.length
@@ -326,30 +277,35 @@ async function inspectLocation(locationId) {
 
   inspector.innerHTML = `
     <div class="inspector-head">
-      <span class="district-code">${escapeHtml(location.code)}</span>
+      <div>
+        <span class="location-code">${escapeHtml(location.code)}</span>
+        <span class="inspector-category">${escapeHtml(category?.name || location.categoryId || '')}</span>
+      </div>
       <span class="location-status">${currentHere ? 'CURRENT LOCATION' : escapeHtml(location.status)}</span>
     </div>
+    <span class="location-kind">${escapeHtml(location.type)}</span>
     <h4>${escapeHtml(location.name)}</h4>
     <p>${escapeHtml(location.description)}</p>
     <div class="world-tags">${tags}</div>
     ${requirements}
     <div class="location-actions">
-      <button id="enter-location-btn" ${currentHere ? 'disabled' : ''}>${currentHere ? 'You are here' : 'Enter location'}</button>
+      <button id="enter-location-btn" ${currentHere ? 'disabled' : ''}>${currentHere ? 'You are here' : 'Open location'}</button>
       ${(location.actions || []).map(action => `
         <button class="secondary location-action" data-action-label="${escapeHtml(action.label)}" data-action-note="${escapeHtml(action.note || '')}" ${action.enabled ? '' : 'disabled'}>
           ${escapeHtml(action.label)}${action.enabled ? '' : ' · LOCKED'}
         </button>
       `).join('')}
     </div>
+    ${(location.actions || []).some(action => action.note) ? `
+      <div class="future-note">SYSTEM HOOKS READY — gameplay modules can attach here without changing the city directory.</div>
+    ` : ''}
   `;
 
   const enterButton = $('#enter-location-btn');
   if (enterButton && !currentHere) enterButton.addEventListener('click', () => travelTo(location.id));
 
   $$('.location-action:not([disabled])').forEach((button) => {
-    button.addEventListener('click', () => {
-      showMessage(`${button.dataset.actionLabel}: ${location.shortDescription}`);
-    });
+    button.addEventListener('click', () => showMessage(`${button.dataset.actionLabel}: ${location.shortDescription}`));
   });
 }
 
@@ -357,7 +313,7 @@ async function travelTo(locationId) {
   const button = $('#enter-location-btn');
   if (button) {
     button.disabled = true;
-    button.textContent = 'Entering…';
+    button.textContent = 'Opening…';
   }
 
   const result = await api('/api/world/travel', {
@@ -369,23 +325,22 @@ async function travelTo(locationId) {
   if (!result.ok) {
     if (button) {
       button.disabled = false;
-      button.textContent = 'Enter location';
+      button.textContent = 'Open location';
     }
-    return showMessage(result.error || 'Could not enter location.', true);
+    return showMessage(result.error || 'Could not open location.', true);
   }
 
   worldState.current = result.current;
-  selectedDistrictId = result.current.districtId;
   selectedLocationId = result.current.locationId;
   renderCurrentLocation(result.current);
-  showMessage(`Entered ${result.current.locationName}.`);
+  showMessage(`Opened ${result.current.locationName}.`);
   renderWorld();
 }
 
 function renderCurrentLocation(current) {
   if (!current) return;
   setText('#current-location-name', current.locationName || current.locationId || 'Unknown');
-  setText('#current-district-name', current.districtName || current.districtId || 'Unknown');
+  setText('#current-location-category', current.categoryName || current.districtName || 'RiftCity');
 }
 
 function setText(selector, value) {

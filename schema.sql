@@ -90,8 +90,8 @@ CREATE INDEX IF NOT EXISTS idx_system_logs_error_id ON system_logs(error_id);
 
 CREATE TABLE IF NOT EXISTS player_location (
   user_id TEXT PRIMARY KEY,
-  district_id TEXT NOT NULL DEFAULT 'downtown',
-  location_id TEXT NOT NULL DEFAULT 'central-plaza',
+  district_id TEXT NOT NULL DEFAULT 'services',
+  location_id TEXT NOT NULL DEFAULT 'rift-civic-hall',
   updated_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
