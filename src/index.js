@@ -175,7 +175,7 @@ async function authenticate(request, env) {
   }
 
   await env.DB.batch([
-    env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE session_id = ?').bind(now, row.session_id),
+    env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').bind(now, row.session_id),
     env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(now, row.id)
   ]);
   row.last_active_at = now;

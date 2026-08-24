@@ -25,13 +25,14 @@ Fresh-start Phase 1 foundation for RiftCity.
 
 1. Install Node.js 20+.
 2. Run `npm install`.
-3. Sign in to Cloudflare with `npx wrangler login`.
-4. Create the database:
+3. `npm run build` can be used by Cloudflare as the build command. It validates the Worker and browser JavaScript without producing a separate frontend bundle.
+4. Sign in to Cloudflare with `npx wrangler login`.
+5. Create the database:
    `npx wrangler d1 create riftcity-v2`
-5. Copy the returned database ID into `wrangler.toml` in place of `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
-6. Apply the schema:
+6. Copy the returned database ID into `wrangler.toml` in place of `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
+7. Apply the schema:
    `npm run db:migrate:remote`
-7. Deploy:
+8. Deploy:
    `npm run deploy`
 
 For local development after configuring D1:
@@ -50,3 +51,11 @@ For local development after configuring D1:
 ## Phase boundary
 
 This ZIP intentionally does NOT add stats, inventory, crimes, money, city map, casino, combat, market, or other gameplay systems. Those belong to later phases so the authentication/account foundation stays clean.
+
+## Cloudflare Git build settings
+
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Root directory: repository root
+
+Before the first deploy, create the D1 database and replace `REPLACE_WITH_YOUR_D1_DATABASE_ID` in `wrangler.toml` with the real database ID.
