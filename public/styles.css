@@ -3306,3 +3306,52 @@ pre { border-color: rgba(255,255,255,.07); border-radius: 10px; background: rgba
   .crime-history-row > div { align-items: flex-start; flex-direction: column; }
   .mobile-nav-link small { font-size: .44rem; }
 }
+
+/* Crime attempt results stay attached to the crime that produced them. */
+.crime-inline-result {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left-width: 4px;
+  background: var(--surface-3);
+}
+.crime-inline-result.success { border-left-color: var(--success); }
+.crime-inline-result.failure { border-left-color: var(--warning); }
+.crime-inline-result.error { border-left-color: var(--danger); }
+.crime-result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  font-size: .67rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.crime-inline-result.success .crime-result-heading strong { color: var(--success); }
+.crime-inline-result.failure .crime-result-heading strong { color: var(--warning); }
+.crime-inline-result.error .crime-result-heading strong { color: var(--danger); }
+.crime-result-heading span { color: var(--muted-2); }
+.crime-inline-result p {
+  margin: 0;
+  color: var(--text);
+  font-size: .76rem;
+  line-height: 1.45;
+}
+.crime-result-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+.crime-result-details span {
+  padding: 4px 6px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: .63rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+

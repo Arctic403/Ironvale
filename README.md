@@ -75,3 +75,19 @@ Wrangler still bundles the Worker for Cloudflare deployment, but RiftCity's sour
 - Crime rewards write directly into the existing D1 inventory engine.
 - Client JavaScript only renders the server result; it does not choose outcomes or reward amounts.
 
+## Plugin architecture
+
+Gameplay definitions now live under `src/plugins/` while `src/index.js` stays focused on generic server engines and persistence:
+
+- `src/plugins/crimes.js` — crime definitions, requirements, reward pools, chances and consequence tuning.
+- `src/plugins/items.js` — item definitions and item lookup/public-shape helpers.
+- `src/plugins/world.js` — city categories, locations, tags, requirements and service descriptors.
+- `src/plugins/index.js` — the single registry surface imported by the Worker.
+- `src/items.js` remains as a compatibility re-export so older imports do not break.
+
+This means content can be added/tuned without rewriting the generic crime, inventory, travel, D1, authentication or audit engines. Future systems such as shops, gyms, bank products, casino games, jobs and location services should follow the same plugin/config pattern when their engines are added.
+
+### Crime result UI
+
+Crime attempts now render their server result directly inside the crime card that was attempted. Successes, failures and blocked/error results stay attached to that crime and display reward/progression details without using the global toast as the result surface.
+

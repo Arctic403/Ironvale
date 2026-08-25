@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node --check src/index.js && node --check src/items.js && node --check public/app.js && node --check public/admin-logs.js && node --check scripts/verify-js-only.js",
+    "build": "npm run verify:js-only && node --check src/index.js && node --check src/items.js && node --check src/plugins/index.js && node --check src/plugins/items.js && node --check src/plugins/crimes.js && node --check src/plugins/world.js && node --check public/app.js && node --check public/admin-logs.js && node --check scripts/verify-js-only.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",

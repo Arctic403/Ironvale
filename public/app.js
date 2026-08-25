@@ -17,6 +17,7 @@ let inventoryState = null;
 let selectedInventoryItemId = null;
 let crimeState = null;
 let crimeRequestInFlight = false;
+let crimeInlineResult = null;
 
 $('#register-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -259,6 +260,34 @@ async function loadCrimes(force = false) {
   renderCrimes();
 }
 
+function renderCrimeInlineResult(crimeId) {
+  if (!crimeInlineResult || crimeInlineResult.crimeId !== crimeId) return '';
+
+  const result = crimeInlineResult;
+  const tone = result.error ? 'error' : (result.success ? 'success' : 'failure');
+  const details = [];
+
+  if (!result.error) {
+    if (Number(result.cashDelta)) details.push(`${result.cashDelta > 0 ? '+' : ''}${formatMoney(result.cashDelta)} cash`);
+    if (Number(result.xpDelta)) details.push(`+${result.xpDelta} XP`);
+    if (Number(result.masteryDelta)) details.push(`+${result.masteryDelta} mastery`);
+    if (Number(result.nerveSpent)) details.push(`-${result.nerveSpent} nerve`);
+    if (result.itemReward?.name) details.push(`Found ${result.itemReward.name}${Number(result.itemReward.quantity) > 1 ? ` x${result.itemReward.quantity}` : ''}`);
+    if (Number(result.levelUps)) details.push(`+${result.levelUps} level${Number(result.levelUps) === 1 ? '' : 's'}`);
+  }
+
+  return `
+    <div class="crime-inline-result ${tone}" role="status">
+      <div class="crime-result-heading">
+        <strong>${result.error ? 'ATTEMPT BLOCKED' : (result.success ? 'SUCCESS' : 'FAILED')}</strong>
+        ${result.chance != null && !result.error ? `<span>${Math.round((Number(result.chance) || 0) * 100)}% roll</span>` : ''}
+      </div>
+      <p>${escapeHtml(result.text || 'Crime resolved.')}</p>
+      ${details.length ? `<div class="crime-result-details">${details.map(detail => `<span>${escapeHtml(detail)}</span>`).join('')}</div>` : ''}
+    </div>
+  `;
+}
+
 function renderCrimes() {
   if (!crimeState) return;
   const crimes = crimeState.crimes || [];
@@ -293,6 +322,7 @@ function renderCrimes() {
             ${crime.available ? `Attempt · ${escapeHtml(crime.nerveCost)} nerve` : escapeHtml(lockText || 'Unavailable')}
           </button>
         </div>
+        ${renderCrimeInlineResult(crime.id)}
       </article>
     `;
   }).join('') : '<div class="world-loading">No crimes installed.</div>';
@@ -316,6 +346,7 @@ function renderCrimes() {
 async function runCrime(crimeId) {
   if (crimeRequestInFlight) return;
   crimeRequestInFlight = true;
+  crimeInlineResult = null;
   const button = $(`[data-run-crime="${cssEscape(crimeId)}"]`);
   if (button) {
     button.disabled = true;
@@ -331,15 +362,26 @@ async function runCrime(crimeId) {
 
   if (!result.ok) {
     if (result.player) renderPlayer(result.player);
+    crimeInlineResult = {
+      crimeId,
+      success: false,
+      error: true,
+      text: result.error || 'Crime attempt failed.'
+    };
     crimeState = null;
     await loadCrimes(true);
-    return showMessage(result.error || 'Crime attempt failed.', true);
+    return;
   }
 
   if (result.player) renderPlayer(result.player);
   inventoryState = null;
+  crimeInlineResult = result.result ? { ...result.result, crimeId } : {
+    crimeId,
+    success: false,
+    error: true,
+    text: 'Crime resolved without a result payload.'
+  };
   crimeState = null;
-  showMessage(result.result?.text || (result.result?.success ? 'Crime succeeded.' : 'Crime failed.'), !result.result?.success);
   await loadCrimes(true);
 }
 
