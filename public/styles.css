@@ -402,3 +402,16 @@ body.pwa-standalone.world3d-game-mode{
   .world3d-editor-card{padding:8px}
   .world3d-nudge-grid button{height:44px}
 }
+
+
+/* Phase 9.8 starter stylized asset pack */
+.world3d-asset-pack{border-color:rgba(214,141,53,.42);background:linear-gradient(180deg,rgba(214,141,53,.08),rgba(255,255,255,.015))}
+.world3d-asset-pack-head{display:flex;align-items:end;justify-content:space-between;gap:8px;margin-bottom:7px}
+.world3d-asset-pack-head small{color:var(--muted2);font-size:.5rem;font-weight:850;white-space:nowrap}
+.world3d-asset-pack p{margin:8px 0 0;color:var(--muted);font-size:.55rem;line-height:1.45}
+.world3d-asset-pack select{min-width:0;width:100%}
+.world3d-asset-pack .primary{white-space:nowrap}
+@media (pointer:coarse){
+  .world3d-asset-pack .world3d-editor-row{grid-template-columns:minmax(0,1fr) auto}
+  .world3d-asset-pack select,.world3d-asset-pack button{min-height:44px}
+}

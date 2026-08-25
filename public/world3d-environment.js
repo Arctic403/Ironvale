@@ -1,4 +1,5 @@
 import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, getNearbyChunkKeys } from './world3d-layout.js';
+import { buildWorldAssetInto, getWorldAsset } from './world3d-assets.js';
 
 const DISTRICT_STYLES = Object.freeze({
   downtown:{accent:'#d68d35',sign:'#f0be6d',foliage:4,cars:['#a3483f','#445b72','#2e3137','#a07a39']},
@@ -237,7 +238,7 @@ function createEnvironmentChunk(ctx) {
         B,scene,shadowGenerator,materials,makeRoot,
         id:`building:${chunkX}:${chunkZ}:${index}:${j}`,
         label:`Filler building ${index+1}.${j+1}`,
-        x:bx,z:bz,seed:seed+index*11+j,
+        x:bx,z:bz,seed:seed+index*11+j,districtId:district.id,
         accentMat,signMat,buildingMat:(seed&1)?altBuildingMat:materials.buildingMats[Math.abs(seed+j)%materials.buildingMats.length]
       });
     }
@@ -248,22 +249,29 @@ function createEnvironmentChunk(ctx) {
     const radius=14+(Math.abs(seed+i*13)%19);
     const x=centerX+Math.cos(angle)*radius;
     const z=centerZ+Math.sin(angle)*radius;
-    const o=makeRoot(`tree:${chunkX}:${chunkZ}:${i}`,'tree',`Tree ${i+1}`,x,0,z);
-    addTree(B,scene,shadowGenerator,materials,o);
-    o.finish();
+    const o=makeRoot(`tree:${chunkX}:${chunkZ}:${i}`,'tree',`Urban Tree ${i+1}`,x,0,z);
+    buildWorldAssetInto({B,scene,shadowGenerator,materials,assetId:'tree-urban-01',id:o.id,root:o.root,add:o.add});
+    const treeScale=.82+(Math.abs(seed+i*17)%5)*.07;
+    o.root.scaling.set(treeScale,treeScale,treeScale);
+    o.finish({assetId:'tree-urban-01'});
   }
 
   [[-6,-18],[6,18],[-18,6],[18,-6],[-6,18],[6,-18]].forEach(([dx,dz],i)=>{
-    const o=makeRoot(`lamp:${chunkX}:${chunkZ}:${i}`,'light',`Street light ${i+1}`,centerX+dx,0,centerZ+dz);
-    addLamp(B,scene,materials,o,signMat);
-    o.finish();
+    const o=makeRoot(`lamp:${chunkX}:${chunkZ}:${i}`,'light',`Modern Streetlight ${i+1}`,centerX+dx,0,centerZ+dz);
+    buildWorldAssetInto({B,scene,shadowGenerator,materials,assetId:'streetlight-01',id:o.id,root:o.root,add:o.add});
+    o.finish({assetId:'streetlight-01'});
   });
 
-  const makeCar=(id,label,x,z,rotation,color,scale,movingMeta=null)=>{
+  const vehicleAssets=['sedan-01','van-01','pickup-01'];
+  const vehicleFor=offset=>vehicleAssets[Math.abs(seed+offset)%vehicleAssets.length];
+  const makeCar=(id,x,z,rotation,assetId,scale,movingMeta=null)=>{
+    const asset=getWorldAsset(assetId);
+    const label=asset?.label||'Vehicle';
     const o=makeRoot(id,movingMeta?'traffic-car':'parked-car',label,x,.12,z);
     o.root.rotation.y=rotation;
-    addCar(B,scene,shadowGenerator,materials,o,color,scale,chunkMaterials);
-    const rec=o.finish(movingMeta||{});
+    buildWorldAssetInto({B,scene,shadowGenerator,materials,assetId,id:o.id,root:o.root,add:o.add});
+    o.root.scaling.setAll(scale);
+    const rec=o.finish({...movingMeta,assetId});
     if (movingMeta) {
       const car={id,root:o.root,...movingMeta};
       localCars.push(car);
@@ -272,20 +280,20 @@ function createEnvironmentChunk(ctx) {
     return rec;
   };
 
-  makeCar(`parked-a:${chunkX}:${chunkZ}`,'Parked car A',centerX+12,centerZ+16,Math.PI/2,style.cars[Math.abs(seed)%style.cars.length],.82);
+  makeCar(`parked-a:${chunkX}:${chunkZ}`,centerX+12,centerZ+16,Math.PI/2,vehicleFor(0),.82);
   if ((seed&3)!==0) {
-    makeCar(`parked-b:${chunkX}:${chunkZ}`,'Parked car B',centerX-17,centerZ-12,0,style.cars[(Math.abs(seed)+2)%style.cars.length],.78);
+    makeCar(`parked-b:${chunkX}:${chunkZ}`,centerX-17,centerZ-12,0,vehicleFor(2),.8);
   }
 
   const vertical=(seed&1)===0;
   const direction=(seed&2)===0?1:-1;
   if (vertical) {
-    makeCar(`traffic:${chunkX}:${chunkZ}`,'Traffic car',centerX+(direction>0?-2:2),centerZ-direction*size*.42,direction>0?0:Math.PI,
-      style.cars[(Math.abs(seed)+1)%style.cars.length],.8,
+    makeCar(`traffic:${chunkX}:${chunkZ}`,centerX+(direction>0?-2:2),centerZ-direction*size*.42,direction>0?0:Math.PI,
+      vehicleFor(1),.82,
       {axis:'z',direction,speed:3.8+(Math.abs(seed)%4)*.45,min:centerZ-size/2,max:centerZ+size/2});
   } else {
-    makeCar(`traffic:${chunkX}:${chunkZ}`,'Traffic car',centerX-direction*size*.42,centerZ+(direction>0?2:-2),direction>0?Math.PI/2:-Math.PI/2,
-      style.cars[(Math.abs(seed)+1)%style.cars.length],.8,
+    makeCar(`traffic:${chunkX}:${chunkZ}`,centerX-direction*size*.42,centerZ+(direction>0?2:-2),direction>0?Math.PI/2:-Math.PI/2,
+      vehicleFor(1),.82,
       {axis:'x',direction,speed:3.8+(Math.abs(seed)%4)*.45,min:centerX-size/2,max:centerX+size/2});
   }
 
@@ -305,30 +313,25 @@ function createEnvironmentChunk(ctx) {
   };
 }
 
-function createBuildingObject({B,scene,shadowGenerator,materials,makeRoot,id,label,x,z,seed,accentMat,signMat,buildingMat}) {
-  const height=8+(Math.abs(seed*7)%20);
-  const width=8+(Math.abs(seed*3)%7);
-  const depth=8+(Math.abs(seed*5)%7);
-  const o=makeRoot(id,'building',label,x,0,z);
-  const building=o.add(B.MeshBuilder.CreateBox(`${id}-body`,{width,height,depth},scene));
-  building.position.y=height/2+.15; building.material=buildingMat; building.checkCollisions=true; building.receiveShadows=true;
-  shadowGenerator.addShadowCaster(building);
-  const awning=o.add(B.MeshBuilder.CreateBox(`${id}-awning`,{width:Math.max(3.4,width*.54),height:.2,depth:1.1},scene));
-  awning.position.set(0,2.7,depth/2+.55); awning.material=accentMat;
-  const door=o.add(B.MeshBuilder.CreateBox(`${id}-door`,{width:1.65,height:2.85,depth:.08},scene));
-  door.position.set(0,1.45,depth/2+.05); door.material=materials.glassMat;
-  const sign=o.add(B.MeshBuilder.CreateBox(`${id}-sign`,{width:Math.max(2.8,width*.5),height:.52,depth:.14},scene));
-  sign.position.set(0,3.45,depth/2+.18); sign.material=signMat;
-  const roof=o.add(B.MeshBuilder.CreateBox(`${id}-roof`,{width:width*.45,height:.7,depth:depth*.4},scene));
-  roof.position.set(.8,height+.5,-.6); roof.material=buildingMat;
-  for (let row=0;row<Math.max(1,Math.floor(height/3.2)-1);row++) {
-    for (const side of [-1,1]) {
-      const win=o.add(B.MeshBuilder.CreateBox(`${id}-window-${row}-${side}`,{width:Math.max(1.7,width*.22),height:.72,depth:.07},scene));
-      win.position.set(side*width*.26,Math.min(height-1.2,4.1+row*2.25),depth/2+.05);
-      win.material=materials.glassMat;
-    }
-  }
-  o.finish({width,height,depth});
+function createBuildingObject({B,scene,shadowGenerator,materials,makeRoot,id,label,x,z,seed,districtId}) {
+  const pools={
+    downtown:['office-01','apartment-01','corner-store-01'],
+    northside:['apartment-01','corner-store-01','office-01'],
+    harbor:['warehouse-01','corner-store-01','apartment-01'],
+    industrial:['warehouse-01','office-01','warehouse-01'],
+    westend:['apartment-01','corner-store-01','apartment-01']
+  };
+  const pool=pools[districtId]||pools.downtown;
+  const assetId=pool[Math.abs(seed)%pool.length];
+  const asset=getWorldAsset(assetId);
+  const o=makeRoot(id,'building',asset?.label||label,x,0,z);
+  buildWorldAssetInto({B,scene,shadowGenerator,materials,assetId,id:o.id,root:o.root,add:o.add});
+
+  const scaleBase=.9+(Math.abs(seed*3)%5)*.06;
+  const tallBoost=assetId==='office-01' ? 1+(Math.abs(seed)%3)*.08 : 1;
+  o.root.scaling.set(scaleBase,scaleBase*tallBoost,scaleBase);
+  if((seed&3)===1) o.root.rotation.y=Math.PI/2;
+  o.finish({assetId,districtId});
 }
 
 function addFurniture(B,scene,materials,shadowGenerator,o,districtId) {

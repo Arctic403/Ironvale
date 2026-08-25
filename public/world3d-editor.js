@@ -1,3 +1,4 @@
+import { WORLD3D_ASSETS, getWorldAsset, buildWorldAssetInto } from './world3d-assets.js';
 import { WORLD3D_CITY_LAYOUT } from './world3d-city-layout.js';
 
 const LAYOUT_PATH='public/world3d-city-layout.js';
@@ -11,18 +12,22 @@ export function createLayoutObjectManager(B,scene,shadowGenerator,materials,init
   const records=new Map();
 
   const build=object=>{
+    const asset=object.assetId?getWorldAsset(object.assetId):null;
+    const type=asset?.type||object.type||'building';
+    const label=object.label||asset?.label||object.id;
     const root=new B.TransformNode(`custom-${object.id}`,scene);
     const meshes=[];
     const add=mesh=>{
       mesh.parent=root;
-      mesh.metadata={...(mesh.metadata||{}),worldEditor:{kind:'custom',id:object.id,type:object.type||'building',label:object.label||object.id}};
+      mesh.metadata={...(mesh.metadata||{}),worldEditor:{kind:'custom',id:object.id,type,label,assetId:object.assetId||null}};
       meshes.push(mesh);
       return mesh;
     };
-    root.metadata={...(root.metadata||{}),worldEditor:{kind:'custom',id:object.id,type:object.type||'building',label:object.label||object.id}};
+    root.metadata={...(root.metadata||{}),worldEditor:{kind:'custom',id:object.id,type,label,assetId:object.assetId||null}};
 
-    const type=object.type||'building';
-    if (type==='road') {
+    if(asset){
+      buildWorldAssetInto({B,scene,shadowGenerator,materials,assetId:asset.id,id:object.id,root,add});
+    } else if (type==='road') {
       const road=add(B.MeshBuilder.CreateBox(`${object.id}-road`,{width:9,height:.08,depth:24},scene));
       road.position.y=.05;road.material=materials.roadMat;
       for (const x of [-2.15,2.15]) {
@@ -64,7 +69,7 @@ export function createLayoutObjectManager(B,scene,shadowGenerator,materials,init
       const sign=add(B.MeshBuilder.CreateBox(`${object.id}-sign`,{width:4.6,height:.55,depth:.15},scene));
       sign.position.set(0,3.5,5.12);sign.material=materials.accentMat;
     }
-    records.set(object.id,{id:object.id,type,label:object.label||object.id,root,meshes});
+    records.set(object.id,{id:object.id,type,label,assetId:object.assetId||null,root,meshes});
     applyObjectTransform(object,root);
     return records.get(object.id);
   };
@@ -132,7 +137,16 @@ export function mountWorldEditor({
   const stepSelect=q('[data-editor-step]');
   const jsonBox=q('[data-editor-json]');
   const placeType=q('[data-editor-place-type]');
+  const assetSelect=q('[data-editor-asset]');
   const gridButton=q('[data-editor-grid]');
+  if(assetSelect){
+    const groups=new Map();
+    for(const asset of WORLD3D_ASSETS){
+      if(!groups.has(asset.category))groups.set(asset.category,[]);
+      groups.get(asset.category).push(asset);
+    }
+    assetSelect.innerHTML=[...groups.entries()].map(([category,assets])=>`<optgroup label="${category}">${assets.map(asset=>`<option value="${asset.id}">${asset.label}</option>`).join('')}</optgroup>`).join('');
+  }
   const gizmoManager=B.GizmoManager?new B.GizmoManager(scene):null;
   let gridRoot=null;
 
@@ -318,15 +332,37 @@ export function mountWorldEditor({
     persist(`${object.label} added beside the player.`);
   };
 
+  const addAsset=()=>{
+    const asset=getWorldAsset(assetSelect?.value);
+    if(!asset)return say('Choose an asset first.');
+    pushUndo();
+    const id=`asset-${asset.id}-${Date.now().toString(36)}`;
+    const object={
+      id,type:asset.type,assetId:asset.id,label:asset.label,
+      x:round(player.root.position.x+4),y:0,z:round(player.root.position.z+4),
+      rotationX:0,rotationY:0,rotationZ:0,scaleX:1,scaleY:1,scaleZ:1
+    };
+    layout.customObjects.push(object);
+    objectManager.updateObject(object);
+    setSelected({kind:'custom',id});
+    persist(`${asset.label} placed beside the player.`);
+  };
+
   const duplicateSelected=()=>{
     if(!selected)return say('Select something first.');
     if(selected.kind==='location')return say('Core locations cannot be duplicated.');
     pushUndo();
     const record=selectedRecord();if(!record)return;
+    const source=selected.kind==='custom'?getCustom(selected.id):null;
     const t=readRoot(record.root);
-    const type=record.type||'building';
-    const id=`custom-${type}-${Date.now().toString(36)}`;
-    const object={id,type,label:`Copy of ${record.label||type}`,...t,x:round(t.x+2),z:round(t.z+2)};
+    const type=record.type||source?.type||'building';
+    const assetId=source?.assetId||record.assetId||record.extra?.assetId||null;
+    const id=`custom-${assetId||type}-${Date.now().toString(36)}`;
+    const object={
+      id,type,label:`Copy of ${record.label||source?.label||type}`,
+      ...(assetId?{assetId}:{}),
+      ...t,x:round(t.x+2),z:round(t.z+2)
+    };
     layout.customObjects.push(object);
     objectManager.updateObject(object);
     setSelected({kind:'custom',id});
@@ -463,6 +499,7 @@ export function mountWorldEditor({
     scaleSelected(axis,Number(amount));
   }));
   q('[data-editor-add]')?.addEventListener('click',()=>addObject());
+  q('[data-editor-add-asset]')?.addEventListener('click',addAsset);
   q('[data-editor-duplicate]')?.addEventListener('click',duplicateSelected);
   q('[data-editor-delete]')?.addEventListener('click',deleteSelected);
   q('[data-editor-reset]')?.addEventListener('click',resetSelected);

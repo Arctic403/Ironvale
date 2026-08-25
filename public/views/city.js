@@ -129,6 +129,18 @@ export async function renderCity(root) {
             </div>
           </section>
 
+          <section class="world3d-editor-card world3d-asset-pack">
+            <div class="world3d-asset-pack-head">
+              <span class="editor-kicker">RIFTCITY ASSET PACK 01</span>
+              <small>15 stylized low-poly assets</small>
+            </div>
+            <div class="world3d-editor-row">
+              <select data-editor-asset aria-label="Asset pack item"></select>
+              <button type="button" class="primary" data-editor-add-asset>PLACE ASSET</button>
+            </div>
+            <p>Buildings, vehicles, street props and nature. These use reusable shared materials so they stay much lighter than unique one-off models.</p>
+          </section>
+
           <section class="world3d-editor-card">
             <div class="world3d-editor-button-row">
               <button type="button" data-editor-duplicate>DUPLICATE <kbd>⌘D</kbd></button>
