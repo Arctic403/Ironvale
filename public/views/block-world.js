@@ -80,11 +80,21 @@ export async function renderBlockWorld(root){
   function nearestBuilding(){
     let best=null,dist=Infinity;
     for(const b of BLOCK1.buildings){
-      const doorX=b.x+b.w*.5, doorY=560;
+      const doorX=b.doorX??(b.x+b.w*.5);
+      const doorY=b.doorY??510;
       const d=Math.hypot(state.x-doorX,state.y-doorY);
       if(d<dist){dist=d;best=b;}
     }
-    return dist<190?best:null;
+    // Interaction only activates when the character is actually at the door.
+    return dist<92?best:null;
+  }
+
+  function collidesWithFacade(x,y){
+    const radius=18;
+    return BLOCK1.buildings.some(b=>
+      x>b.x-radius && x<b.x+b.w+radius &&
+      y>b.y-radius && y<b.y+b.h+radius
+    );
   }
   function updatePrompt(){
     state.near=nearestBuilding();
@@ -113,11 +123,17 @@ export async function renderBlockWorld(root){
     const speed=(state.running||keys.has('shift'))?390:235;
     let nx=state.x+dx*speed*dt, ny=state.y+dy*speed*dt;
     nx=Math.max(45,Math.min(BLOCK1.width-45,nx));
-    ny=Math.max(610,Math.min(1225,ny));
-    // Building fronts are solid; the player approaches doors from the sidewalk.
-    if(ny<625)ny=625;
-    state.x=nx;state.y=ny;
+    // The whole foreground street plane is walkable. Players can now walk
+    // north across the road and right up to the storefront threshold.
+    ny=Math.max(510,Math.min(1225,ny));
+
+    // Resolve axes separately so facades feel solid without sticky corners.
+    if(!collidesWithFacade(nx,state.y))state.x=nx;
+    if(!collidesWithFacade(state.x,ny))state.y=ny;
     player.style.left=`${state.x}px`; player.style.top=`${state.y}px`;
+    const playerDepth=.78+((state.y-510)/(1225-510))*.24;
+    player.style.transform=`translate(-50%,-100%) scale(${playerDepth})`;
+    player.style.zIndex=String(30+Math.round(state.y));
 
     // Scale Block 01 to the real viewport height so portrait mode never crops
     // the buildings/road/controls. The camera then pans through world space.

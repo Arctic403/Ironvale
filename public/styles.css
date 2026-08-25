@@ -616,3 +616,13 @@ body.bw-fullscreen-mode .blockworld-shell{
     }
   }
 }
+
+
+/* Phase 11.2 — storefront approach depth */
+.bw-player{
+  transform-origin:50% 100%;
+  will-change:left,top,transform;
+}
+.bw-prompt{
+  pointer-events:none;
+}

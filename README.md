@@ -332,3 +332,8 @@ Fullscreen behavior is device-aware:
 - Samsung/Android requests native Fullscreen API mode and attempts `screen.orientation.lock('landscape')`.
 - iPhone/iPad attempts native fullscreen when Safari exposes it; because Safari does not reliably permit webpage orientation locking, portrait iPhones use a CSS-rotated edge-to-edge landscape game canvas.
 - Leaving fullscreen restores RiftCity's normal portrait shell/navigation.
+
+
+## Phase 11.2 — walk-up storefronts
+
+Commerce Street now uses a real two-axis walkable street plane. The player can walk from the foreground sidewalk, across the road, onto the north sidewalk and directly to each storefront door. Building rectangles are solid collision geometry, door interactions use authored threshold coordinates with a tighter activation radius, and the player subtly depth-scales by Y position to reinforce the 2.5D approach.
