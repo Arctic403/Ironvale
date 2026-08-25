@@ -26,21 +26,30 @@ export async function renderCity(root) {
         <small>WASD / arrows to move · Shift to run · drag to orbit · E to enter</small>
       </div>
       <div class="world3d-top-right">
-        <button id="world3d-directory-button" class="world3d-hud-button">CITY DIRECTORY</button>
+        <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
+        <button id="world3d-directory-button" class="world3d-hud-button" type="button">CITY DIRECTORY</button>
       </div>
       <div id="world3d-prompt" class="world3d-prompt">
         <span>NEARBY</span><strong id="world3d-location">Location</strong>
         <button id="world3d-interact">ENTER <kbd>E</kbd></button>
       </div>
       <div class="world3d-current"><span>CURRENT</span><strong>${escapeHtml(current)}</strong></div>
-      <div class="world3d-touch" aria-label="Touch movement controls">
-        <div class="world3d-dpad">
-          <button data-move="forward">▲</button>
-          <button data-move="left">◀</button>
-          <button data-move="back">▼</button>
-          <button data-move="right">▶</button>
+      <div class="world3d-touch" aria-label="Touch game controls">
+        <div id="world3d-joystick" class="world3d-joystick" role="group" aria-label="Movement joystick">
+          <div class="world3d-joystick-ring">
+            <div id="world3d-joystick-knob" class="world3d-joystick-knob"></div>
+          </div>
+          <span>MOVE</span>
         </div>
-        <button class="world3d-run" data-move="run">RUN</button>
+        <div class="world3d-action-pad">
+          <button id="world3d-touch-interact" class="world3d-action world3d-action-enter" type="button">ENTER</button>
+          <button class="world3d-action world3d-action-run" data-move="run" type="button">RUN</button>
+        </div>
+      </div>
+      <div id="world3d-rotate" class="world3d-rotate" aria-live="polite">
+        <div class="world3d-phone-icon">▯</div>
+        <strong>Rotate sideways</strong>
+        <span>RiftCity plays best in landscape.</span>
       </div>
       <aside id="world3d-directory" class="world3d-directory">
         <header><div><span class="eyebrow">FAST NAV / DEV</span><strong>City Directory</strong></div><button id="world3d-directory-close">×</button></header>

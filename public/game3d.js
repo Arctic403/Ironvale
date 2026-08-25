@@ -87,7 +87,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   createNPCs(B, scene, shadowGenerator, 11);
 
   const keys = new Set();
-  const touch = { forward: false, back: false, left: false, right: false, run: false };
+  const touch = { forward: false, back: false, left: false, right: false, run: false, axisX: 0, axisZ: 0 };
   const onKeyDown = event => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
     keys.add(event.code);
@@ -99,16 +99,73 @@ export function mountCity3D({ root, world, onEnterLocation }) {
 
   root.querySelectorAll('[data-move]').forEach(button => {
     const action = button.dataset.move;
-    const start = event => { event.preventDefault(); touch[action] = true; };
-    const stop = event => { event.preventDefault(); touch[action] = false; };
+    const start = event => {
+      event.preventDefault();
+      touch[action] = true;
+      try { button.setPointerCapture?.(event.pointerId); } catch (_) {}
+    };
+    const stop = event => {
+      event.preventDefault();
+      touch[action] = false;
+      try { button.releasePointerCapture?.(event.pointerId); } catch (_) {}
+    };
     button.addEventListener('pointerdown', start);
     button.addEventListener('pointerup', stop);
     button.addEventListener('pointercancel', stop);
-    button.addEventListener('pointerleave', stop);
   });
 
+  const joystick = setupVirtualJoystick(root, touch);
   const interactButton = root.querySelector('#world3d-interact');
+  const touchInteractButton = root.querySelector('#world3d-touch-interact');
   interactButton?.addEventListener('click', tryInteract);
+  touchInteractButton?.addEventListener('click', tryInteract);
+
+  const shell = root.querySelector('.world3d-shell');
+  const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
+  const rotatePrompt = root.querySelector('#world3d-rotate');
+  let gameMode = false;
+
+  const updateOrientationUi = () => {
+    const portrait = window.matchMedia?.('(orientation: portrait)')?.matches ?? (window.innerHeight > window.innerWidth);
+    rotatePrompt?.classList.toggle('visible', gameMode && portrait && isTouchDevice());
+  };
+
+  const setGameMode = async enabled => {
+    gameMode = enabled;
+    document.body.classList.toggle('world3d-game-mode', enabled);
+    shell?.classList.toggle('game-mode', enabled);
+    fullscreenButton?.classList.toggle('active', enabled);
+    if (fullscreenButton) fullscreenButton.textContent = enabled ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+
+    if (enabled) {
+      try {
+        const request = shell?.requestFullscreen || shell?.webkitRequestFullscreen;
+        if (request && !document.fullscreenElement && !document.webkitFullscreenElement) {
+          await request.call(shell);
+        }
+      } catch (_) {}
+      try {
+        if (screen.orientation?.lock) await screen.orientation.lock('landscape');
+      } catch (_) {}
+    } else {
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      } catch (_) {}
+      try { screen.orientation?.unlock?.(); } catch (_) {}
+    }
+
+    updateOrientationUi();
+    setTimeout(() => engine.resize(), 80);
+  };
+
+  fullscreenButton?.addEventListener('click', () => setGameMode(!gameMode));
+  const onOrientationChange = () => {
+    updateOrientationUi();
+    setTimeout(() => engine.resize(), 80);
+  };
+  window.addEventListener('orientationchange', onOrientationChange);
+  window.addEventListener('resize', onOrientationChange);
   const directoryButton = root.querySelector('#world3d-directory-button');
   const directory = root.querySelector('#world3d-directory');
   directoryButton?.addEventListener('click', () => directory?.classList.toggle('open'));
@@ -150,9 +207,14 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     const right = keys.has('KeyD') || keys.has('ArrowRight') || touch.right;
     const running = keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.run;
 
-    const inputX = (right ? 1 : 0) - (left ? 1 : 0);
-    const inputZ = (forward ? 1 : 0) - (back ? 1 : 0);
-    const moving = inputX !== 0 || inputZ !== 0;
+    let inputX = (right ? 1 : 0) - (left ? 1 : 0);
+    let inputZ = (forward ? 1 : 0) - (back ? 1 : 0);
+    if (Math.abs(touch.axisX) > 0.01 || Math.abs(touch.axisZ) > 0.01) {
+      inputX = touch.axisX;
+      inputZ = touch.axisZ;
+    }
+    const inputStrength = Math.min(1, Math.hypot(inputX, inputZ));
+    const moving = inputStrength > 0.04;
 
     if (moving) {
       const cameraForward = camera.target.subtract(camera.position);
@@ -160,7 +222,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
       cameraForward.normalize();
       const cameraRight = new B.Vector3(cameraForward.z, 0, -cameraForward.x);
       const direction = cameraForward.scale(inputZ).add(cameraRight.scale(inputX)).normalize();
-      const speed = running ? 7.1 : 4.6;
+      const speed = (running ? 7.1 : 4.6) * Math.max(0.32, inputStrength);
       player.velocity.x = B.Scalar.Lerp(player.velocity.x, direction.x * speed, Math.min(1, dt * 9));
       player.velocity.z = B.Scalar.Lerp(player.velocity.z, direction.z * speed, Math.min(1, dt * 9));
       const targetYaw = Math.atan2(direction.x, direction.z);
@@ -205,12 +267,101 @@ export function mountCity3D({ root, world, onEnterLocation }) {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('orientationchange', onOrientationChange);
+      window.removeEventListener('resize', onOrientationChange);
+      joystick?.destroy?.();
+      document.body.classList.remove('world3d-game-mode');
+      try { screen.orientation?.unlock?.(); } catch (_) {}
+      try {
+        if ((document.fullscreenElement === shell || document.webkitFullscreenElement === shell) && document.exitFullscreen) {
+          const exiting = document.exitFullscreen();
+          exiting?.catch?.(() => {});
+        } else if (document.webkitFullscreenElement === shell && document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      } catch (_) {}
       scene.dispose();
       engine.dispose();
       if (activeWorld === this) activeWorld = null;
     }
   };
   return activeWorld;
+}
+
+function isTouchDevice() {
+  return window.matchMedia?.('(pointer: coarse)')?.matches || navigator.maxTouchPoints > 0;
+}
+
+function setupVirtualJoystick(root, touch) {
+  const zone = root.querySelector('#world3d-joystick');
+  const ring = zone?.querySelector('.world3d-joystick-ring');
+  const knob = root.querySelector('#world3d-joystick-knob');
+  if (!zone || !ring || !knob) return null;
+
+  let activePointer = null;
+  const maxDistance = 38;
+
+  const reset = () => {
+    activePointer = null;
+    touch.axisX = 0;
+    touch.axisZ = 0;
+    knob.style.transform = 'translate(0px, 0px)';
+    zone.classList.remove('active');
+  };
+
+  const update = event => {
+    if (activePointer !== event.pointerId) return;
+    const rect = ring.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let dx = event.clientX - cx;
+    let dy = event.clientY - cy;
+    const distance = Math.hypot(dx, dy);
+    if (distance > maxDistance) {
+      dx = dx / distance * maxDistance;
+      dy = dy / distance * maxDistance;
+    }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    touch.axisX = dx / maxDistance;
+    touch.axisZ = -dy / maxDistance;
+  };
+
+  const down = event => {
+    event.preventDefault();
+    if (activePointer !== null) return;
+    activePointer = event.pointerId;
+    zone.classList.add('active');
+    try { zone.setPointerCapture?.(event.pointerId); } catch (_) {}
+    update(event);
+  };
+
+  const move = event => {
+    if (activePointer !== event.pointerId) return;
+    event.preventDefault();
+    update(event);
+  };
+
+  const up = event => {
+    if (activePointer !== event.pointerId) return;
+    event.preventDefault();
+    try { zone.releasePointerCapture?.(event.pointerId); } catch (_) {}
+    reset();
+  };
+
+  zone.addEventListener('pointerdown', down);
+  zone.addEventListener('pointermove', move);
+  zone.addEventListener('pointerup', up);
+  zone.addEventListener('pointercancel', up);
+
+  return {
+    destroy() {
+      zone.removeEventListener('pointerdown', down);
+      zone.removeEventListener('pointermove', move);
+      zone.removeEventListener('pointerup', up);
+      zone.removeEventListener('pointercancel', up);
+      reset();
+    }
+  };
 }
 
 function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat) {
