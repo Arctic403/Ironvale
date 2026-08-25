@@ -1,3 +1,4 @@
+import { renderBlockWorld, destroyBlockWorld } from './block-world.js';
 import { api } from '../ui/api.js';
 import { state } from '../ui/state.js';
 import { escapeHtml, panel, empty } from '../ui/helpers.js';
@@ -14,12 +15,13 @@ const ROUTE_BY_TYPE={bank:'bank',education:'education',gym:'gym',jobs:'jobs',pro
 let activeCity2D=null;
 
 export function destroyCity2D(){
+  destroyBlockWorld();
   activeCity2D?.destroy?.();
   activeCity2D=null;
   document.body.classList.remove('city2d-game-mode');
 }
 
-export async function renderCity(root){
+async function renderLegacyCity(root){
   destroyCity2D();
   const result=await api('/api/world');
   if(!result.ok){
@@ -429,3 +431,7 @@ export async function renderLocation(root,id) {
     window.location.hash=`#${btn.dataset.serviceRoute}${btn.dataset.serviceQuery||''}`;
   }));
 }
+
+
+// Phase 11: active City route uses authored 2.5D Block 01.
+export async function renderCity(root){ return renderBlockWorld(root); }
