@@ -342,3 +342,20 @@ Commerce Street now uses a real two-axis walkable street plane. The player can w
 ## Phase 11.3 — Commerce Street visual-life pass
 
 Block 01 now gives each destination its own visual language rather than reusing one storefront treatment. The mart, pharmacy, realty office, noodle shop, exchange and apartments receive distinct facade details, signage, window/awning treatments and proportions. Downtown now has a layered skyline and utility wires behind the playable block, while Commerce Street gains parked vehicles, benches, a hydrant, utility/news boxes and a dressed alley with fire escape, dumpster, bins, graffiti and puddle. These additions are presentation-only and preserve Phase 11.2 movement, collision, door thresholds and server routes.
+
+
+## Phase 11.4 — live Block Editor + JSON handoff
+
+Commerce Street now includes a temporary in-game developer editor. `EDIT BLOCK` switches the active block from play controls to direct scene editing without changing server-authoritative gameplay.
+
+Editor capabilities:
+- select buildings, authored props and the alley directly in the scene or inspector;
+- drag objects live and edit X/Y plus building/alley width and height;
+- configurable coordinate snapping;
+- visible storefront interaction-door markers;
+- add common props at the player's current position;
+- duplicate/delete supported objects;
+- undo/redo and reset to the authored Block 01 source;
+- export the complete working block as a versioned `riftcity-block-edit` JSON file.
+
+The export is intentionally source-neutral: it can be sent with the newest RiftCity workspace and integrated back into `public/block1.js`. The editor changes only its browser working copy until an exported layout is deliberately integrated into source.

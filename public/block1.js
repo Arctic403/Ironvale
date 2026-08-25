@@ -31,3 +31,6 @@ export const BLOCK1 = Object.freeze({
     {id:'east',x:3510,y:650,w:90,h:580,label:'East Downtown — future block'}
   ]
 });
+
+
+export const BLOCK_EDITOR_SCHEMA_VERSION = 1;
