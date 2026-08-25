@@ -4,12 +4,11 @@ import { state } from './ui/state.js';
 import { parseRoute, go } from './ui/router.js';
 import { initShell, refreshSession, submitAuth, setPageTitle, updateActiveNav, showToast } from './ui/shell.js';
 import { renderCharacter } from './views/character.js';
-import { renderCity, renderLocation } from './views/city.js';
+import { renderCity, renderLocation, destroyCity2D } from './views/city.js';
 import { renderCrimes } from './views/crimes.js';
 import { renderInventory } from './views/inventory.js';
 import { renderService } from './views/service.js';
 import { renderWiki } from './views/wiki.js';
-import { destroyCity3D } from './game3d.js';
 import { initPwaSupport } from './pwa.js';
 
 initShell();
@@ -27,7 +26,7 @@ async function boot() {
 }
 
 async function route() {
-  destroyCity3D();
+  destroyCity2D();
   const request=++state.activeRequest;
   const parsed=parseRoute();
   state.route=parsed;

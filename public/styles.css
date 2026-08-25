@@ -415,3 +415,33 @@ body.pwa-standalone.world3d-game-mode{
   .world3d-asset-pack .world3d-editor-row{grid-template-columns:minmax(0,1fr) auto}
   .world3d-asset-pack select,.world3d-asset-pack button{min-height:44px}
 }
+
+
+/* Phase 10 — RiftCity 2D world foundation */
+.game-root:has(.city2d-shell){width:100%;max-width:none;margin:0;padding:0;height:calc(100dvh - 128px);overflow:hidden}
+.city2d-shell{position:relative;width:100%;height:100%;min-height:380px;overflow:hidden;background:#090b0c;isolation:isolate;touch-action:none}
+.city2d-viewport{position:absolute;inset:0;overflow:hidden;background:#0b0e10}
+.city2d-world{position:absolute;left:0;top:0;will-change:transform}
+.city2d-ground{position:absolute;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.city2d-location-layer{position:absolute;inset:0}
+.city2d-player{position:absolute;width:68px;height:68px;transform:translate(-50%,-50%);z-index:8;display:grid;place-items:center;pointer-events:none}
+.city2d-player-body{width:38px;height:38px;border-radius:50%;background:#f3eee6;border:6px solid #181a1c;box-shadow:0 8px 16px rgba(0,0,0,.45),0 0 0 5px rgba(214,141,53,.34);transition:transform .08s}
+.city2d-player.moving .city2d-player-body{transform:scale(.9)}
+.city2d-location-marker{position:absolute;z-index:6;transform:translate(-50%,-50%);display:grid;place-items:center;gap:8px;background:none;border:0;color:#fff;padding:0}
+.city2d-location-marker>span{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:rgba(10,12,13,.9);border:6px solid rgba(214,141,53,.92);color:#f4c986;font-size:1.25rem;font-weight:1000;box-shadow:0 7px 18px rgba(0,0,0,.48)}
+.city2d-location-marker>strong{display:none;background:rgba(8,10,11,.92);border:2px solid rgba(214,141,53,.35);padding:8px 12px;font-size:1rem;white-space:nowrap}
+.city2d-location-marker:focus>strong,.city2d-location-marker:hover>strong{display:block}
+.city2d-top-left,.city2d-top-right,.city2d-prompt,.city2d-touch,.city2d-directory{position:absolute;z-index:12}
+.city2d-top-left{top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));display:grid;gap:3px;background:rgba(8,10,11,.86);border-left:4px solid var(--accent);padding:9px 11px;backdrop-filter:blur(8px)}
+.city2d-top-left strong{font-size:.8rem}.city2d-top-left small{font-size:.53rem;color:var(--muted)}
+.city2d-top-right{top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right));display:flex;gap:7px}
+.city2d-hud-button{min-height:40px;padding:9px 10px;border:1px solid rgba(214,141,53,.5);background:rgba(8,10,11,.86);color:#eee9de;font-weight:950;font-size:.53rem;letter-spacing:.08em}
+.city2d-prompt{left:50%;bottom:82px;transform:translate(-50%,18px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:12px;background:rgba(8,10,11,.92);border:1px solid rgba(214,141,53,.5);padding:8px 10px;transition:.14s}
+.city2d-prompt.visible{transform:translate(-50%,0);opacity:1;pointer-events:auto}.city2d-prompt>div{display:grid}.city2d-prompt span{font-size:.48rem;color:var(--accent);font-weight:950}.city2d-prompt strong{font-size:.82rem}.city2d-prompt button{background:var(--accent);color:#17130f;border:0;padding:8px 11px;font-weight:950}
+.city2d-touch{left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:end;padding:12px max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));pointer-events:none}
+.city2d-joystick,.city2d-action-pad{pointer-events:auto}.city2d-joystick{width:126px;height:126px;display:grid;justify-items:center;align-content:center;gap:4px}.city2d-joystick-ring{position:relative;width:104px;height:104px;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:rgba(8,10,11,.72);box-shadow:inset 0 0 24px rgba(0,0,0,.45)}.city2d-joystick-knob{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px;border-radius:50%;background:#b77c35;border:4px solid #d5a15f;will-change:transform}.city2d-joystick>span{font-size:.48rem;color:#a9a39a;font-weight:900;letter-spacing:.1em}
+.city2d-action-pad{display:grid;grid-template-columns:68px 68px;gap:9px}.city2d-action{width:68px;height:68px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(8,10,11,.82);color:#fff;font-weight:950;font-size:.62rem}.city2d-action-enter{background:rgba(214,141,53,.78);color:#17130f}.city2d-action.active{transform:scale(.95);background:rgba(214,141,53,.62)}
+.city2d-directory{top:0;right:0;bottom:0;width:min(390px,94vw);display:flex;flex-direction:column;background:rgba(11,13,14,.98);border-left:1px solid var(--line2);transform:translateX(102%);transition:transform .18s ease}.city2d-directory.open{transform:translateX(0)}.city2d-directory>header{display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--line2)}.city2d-directory>header>div{display:grid}.city2d-directory>header button{width:42px;height:42px;border:1px solid var(--line2);background:#16191b;color:#fff;font-size:1.4rem}.city2d-directory-list{padding:8px;overflow:auto}.city2d-directory-list button{width:100%;display:grid;text-align:left;padding:11px;margin-bottom:6px;border:1px solid var(--line2);background:#151719;color:#eee9de}.city2d-directory-list small{color:var(--muted);margin-top:3px}
+body.city2d-game-mode{overflow:hidden}.city2d-game-mode .topbar,.city2d-game-mode #status,.city2d-game-mode #hud-shell,.city2d-game-mode #mobile-nav{display:none!important}.city2d-game-mode .game-root:has(.city2d-shell){height:100dvh}
+@media(min-width:901px) and (pointer:fine){.game-root:has(.city2d-shell){height:calc(100dvh - 108px)}.city2d-touch{opacity:.8}.city2d-location-marker>strong{display:block}}
+@media(max-width:560px){.city2d-top-left small{display:none}.city2d-top-left{max-width:calc(100vw - 205px)}.city2d-hud-button{font-size:.46rem;padding:7px}.city2d-prompt{bottom:82px;width:min(280px,calc(100vw - 24px));justify-content:space-between}.city2d-prompt button{display:none}.city2d-joystick{width:116px;height:116px}.city2d-joystick-ring{width:96px;height:96px}.city2d-action-pad{grid-template-columns:62px 62px}.city2d-action{width:62px;height:62px}}

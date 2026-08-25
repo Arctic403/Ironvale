@@ -289,3 +289,20 @@ The Meridian now has server-resolved fictional in-game-chip rounds for Blackjack
 
 ### Economy risk
 High Heat now contributes to bank exposure and can trigger a temporary server-side security review. Home Security upgrades reduce that risk. Bank risk status is visible instead of being hidden.
+
+
+## Phase 10 — 2D Downtown world foundation
+
+RiftCity's active City route is now a mobile-first 2D world using the exact supplied Downtown artwork as a static ground layer. Babylon/3D is no longer loaded by `public/index.html`, and the City route no longer imports or mounts the 3D runtime.
+
+The 2D client now uses:
+- logical world coordinates independent of source image resolution (`6400 × 5697` world units),
+- a fixed gameplay camera with movement look-ahead and edge clamping,
+- analog touch joystick plus WASD/arrow controls and Shift/run,
+- authored location coordinates layered over the world,
+- collision primitives with a spatial chunk index,
+- nearby-location interaction detection,
+- mobile fullscreen support,
+- existing server-authoritative location/service routes unchanged.
+
+The Downtown image remains static presentation. Collision, location placement, interactions and future building/prop sprites are separate data layers, so gameplay logic never depends on reading pixels from the ground image.
