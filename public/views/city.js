@@ -3,7 +3,7 @@ import { state } from '../ui/state.js';
 import { escapeHtml, panel, empty } from '../ui/helpers.js';
 import { go } from '../ui/router.js';
 import { showToast } from '../ui/shell.js';
-import { DOWNTOWN_GROUND } from '../downtown-ground.js';
+import { DOWNTOWN_GROUND, getDowntownTilesForRect } from '../downtown-ground.js';
 import {
   WORLD2D_CONFIG, WORLD2D_COLLIDERS, getWorld2DLocationPosition,
   buildSpatialIndex, querySpatialIndex, playerHitsCollider, clampPlayer
@@ -39,7 +39,7 @@ export async function renderCity(root){
     <section class="city2d-shell" aria-label="Playable 2D Downtown">
       <div id="city2d-viewport" class="city2d-viewport">
         <div id="city2d-world" class="city2d-world">
-          <img class="city2d-ground" src="${DOWNTOWN_GROUND.src}" alt="" draggable="false">
+          <div id="city2d-ground-tiles" class="city2d-ground-tiles" aria-hidden="true"></div>
           <div id="city2d-location-layer" class="city2d-location-layer"></div>
           <div id="city2d-player" class="city2d-player"><span class="city2d-player-body"></span></div>
         </div>
@@ -83,6 +83,7 @@ export async function renderCity(root){
   const shell=root.querySelector('.city2d-shell');
   const viewport=root.querySelector('#city2d-viewport');
   const world=root.querySelector('#city2d-world');
+  const groundTiles=root.querySelector('#city2d-ground-tiles');
   const playerEl=root.querySelector('#city2d-player');
   const layer=root.querySelector('#city2d-location-layer');
   const prompt=root.querySelector('#city2d-prompt');
@@ -137,10 +138,10 @@ export async function renderCity(root){
 
   function preferredZoom(){
     const w=viewport?.clientWidth||window.innerWidth;
-    if(w<=430)return .62;
-    if(w<=700)return .68;
-    if(w<=1000)return .78;
-    return .9;
+    if(w<=430)return .56;
+    if(w<=700)return .62;
+    if(w<=1000)return .72;
+    return .84;
   }
 
   function worldToScreen(x,y){
@@ -150,6 +151,40 @@ export async function renderCity(root){
     };
   }
 
+  const mountedTiles=new Map();
+  function updateGroundTiles(){
+    const halfW=viewport.clientWidth/(2*camera.zoom);
+    const halfH=viewport.clientHeight/(2*camera.zoom);
+    const visible=getDowntownTilesForRect(
+      camera.x-halfW,camera.y-halfH,camera.x+halfW,camera.y+halfH,
+      Math.max(320,WORLD2D_CONFIG.chunkSize*.8)
+    );
+    const wanted=new Set(visible.map(tile=>tile.id));
+
+    for(const [id,img] of mountedTiles){
+      if(wanted.has(id))continue;
+      img.remove();
+      mountedTiles.delete(id);
+    }
+
+    for(const tile of visible){
+      if(mountedTiles.has(tile.id))continue;
+      const img=document.createElement('img');
+      img.className='city2d-ground-tile';
+      img.alt='';
+      img.draggable=false;
+      img.decoding='async';
+      img.loading='eager';
+      img.src=tile.src;
+      img.style.left=`${tile.x}px`;
+      img.style.top=`${tile.y}px`;
+      img.style.width=`${tile.width+0.8}px`;
+      img.style.height=`${tile.height+0.8}px`;
+      groundTiles.appendChild(img);
+      mountedTiles.set(tile.id,img);
+    }
+  }
+
   function updateTransform(){
     world.style.width=`${WORLD2D_CONFIG.width}px`;
     world.style.height=`${WORLD2D_CONFIG.height}px`;
@@ -157,6 +192,7 @@ export async function renderCity(root){
     world.style.transformOrigin='0 0';
     playerEl.style.left=`${player.x}px`;
     playerEl.style.top=`${player.y}px`;
+    updateGroundTiles();
   }
 
   function collides(x,y){
@@ -285,6 +321,7 @@ export async function renderCity(root){
       window.removeEventListener('keyup',onKeyUp);
       window.removeEventListener('resize',onResize);
       window.visualViewport?.removeEventListener('resize',onResize);
+      mountedTiles.clear();
       root.style.height='';
       shell.style.height='';
       document.body.classList.remove('city2d-game-mode');
