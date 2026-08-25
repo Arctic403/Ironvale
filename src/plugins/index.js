@@ -32,8 +32,10 @@ export { WORLD_EVENT_REGISTRY, getActiveWorldEvent } from './events.js';
 export { SHOP_REGISTRY, getShopDefinition } from './shops.js';
 export { CASINO_GAMES, DAILY_CHIP_GRANT } from './casino.js';
 
-export { COMBAT_SETTINGS, NPC_OPPONENTS, getNpcOpponent } from './combat.js';
+export { COMBAT_SETTINGS, NPC_OPPONENTS, COMBAT_WEAPONS, WEAPON_SKILL_CLASSES, getNpcOpponent, getCombatWeapon } from './combat.js';
 export { TRAVEL_DESTINATIONS, getTravelDestination } from './travel.js';
 export { ACHIEVEMENT_REGISTRY, getAchievementDefinition } from './achievements.js';
 export { DAILY_CHALLENGE_TEMPLATES, WEEKLY_CHALLENGE_TEMPLATES } from './challenges.js';
 export { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, getProductionFacility, getProductionRecipe } from './production.js';
+
+export { RESOURCE_REGEN, getResourceRegen } from './resources.js';

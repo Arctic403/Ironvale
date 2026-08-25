@@ -1,5 +1,5 @@
 import {
-  NPC_OPPONENTS, COMBAT_SETTINGS, getNpcOpponent,
+  NPC_OPPONENTS, COMBAT_SETTINGS, getNpcOpponent, getCombatWeapon, WEAPON_SKILL_CLASSES,
   TRAVEL_DESTINATIONS, getTravelDestination,
   ACHIEVEMENT_REGISTRY, getAchievementDefinition,
   DAILY_CHALLENGE_TEMPLATES, WEEKLY_CHALLENGE_TEMPLATES,
@@ -9,6 +9,7 @@ import {
   getActiveWorldEvent,
   getItemDefinition, toPublicItemDefinition
 } from '../plugins/index.js';
+import { simulateFullFight, skillLevelFromXp, skillXpForNextLevel, UNARMED_WEAPON } from './combat-engine.js';
 
 const ADVANCED_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS player_travel (
@@ -46,6 +47,21 @@ CREATE TABLE IF NOT EXISTS combat_history (
   defender_damage INTEGER NOT NULL DEFAULT 0,
   xp_gain INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS combat_turns (
+  fight_id TEXT NOT NULL,
+  turn_index INTEGER NOT NULL,
+  round_number INTEGER NOT NULL,
+  side TEXT NOT NULL,
+  log_json TEXT NOT NULL,
+  PRIMARY KEY(fight_id,turn_index)
+);
+CREATE TABLE IF NOT EXISTS player_weapon_skills (
+  user_id TEXT NOT NULL,
+  weapon_class TEXT NOT NULL,
+  xp INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,weapon_class)
 );
 CREATE TABLE IF NOT EXISTS player_achievements (
   user_id TEXT NOT NULL,
@@ -300,196 +316,140 @@ async function equippedWeapon(userId, env) {
     WHERE user_id=? AND equipped_slot='weapon' AND quantity>0 LIMIT 1
   `).bind(userId).first();
   const item = row?.item_id ? getItemDefinition(row.item_id) : null;
-  return item ? { item: toPublicItemDefinition(item), combat: item.combat || {} } : null;
+  const weapon = item?.combat?.weaponId ? getCombatWeapon(item.combat.weaponId) : UNARMED_WEAPON;
+  return item ? { item: toPublicItemDefinition(item), weapon } : { item:null, weapon:UNARMED_WEAPON };
 }
-function combatantFromPlayer(player, weapon, modifiers = {}) {
-  const combat = weapon?.combat || {};
+
+async function getWeaponSkills(userId, env) {
+  const rows = await env.DB.prepare('SELECT weapon_class,xp FROM player_weapon_skills WHERE user_id=?').bind(userId).all();
+  const xpMap = Object.fromEntries((rows.results||[]).map(row=>[row.weapon_class,Number(row.xp)||0]));
+  return Object.fromEntries(WEAPON_SKILL_CLASSES.map(cls=>{
+    const xp=xpMap[cls]||0, level=skillLevelFromXp(xp);
+    return [cls,{xp,level,nextLevelXp:level>=100?null:skillXpForNextLevel(level)}];
+  }));
+}
+
+function fighterFromPlayer(player, loadout, skillState, modifiers={}, name='Player') {
   return {
-    health: Number(player.health) || 1,
-    maxHealth: Number(player.max_health) || 100,
-    strength: Number(player.strength) || 1,
-    defense: Number(player.defense) || 1,
-    speed: Number(player.speed) || 1,
-    dexterity: Number(player.dexterity) || 1,
-    multiplier: Number(modifiers.combatMultiplier) || 1,
-    weapon: {
-      name: weapon?.item?.name || 'Unarmed',
-      damageMin: Number(combat.damageMin) || 2,
-      damageMax: Number(combat.damageMax) || 5,
-      accuracy: Number(combat.accuracy) || 0
-    }
+    id:player.user_id,name,health:Number(player.health)||1,maxHealth:Number(player.max_health)||100,
+    stats:{strength:Number(player.strength)||1,defense:Number(player.defense)||1,speed:Number(player.speed)||1,dexterity:Number(player.dexterity)||1},
+    weapon:loadout?.weapon||UNARMED_WEAPON,
+    weaponSkills:Object.fromEntries(Object.entries(skillState||{}).map(([k,v])=>[k,Number(v.level)||1])),
+    armorProtection:0,zone:'Mid',inCover:false,
+    multiplier:Number(modifiers.combatMultiplier)||1
   };
 }
-function combatantFromNpc(npc) {
+
+function fighterFromNpc(npc) {
   return {
-    health: npc.health,
-    maxHealth: npc.health,
-    strength: npc.stats.strength,
-    defense: npc.stats.defense,
-    speed: npc.stats.speed,
-    dexterity: npc.stats.dexterity,
-    multiplier: 1,
-    weapon: npc.weapon
+    id:npc.id,name:npc.name,health:npc.health,maxHealth:npc.health,stats:{...npc.stats},
+    weapon:getCombatWeapon(npc.weaponId),weaponSkills:{[getCombatWeapon(npc.weaponId).weaponClass]:Math.min(100,Math.max(1,npc.level*2))},
+    armorProtection:Number(npc.armorProtection)||0,zone:npc.zone||'Mid',inCover:Boolean(npc.inCover)
   };
 }
-function resolveStrike(attacker, defender) {
-  const accuracy = clamp(
-    COMBAT_SETTINGS.baseAccuracy + (attacker.dexterity - defender.speed) * 0.006 + Number(attacker.weapon.accuracy || 0),
-    COMBAT_SETTINGS.minAccuracy,
-    COMBAT_SETTINGS.maxAccuracy
-  );
-  if (randomFloat() > accuracy) return { hit: false, damage: 0 };
-  const weaponDamage = randomInt(attacker.weapon.damageMin, attacker.weapon.damageMax);
-  const statDamage = attacker.strength * 0.42 * attacker.multiplier;
-  const mitigation = defender.defense * 0.20;
-  const damage = Math.max(1, Math.round(weaponDamage + statDamage - mitigation));
-  defender.health = Math.max(0, defender.health - damage);
-  return { hit: true, damage };
-}
-function simulateCombat(attacker, defender) {
-  let attackerDamage = 0;
-  let defenderDamage = 0;
-  let rounds = 0;
-  for (let round = 1; round <= COMBAT_SETTINGS.maxRounds; round += 1) {
-    rounds = round;
-    const attackerFirst = attacker.speed + randomInt(0, 5) >= defender.speed + randomInt(0, 5);
-    const first = attackerFirst ? attacker : defender;
-    const second = attackerFirst ? defender : attacker;
-    const firstResult = resolveStrike(first, second);
-    if (attackerFirst) attackerDamage += firstResult.damage;
-    else defenderDamage += firstResult.damage;
-    if (second.health <= 0) break;
-    const secondResult = resolveStrike(second, first);
-    if (attackerFirst) defenderDamage += secondResult.damage;
-    else attackerDamage += secondResult.damage;
-    if (first.health <= 0) break;
-  }
-  const winner = defender.health <= 0 ? 'attacker' : attacker.health <= 0 ? 'defender' :
-    (attacker.health / attacker.maxHealth >= defender.health / defender.maxHealth ? 'attacker' : 'defender');
-  return { winner, rounds, attackerDamage, defenderDamage, attackerHealth: attacker.health, defenderHealth: defender.health };
-}
+
 async function getCombat(userId, env, deps) {
   const history = await env.DB.prepare(`
     SELECT * FROM combat_history
     WHERE attacker_user_id=? OR defender_user_id=?
     ORDER BY created_at DESC LIMIT 20
   `).bind(userId,userId).all();
+  const playerRow=await deps.ensureActivePlayerState(env,userId);
   return {
     ok:true,
-    settings:COMBAT_SETTINGS,
-    npcs:NPC_OPPONENTS,
+    settings:{...COMBAT_SETTINGS,energyCostMode:'per-fight'},
+    npcs:NPC_OPPONENTS.map(npc=>({...npc,weapon:getCombatWeapon(npc.weaponId)})),
     equippedWeapon:await equippedWeapon(userId,env),
-    history:history.results || [],
-    player:deps.toPublicPlayerState(await deps.ensureActivePlayerState(env,userId))
+    weaponSkills:await getWeaponSkills(userId,env),
+    history:history.results||[],
+    player:deps.toPublicPlayerState(playerRow)
   };
 }
+
 async function combatAction(body, userId, env, deps, requestId) {
   if (body.action !== 'attack') return {ok:false,error:'Unknown combat action',status:400};
-  const timestamp = now();
-  const attackerPlayer = await deps.ensureActivePlayerState(env,userId);
-  if (attackerPlayer.status !== 'active') return {ok:false,error:`You cannot fight while ${attackerPlayer.status}.`,status:409};
-  if (Number(attackerPlayer.energy) < COMBAT_SETTINGS.energyCost) return {ok:false,error:`You need ${COMBAT_SETTINGS.energyCost} energy.`,status:409};
+  const timestamp=now();
+  const attackerPlayer=await deps.ensureActivePlayerState(env,userId);
+  if (attackerPlayer.status!=='active') return {ok:false,error:`You cannot fight while ${attackerPlayer.status}.`,status:409};
+  if (Number(attackerPlayer.energy)<COMBAT_SETTINGS.energyCost) return {ok:false,error:`You need ${COMBAT_SETTINGS.energyCost} energy to start a fight.`,status:409};
 
-  const last = await env.DB.prepare('SELECT created_at FROM combat_history WHERE attacker_user_id=? ORDER BY created_at DESC LIMIT 1').bind(userId).first();
-  if (last?.created_at && timestamp - Number(last.created_at) < COMBAT_SETTINGS.pvpCooldownSeconds * 1000) {
-    return {ok:false,error:'Combat is cooling down.',status:429};
-  }
+  const last=await env.DB.prepare('SELECT created_at FROM combat_history WHERE attacker_user_id=? ORDER BY created_at DESC LIMIT 1').bind(userId).first();
+  if(last?.created_at&&timestamp-Number(last.created_at)<COMBAT_SETTINGS.pvpCooldownSeconds*1000) return {ok:false,error:'Combat is cooling down.',status:429};
 
-  const attackerWeapon = await equippedWeapon(userId,env);
-  const attackerModifiers = await getGameplayModifiers(userId,env);
-  const attacker = combatantFromPlayer(attackerPlayer, attackerWeapon, attackerModifiers);
+  const attackerLoadout=await equippedWeapon(userId,env);
+  const attackerSkills=await getWeaponSkills(userId,env);
+  const attackerMods=await getGameplayModifiers(userId,env);
+  const attacker=fighterFromPlayer(attackerPlayer,attackerLoadout,attackerSkills,attackerMods,'You');
 
-  let defender;
-  let defenderUserId = null;
-  let opponentType = 'npc';
-  let opponentId = '';
-  let opponentName = '';
-  let defenderPlayer = null;
-
-  if (body.npcId) {
-    const npc = getNpcOpponent(String(body.npcId));
-    if (!npc) return {ok:false,error:'Unknown NPC opponent',status:404};
-    defender = combatantFromNpc(npc);
-    opponentId = npc.id;
-    opponentName = npc.name;
+  let defender,defenderUserId=null,opponentType='npc',opponentId='',opponentName='',defenderPlayer=null;
+  if(body.npcId){
+    const npc=getNpcOpponent(String(body.npcId));
+    if(!npc) return {ok:false,error:'Unknown NPC opponent',status:404};
+    defender=fighterFromNpc(npc);opponentId=npc.id;opponentName=npc.name;
   } else {
-    const username = String(body.targetUsername || '').trim();
-    const targetUserId = String(body.targetUserId || '').trim();
-    let user = null;
-    if (targetUserId) user = await env.DB.prepare('SELECT id,username FROM users WHERE id=?').bind(targetUserId).first();
-    else if (username) user = await env.DB.prepare('SELECT id,username FROM users WHERE username=? COLLATE NOCASE').bind(username).first();
-    if (!user) return {ok:false,error:'Player not found',status:404};
-    if (user.id === userId) return {ok:false,error:'You cannot attack yourself',status:409};
-    defenderPlayer = await deps.ensureActivePlayerState(env,user.id);
-    if (defenderPlayer.status !== 'active') return {ok:false,error:'That player is currently unavailable for combat.',status:409};
-    const defenderWeapon = await equippedWeapon(user.id,env);
-    const defenderModifiers = await getGameplayModifiers(user.id,env);
-    defender = combatantFromPlayer(defenderPlayer, defenderWeapon, defenderModifiers);
-    defenderUserId = user.id;
-    opponentType = 'player';
-    opponentId = user.id;
-    opponentName = user.username;
+    const username=String(body.targetUsername||'').trim(),targetUserId=String(body.targetUserId||'').trim();
+    let user=null;
+    if(targetUserId) user=await env.DB.prepare('SELECT id,username FROM users WHERE id=?').bind(targetUserId).first();
+    else if(username) user=await env.DB.prepare('SELECT id,username FROM users WHERE username=? COLLATE NOCASE').bind(username).first();
+    if(!user) return {ok:false,error:'Player not found',status:404};
+    if(user.id===userId) return {ok:false,error:'You cannot attack yourself',status:409};
+    defenderPlayer=await deps.ensureActivePlayerState(env,user.id);
+    if(defenderPlayer.status!=='active') return {ok:false,error:'That player is currently unavailable for combat.',status:409};
+    const defenderLoadout=await equippedWeapon(user.id,env);
+    const defenderSkills=await getWeaponSkills(user.id,env);
+    const defenderMods=await getGameplayModifiers(user.id,env);
+    defender=fighterFromPlayer(defenderPlayer,defenderLoadout,defenderSkills,defenderMods,user.username);
+    defenderUserId=user.id;opponentType='player';opponentId=user.id;opponentName=user.username;
   }
 
-  const result = simulateCombat(attacker,defender);
-  const attackerWon = result.winner === 'attacker';
-  const xpGain = attackerWon ? (opponentType === 'player' ? 45 : 25) : 8;
-  const levelResult = deps.applyXpAndLevels(Number(attackerPlayer.level), Number(attackerPlayer.xp), xpGain);
-  const hospitalUntil = timestamp + COMBAT_SETTINGS.hospitalSeconds * 1000;
-  const statements = [
-    env.DB.prepare(`
-      UPDATE player_state SET energy=MAX(0,energy-?),health=?,level=?,xp=?,
-        status=?,status_until=?,status_reason=?,updated_at=? WHERE user_id=?
-    `).bind(
-      COMBAT_SETTINGS.energyCost,
-      result.attackerHealth,
-      levelResult.level,
-      levelResult.xp,
-      result.attackerHealth <= 0 ? 'hospitalized' : 'active',
-      result.attackerHealth <= 0 ? hospitalUntil : null,
-      result.attackerHealth <= 0 ? `Combat loss against ${opponentName}` : null,
-      timestamp,
-      userId
-    )
+  const result=simulateFullFight(attacker,defender,COMBAT_SETTINGS.maxRounds);
+  const attackerWon=result.winner==='attacker';
+  const xpGain=attackerWon?(opponentType==='player'?45:25):8;
+  const levelResult=deps.applyXpAndLevels(Number(attackerPlayer.level),Number(attackerPlayer.xp),xpGain);
+  const hospitalUntil=timestamp+COMBAT_SETTINGS.hospitalSeconds*1000;
+  const weaponClass=attacker.weapon.weaponClass;
+  const skillXpGain=Math.max(1,result.logs.filter(log=>log.side==='attacker').reduce((sum,log)=>sum+(log.isMiss?1:3)+(log.isCrit?2:0),0));
+
+  const statements=[
+    env.DB.prepare(`UPDATE player_state SET energy=MAX(0,energy-?),energy_regen_at=?,health=?,level=?,xp=?,
+      status=?,status_until=?,status_reason=?,updated_at=? WHERE user_id=?`)
+      .bind(COMBAT_SETTINGS.energyCost,timestamp,result.attackerHealth,levelResult.level,levelResult.xp,
+        result.attackerHealth<=0?'hospitalized':'active',result.attackerHealth<=0?hospitalUntil:null,
+        result.attackerHealth<=0?`Combat loss against ${opponentName}`:null,timestamp,userId),
+    env.DB.prepare(`INSERT INTO player_weapon_skills(user_id,weapon_class,xp,updated_at) VALUES(?,?,?,?)
+      ON CONFLICT(user_id,weapon_class) DO UPDATE SET xp=xp+excluded.xp,updated_at=excluded.updated_at`)
+      .bind(userId,weaponClass,skillXpGain,timestamp)
   ];
 
-  if (defenderUserId) {
-    statements.push(env.DB.prepare(`
-      UPDATE player_state SET health=?,status=?,status_until=?,status_reason=?,updated_at=? WHERE user_id=?
-    `).bind(
-      result.defenderHealth,
-      result.defenderHealth <= 0 ? 'hospitalized' : 'active',
-      result.defenderHealth <= 0 ? hospitalUntil : null,
-      result.defenderHealth <= 0 ? 'Combat defeat' : null,
-      timestamp,
-      defenderUserId
-    ));
+  if(defenderUserId){
+    statements.push(env.DB.prepare(`UPDATE player_state SET health=?,health_regen_at=?,status=?,status_until=?,status_reason=?,updated_at=? WHERE user_id=?`)
+      .bind(result.defenderHealth,timestamp,result.defenderHealth<=0?'hospitalized':'active',
+        result.defenderHealth<=0?hospitalUntil:null,result.defenderHealth<=0?'Combat defeat':null,timestamp,defenderUserId));
   }
 
-  const historyId = crypto.randomUUID();
-  statements.push(env.DB.prepare(`
-    INSERT INTO combat_history
-      (id,attacker_user_id,defender_user_id,opponent_type,opponent_id,winner,rounds,attacker_damage,defender_damage,xp_gain,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?)
-  `).bind(historyId,userId,defenderUserId,opponentType,opponentId,result.winner,result.rounds,result.attackerDamage,result.defenderDamage,xpGain,timestamp));
+  const historyId=crypto.randomUUID();
+  statements.push(env.DB.prepare(`INSERT INTO combat_history
+    (id,attacker_user_id,defender_user_id,opponent_type,opponent_id,winner,rounds,attacker_damage,defender_damage,xp_gain,created_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(historyId,userId,defenderUserId,opponentType,opponentId,result.winner,result.rounds,result.attackerDamage,result.defenderDamage,xpGain,timestamp));
+  result.logs.forEach((log,index)=>statements.push(env.DB.prepare(
+    `INSERT INTO combat_turns(fight_id,turn_index,round_number,side,log_json) VALUES(?,?,?,?,?)`
+  ).bind(historyId,index+1,log.round,log.side,JSON.stringify(log))));
   await env.DB.batch(statements);
 
   await incrementCounter(userId,'combat',1,env);
-  if (attackerWon) await incrementCounter(userId,'combat_win',1,env);
+  if(attackerWon) await incrementCounter(userId,'combat_win',1,env);
   await unlockEligibleAchievements(userId,env);
 
+  const updatedSkills=await getWeaponSkills(userId,env);
   return {
     ok:true,
     result:{
-      id:historyId,
-      opponentType,opponentId,opponentName,
-      winner:result.winner,
-      won:attackerWon,
-      rounds:result.rounds,
-      damageDealt:result.attackerDamage,
-      damageTaken:result.defenderDamage,
-      xpGain,
-      text:attackerWon ? `You won the encounter against ${opponentName}.` : `${opponentName} won the encounter.`
+      id:historyId,opponentType,opponentId,opponentName,winner:result.winner,won:attackerWon,
+      rounds:result.rounds,damageDealt:result.attackerDamage,damageTaken:result.defenderDamage,xpGain,
+      energySpent:COMBAT_SETTINGS.energyCost,turns:result.logs,
+      weapon:{...attacker.weapon},weaponSkill:updatedSkills[weaponClass],
+      text:attackerWon?`You won the fight against ${opponentName}.`:`${opponentName} won the fight.`
     },
     player:deps.toPublicPlayerState(await deps.ensureActivePlayerState(env,userId))
   };

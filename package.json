@@ -1,6 +1,6 @@
 {
-  "name": "riftcity-v2-phase8-frontend-restoration",
-  "version": "0.8.0",
+  "name": "riftcity-v2-phase8-1-combat-regen",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "scripts": {

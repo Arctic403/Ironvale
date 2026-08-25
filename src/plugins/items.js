@@ -35,7 +35,7 @@ export const ITEM_REGISTRY = Object.freeze([
     equipable: true,
     equipmentSlot: 'weapon',
     effects: {},
-    combat: { damageMin: 5, damageMax: 10, accuracy: 0.02 },
+    combat: { weaponId: 'knife' },
     tags: ['WEAPON', 'EQUIPMENT']
   },
   {
@@ -139,7 +139,19 @@ export const ITEM_REGISTRY = Object.freeze([
     equipmentSlot: null,
     effects: {},
     tags: ['TICKET', 'ACCESS']
-  }
+  },
+  {id:'bat',name:'Composite Bat',category:'weapon',rarity:'common',description:'A reinforced blunt weapon.',baseValue:180,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'bat'},tags:['WEAPON','EQUIPMENT']},
+  {id:'crowbar',name:'Heavy Crowbar',category:'weapon',rarity:'common',description:'A heavy improvised weapon.',baseValue:210,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'crowbar'},tags:['WEAPON','EQUIPMENT']},
+  {id:'machete',name:'Machete',category:'weapon',rarity:'uncommon',description:'A heavier blade with strong close-range damage.',baseValue:360,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'machete'},tags:['WEAPON','EQUIPMENT']},
+  {id:'pistol',name:'9mm Pistol',category:'weapon',rarity:'uncommon',description:'A compact handgun.',baseValue:700,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'pistol'},tags:['WEAPON','EQUIPMENT']},
+  {id:'heavy-pistol',name:'Heavy Pistol',category:'weapon',rarity:'rare',description:'A high-damage handgun with slower handling.',baseValue:1200,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'heavy-pistol'},tags:['WEAPON','EQUIPMENT']},
+  {id:'machine-pistol',name:'Machine Pistol',category:'weapon',rarity:'rare',description:'A compact automatic sidearm.',baseValue:1450,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'machine-pistol'},tags:['WEAPON','EQUIPMENT']},
+  {id:'smg',name:'Compact SMG',category:'weapon',rarity:'rare',description:'A compact automatic primary weapon.',baseValue:1900,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'smg'},tags:['WEAPON','EQUIPMENT']},
+  {id:'shotgun',name:'Pump Shotgun',category:'weapon',rarity:'rare',description:'A close-range primary weapon.',baseValue:2200,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'shotgun'},tags:['WEAPON','EQUIPMENT']},
+  {id:'carbine',name:'Street Carbine',category:'weapon',rarity:'epic',description:'A balanced mid-range rifle.',baseValue:3100,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'carbine'},tags:['WEAPON','EQUIPMENT']},
+  {id:'rifle',name:'Rift Rifle',category:'weapon',rarity:'epic',description:'A powerful long-range rifle.',baseValue:3900,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'rifle'},tags:['WEAPON','EQUIPMENT']},
+  {id:'syndicate-blade',name:'Syndicate Blade',category:'weapon',rarity:'epic',description:'A specialized high-skill blade.',baseValue:2800,stackable:false,maxStack:1,tradeable:true,usable:false,consumable:false,equipable:true,equipmentSlot:'weapon',effects:{},combat:{weaponId:'syndicate-blade'},tags:['WEAPON','EQUIPMENT']}
+
 ]);
 
 const ITEM_LOOKUP = new Map(ITEM_REGISTRY.map(item => [item.id, item]));

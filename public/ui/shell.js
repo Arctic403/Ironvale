@@ -90,6 +90,15 @@ export function showToast(text, error=false) {
   showToast.timer=setTimeout(()=>el.classList.add('hidden'),3200);
 }
 
+function regenText(resource, current, max) {
+  if (Number(current)>=Number(max)) return 'FULL';
+  const regen=state.player?.resources?.regen?.[resource];
+  if (!regen) return '';
+  const nextAt=Number(regen.nextAt)||0;
+  const remaining=nextAt?timeUntil(nextAt):'Ready';
+  return `+${regen.amount||1} in ${remaining}`;
+}
+
 export function renderPlayerHud(player=state.player) {
   if (!player) return;
   setPlayer(player);
@@ -98,21 +107,34 @@ export function renderPlayerHud(player=state.player) {
   const stats=player.stats||{};
   const status=player.status||{};
   const items=[
-    ['LVL',progression.level??1],
-    ['XP',`${progression.xp??0}/${progression.xpToNextLevel??100}`],
-    ['HP',`${resources.health??0}/${resources.maxHealth??0}`],
-    ['ENG',`${resources.energy??0}/${resources.maxEnergy??0}`],
-    ['NRV',`${resources.nerve??0}/${resources.maxNerve??0}`],
-    ['CASH',money(resources.cash??0)],
-    ['STR',stats.strength??1],
-    ['DEF',stats.defense??1],
-    ['SPD',stats.speed??1],
-    ['DEX',stats.dexterity??1]
+    {k:'LVL',v:progression.level??1},
+    {k:'XP',v:`${progression.xp??0}/${progression.xpToNextLevel??100}`},
+    {k:'HP',v:`${resources.health??0}/${resources.maxHealth??0}`,sub:regenText('health',resources.health,resources.maxHealth)},
+    {k:'ENG',v:`${resources.energy??0}/${resources.maxEnergy??0}`,sub:regenText('energy',resources.energy,resources.maxEnergy)},
+    {k:'NRV',v:`${resources.nerve??0}/${resources.maxNerve??0}`,sub:regenText('nerve',resources.nerve,resources.maxNerve)},
+    {k:'CASH',v:money(resources.cash??0)},
+    {k:'STR',v:stats.strength??1},
+    {k:'DEF',v:stats.defense??1},
+    {k:'SPD',v:stats.speed??1},
+    {k:'DEX',v:stats.dexterity??1}
   ];
-  $('#hud-primary').innerHTML=items.map(([k,v])=>`<div class="hud-cell"><span>${k}</span><strong>${escapeHtml(v)}</strong></div>`).join('');
+  $('#hud-primary').innerHTML=items.map(item=>`<div class="hud-cell"><span>${item.k}</span><strong>${escapeHtml(item.v)}</strong>${item.sub?`<small class="hud-regen">${escapeHtml(item.sub)}</small>`:''}</div>`).join('');
   const badge=$('#hud-status');
   badge.textContent=String(status.type||'active').toUpperCase();
   badge.className=`hud-status status-${String(status.type||'active').replace(/[^a-z0-9_-]/gi,'').toLowerCase()}`;
+}
+
+async function refreshResourceHudIfDue() {
+  const regen=state.player?.resources?.regen||{};
+  const due=['health','energy','nerve'].some(key=>Number(regen[key]?.nextAt)>0&&Number(regen[key].nextAt)<=Date.now());
+  if (!due || refreshResourceHudIfDue.pending) return;
+  refreshResourceHudIfDue.pending=true;
+  try {
+    const result=await api('/api/player/state');
+    if (result.ok&&result.player) renderPlayerHud(result.player);
+  } finally {
+    refreshResourceHudIfDue.pending=false;
+  }
 }
 
 export async function refreshSession({navigate=true}={}) {
@@ -179,6 +201,8 @@ export function stopEffects() {
 let effects=[];
 
 function tickEffects() {
+  renderPlayerHud(state.player);
+  refreshResourceHudIfDue();
   const root=$('#effects-strip');
   if (!root || !effects.length) return;
   root.innerHTML=effects.map(renderEffect).join('');

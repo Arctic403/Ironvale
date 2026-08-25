@@ -7,7 +7,8 @@ import {
   getWorldCategory,
   getWorldLocation,
   getItemDefinition,
-  toPublicItemDefinition
+  toPublicItemDefinition,
+  RESOURCE_REGEN
 } from './plugins/index.js';
 import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast, getGameplayModifiers } from './services/gameplay.js';
 
@@ -53,6 +54,9 @@ const PLAYER_STATE_TABLE_SQL = `
     status_until INTEGER,
     status_reason TEXT,
     created_at INTEGER NOT NULL,
+    health_regen_at INTEGER NOT NULL DEFAULT 0,
+    energy_regen_at INTEGER NOT NULL DEFAULT 0,
+    nerve_regen_at INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )
@@ -828,20 +832,6 @@ async function ensureCrimeTables(env) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_crime_history_crime ON crime_history(user_id, crime_id, created_at DESC)').run();
 }
 
-async function ensureActivePlayerState(env, userId) {
-  let player = await ensurePlayerState(env, userId);
-  if (player.status !== 'active' && player.status_until && Number(player.status_until) <= Date.now()) {
-    const now = Date.now();
-    await env.DB.prepare(`
-      UPDATE player_state SET status = 'active', status_until = NULL, status_reason = NULL,
-        health = CASE WHEN health <= 0 THEN MAX(1, CAST(max_health * 0.25 AS INTEGER)) ELSE health END,
-        updated_at = ? WHERE user_id = ?
-    `).bind(now, userId).run();
-    player = await getPlayerStateRow(env, userId);
-  }
-  return player;
-}
-
 function normalizeCrimeProgress(row, crimeId) {
   return {
     crimeId,
@@ -1203,6 +1193,13 @@ async function writeAudit(env, actorUserId, action, targetUserId, details) {
 
 async function ensurePlayerStateTable(env) {
   await env.DB.prepare(PLAYER_STATE_TABLE_SQL).run();
+  const columns = await env.DB.prepare('PRAGMA table_info(player_state)').all();
+  const names = new Set((columns.results || []).map(row => row.name));
+  for (const column of ['health_regen_at','energy_regen_at','nerve_regen_at']) {
+    if (!names.has(column)) {
+      await env.DB.prepare(`ALTER TABLE player_state ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`).run();
+    }
+  }
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_state_status ON player_state(status)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_state_level ON player_state(level)').run();
 }
@@ -1211,9 +1208,10 @@ async function ensurePlayerState(env, userId) {
   await ensurePlayerStateTable(env);
   const now = Date.now();
   await env.DB.prepare(`
-    INSERT OR IGNORE INTO player_state (user_id, created_at, updated_at)
-    VALUES (?, ?, ?)
-  `).bind(userId, now, now).run();
+    INSERT OR IGNORE INTO player_state
+      (user_id, health_regen_at, energy_regen_at, nerve_regen_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).bind(userId, now, now, now, now, now).run();
   return getPlayerStateRow(env, userId);
 }
 
@@ -1221,7 +1219,7 @@ async function getPlayerStateRow(env, userId) {
   const row = await env.DB.prepare(`
     SELECT user_id, health, max_health, nerve, max_nerve, energy, max_energy, cash,
       level, xp, strength, defense, speed, dexterity, status, status_until, status_reason,
-      created_at, updated_at
+      health_regen_at, energy_regen_at, nerve_regen_at, created_at, updated_at
     FROM player_state WHERE user_id = ?
   `).bind(userId).first();
 
@@ -1229,14 +1227,82 @@ async function getPlayerStateRow(env, userId) {
   return row;
 }
 
+function settleResourceValue(current, maximum, lastAt, config, timestamp) {
+  const value = Math.max(0, Number(current) || 0);
+  const max = Math.max(1, Number(maximum) || 1);
+  const amount = Math.max(1, Number(config?.amount) || 1);
+  const intervalMs = Math.max(1000, Number(config?.intervalSeconds) * 1000 || 300000);
+  let anchor = Number(lastAt) || timestamp;
+
+  if (value >= max) return { value: max, anchor: timestamp, nextAt: null, amount, intervalMs };
+
+  const elapsed = Math.max(0, timestamp - anchor);
+  const ticks = Math.floor(elapsed / intervalMs);
+  if (!ticks) return { value, anchor, nextAt: anchor + intervalMs, amount, intervalMs };
+
+  const gained = ticks * amount;
+  const nextValue = Math.min(max, value + gained);
+  anchor += ticks * intervalMs;
+  if (nextValue >= max) anchor = timestamp;
+  return { value: nextValue, anchor, nextAt: nextValue >= max ? null : anchor + intervalMs, amount, intervalMs };
+}
+
+async function settlePlayerResources(env, player) {
+  const timestamp = Date.now();
+  const health = settleResourceValue(player.health, player.max_health, player.health_regen_at, RESOURCE_REGEN.health, timestamp);
+  const energy = settleResourceValue(player.energy, player.max_energy, player.energy_regen_at, RESOURCE_REGEN.energy, timestamp);
+  const nerve = settleResourceValue(player.nerve, player.max_nerve, player.nerve_regen_at, RESOURCE_REGEN.nerve, timestamp);
+
+  const changed =
+    health.value !== Number(player.health) || energy.value !== Number(player.energy) || nerve.value !== Number(player.nerve) ||
+    health.anchor !== Number(player.health_regen_at) || energy.anchor !== Number(player.energy_regen_at) || nerve.anchor !== Number(player.nerve_regen_at);
+
+  if (changed) {
+    await env.DB.prepare(`
+      UPDATE player_state
+      SET health=?, energy=?, nerve=?, health_regen_at=?, energy_regen_at=?, nerve_regen_at=?, updated_at=?
+      WHERE user_id=?
+    `).bind(health.value, energy.value, nerve.value, health.anchor, energy.anchor, nerve.anchor, timestamp, player.user_id).run();
+    player = await getPlayerStateRow(env, player.user_id);
+  }
+
+  player._regen = {
+    health: { amount: health.amount, intervalSeconds: health.intervalMs / 1000, nextAt: health.nextAt },
+    energy: { amount: energy.amount, intervalSeconds: energy.intervalMs / 1000, nextAt: energy.nextAt },
+    nerve: { amount: nerve.amount, intervalSeconds: nerve.intervalMs / 1000, nextAt: nerve.nextAt }
+  };
+  return player;
+}
+
+async function ensureActivePlayerState(env, userId) {
+  let player = await ensurePlayerState(env, userId);
+  if (player.status !== 'active' && player.status_until && Number(player.status_until) <= Date.now()) {
+    const now = Date.now();
+    await env.DB.prepare(`
+      UPDATE player_state SET status = 'active', status_until = NULL, status_reason = NULL,
+        health = CASE WHEN health <= 0 THEN MAX(1, CAST(max_health * 0.25 AS INTEGER)) ELSE health END,
+        health_regen_at = ?, updated_at = ? WHERE user_id = ?
+    `).bind(now, now, userId).run();
+    player = await getPlayerStateRow(env, userId);
+  }
+  return settlePlayerResources(env, player);
+}
+
 function toPublicPlayerState(row) {
+  const timestamp = Date.now();
+  const regen = row._regen || {
+    health: { ...RESOURCE_REGEN.health, nextAt: Number(row.health) >= Number(row.max_health) ? null : (Number(row.health_regen_at) || timestamp) + RESOURCE_REGEN.health.intervalSeconds * 1000 },
+    energy: { ...RESOURCE_REGEN.energy, nextAt: Number(row.energy) >= Number(row.max_energy) ? null : (Number(row.energy_regen_at) || timestamp) + RESOURCE_REGEN.energy.intervalSeconds * 1000 },
+    nerve: { ...RESOURCE_REGEN.nerve, nextAt: Number(row.nerve) >= Number(row.max_nerve) ? null : (Number(row.nerve_regen_at) || timestamp) + RESOURCE_REGEN.nerve.intervalSeconds * 1000 }
+  };
   return {
     userId: row.user_id,
     resources: {
       health: row.health, maxHealth: row.max_health,
       nerve: row.nerve, maxNerve: row.max_nerve,
       energy: row.energy, maxEnergy: row.max_energy,
-      cash: row.cash
+      cash: row.cash,
+      regen
     },
     progression: { level: row.level, xp: row.xp, xpToNextLevel: xpNeededForLevel(row.level) },
     stats: { strength: row.strength, defense: row.defense, speed: row.speed, dexterity: row.dexterity },

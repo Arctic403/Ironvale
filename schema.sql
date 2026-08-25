@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS player_state (
   status_until INTEGER,
   status_reason TEXT,
   created_at INTEGER NOT NULL,
+  health_regen_at INTEGER NOT NULL DEFAULT 0,
+  energy_regen_at INTEGER NOT NULL DEFAULT 0,
+  nerve_regen_at INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -279,6 +282,23 @@ CREATE TABLE IF NOT EXISTS combat_history (
 );
 CREATE INDEX IF NOT EXISTS idx_combat_attacker ON combat_history(attacker_user_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_combat_defender ON combat_history(defender_user_id,created_at);
+
+CREATE TABLE IF NOT EXISTS combat_turns (
+  fight_id TEXT NOT NULL,
+  turn_index INTEGER NOT NULL,
+  round_number INTEGER NOT NULL,
+  side TEXT NOT NULL,
+  log_json TEXT NOT NULL,
+  PRIMARY KEY(fight_id,turn_index)
+);
+CREATE TABLE IF NOT EXISTS player_weapon_skills (
+  user_id TEXT NOT NULL,
+  weapon_class TEXT NOT NULL,
+  xp INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,weapon_class),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS player_achievements (
   user_id TEXT NOT NULL,

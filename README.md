@@ -249,3 +249,15 @@ Nightclub, police, park and downtown route shells are restored without inventing
 ### Build validation
 
 `npm run build` now uses `scripts/check-js.js` to recursively syntax-check every JavaScript module under `src`, `public` and `scripts`, so future frontend modules are automatically included without manually extending the package script.
+
+
+## Phase 8.1 — Full combat restoration + resource regeneration
+
+- Health, Energy and Nerve now regenerate server-side on configurable timers.
+- The HUD shows the next regeneration tick (`+X in mm:ss`) or `FULL`.
+- Combat costs Energy once when a fight starts; turns inside the fight do not spend additional Energy.
+- The V1 combat model has been ported into the Worker: alternating turns, body-part hits, misses, criticals, range, cover, defense/armor mitigation and weapon-class skill progression.
+- Combat turn logs are persisted and returned for the animated/frontend battle feed.
+- Seven weapon skill classes are supported: Unarmed, Blades, Blunt, Handguns, SMGs, Shotguns and Rifles.
+- Additional V1 combat weapons are registered as normal RiftCity items/equipment.
+- Inventory now displays only items the player actually owns; the item registry is no longer rendered as player inventory.

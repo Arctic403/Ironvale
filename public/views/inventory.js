@@ -16,27 +16,24 @@ export async function renderInventory(root) {
 }
 
 function draw(root) {
-  const data=state.inventory||{}, owned=data.inventory||[], catalog=data.catalog||[];
-  const merged=catalog.map(item=>{
-    const own=owned.find(o=>o.id===item.id);
-    return {...item,quantity:own?.quantity||0,equipped:own?.equipped||false,equippedSlot:own?.equippedSlot||null};
-  });
-  const filtered=merged.filter(item=>{
+  const data=state.inventory||{}, owned=(data.inventory||[]).filter(item=>Number(item.quantity)>0);
+  const filtered=owned.filter(item=>{
     const matchesFilter=filter==='all'||String(item.category||'').toLowerCase()===filter;
     const q=query.trim().toLowerCase();
     const matchesQ=!q||`${item.name} ${item.description} ${(item.tags||[]).join(' ')}`.toLowerCase().includes(q);
     return matchesFilter&&matchesQ;
   });
-  const categories=['all',...new Set(catalog.map(i=>String(i.category||'item').toLowerCase()))];
+  const categories=['all',...new Set(owned.map(i=>String(i.category||'item').toLowerCase()))];
+  if (selected && !owned.some(item=>item.id===selected)) selected=null;
   if (!selected && owned[0]) selected=owned[0].id;
-  const item=merged.find(i=>i.id===selected)||filtered[0]||merged[0];
+  const item=owned.find(i=>i.id===selected)||filtered[0]||owned[0]||null;
 
   root.innerHTML=`
-    <section class="inventory-hero"><div><span class="eyebrow">PLAYER STORAGE</span><h2>Inventory</h2><p>Equipment, consumables, tools and valuables are persisted server-side.</p></div><div class="inventory-count"><span>OWNED</span><strong>${data.summary?.totalQuantity||0}</strong><small>${data.summary?.uniqueItems||0} item types</small></div></section>
-    <div class="inventory-toolbar"><input id="inventory-search" placeholder="Search items…" value="${escapeHtml(query)}" />${categories.map(c=>`<button class="${filter===c?'active':''}" data-inventory-filter="${escapeHtml(c)}">${escapeHtml(c.toUpperCase())}</button>`).join('')}</div>
+    <section class="inventory-hero"><div><span class="eyebrow">PLAYER STORAGE</span><h2>Inventory</h2><p>Only items you currently own are shown here.</p></div><div class="inventory-count"><span>OWNED</span><strong>${data.summary?.totalQuantity||0}</strong><small>${data.summary?.uniqueItems||0} item types</small></div></section>
+    ${owned.length?`<div class="inventory-toolbar"><input id="inventory-search" placeholder="Search owned items…" value="${escapeHtml(query)}" />${categories.map(c=>`<button class="${filter===c?'active':''}" data-inventory-filter="${escapeHtml(c)}">${escapeHtml(c.toUpperCase())}</button>`).join('')}</div>`:''}
     <div class="inventory-layout-v2">
-      <section class="inventory-grid">${filtered.map(item=>itemCard(item)).join('')||empty('No matching items')}</section>
-      <aside class="item-inspector">${item?detail(item):empty('Select an item')}</aside>
+      <section class="inventory-grid">${owned.length?(filtered.map(item=>itemCard(item)).join('')||empty('No matching owned items')):empty('Inventory empty','Shops, crimes, trades and rewards will add items here.')}</section>
+      <aside class="item-inspector">${item?detail(item):empty('No owned item selected')}</aside>
     </div>`;
   root.querySelector('#inventory-search')?.addEventListener('input',e=>{query=e.target.value;draw(root);root.querySelector('#inventory-search')?.focus();});
   root.querySelectorAll('[data-inventory-filter]').forEach(btn=>btn.addEventListener('click',()=>{filter=btn.dataset.inventoryFilter;draw(root);}));
