@@ -1,7 +1,6 @@
 import { escapeHtml } from './ui/helpers.js';
 import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, buildWorldLayout, getNearbyChunkKeys, getChunkKey } from './world3d-layout.js';
 import { createStreamedEnvironment } from './world3d-environment.js';
-import { WORLD3D_CITY_LAYOUT } from './world3d-city-layout.js';
 import { cloneCityLayout, createLayoutObjectManager, mountWorldEditor } from './world3d-editor.js';
 
 let activeWorld = null;
@@ -85,10 +84,6 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   ground.checkCollisions = true;
   ground.receiveShadows = true;
 
-  WORLD3D_DISTRICTS.forEach(district => {
-    createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat, district.x, district.z, 150);
-  });
-
   const editorInitialLayout = cloneCityLayout();
   const locationEntries = buildWorldLayout(world?.locations || [], editorInitialLayout.locationOverrides);
   const interactables = locationEntries;
@@ -101,7 +96,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
 
   const environmentManager = createStreamedEnvironment(B, scene, shadowGenerator, {
     roadMat, sidewalkMat, groundMat, lineMat, accentMat, glassMat, foliageMat, trunkMat, metalMat, buildingMats
-  });
+  }, editorInitialLayout.environmentOverrides);
 
   const layoutObjectManager = createLayoutObjectManager(B, scene, shadowGenerator, {
     roadMat, sidewalkMat, groundMat, lineMat, accentMat, glassMat, foliageMat, trunkMat, metalMat, buildingMats
@@ -123,6 +118,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   const touch = { forward: false, back: false, left: false, right: false, run: false, axisX: 0, axisZ: 0 };
   const onKeyDown = event => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    if (root.querySelector('#world3d-editor')?.classList.contains('open')) return;
     keys.add(event.code);
     if (event.code === 'KeyE') tryInteract();
   };
@@ -240,15 +236,18 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   }));
 
   const worldEditor = mountWorldEditor({
+    B,
     root,
     scene,
     camera,
     player,
     locationEntries,
     chunkManager,
+    environmentManager,
     objectManager: layoutObjectManager,
     initialLayout: editorInitialLayout,
-    onLayoutChange: () => {
+    onLayoutChange: layout => {
+      environmentManager.setOverrides(layout.environmentOverrides || {});
       chunkManager.update(player.root.position.x, player.root.position.z);
     }
   });
@@ -275,11 +274,12 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     const dt = Math.min((now - lastTime) / 1000, 0.05);
     lastTime = now;
 
-    const forward = keys.has('KeyW') || keys.has('ArrowUp') || touch.forward;
-    const back = keys.has('KeyS') || keys.has('ArrowDown') || touch.back;
-    const left = keys.has('KeyA') || keys.has('ArrowLeft') || touch.left;
-    const right = keys.has('KeyD') || keys.has('ArrowRight') || touch.right;
-    const running = keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.run;
+    const editingWorld = worldEditor?.isEditing?.() === true;
+    const forward = !editingWorld && (keys.has('KeyW') || keys.has('ArrowUp') || touch.forward);
+    const back = !editingWorld && (keys.has('KeyS') || keys.has('ArrowDown') || touch.back);
+    const left = !editingWorld && (keys.has('KeyA') || keys.has('ArrowLeft') || touch.left);
+    const right = !editingWorld && (keys.has('KeyD') || keys.has('ArrowRight') || touch.right);
+    const running = !editingWorld && (keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.run);
 
     let inputX = (right ? 1 : 0) - (left ? 1 : 0);
     let inputZ = (forward ? 1 : 0) - (back ? 1 : 0);

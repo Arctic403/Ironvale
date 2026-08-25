@@ -381,3 +381,24 @@ body.pwa-standalone.world3d-game-mode{
   }
   .world3d-editor.open{transform:none}
 }
+
+
+/* Phase 9.7 full world editor */
+.world3d-editor-readout-xyz{grid-template-columns:repeat(3,minmax(0,1fr))}
+.world3d-editor-readout-xyz .wide{grid-column:1/-1}
+.world3d-editor-modebar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:8px 0}
+.world3d-editor-modebar button.active{background:var(--accent);border-color:var(--accent);color:#17130f}
+.world3d-editor kbd{font:inherit;font-size:.48rem;opacity:.65;border:1px solid currentColor;padding:1px 3px;margin-left:2px}
+.world3d-editor-button-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.world3d-editor-button-row:has(>button:nth-child(5)){grid-template-columns:repeat(2,minmax(0,1fr))}
+.world3d-editor-shortcuts{display:grid;gap:4px;padding:4px 2px 12px;color:var(--muted);font-size:.55rem;line-height:1.45}
+.world3d-editor-shortcuts strong{color:var(--text);font-size:.58rem}
+@media (pointer:fine){
+  .world3d-editor{width:min(410px,38vw)}
+  .world3d-editor-scroll{padding:12px}
+}
+@media (orientation:landscape) and (pointer:coarse){
+  .world3d-editor{width:min(400px,52vw)}
+  .world3d-editor-card{padding:8px}
+  .world3d-nudge-grid button{height:44px}
+}

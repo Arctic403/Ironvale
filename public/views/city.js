@@ -54,33 +54,42 @@ export async function renderCity(root) {
       </div>
       <aside id="world3d-editor" class="world3d-editor" aria-label="DEV world editor">
         <header>
-          <div><span class="eyebrow">PUBLIC DEV TOOL</span><strong>World Editor</strong></div>
-          <button id="world3d-editor-close" type="button">×</button>
+          <div><span class="eyebrow">PUBLIC DEV TOOL</span><strong>Full World Editor</strong></div>
+          <button id="world3d-editor-close" type="button" aria-label="Close editor">×</button>
         </header>
         <div class="world3d-editor-scroll">
-          <p class="world3d-editor-note">Edits stay on this device until you export a patch. Import that patch into your custom Editor to make the city change permanent.</p>
+          <p class="world3d-editor-note">Tap/click roads, sidewalks, intersections, filler buildings, trees, lights, cars, props or RiftCity locations. Mouse/keyboard gets gizmos + shortcuts; every action still has touch controls.</p>
 
           <section class="world3d-editor-card">
             <span class="editor-kicker">SELECTED</span>
             <strong data-editor-selected>Nothing selected</strong>
-            <small data-editor-type>Tap a location/building or add an object.</small>
-            <div class="world3d-editor-readout">
+            <small data-editor-type>Tap anything in the city.</small>
+            <div class="world3d-editor-readout world3d-editor-readout-xyz">
               <div><span>X</span><b data-editor-x>—</b></div>
+              <div><span>Y</span><b data-editor-y>—</b></div>
               <div><span>Z</span><b data-editor-z>—</b></div>
-              <div><span>ROT</span><b data-editor-rot>—</b></div>
-              <div><span>SCALE</span><b data-editor-scale>—</b></div>
+              <div><span>ROT Y</span><b data-editor-rot>—</b></div>
+              <div class="wide"><span>SCALE X / Y / Z</span><b data-editor-scale>—</b></div>
             </div>
           </section>
 
           <section class="world3d-editor-card">
+            <span class="editor-kicker">TRANSFORM</span>
+            <div class="world3d-editor-modebar">
+              <button type="button" data-editor-mode="move">MOVE <kbd>W</kbd></button>
+              <button type="button" data-editor-mode="rotate">ROTATE <kbd>E</kbd></button>
+              <button type="button" data-editor-mode="scale">SCALE <kbd>R</kbd></button>
+            </div>
             <div class="world3d-editor-row">
-              <label>NUDGE
+              <label>SNAP / NUDGE
                 <select data-editor-step>
+                  <option value="0.25">0.25m</option>
                   <option value="0.5">0.5m</option>
                   <option value="1" selected>1m</option>
                   <option value="5">5m</option>
                 </select>
               </label>
+              <button type="button" data-editor-grid>CHUNK GRID</button>
             </div>
             <div class="world3d-nudge-grid">
               <span></span><button type="button" data-editor-nudge="z:-">Z−</button><span></span>
@@ -88,25 +97,28 @@ export async function renderCity(root) {
               <span></span><button type="button" data-editor-nudge="z:+">Z+</button><span></span>
             </div>
             <div class="world3d-editor-button-row">
+              <button type="button" data-editor-nudge="y:+">Y +</button>
+              <button type="button" data-editor-nudge="y:-">Y −</button>
               <button type="button" data-editor-rotate="-15">↶ 15°</button>
               <button type="button" data-editor-rotate="15">15° ↷</button>
             </div>
             <div class="world3d-editor-button-row">
-              <button type="button" data-editor-scale="scaleX:-0.1">WIDTH −</button>
-              <button type="button" data-editor-scale="scaleX:0.1">WIDTH +</button>
-              <button type="button" data-editor-scale="scaleY:-0.1">HEIGHT −</button>
-              <button type="button" data-editor-scale="scaleY:0.1">HEIGHT +</button>
-            </div>
-            <div class="world3d-editor-button-row">
-              <button type="button" data-editor-reset>RESET SELECTED</button>
-              <button type="button" class="danger" data-editor-delete>DELETE</button>
+              <button type="button" data-editor-scale="x:-0.1">WIDTH −</button>
+              <button type="button" data-editor-scale="x:0.1">WIDTH +</button>
+              <button type="button" data-editor-scale="y:-0.1">HEIGHT −</button>
+              <button type="button" data-editor-scale="y:0.1">HEIGHT +</button>
+              <button type="button" data-editor-scale="z:-0.1">LENGTH −</button>
+              <button type="button" data-editor-scale="z:0.1">LENGTH +</button>
             </div>
           </section>
 
           <section class="world3d-editor-card">
-            <span class="editor-kicker">PLACE OBJECT</span>
+            <span class="editor-kicker">PLACE NEW</span>
             <div class="world3d-editor-row">
               <select data-editor-place-type>
+                <option value="road">Road segment</option>
+                <option value="sidewalk">Sidewalk</option>
+                <option value="intersection">Intersection</option>
                 <option value="building">Building</option>
                 <option value="tree">Tree</option>
                 <option value="light">Street light</option>
@@ -119,13 +131,21 @@ export async function renderCity(root) {
 
           <section class="world3d-editor-card">
             <div class="world3d-editor-button-row">
-              <button type="button" data-editor-undo>UNDO</button>
+              <button type="button" data-editor-duplicate>DUPLICATE <kbd>⌘D</kbd></button>
+              <button type="button" data-editor-reset>RESET SELECTED</button>
+              <button type="button" data-editor-undo>UNDO <kbd>⌘Z</kbd></button>
               <button type="button" data-editor-redo>REDO</button>
+              <button type="button" class="danger" data-editor-delete>DELETE</button>
             </div>
             <button type="button" class="world3d-editor-export" data-editor-export>EXPORT CITY PATCH</button>
             <button type="button" class="world3d-editor-reset-draft" data-editor-clear-draft>RESET LOCAL DRAFT</button>
             <textarea data-editor-json hidden aria-label="Exported patch JSON"></textarea>
-            <small data-editor-status>DEV editor loading…</small>
+            <small data-editor-status>Full editor loading…</small>
+          </section>
+
+          <section class="world3d-editor-shortcuts">
+            <strong>Keyboard</strong>
+            <span>W/E/R transform · arrows X/Z · PageUp/PageDown Y · Shift = 5× nudge · Delete = remove · Ctrl/Cmd+Z undo · Ctrl/Cmd+D duplicate</span>
           </section>
         </div>
       </aside>
