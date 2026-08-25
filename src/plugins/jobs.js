@@ -6,5 +6,12 @@ export const JOB_REGISTRY = Object.freeze([
   {id:'technician',company:'RiftTech',title:'Technician',description:'Keep RiftCity technology running.',energyCost:8,basePay:500,skills:['technology','efficiency','discipline'],positions:[{tier:1,title:'Technician',skill:0,pay:500},{tier:2,title:'Systems Specialist',skill:5,pay:700},{tier:3,title:'Senior Engineer',skill:10,pay:950}]},
   {id:'finance',company:'Rift Capital',title:'Finance Associate',description:'Work the financial side of RiftCity.',energyCost:9,basePay:800,skills:['finance','communication','discipline'],positions:[{tier:1,title:'Finance Associate',skill:0,pay:800},{tier:2,title:'Portfolio Analyst',skill:5,pay:1100},{tier:3,title:'Senior Broker',skill:10,pay:1500}]}
 ]);
+export const JOB_SHIFT_EVENTS = Object.freeze([
+ {id:'smooth-shift',name:'Smooth Shift',payMultiplier:1,skillXp:1,weight:52},
+ {id:'rush-order',name:'Rush Order',payMultiplier:1.2,skillXp:2,weight:18},
+ {id:'training-day',name:'Training Day',payMultiplier:.9,skillXp:3,weight:14},
+ {id:'equipment-delay',name:'Equipment Delay',payMultiplier:.8,skillXp:1,weight:10},
+ {id:'standout-work',name:'Standout Work',payMultiplier:1.35,skillXp:2,weight:6}
+]);
 export const getJobDefinition=id=>JOB_REGISTRY.find(job=>job.id===id)||null;
 export function getJobPosition(job, skillLevel=0){return [...job.positions].reverse().find(p=>skillLevel>=p.skill)||job.positions[0];}

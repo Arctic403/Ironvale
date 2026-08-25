@@ -14,13 +14,13 @@ const PRIMARY_NAV = [
 const DRAWER_GROUPS = [
   ['Progression',[
     ['gym','Gym'],['jobs','Jobs'],['education','Education'],['missions','Missions'],
-    ['achievements','Awards'],['challenges','Challenges'],['factions','Factions'],['properties','Property']
+    ['achievements','Awards'],['challenges','Challenges'],['merits','Merits'],['factions','Factions'],['faction-shop','Faction Rewards'],['properties','Property'],['property-portfolio','Rental Portfolio']
   ]],
   ['Economy',[
     ['bank','Bank'],['market','Market'],['shop','Shops'],['auction','Black Market'],['production','Production']
   ]],
   ['World',[
-    ['travel','Airport / Travel'],['casino','Casino'],['status','Hospital / Jail'],['events','World Events'],['wiki','Field Manual']
+    ['travel','Airport / Travel'],['casino','Casino'],['nightclub','Nightclub'],['law','Police / Heat'],['city-activities','City Activities'],['activity','Activity Feed'],['status','Hospital / Jail'],['events','World Events'],['wiki','Field Manual']
   ]]
 ];
 
@@ -113,6 +113,8 @@ export function renderPlayerHud(player=state.player) {
     {k:'ENG',v:`${resources.energy??0}/${resources.maxEnergy??0}`,sub:regenText('energy',resources.energy,resources.maxEnergy)},
     {k:'NRV',v:`${resources.nerve??0}/${resources.maxNerve??0}`,sub:regenText('nerve',resources.nerve,resources.maxNerve)},
     {k:'CASH',v:money(resources.cash??0)},
+    {k:'HEAT',v:state.law?.heat??0},
+    {k:'MERIT',v:state.merits?.points??0},
     {k:'STR',v:stats.strength??1},
     {k:'DEF',v:stats.defense??1},
     {k:'SPD',v:stats.speed??1},
@@ -218,10 +220,12 @@ function renderEffect(effect) {
 
 export async function refreshEffects() {
   if (!state.authenticated) return;
-  const [status,events,travel,education,production,bank]=await Promise.all([
+  const [status,events,travel,education,production,bank,law,activity,merits]=await Promise.all([
     getService('status'),getService('events'),getService('travel'),
-    getService('education'),getService('production'),getService('bank')
+    getService('education'),getService('production'),getService('bank'),
+    getService('law'),getService('activity'),getService('merits')
   ]);
+  if(law.ok) state.law=law.law; if(merits.ok) state.merits=merits.state;
   const next=[];
   if (status.ok && status.status?.type && status.status.type!=='active') {
     next.push({label:String(status.status.type).toUpperCase(),until:status.status.until,route:'status',tone:'danger'});
@@ -242,6 +246,8 @@ export async function refreshEffects() {
     if (active.length) next.push({label:'PRODUCTION',value:`${active.length} active`,route:'production'});
   }
   if (bank.ok && bank.security?.frozen) next.push({label:'BANK FROZEN',until:bank.security.frozenUntil||bank.security.frozen_until,route:'bank',tone:'danger'});
+  if(law.ok&&Number(law.law?.heat)>0) next.push({label:'HEAT',value:`${law.law.heat} · ${law.law.tier?.name||''}`,route:'law',tone:Number(law.law.heat)>=60?'danger':'event'});
+  if(activity.ok&&Number(activity.unread)>0) next.push({label:'ACTIVITY',value:`${activity.unread} unread`,route:'activity',tone:'info'});
   effects=next;
   const root=$('#effects-strip');
   root?.classList.toggle('empty',!effects.length);

@@ -13,12 +13,12 @@ export function renderFinanceService(root,service,data,query) {
 }
 
 function renderBank(root,data) {
-  const account=data.account||{}, investments=data.investments||[], tiers=data.tiers||[], ledger=data.ledger||[], security=data.security||{};
+  const account=data.account||{}, investments=data.investments||[], tiers=data.tiers||[], ledger=data.ledger||[], security=data.security||{}, risk=data.risk||{};
   root.innerHTML=`
     <section class="service-hero"><div><span class="eyebrow">RIFT NATIONAL BANK</span><h2>Banking</h2><p>Checking, savings, investment products and server-tracked account security.</p></div>
       <div class="service-kpis"><div><span>CHECKING</span><strong>${money(account.checking)}</strong></div><div><span>SAVINGS</span><strong>${money(account.savings)}</strong></div></div>
     </section>
-    ${security.frozen?`<div class="warning-banner">ACCOUNT FROZEN ${security.frozenUntil?`· ${escapeHtml(timeUntil(security.frozenUntil))}`:''}</div>`:''}
+    ${security.frozen?`<div class="warning-banner">ACCOUNT FROZEN ${security.frozenUntil?`· ${escapeHtml(timeUntil(security.frozenUntil))}`:''}</div>`:''}${risk.exposure&&risk.exposure!=='normal'?`<div class="warning-banner">FINANCIAL EXPOSURE: ${escapeHtml(String(risk.exposure).toUpperCase())} · Heat ${risk.heat||0}</div>`:''}
     <div class="two-col">
       ${panel('Move Money',`
         <div class="bank-action-grid">
@@ -32,7 +32,7 @@ function renderBank(root,data) {
           <div><span>Checking</span><strong>${money(account.checking)}</strong></div>
           <div><span>Savings</span><strong>${money(account.savings)}</strong></div>
           <div><span>Lifetime deposits</span><strong>${money(account.lifetime_deposits)}</strong></div>
-          <div><span>Security</span><strong>${security.frozen?'FROZEN':'NORMAL'}</strong></div>
+          <div><span>Security</span><strong>${security.frozen?'FROZEN':'NORMAL'}</strong></div><div><span>Exposure</span><strong>${escapeHtml(String(risk.exposure||'normal').toUpperCase())}</strong></div>
         </div>
         <a class="rc-button wide" href="#offshore" data-route="offshore">Offshore Accounts</a>`,{eyebrow:'BALANCES'})}
     </div>

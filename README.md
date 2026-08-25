@@ -261,3 +261,31 @@ Nightclub, police, park and downtown route shells are restored without inventing
 - Seven weapon skill classes are supported: Unarmed, Blades, Blunt, Handguns, SMGs, Shotguns and Rifles.
 - Additional V1 combat weapons are registered as normal RiftCity items/equipment.
 - Inventory now displays only items the player actually owns; the item registry is no longer rendered as player inventory.
+
+
+## Phase 8.2 — Living City + V1 gameplay parity
+
+Phase 8.2 fills the largest remaining gameplay gaps from the original RiftCity V1 while preserving the new server-authoritative Worker/D1 architecture. This pass intentionally does **not** rebuild the old master map, does **not** add an NPC relationship system, and does **not** add cemetery-key or beach metal-detector activities.
+
+### Crime careers and Heat
+- Twelve immediate crime definitions across Street, Theft, Burglary, Vehicle, Fraud, Cyber and Organized careers.
+- UI-mode metadata for scavenging, pickpocket, shoplifting, graffiti, memory, target, choice and operation presentations.
+- Quiet / Balanced / Bold approaches alter success chance, reward and Heat server-side.
+- Persistent Heat, wanted tiers, fines, automatic Heat decay, laying low and law history.
+- Heat applies a real crime-success penalty at higher wanted tiers.
+- Passive multi-minute crime operations add Street Reputation and persistent operation history.
+
+### Living city systems
+- Afterdark nightclub reputation, rank tiers, rotating events and server-timed activities.
+- Merit points plus permanent Energy/Nerve cap, crime, gym, job and market upgrades.
+- Property upgrade records and a separate rental-unit portfolio with rent/upkeep collection.
+- Job workplace events with variable pay and skill XP.
+- Faction leave cooldown plus a faction-points reward shop.
+- Persistent activity feed for crime, combat, travel, casino, production, law and progression events.
+- RiftCity-specific Park, Downtown, Transit, Harbour, Warehouse, Safehouse, Mall, Courthouse, Company Plaza and dealership side activities.
+
+### Casino
+The Meridian now has server-resolved fictional in-game-chip rounds for Blackjack, Roulette, Baccarat, Craps, Casino War, Slots, Horse Racing and a Hold’em table foundation. Results and chip movements are persisted in D1; no real-money wagering exists.
+
+### Economy risk
+High Heat now contributes to bank exposure and can trigger a temporary server-side security review. Home Security upgrades reduce that risk. Bank risk status is visible instead of being hidden.

@@ -5,15 +5,15 @@ import { renderFinanceService } from './services/finance.js';
 import { renderProgressionService } from './services/progression.js';
 import { renderWorldService } from './services/world.js';
 import { renderCombatService } from './services/combat.js';
+import { renderLivingCityService } from './services/living-city.js';
 
 const FINANCE = new Set(['bank','market','shop','auction','offshore']);
 const PROGRESSION = new Set(['gym','jobs','education','properties','factions','missions','achievements','challenges']);
 const WORLD = new Set(['travel','production','status','events','casino']);
+const LIVING = new Set(['law','crime-careers','nightclub','merits','property-portfolio','faction-shop','city-activities','activity']);
 
 
 const STATIC = {
-  nightclub:{title:'Afterdark',eyebrow:'NIGHTLIFE',text:'The nightclub shell is restored from the V1 destination model. Reputation, VIP ranks, rotating events and NPC encounters will plug into this page when the server module is enabled.'},
-  police:{title:'Rift Central Precinct',eyebrow:'LAW',text:'Police, bounties, warrants, fines and wanted-state tools are reserved for the next law-system backend pass. Current jail and status consequences remain server-authoritative.'},
   park:{title:'RiftCity Park',eyebrow:'PUBLIC SPACE',text:'The park is restored as a destination shell for future encounters, events and location-specific crime opportunities.'},
   downtown:{title:'Downtown',eyebrow:'CITY DISTRICT',text:'Downtown is restored as a district shell for events, shops, encounters and future high-traffic crime opportunities.'}
 };
@@ -37,7 +37,15 @@ const TITLES = {
   status:['Hospital / Jail','PLAYER STATUS'],
   events:['World Events','CITY CONDITIONS'],
   casino:['Meridian Casino','IN-GAME CHIPS'],
-  combat:['Combat','BATTLE NETWORK']
+  combat:['Combat','BATTLE NETWORK'],
+  law:['Rift Central Precinct','HEAT / ENFORCEMENT'],
+  'crime-careers':['Crime Careers','UNDERGROUND NETWORK'],
+  nightclub:['Afterdark','NIGHTLIFE'],
+  merits:['Merits','LONG-TERM PROGRESSION'],
+  'property-portfolio':['Rental Portfolio','PROPERTY ECONOMY'],
+  'faction-shop':['Faction Quartermaster','FACTION REWARDS'],
+  'city-activities':['City Activities','LOCAL GAMEPLAY'],
+  activity:['Activity Feed','PLAYER HISTORY']
 };
 
 export async function renderService(root, service, query=new URLSearchParams()) {
@@ -60,6 +68,7 @@ export async function renderService(root, service, query=new URLSearchParams()) 
   if (FINANCE.has(service)) return renderFinanceService(root,service,data,query);
   if (PROGRESSION.has(service)) return renderProgressionService(root,service,data,query);
   if (WORLD.has(service)) return renderWorldService(root,service,data,query);
+  if (LIVING.has(service)) return renderLivingCityService(root,service,data,query);
   if (service==='combat') return renderCombatService(root,data);
   root.innerHTML=`<div class="rc-empty"><strong>${escapeHtml(title[0])}</strong><span>Frontend module not installed.</span></div>`;
 }

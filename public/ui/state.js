@@ -10,7 +10,9 @@ export const state = {
   selectedLocation:null,
   activeRequest:0,
   serviceCache:new Map(),
-  inlineMessage:null
+  inlineMessage:null,
+  law:null,
+  merits:null
 };
 
 export function setPlayer(player) {
@@ -26,5 +28,6 @@ export function clearState() {
   state.inventory=null;
   state.crimes=null;
   state.selectedLocation=null;
+  state.law=null; state.merits=null;
   state.serviceCache.clear();
 }

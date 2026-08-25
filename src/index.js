@@ -11,6 +11,7 @@ import {
   RESOURCE_REGEN
 } from './plugins/index.js';
 import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast, getGameplayModifiers } from './services/gameplay.js';
+import { getLawState, getLawChancePenalty, applyCrimeHeat, recordActivity } from './services/living-city.js';
 
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -369,6 +370,8 @@ async function getCrimes(request, env) {
   `).bind(auth.user.id).all();
 
   const gameplayModifiers = await getGameplayModifiers(auth.user.id, env);
+  const law = await getLawState(auth.user.id, env);
+  gameplayModifiers.heatPenalty = await getLawChancePenalty(auth.user.id, env);
   const crimes = CRIME_REGISTRY.map(crime => {
     const progress = normalizeCrimeProgress(progressById.get(crime.id), crime.id);
     return toPublicCrime(crime, progress, player, location, owned, gameplayModifiers);
@@ -378,7 +381,8 @@ async function getCrimes(request, env) {
     ok: true,
     crimes,
     player: toPublicPlayerState(player),
-    history: (historyRows.results || []).map(toPublicCrimeHistory)
+    history: (historyRows.results || []).map(toPublicCrimeHistory),
+    law
   });
 }
 
@@ -388,6 +392,7 @@ async function executeCrime(request, env, requestId) {
 
   const body = await readJson(request);
   const crimeId = typeof body?.crimeId === 'string' ? body.crimeId.trim() : '';
+  const approach = ['quiet','balanced','bold'].includes(String(body?.approach||'')) ? String(body.approach) : 'balanced';
   const crime = getCrimeDefinition(crimeId);
   if (!crime) return json({ ok: false, error: 'Unknown crime' }, 404);
 
@@ -428,7 +433,11 @@ async function executeCrime(request, env, requestId) {
   }
 
   const gameplayModifiers = await getGameplayModifiers(auth.user.id, env);
-  const chance = calculateCrimeChance(crime, progress, player, gameplayModifiers);
+  gameplayModifiers.heatPenalty = await getLawChancePenalty(auth.user.id, env);
+  const approachChance = approach==='quiet'?.04:approach==='bold'?-.06:0;
+  const approachReward = approach==='quiet'?.80:approach==='bold'?1.35:1;
+  const approachHeat = approach==='quiet'?.70:approach==='bold'?1.40:1;
+  const chance = Math.max(.05,Math.min(.97,calculateCrimeChance(crime, progress, player, gameplayModifiers)+approachChance));
   const success = randomFloat() < chance;
   const masteryDelta = success ? 2 : 1;
   const nextMastery = Math.min(100, progress.mastery + masteryDelta);
@@ -441,8 +450,8 @@ async function executeCrime(request, env, requestId) {
   let resultText = '';
 
   if (success) {
-    cashDelta = randomInt(crime.cashMin, crime.cashMax);
-    xpDelta = randomInt(crime.xpMin, crime.xpMax);
+    cashDelta = Math.max(0,Math.round(randomInt(crime.cashMin, crime.cashMax)*approachReward));
+    xpDelta = Math.max(1,Math.round(randomInt(crime.xpMin, crime.xpMax)*(.9+approachReward*.1)));
     if (crime.itemPool.length && randomFloat() < crime.itemChance) {
       const rewardChoice = weightedPick(crime.itemPool);
       if (rewardChoice) {
@@ -527,6 +536,9 @@ async function executeCrime(request, env, requestId) {
   await env.DB.batch(statements);
   await ensureGameplayTables(env);
   if (success) await incrementProgress(auth.user.id, 'crime', 1, env);
+  const heatCrime={...crime,heatSuccess:Math.round((Number(crime.heatSuccess)||0)*approachHeat),heatFailure:Math.round((Number(crime.heatFailure)||0)*approachHeat)};
+  const law = await applyCrimeHeat(auth.user.id, heatCrime, success, env);
+  await recordActivity(auth.user.id,'crime',`${crime.name}: ${success?'success':'failed'}`,resultText,'crimes',env);
   if (cashDelta > 0) {
     const cashRow = await env.DB.prepare('SELECT cash FROM player_state WHERE user_id = ?').bind(auth.user.id).first();
     await setProgressAtLeast(auth.user.id, 'cash', Number(cashRow?.cash) || 0, env);
@@ -848,7 +860,8 @@ function calculateCrimeChance(crime, progress, player, modifiers = {}) {
   const masteryBonus = (progress.mastery / 100) * 0.12;
   const dexterityBonus = Math.min(0.04, Math.max(0, (Number(player.dexterity) - 1) * 0.002));
   const externalBonus = Number(modifiers.crimeChanceBonus) || 0;
-  return Math.max(0.05, Math.min(0.97, crime.baseChance + masteryBonus + dexterityBonus + externalBonus));
+  const heatPenalty = Number(modifiers.heatPenalty) || 0;
+  return Math.max(0.05, Math.min(0.97, crime.baseChance + masteryBonus + dexterityBonus + externalBonus - heatPenalty));
 }
 
 function toPublicCrime(crime, progress, player, location, owned, modifiers = {}) {
@@ -864,6 +877,8 @@ function toPublicCrime(crime, progress, player, location, owned, modifiers = {})
     id: crime.id,
     name: crime.name,
     category: crime.category,
+    career: crime.career || crime.category,
+    uiType: crime.uiType || 'target',
     description: crime.description,
     nerveCost: crime.nerveCost,
     successChance: calculateCrimeChance(crime, progress, player, modifiers),
@@ -875,7 +890,8 @@ function toPublicCrime(crime, progress, player, location, owned, modifiers = {})
     requiredLocation: requiredLocation ? { id: requiredLocation.id, name: requiredLocation.name, current: location.location_id === requiredLocation.id } : null,
     available: lockedReasons.length === 0,
     lockedReasons,
-    modifiers: { crimeChanceBonus: Number(modifiers.crimeChanceBonus) || 0, event: modifiers.event || null }
+    heat: { success: Number(crime.heatSuccess)||0, failure: Number(crime.heatFailure)||0 },
+    modifiers: { crimeChanceBonus: Number(modifiers.crimeChanceBonus) || 0, heatPenalty:Number(modifiers.heatPenalty)||0, event: modifiers.event || null }
   };
 }
 

@@ -20,7 +20,7 @@ export {
 } from './items.js';
 
 
-export { JOB_REGISTRY, getJobDefinition, getJobPosition } from './jobs.js';
+export { JOB_REGISTRY, JOB_SHIFT_EVENTS, getJobDefinition, getJobPosition } from './jobs.js';
 export { EDUCATION_REGISTRY, getEducationDefinition } from './education.js';
 export { GYM_PROGRAMS, TRAINING_STATS, getGymProgram } from './gym.js';
 export { BANK_INVESTMENT_TIERS, getBankTier, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE } from './banking.js';
@@ -39,3 +39,7 @@ export { DAILY_CHALLENGE_TEMPLATES, WEEKLY_CHALLENGE_TEMPLATES } from './challen
 export { PRODUCTION_FACILITIES, PRODUCTION_RECIPES, getProductionFacility, getProductionRecipe } from './production.js';
 
 export { RESOURCE_REGEN, getResourceRegen } from './resources.js';
+export { HEAT_TIERS, HEAT_DECAY_PER_HOUR, LAY_LOW_ENERGY_COST, LAY_LOW_HEAT_REDUCTION, LAY_LOW_COOLDOWN_MS, getHeatTier } from './law.js';
+export { NIGHTCLUB_TIERS, NIGHTCLUB_ACTIVITIES, NIGHTCLUB_EVENTS, getNightclubTier, getNightclubEvent } from './nightclub.js';
+export { MERIT_UPGRADES, getMeritUpgrade } from './merits.js';
+export { CITY_ACTIVITIES, getCityActivity } from './city-activities.js';

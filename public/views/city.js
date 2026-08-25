@@ -4,7 +4,7 @@ import { escapeHtml, panel, empty } from '../ui/helpers.js';
 import { serviceRoute, go } from '../ui/router.js';
 import { renderPlayerHud, showToast } from '../ui/shell.js';
 
-const ROUTE_BY_TYPE={bank:'bank',education:'education',gym:'gym',jobs:'jobs',properties:'properties',shop:'shop',status:'status',casino:'casino',travel:'travel',production:'production',market:'market',auction:'auction'};
+const ROUTE_BY_TYPE={bank:'bank',education:'education',gym:'gym',jobs:'jobs',properties:'properties',shop:'shop',status:'status',casino:'casino',travel:'travel',production:'production',market:'market',auction:'auction',law:'law',nightclub:'nightclub','city-activities':'city-activities'};
 
 export async function renderCity(root) {
   const result=await api('/api/world');

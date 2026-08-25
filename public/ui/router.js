@@ -4,9 +4,9 @@ const aliases = {
   awards:'achievements',
   property:'properties',
   nightclub:'nightclub',
-  police:'police',
-  park:'park',
-  downtown:'downtown',
+  police:'law',
+  park:'city-activities',
+  downtown:'city-activities',
   'black-market':'auction',
   bank:'bank',
   market:'market',
@@ -23,7 +23,14 @@ const aliases = {
   hospital:'status',
   jail:'status',
   pharmacy:'shop',
-  shops:'shop'
+  shops:'shop',
+  merits:'merits',
+  activity:'activity',
+  law:'law',
+  'crime-careers':'crime-careers',
+  'property-portfolio':'property-portfolio',
+  'faction-shop':'faction-shop',
+  'city-activities':'city-activities'
 };
 
 export function parseRoute() {

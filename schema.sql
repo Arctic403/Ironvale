@@ -365,3 +365,163 @@ CREATE TABLE IF NOT EXISTS property_ledger (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_property_ledger_user ON property_ledger(user_id,created_at);
+
+-- Phase 8.2 Living City systems
+CREATE TABLE IF NOT EXISTS player_law (
+  user_id TEXT PRIMARY KEY,
+  heat INTEGER NOT NULL DEFAULT 0,
+  fine_balance INTEGER NOT NULL DEFAULT 0,
+  last_heat_at INTEGER,
+  last_lay_low_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS law_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  heat_delta INTEGER NOT NULL DEFAULT 0,
+  fine_delta INTEGER NOT NULL DEFAULT 0,
+  note TEXT,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_law_history_user ON law_history(user_id,created_at DESC);
+
+CREATE TABLE IF NOT EXISTS crime_career_state (
+  user_id TEXT PRIMARY KEY,
+  reputation INTEGER NOT NULL DEFAULT 0,
+  operations_completed INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS crime_operations (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  completes_at INTEGER NOT NULL,
+  risk INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'active',
+  reward_cash INTEGER,
+  reward_xp INTEGER,
+  completed_at INTEGER,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_crime_operations_user ON crime_operations(user_id,status,completes_at);
+
+CREATE TABLE IF NOT EXISTS player_nightclub (
+  user_id TEXT PRIMARY KEY,
+  reputation INTEGER NOT NULL DEFAULT 0,
+  visits INTEGER NOT NULL DEFAULT 0,
+  last_activity_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_merits (
+  user_id TEXT PRIMARY KEY,
+  points INTEGER NOT NULL DEFAULT 0,
+  lifetime_points INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_merit_upgrades (
+  user_id TEXT NOT NULL,
+  upgrade_id TEXT NOT NULL,
+  rank INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,upgrade_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS property_upgrades (
+  user_id TEXT NOT NULL,
+  property_id TEXT NOT NULL,
+  upgrade_id TEXT NOT NULL,
+  rank INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,property_id,upgrade_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS rental_units (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  purchase_price INTEGER NOT NULL,
+  rent_per_hour INTEGER NOT NULL,
+  upkeep_per_hour INTEGER NOT NULL,
+  last_collect_at INTEGER NOT NULL,
+  total_income INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS rental_ledger (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  unit_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS activity_feed (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  category TEXT NOT NULL,
+  title TEXT NOT NULL,
+  detail TEXT,
+  route TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id,created_at DESC);
+
+CREATE TABLE IF NOT EXISTS city_activity_state (
+  user_id TEXT NOT NULL,
+  activity_id TEXT NOT NULL,
+  last_used_at INTEGER,
+  uses INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(user_id,activity_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS job_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  job_id TEXT NOT NULL,
+  event_id TEXT,
+  pay INTEGER NOT NULL,
+  skill_xp INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS faction_reward_purchases (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  faction_id TEXT NOT NULL,
+  reward_id TEXT NOT NULL,
+  cost INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_faction_ext (
+  user_id TEXT PRIMARY KEY,
+  last_left_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS casino_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  game_id TEXT NOT NULL,
+  wager INTEGER NOT NULL,
+  payout INTEGER NOT NULL,
+  result_text TEXT,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

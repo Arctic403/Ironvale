@@ -1,4 +1,4 @@
-import { api } from '../ui/api.js';
+import { api, getService } from '../ui/api.js';
 import { state, setPlayer } from '../ui/state.js';
 import { escapeHtml, money, progress, panel, badge } from '../ui/helpers.js';
 import { renderPlayerHud, refreshEffects } from '../ui/shell.js';
@@ -7,24 +7,24 @@ let inlineResult=null;
 let busy=false;
 
 export async function renderCrimes(root) {
-  const result=await api('/api/crimes');
+  const [result,careers]=await Promise.all([api('/api/crimes'),getService('crime-careers')]);
   if (!result.ok) {
     root.innerHTML=`<div class="rc-error"><strong>Crime engine unavailable</strong><p>${escapeHtml(result.error||'Could not load crimes')}</p></div>`;
     return;
   }
   state.crimes=result;
   if (result.player) { setPlayer(result.player); renderPlayerHud(result.player); }
-  draw(root,result);
+  draw(root,result,careers.ok?careers:null);
 }
 
-function draw(root,result) {
+function draw(root,result,careers=null) {
   const crimes=result.crimes||[], history=result.history||[];
   root.innerHTML=`
     <section class="crime-hero">
       <div><span class="eyebrow">SERVER CRIME ENGINE</span><h2>Crime Careers</h2><p>Outcomes, rewards, mastery and consequences are resolved by the Worker. The client only presents the opportunity.</p></div>
-      <div class="crime-summary"><span>AVAILABLE</span><strong>${crimes.filter(c=>c.available).length}/${crimes.length}</strong><small>Server-authoritative</small></div>
+      <div class="crime-summary"><span>HEAT</span><strong>${result.law?.heat||0}/100</strong><small>${escapeHtml(result.law?.tier?.name||'Clear')} · ${crimes.filter(c=>c.available).length}/${crimes.length} available</small></div>
     </section>
-    <div class="crime-layout-v2">
+    <div class="crime-career-toolbar"><a class="rc-button" href="#crime-careers" data-route="crime-careers">Operations & Street Rep</a><a class="rc-button" href="#law" data-route="law">Heat / Police</a>${careers?`<span>Street Rep <strong>${careers.state?.reputation||0}</strong> · Active Ops <strong>${(careers.active||[]).filter(x=>x.status==='active').length}</strong></span>`:''}</div><div class="crime-layout-v2">
       <section class="crime-careers">
         ${crimes.map(crime=>crimeCard(crime)).join('')||'<div class="rc-empty">No crimes installed.</div>'}
       </section>
@@ -44,7 +44,7 @@ function crimeCard(crime) {
   return `<article class="crime-card-v2 crime-mode-${escapeHtml(mode)} ${crime.available?'':'locked'}">
     <div class="crime-card-accent"></div>
     <header><div><span class="eyebrow">${escapeHtml(String(crime.category||'crime').toUpperCase())}</span><h3>${escapeHtml(crime.name)}</h3></div><div class="chance-ring" style="--chance:${chance}"><strong>${chance}%</strong><small>chance</small></div></header>
-    <p>${escapeHtml(crime.description)}</p>
+    <p>${escapeHtml(crime.description)}</p><div class="tag-row"><span>${escapeHtml(String(crime.uiType||'target').toUpperCase())}</span><span>HEAT +${crime.heat?.success||0}/+${crime.heat?.failure||0}</span>${crime.modifiers?.heatPenalty?`<span>HEAT PENALTY -${Math.round(crime.modifiers.heatPenalty*100)}%</span>`:''}</div>
     <div class="crime-progress">
       <div><span>Mastery</span><strong>${escapeHtml(crime.mastery)}/100</strong></div>
       <div class="rc-meter"><span style="width:${progress(crime.mastery,100)}%"></span></div>
@@ -58,7 +58,7 @@ function crimeCard(crime) {
       ${required?badge(`${required.name} · ${required.owned>0?'OWNED':'REQUIRED'}`,required.owned>0?'success':'danger'):badge('NO TOOL REQUIRED','success')}
       ${(crime.lockedReasons||[]).map(r=>badge(r,'danger')).join('')}
     </div>
-    <button class="rc-button primary wide" data-run-crime="${escapeHtml(crime.id)}" ${crime.available?'':'disabled'}>${crime.available?`Attempt · ${crime.nerveCost} nerve`:'Unavailable'}</button>
+    <div class="crime-approach-row"><label><span>Approach</span><select data-crime-approach="${escapeHtml(crime.id)}"><option value="quiet">Quiet · safer / lower reward</option><option value="balanced" selected>Balanced</option><option value="bold">Bold · riskier / higher reward</option></select></label></div><button class="rc-button primary wide" data-run-crime="${escapeHtml(crime.id)}" ${crime.available?'':'disabled'}>${crime.available?`Attempt · ${crime.nerveCost} nerve`:'Unavailable'}</button>
     ${result}
   </article>`;
 }
@@ -71,6 +71,7 @@ function inlineMarkup(result) {
     if (Number(result.xpDelta)) details.push(`+${result.xpDelta} XP`);
     if (Number(result.masteryDelta)) details.push(`+${result.masteryDelta} mastery`);
     if (Number(result.nerveSpent)) details.push(`-${result.nerveSpent} nerve`);
+    if (result.approach) details.push(`${result.approach} approach`);
     if (result.itemReward?.name) details.push(`Found ${result.itemReward.name}${Number(result.itemReward.quantity)>1?` x${result.itemReward.quantity}`:''}`);
   }
   return `<div class="inline-result ${tone}"><header><strong>${result.error?'BLOCKED':result.success?'SUCCESS':'FAILED'}</strong>${result.chance!=null?`<span>${Math.round(Number(result.chance)*100)}% roll</span>`:''}</header><p>${escapeHtml(result.text||'Crime resolved.')}</p>${details.length?`<div>${details.map(d=>`<span>${escapeHtml(d)}</span>`).join('')}</div>`:''}</div>`;
@@ -81,7 +82,8 @@ async function runCrime(root,crimeId) {
   busy=true; inlineResult=null;
   const button=root.querySelector(`[data-run-crime="${CSS.escape(crimeId)}"]`);
   if (button) { button.disabled=true; button.textContent='Resolving on server…'; }
-  const result=await api('/api/crimes/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({crimeId})});
+  const approach=root.querySelector(`[data-crime-approach="${CSS.escape(crimeId)}"]`)?.value||'balanced';
+  const result=await api('/api/crimes/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({crimeId,approach})});
   busy=false;
   if (!result.ok) inlineResult={crimeId,error:true,success:false,text:result.error||'Attempt failed.'};
   else {
@@ -90,6 +92,6 @@ async function runCrime(root,crimeId) {
   }
   state.inventory=null;
   const fresh=await api('/api/crimes');
-  if (fresh.ok) { state.crimes=fresh; draw(root,fresh); }
+  if (fresh.ok) { state.crimes=fresh; const careers=await getService('crime-careers'); draw(root,fresh,careers.ok?careers:null); }
   refreshEffects();
 }

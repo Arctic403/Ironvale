@@ -2,9 +2,14 @@ import {
   ensureAdvancedTables, getAdvancedService, postAdvancedService,
   getGameplayModifiers, reconcilePropertyBonuses, getBankSecurity, collectPropertyIncome
 } from './advanced.js';
+import {
+  ensureLivingCityTables, getLivingCityService, postLivingCityService,
+  getCasinoExperience, playCasinoGame, evaluateBankRisk, maybeTriggerBankRisk, recordActivity,
+  canJoinFaction, noteFactionLeave
+} from './living-city.js';
 
 import {
-  JOB_REGISTRY, getJobDefinition, getJobPosition,
+  JOB_REGISTRY, JOB_SHIFT_EVENTS, getJobDefinition, getJobPosition,
   EDUCATION_REGISTRY, getEducationDefinition,
   GYM_PROGRAMS, TRAINING_STATS, getGymProgram,
   BANK_INVESTMENT_TIERS, getBankTier, SAVINGS_WITHDRAWAL_FEE_RATE, SAVINGS_WITHDRAWAL_MIN_FEE,
@@ -81,6 +86,7 @@ let ensured = false;
 
 export async function ensureGameplayTables(env) {
   await ensureAdvancedTables(env);
+  await ensureLivingCityTables(env);
   if (ensured) return;
   for (const statement of SERVICE_TABLE_SQL.split(';').map(v => v.trim()).filter(Boolean)) {
     await env.DB.prepare(statement).run();
@@ -116,7 +122,9 @@ function serviceCatalog() {
     ['market','City Market'],['shop','Shops'],['auction','Black Market Auction'],
     ['status','Jail / Hospital'],['events','World Events'],['casino','Casino'],
     ['combat','Combat'],['travel','Travel'],['offshore','Offshore Banking'],
-    ['achievements','Achievements'],['challenges','Challenges'],['production','Production']
+    ['achievements','Achievements'],['challenges','Challenges'],['production','Production'],
+    ['law','Police / Heat'],['crime-careers','Crime Careers'],['nightclub','Nightclub'],['merits','Merits'],
+    ['property-portfolio','Rental Portfolio'],['faction-shop','Faction Rewards'],['city-activities','City Activities'],['activity','Activity Feed']
   ].map(([id,name])=>({id,name}));
 }
 
@@ -136,6 +144,8 @@ async function getService(service, userId, env, deps, url) {
     case 'events': return deps.json({ok:true,active:getActiveWorldEvent(),catalog:WORLD_EVENT_REGISTRY});
     case 'casino': return deps.json(await getCasino(userId,env));
     default: {
+      const living = await getLivingCityService(service,userId,env,deps,url);
+      if (living) return deps.json(living);
       const advanced = await getAdvancedService(service,userId,env,deps,url);
       return advanced ? deps.json(advanced) : deps.json({ok:false,error:'Unknown service'},404);
     }
@@ -156,7 +166,11 @@ async function postService(service, body, userId, env, deps, requestId) {
     case 'shop': result=await shopAction(body,userId,env,deps); break;
     case 'auction': result=await auctionAction(body,userId,env,deps); break;
     case 'casino': result=await casinoAction(body,userId,env,deps); break;
-    default: result=await postAdvancedService(service,body,userId,env,deps,requestId); break;
+    default: {
+      result=await postLivingCityService(service,body,userId,env,deps);
+      if(!result) result=await postAdvancedService(service,body,userId,env,deps,requestId);
+      break;
+    }
   }
   if (!result) return deps.json({ok:false,error:'Unknown service'},404);
   if (result?.ok) await deps.writeAudit(env,userId,`service.${service}.${String(body.action||'action')}`,userId,{requestId});
@@ -174,7 +188,7 @@ async function getBank(userId,env,deps){
   const account=await env.DB.prepare('SELECT * FROM player_bank_accounts WHERE user_id=?').bind(userId).first();
   const investments=await env.DB.prepare('SELECT * FROM player_investments WHERE user_id=? ORDER BY created_at DESC LIMIT 20').bind(userId).all();
   const ledger=await env.DB.prepare('SELECT * FROM bank_ledger WHERE user_id=? ORDER BY created_at DESC LIMIT 25').bind(userId).all();
-  return {ok:true,account,tiers:BANK_INVESTMENT_TIERS,investments:investments.results||[],ledger:ledger.results||[],security:await getBankSecurity(userId,env)};
+  return {ok:true,account,tiers:BANK_INVESTMENT_TIERS,investments:investments.results||[],ledger:ledger.results||[],security:await getBankSecurity(userId,env),risk:await evaluateBankRisk(userId,env)};
 }
 async function bankAction(body,userId,env,deps){
   await ensureBank(userId,env);
@@ -185,6 +199,7 @@ async function bankAction(body,userId,env,deps){
   const t=now();
   const security=await getBankSecurity(userId,env);
   if(security.frozen) return {ok:false,error:'Bank account is temporarily frozen.',status:409,security};
+  const riskEvent=await maybeTriggerBankRisk(userId,env);if(riskEvent.triggered)return {ok:false,error:'High Heat triggered a temporary bank security review.',status:409,security:{frozen:true,frozenUntil:riskEvent.until},risk:riskEvent.risk};
   if(action==='deposit'){
     if(!amount) return {ok:false,error:'Enter a valid deposit amount',status:400};
     if(Number(player.cash)<amount) return {ok:false,error:'Not enough cash on hand',status:409};
@@ -256,7 +271,8 @@ async function ensureJob(userId,env){await env.DB.prepare('INSERT OR IGNORE INTO
 async function getJobs(userId,env){
  await ensureJob(userId,env); const state=await env.DB.prepare('SELECT * FROM player_jobs WHERE user_id=?').bind(userId).first();
  const job=state.job_id?getJobDefinition(state.job_id):null;
- return {ok:true,jobs:JOB_REGISTRY,state,position:job?getJobPosition(job,Number(state.skill_level)):null};
+ const history=await env.DB.prepare('SELECT * FROM job_history WHERE user_id=? ORDER BY created_at DESC LIMIT 20').bind(userId).all();
+ return {ok:true,jobs:JOB_REGISTRY,state,position:job?getJobPosition(job,Number(state.skill_level)):null,history:history.results||[]};
 }
 async function jobAction(body,userId,env,deps){
  await ensureJob(userId,env); const state=await env.DB.prepare('SELECT * FROM player_jobs WHERE user_id=?').bind(userId).first(); const t=now();
@@ -266,14 +282,17 @@ async function jobAction(body,userId,env,deps){
    if(state.last_work_at&&t-Number(state.last_work_at)<60_000)return {ok:false,error:'Your next shift is not ready yet',status:429};
    const player=await getPlayer(userId,env,deps); if(player.status!=='active')return {ok:false,error:`You cannot work while ${player.status}.`,status:409};
    if(Number(player.energy)<job.energyCost)return {ok:false,error:`You need ${job.energyCost} energy.`,status:409};
-   const position=getJobPosition(job,Number(state.skill_level)); const modifiers=await getGameplayModifiers(userId,env); const pay=Math.max(1,Math.round(position.pay*modifiers.jobPayMultiplier));
-   const nextXp=Number(state.skill_xp)+1; const nextLevel=Math.floor(nextXp/5);
+   const position=getJobPosition(job,Number(state.skill_level)); const modifiers=await getGameplayModifiers(userId,env);
+   const totalWeight=JOB_SHIFT_EVENTS.reduce((n,e)=>n+e.weight,0);let roll=Math.random()*totalWeight,event=JOB_SHIFT_EVENTS[0];for(const candidate of JOB_SHIFT_EVENTS){roll-=candidate.weight;if(roll<=0){event=candidate;break;}}
+   const pay=Math.max(1,Math.round(position.pay*modifiers.jobPayMultiplier*event.payMultiplier));
+   const skillGain=Number(event.skillXp)||1; const nextXp=Number(state.skill_xp)+skillGain; const nextLevel=Math.floor(nextXp/5);
    await env.DB.batch([
      env.DB.prepare('UPDATE player_state SET energy=energy-?,cash=cash+?,updated_at=? WHERE user_id=?').bind(job.energyCost,pay,t,userId),
-     env.DB.prepare('UPDATE player_jobs SET skill_xp=?,skill_level=?,shifts=shifts+1,last_work_at=?,updated_at=? WHERE user_id=?').bind(nextXp,nextLevel,t,t,userId)
+     env.DB.prepare('UPDATE player_jobs SET skill_xp=?,skill_level=?,shifts=shifts+1,last_work_at=?,updated_at=? WHERE user_id=?').bind(nextXp,nextLevel,t,t,userId),
+     env.DB.prepare('INSERT INTO job_history(id,user_id,job_id,event_id,pay,skill_xp,created_at) VALUES(?,?,?,?,?,?,?)').bind(crypto.randomUUID(),userId,job.id,event.id,pay,skillGain,t)
    ]);
-   await incrementProgress(userId,'job',1,env); await syncCashMetric(userId,env,deps);
-   return {ok:true,message:`Shift complete. Earned $${pay}.`,pay,skillLevel:nextLevel,player:deps.toPublicPlayerState(await getPlayer(userId,env,deps))};
+   await incrementProgress(userId,'job',1,env); await syncCashMetric(userId,env,deps); await recordActivity(userId,'job',event.name,`${job.company}: +$${pay}, +${skillGain} skill XP.`,'jobs',env);
+   return {ok:true,message:`${event.name}. Earned $${pay}.`,pay,skillGain,event,skillLevel:nextLevel,player:deps.toPublicPlayerState(await getPlayer(userId,env,deps))};
  }
  return {ok:false,error:'Unknown job action',status:400};
 }
@@ -338,9 +357,9 @@ async function ensureFaction(userId,env){await env.DB.prepare('INSERT OR IGNORE 
 async function getFactions(userId,env){await ensureFaction(userId,env);const state=await env.DB.prepare('SELECT * FROM player_factions WHERE user_id=?').bind(userId).first();const faction=state.faction_id?getFactionDefinition(state.faction_id):null;return {ok:true,factions:FACTION_REGISTRY,state,rank:faction?getFactionRank(faction,Number(state.reputation)):null};}
 async function factionAction(body,userId,env,deps){
  await ensureFaction(userId,env); const state=await env.DB.prepare('SELECT * FROM player_factions WHERE user_id=?').bind(userId).first(); const t=now();
- if(body.action==='join'){const faction=getFactionDefinition(String(body.factionId||''));if(!faction)return {ok:false,error:'Unknown faction',status:404};if(state.faction_id&&state.faction_id!==faction.id)return {ok:false,error:'Leave your current faction before joining another',status:409};await env.DB.prepare('UPDATE player_factions SET faction_id=?,updated_at=? WHERE user_id=?').bind(faction.id,t,userId).run();return {ok:true,message:`Joined ${faction.name}.`};}
+ if(body.action==='join'){const faction=getFactionDefinition(String(body.factionId||''));if(!faction)return {ok:false,error:'Unknown faction',status:404};const gate=await canJoinFaction(userId,env);if(!gate.ok)return {ok:false,error:`Faction leave cooldown: ${Math.ceil(gate.remainingMs/60000)}m remaining.`,status:409};if(state.faction_id&&state.faction_id!==faction.id)return {ok:false,error:'Leave your current faction before joining another',status:409};await env.DB.prepare('UPDATE player_factions SET faction_id=?,updated_at=? WHERE user_id=?').bind(faction.id,t,userId).run();return {ok:true,message:`Joined ${faction.name}.`};}
  if(body.action==='work'){const faction=getFactionDefinition(state.faction_id);if(!faction)return {ok:false,error:'Join a faction first',status:409};if(state.last_work_at&&t-Number(state.last_work_at)<90_000)return {ok:false,error:'Faction work is cooling down',status:429};const player=await getPlayer(userId,env,deps);if(Number(player.energy)<5)return {ok:false,error:'You need 5 energy',status:409};const cash=150+Math.floor(Number(state.reputation)*.5),rep=10,points=3;await env.DB.batch([env.DB.prepare('UPDATE player_state SET energy=energy-5,cash=cash+?,updated_at=? WHERE user_id=?').bind(cash,t,userId),env.DB.prepare('UPDATE player_factions SET reputation=reputation+?,points=points+?,jobs_done=jobs_done+1,last_work_at=?,updated_at=? WHERE user_id=?').bind(rep,points,t,t,userId)]);await incrementProgress(userId,'faction',rep,env);await syncCashMetric(userId,env,deps);return {ok:true,message:`Faction work complete: +${rep} reputation, +$${cash}.`,reputationGain:rep,cash};}
- if(body.action==='leave'){await env.DB.prepare('UPDATE player_factions SET faction_id=NULL,reputation=0,points=0,updated_at=? WHERE user_id=?').bind(t,userId).run();return {ok:true,message:'Left faction.'};}
+ if(body.action==='leave'){await env.DB.prepare('UPDATE player_factions SET faction_id=NULL,reputation=0,points=0,updated_at=? WHERE user_id=?').bind(t,userId).run();await noteFactionLeave(userId,env);return {ok:true,message:'Left faction. Rejoining is temporarily locked.'};}
  return {ok:false,error:'Unknown faction action',status:400};
 }
 
@@ -413,9 +432,12 @@ async function getStatus(userId,env,deps){const player=await getPlayer(userId,en
 
 // CASINO FOUNDATION
 async function ensureCasino(userId,env){await env.DB.prepare('INSERT OR IGNORE INTO player_casino(user_id,updated_at) VALUES(?,?)').bind(userId,now()).run();}
-async function getCasino(userId,env){await ensureCasino(userId,env);const state=await env.DB.prepare('SELECT * FROM player_casino WHERE user_id=?').bind(userId).first();return {ok:true,realMoney:false,games:CASINO_GAMES,dailyChipGrant:DAILY_CHIP_GRANT,state};}
-async function casinoAction(body,userId,env){
- if(body.action!=='claim-daily')return {ok:false,error:'Casino games are not enabled in this backend pass',status:409};await ensureCasino(userId,env);const state=await env.DB.prepare('SELECT * FROM player_casino WHERE user_id=?').bind(userId).first();const t=now(),day=Math.floor(t/86400000),last=state.last_daily_grant?Math.floor(Number(state.last_daily_grant)/86400000):-1;if(day===last)return {ok:false,error:'Daily chips already claimed',status:409};await env.DB.prepare('UPDATE player_casino SET chips=chips+?,last_daily_grant=?,updated_at=? WHERE user_id=?').bind(DAILY_CHIP_GRANT,t,t,userId).run();await incrementProgress(userId,'casino',1,env);return {ok:true,message:`Claimed ${DAILY_CHIP_GRANT} in-game chips.`,chips:Number(state.chips)+DAILY_CHIP_GRANT};
+async function getCasino(userId,env){await ensureCasino(userId,env);const state=await env.DB.prepare('SELECT * FROM player_casino WHERE user_id=?').bind(userId).first();const experience=await getCasinoExperience(userId,env);return {ok:true,realMoney:false,games:CASINO_GAMES,dailyChipGrant:DAILY_CHIP_GRANT,state,...experience};}
+async function casinoAction(body,userId,env,deps){
+ await ensureCasino(userId,env);
+ if(body.action==='play') return playCasinoGame(body,userId,env,deps);
+ if(body.action!=='claim-daily')return {ok:false,error:'Unknown casino action',status:400};
+ const state=await env.DB.prepare('SELECT * FROM player_casino WHERE user_id=?').bind(userId).first();const t=now(),day=Math.floor(t/86400000),last=state.last_daily_grant?Math.floor(Number(state.last_daily_grant)/86400000):-1;if(day===last)return {ok:false,error:'Daily chips already claimed',status:409};await env.DB.prepare('UPDATE player_casino SET chips=chips+?,last_daily_grant=?,updated_at=? WHERE user_id=?').bind(DAILY_CHIP_GRANT,t,t,userId).run();await incrementProgress(userId,'casino',1,env);await recordActivity(userId,'casino','Daily chips',`Claimed ${DAILY_CHIP_GRANT} in-game chips.`,'casino',env);return {ok:true,message:`Claimed ${DAILY_CHIP_GRANT} in-game chips.`,chips:Number(state.chips)+DAILY_CHIP_GRANT};
 }
 
 export { getGameplayModifiers, reconcilePropertyBonuses };

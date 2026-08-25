@@ -10,6 +10,7 @@ import {
   getItemDefinition, toPublicItemDefinition
 } from '../plugins/index.js';
 import { simulateFullFight, skillLevelFromXp, skillXpForNextLevel, UNARMED_WEAPON } from './combat-engine.js';
+import { getMeritModifiers, getPropertyUpgradeModifiers, recordActivity, grantMeritPoints } from './living-city.js';
 
 const ADVANCED_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS player_travel (
@@ -223,6 +224,14 @@ export async function getGameplayModifiers(userId, env) {
     modifiers.maxHealthBonus = Number(property.bonuses.maxHealth) || 0;
     modifiers.maxNerveBonus = Number(property.bonuses.nerve) || 0;
   }
+
+  const merits = await getMeritModifiers(userId, env);
+  const propertyUpgrades = await getPropertyUpgradeModifiers(userId, env);
+  modifiers.crimeChanceBonus += Number(merits.crimeChanceBonus)||0;
+  modifiers.gymGainMultiplier *= Number(merits.gymGainMultiplier)||1;
+  modifiers.gymGainMultiplier *= Number(propertyUpgrades.gymGainMultiplier)||1;
+  modifiers.jobPayMultiplier *= Number(merits.jobPayMultiplier)||1;
+  modifiers.marketVolatilityMultiplier *= Number(merits.marketVolatilityMultiplier)||1;
 
   const eventEffects = modifiers.event?.effects || {};
   modifiers.crimeChanceBonus += Number(eventEffects.crimeChance) || 0;
@@ -440,6 +449,8 @@ async function combatAction(body, userId, env, deps, requestId) {
   await incrementCounter(userId,'combat',1,env);
   if(attackerWon) await incrementCounter(userId,'combat_win',1,env);
   await unlockEligibleAchievements(userId,env);
+  await recordActivity(userId,'combat',attackerWon?'Fight won':'Fight lost',`${opponentName} · ${result.rounds} rounds · ${xpGain} XP.`,'combat',env);
+  if(defenderUserId) await recordActivity(defenderUserId,'combat','You were attacked',`${opponentName? 'Combat encounter':''} ${result.defenderHealth<=0?'You were hospitalized.':'Fight resolved.'}`,'combat',env);
 
   const updatedSkills=await getWeaponSkills(userId,env);
   return {
@@ -470,6 +481,7 @@ async function settleTravel(userId,env) {
       env.DB.prepare("UPDATE player_state SET status='active',status_until=NULL,status_reason=NULL,updated_at=? WHERE user_id=?").bind(timestamp,userId)
     ]);
     await incrementCounter(userId,'travel',1,env);
+    await recordActivity(userId,'travel','Arrived',`Arrived in ${destination?.name||state.traveling_to}.`,'travel',env);
     return { ...(state || {}), current_region:destination?.id || state.traveling_to, traveling_to:null, arrives_at:null };
   }
   return state;
@@ -494,6 +506,7 @@ async function travelAction(body,userId,env,deps) {
     env.DB.prepare('UPDATE player_state SET cash=cash-?,status=?,status_until=?,status_reason=?,updated_at=? WHERE user_id=?').bind(destination.fare,'traveling',arrivesAt,`Traveling to ${destination.name}`,timestamp,userId),
     env.DB.prepare('UPDATE player_travel SET traveling_to=?,departed_at=?,arrives_at=?,updated_at=? WHERE user_id=?').bind(destination.id,timestamp,arrivesAt,timestamp,userId)
   ]);
+  await recordActivity(userId,'travel','Travel started',`Departed for ${destination.name}.`,'travel',env);
   return {ok:true,message:`Departed for ${destination.name}.`,arrivesAt,destination,player:deps.toPublicPlayerState(await deps.ensureActivePlayerState(env,userId))};
 }
 
@@ -580,7 +593,9 @@ async function achievementAction(body,userId,env,deps) {
     env.DB.prepare('UPDATE player_achievements SET claimed=1,claimed_at=? WHERE user_id=? AND achievement_id=? AND claimed=0').bind(timestamp,userId,achievement.id),
     env.DB.prepare('UPDATE player_state SET level=?,xp=?,updated_at=? WHERE user_id=?').bind(level.level,level.xp,timestamp,userId)
   ]);
-  return {ok:true,message:`Claimed ${achievement.name}.`,reward:achievement.reward,player:deps.toPublicPlayerState(await deps.ensureActivePlayerState(env,userId))};
+  await grantMeritPoints(userId,1,env,achievement.name);
+  await recordActivity(userId,'achievement','Achievement claimed',achievement.name,'achievements',env);
+  return {ok:true,message:`Claimed ${achievement.name} and earned 1 Merit point.`,reward:{...achievement.reward,merits:1},player:deps.toPublicPlayerState(await deps.ensureActivePlayerState(env,userId))};
 }
 
 // CHALLENGES
@@ -714,6 +729,7 @@ async function productionAction(body,userId,env,deps) {
     await env.DB.prepare('UPDATE production_batches SET claimed=1,claimed_at=? WHERE id=? AND claimed=0').bind(timestamp,batch.id).run();
     await incrementCounter(userId,'production',1,env);
     await unlockEligibleAchievements(userId,env);
+    await recordActivity(userId,'production','Production complete',`Collected ${recipe.name}.`,'production',env);
     return {ok:true,message:`Collected ${recipe.name}.`,outputs:recipe.outputs};
   }
   return {ok:false,error:'Unknown production action',status:400};

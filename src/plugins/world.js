@@ -65,7 +65,7 @@ export const WORLD_LOCATIONS = [
     shortDescription: 'Law enforcement headquarters and bounty services.',
     description: 'Central police headquarters. Bounties, reports, warrants and future law-related systems can connect here.',
     tags: ['POLICE', 'LAW'], requirements: [],
-    actions: [{ id: 'precinct', label: 'Precinct services', type: 'police', enabled: false, note: 'Police systems arrive later.' }]
+    actions: [{ id: 'precinct', label: 'Heat & enforcement', type: 'law', enabled: true, note: 'View Heat, wanted status and fines.' }]
   },
   {
     id: 'keystone-realty', categoryId: 'services', code: 'SV-09', name: 'Keystone Realty', type: 'Property Agency', status: 'OPEN',
@@ -133,18 +133,18 @@ export const WORLD_LOCATIONS = [
   },
 
   {
-    id: 'meridian-casino', categoryId: 'entertainment', code: 'EN-01', name: 'The Meridian Casino', type: 'Casino', status: 'FOUNDATION',
+    id: 'meridian-casino', categoryId: 'entertainment', code: 'EN-01', name: 'The Meridian Casino', type: 'Casino', status: 'OPEN',
     shortDescription: 'RiftCity\'s flagship casino and gaming floor.',
     description: 'The future home of blackjack, poker, roulette, slots, horse betting and other casino systems.',
     tags: ['CASINO', 'GAMBLING', 'NIGHTLIFE'], requirements: [],
-    actions: [{ id: 'casino', label: 'Casino floor', type: 'casino', enabled: true, note: 'In-game chip account and casino game catalog.' }]
+    actions: [{ id: 'casino', label: 'Casino floor', type: 'casino', enabled: true, note: 'Playable server-resolved in-game chip tables and game history.' }]
   },
   {
-    id: 'afterdark', categoryId: 'entertainment', code: 'EN-02', name: 'Afterdark', type: 'Nightclub', status: 'COMING SOON',
+    id: 'afterdark', categoryId: 'entertainment', code: 'EN-02', name: 'Afterdark', type: 'Nightclub', status: 'OPEN',
     shortDescription: 'A late-night club for events, nightlife and special opportunities.',
     description: 'One of RiftCity\'s best-known nightlife venues. Future events, NPC encounters and nightclub-specific systems will live here.',
     tags: ['NIGHTCLUB', 'EVENTS', 'NIGHTLIFE'], requirements: [],
-    actions: [{ id: 'nightclub', label: 'Enter club', type: 'nightlife', enabled: false, note: 'Nightlife gameplay is not installed yet.' }]
+    actions: [{ id: 'nightclub', label: 'Enter club', type: 'nightclub', enabled: true, note: 'Nightlife reputation, VIP tiers and rotating events.' }]
   },
 
   {
@@ -152,7 +152,7 @@ export const WORLD_LOCATIONS = [
     shortDescription: 'Freight terminals, shipping lanes and waterfront access.',
     description: 'RiftCity\'s working docks. Cargo, shipping, smuggling opportunities and waterfront crimes can plug into Greywater later.',
     tags: ['DOCKS', 'FREIGHT', 'WATERFRONT'], requirements: [],
-    actions: [{ id: 'production', label: 'Workshop district', type: 'production', enabled: true, note: 'Production facilities and timed batches.' }]
+    actions: [{ id: 'production', label: 'Workshop district', type: 'production', enabled: true, note: 'Production facilities and timed batches.' },{id:'activities',label:'Dock activities',type:'city-activities',enabled:true,note:'Open harbour-side city activities.'}]
   },
   {
     id: 'rift-international-airport', categoryId: 'transport', code: 'TR-02', name: 'Rift International Airport', type: 'Airport', status: 'OPEN',
@@ -166,7 +166,7 @@ export const WORLD_LOCATIONS = [
     shortDescription: 'Vehicle sales and future transportation upgrades.',
     description: 'A city vehicle dealership reserved for cars, ownership and future transportation systems.',
     tags: ['VEHICLES', 'DEALER'], requirements: [],
-    actions: [{ id: 'dealer', label: 'Browse vehicles', type: 'vehicle', enabled: false, note: 'Vehicles arrive later.' }]
+    actions: [{ id: 'dealer', label: 'Showroom activities', type: 'city-activities', enabled: true, note: 'Vehicle ownership is later; showroom activities are available now.' }]
   },
 
   {
@@ -179,7 +179,7 @@ export const WORLD_LOCATIONS = [
   {
     id: 'breakwater-beach', categoryId: 'other', code: 'OT-02', name: 'Breakwater Beach', type: 'Beach', status: 'OPEN',
     shortDescription: 'Public shoreline along RiftCity\'s outer breakwater.',
-    description: 'A stretch of city shoreline intended for scavenging, seasonal events and future metal-detector opportunities.',
+    description: 'A stretch of city shoreline reserved for seasonal events and future RiftCity-specific activities.',
     tags: ['BEACH', 'PUBLIC', 'SCAVENGING'], requirements: [],
     actions: [{ id: 'beach', label: 'Explore beach', type: 'special', enabled: false, note: 'Beach activities arrive later.' }]
   },
@@ -189,7 +189,16 @@ export const WORLD_LOCATIONS = [
     description: 'A neutral trading hub planned as the player marketplace. Listings, auctions and transaction fees will eventually operate here.',
     tags: ['MARKET', 'PLAYER TRADE'], requirements: [],
     actions: [{ id: 'market', label: 'Open market', type: 'auction', enabled: true, note: 'Browse and manage player item listings.' }]
-  }
+  },
+  {id:'riftcity-park',categoryId:'other',code:'OT-04',name:'RiftCity Park',type:'Public Park',status:'OPEN',shortDescription:'Courts, paths and rotating public activities.',description:'A central public park used for recreation and city events.',tags:['PARK','ACTIVITIES'],requirements:[],actions:[{id:'activities',label:'Park activities',type:'city-activities',enabled:true,note:'Open RiftCity-specific location activities.'}]},
+  {id:'downtown-core',categoryId:'other',code:'OT-05',name:'Downtown Core',type:'City District',status:'OPEN',shortDescription:'The busiest blocks in central RiftCity.',description:'A dense commercial district with rotating city tasks and events.',tags:['DOWNTOWN','ACTIVITIES'],requirements:[],actions:[{id:'activities',label:'Downtown activities',type:'city-activities',enabled:true,note:'Open location-specific activities.'}]},
+  {id:'central-transit',categoryId:'transport',code:'TR-04',name:'Central Transit',type:'Transit Hub',status:'OPEN',shortDescription:'RiftCity’s main public transit interchange.',description:'A high-traffic transport hub with short city tasks.',tags:['TRANSIT','ACTIVITIES'],requirements:[],actions:[{id:'activities',label:'Transit activities',type:'city-activities',enabled:true,note:'Open location-specific activities.'}]},
+  {id:'warehouse-district',categoryId:'other',code:'OT-06',name:'Warehouse District',type:'Industrial District',status:'OPEN',shortDescription:'Storage yards and legal short-shift work.',description:'An industrial district used for contracts, production and city events.',tags:['WAREHOUSE','ACTIVITIES'],requirements:[],actions:[{id:'activities',label:'Warehouse activities',type:'city-activities',enabled:true,note:'Open location-specific activities.'}]},
+  {id:'safehouse',categoryId:'other',code:'OT-07',name:'Safehouse',type:'Safehouse',status:'OPEN',shortDescription:'A quiet place for recovery and planning.',description:'A private low-profile location with recovery-focused activities.',tags:['SAFEHOUSE','RECOVERY'],requirements:[],actions:[{id:'activities',label:'Safehouse activities',type:'city-activities',enabled:true,note:'Open safehouse activities.'}]},
+  {id:'rift-mall',categoryId:'shops',code:'SH-08',name:'Rift Mall',type:'Shopping Mall',status:'OPEN',shortDescription:'A multi-store commercial complex.',description:'A large shopping destination with rotating public tasks.',tags:['MALL','ACTIVITIES'],requirements:[],actions:[{id:'activities',label:'Mall activities',type:'city-activities',enabled:true,note:'Open mall activities.'}]},
+  {id:'courthouse',categoryId:'services',code:'SV-11',name:'RiftCity Courthouse',type:'Courthouse',status:'OPEN',shortDescription:'Courts, public records and civic services.',description:'The city courthouse and public records center.',tags:['LAW','CIVIC'],requirements:[],actions:[{id:'activities',label:'Courthouse activities',type:'city-activities',enabled:true,note:'Open civic activities.'}]},
+  {id:'company-plaza',categoryId:'services',code:'SV-12',name:'Company Plaza',type:'Business District',status:'OPEN',shortDescription:'Corporate offices and temporary work.',description:'A cluster of major employers and business services.',tags:['BUSINESS','ACTIVITIES'],requirements:[],actions:[{id:'activities',label:'Plaza activities',type:'city-activities',enabled:true,note:'Open business-district activities.'}]}
+
 ];
 
 const CATEGORY_LOOKUP = new Map(WORLD_CATEGORIES.map(category => [category.id, category]));
