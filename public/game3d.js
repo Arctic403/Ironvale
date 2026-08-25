@@ -32,11 +32,11 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   scene.imageProcessingConfiguration.contrast = 1.12;
   scene.imageProcessingConfiguration.exposure = 1.04;
 
-  const camera = new B.ArcRotateCamera('player-camera', Math.PI * 1.5, 1.05, 11, new B.Vector3(0, 2.2, 0), scene);
-  camera.lowerRadiusLimit = 5;
-  camera.upperRadiusLimit = 16;
-  camera.lowerBetaLimit = 0.65;
-  camera.upperBetaLimit = 1.35;
+  const camera = new B.ArcRotateCamera('player-camera', Math.PI * 1.5, 1.0, 9.4, new B.Vector3(0, 1.7, 0), scene);
+  camera.lowerRadiusLimit = 4.6;
+  camera.upperRadiusLimit = 13;
+  camera.lowerBetaLimit = 0.58;
+  camera.upperBetaLimit = 1.22;
   camera.wheelPrecision = 45;
   camera.panningSensibility = 0;
   camera.attachControl(canvas, true);
@@ -300,7 +300,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     player.visual.position.copyFrom(player.root.position);
     chunkManager.update(player.root.position.x, player.root.position.z);
     environmentManager.update(player.root.position.x, player.root.position.z);
-    camera.target = B.Vector3.Lerp(camera.target, player.root.position.add(new B.Vector3(0, 1.55, 0)), Math.min(1, dt * 8));
+    camera.target = B.Vector3.Lerp(camera.target, player.root.position.add(new B.Vector3(0, 1.35, 0)), Math.min(1, dt * 9.5));
 
     nearest = getNearest(interactables, player.root.position, 6.7);
     if (nearest) {
@@ -770,20 +770,37 @@ function createPlayer(B, scene, shadowGenerator) {
   skinMat.diffuseColor = B.Color3.FromHexString('#c18c69');
   const accent = new B.StandardMaterial('player-accent', scene);
   accent.diffuseColor = B.Color3.FromHexString('#d68d35');
+  const shoeMat = new B.StandardMaterial('player-shoe', scene);
+  shoeMat.diffuseColor = B.Color3.FromHexString('#191d22');
 
-  const torso = B.MeshBuilder.CreateBox('player-torso', { width: 0.85, height: 1.1, depth: 0.42 }, scene);
+  const torso = B.MeshBuilder.CreateBox('player-torso', { width: 0.82, height: 1.14, depth: 0.42 }, scene);
   torso.parent = visual;
-  torso.position.y = 1.55;
+  torso.position.y = 1.56;
   torso.material = bodyMat;
-  const head = B.MeshBuilder.CreateSphere('player-head', { diameter: 0.58, segments: 16 }, scene);
+  const chest = B.MeshBuilder.CreateBox('player-chest', { width: 0.74, height: 0.38, depth: 0.18 }, scene);
+  chest.parent = visual;
+  chest.position.set(0, 1.75, 0.22);
+  chest.material = accent;
+  const head = B.MeshBuilder.CreateSphere('player-head', { diameter: 0.56, segments: 16 }, scene);
   head.parent = visual;
   head.position.y = 2.42;
   head.material = skinMat;
-  const leftArm = limb(B, scene, visual, -0.56, 1.55, bodyMat, 'left-arm');
-  const rightArm = limb(B, scene, visual, 0.56, 1.55, bodyMat, 'right-arm');
-  const leftLeg = limb(B, scene, visual, -0.22, 0.6, accent, 'left-leg', 0.9);
-  const rightLeg = limb(B, scene, visual, 0.22, 0.6, accent, 'right-leg', 0.9);
-  [torso, head, leftArm, rightArm, leftLeg, rightLeg].forEach(mesh => shadowGenerator.addShadowCaster(mesh));
+  const hair = B.MeshBuilder.CreateBox('player-hair', { width: 0.52, height: 0.18, depth: 0.46 }, scene);
+  hair.parent = visual;
+  hair.position.set(0, 2.63, -0.02);
+  hair.material = bodyMat;
+  const leftArm = limb(B, scene, visual, -0.56, 1.52, bodyMat, 'left-arm', 0.88);
+  const rightArm = limb(B, scene, visual, 0.56, 1.52, bodyMat, 'right-arm', 0.88);
+  const leftLeg = limb(B, scene, visual, -0.22, 0.62, accent, 'left-leg', 0.92);
+  const rightLeg = limb(B, scene, visual, 0.22, 0.62, accent, 'right-leg', 0.92);
+  const leftFoot = B.MeshBuilder.CreateBox('player-left-foot', { width: 0.25, height: 0.1, depth: 0.4 }, scene);
+  leftFoot.parent = visual;
+  leftFoot.position.set(-0.22, 0.12, 0.08);
+  leftFoot.material = shoeMat;
+  const rightFoot = leftFoot.clone('player-right-foot');
+  rightFoot.parent = visual;
+  rightFoot.position.x = 0.22;
+  [torso, chest, head, hair, leftArm, rightArm, leftLeg, rightLeg, leftFoot, rightFoot].forEach(mesh => shadowGenerator.addShadowCaster(mesh));
 
   const collider = B.MeshBuilder.CreateCapsule('player-collider', { radius: 0.38, height: 1.8 }, scene);
   collider.isVisible = false;
