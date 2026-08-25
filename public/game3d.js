@@ -1,4 +1,5 @@
 import { escapeHtml } from './ui/helpers.js';
+import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, buildWorldLayout, getNearbyChunkKeys } from './world3d-layout.js';
 
 let activeWorld = null;
 
@@ -69,18 +70,20 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   const trunkMat = material('trunk', '#4a372b');
   glassMat.alpha = 0.86;
 
-  const ground = B.MeshBuilder.CreateGround('city-ground', { width: 190, height: 190 }, scene);
+  const ground = B.MeshBuilder.CreateGround('city-ground', { width: WORLD3D_CONFIG.worldSize, height: WORLD3D_CONFIG.worldSize }, scene);
   ground.material = groundMat;
   ground.checkCollisions = true;
   ground.receiveShadows = true;
 
-  createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat);
+  WORLD3D_DISTRICTS.forEach(district => {
+    createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat, district.x, district.z, 150);
+  });
 
-  const locationEntries = buildLocationLayout(world?.locations || []);
-  const interactables = [];
-  locationEntries.forEach((entry, index) => {
-    const building = createBuilding(B, scene, entry, index, { accentMat, glassMat, shadowGenerator });
-    interactables.push({ ...entry, mesh: building.pickMesh });
+  const locationEntries = buildWorldLayout(world?.locations || []);
+  const interactables = locationEntries;
+  const chunkManager = createLocationChunkManager({
+    entries: locationEntries,
+    create: (entry, index) => createBuilding(B, scene, entry, index, { accentMat, glassMat, shadowGenerator })
   });
 
   createSkyline(B, scene, material, shadowGenerator);
@@ -96,6 +99,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   if (currentEntry) player.root.position = new B.Vector3(currentEntry.x, 0.92, currentEntry.z + 7);
   player.collider.position.copyFrom(player.root.position);
   player.visual.position.copyFrom(player.root.position);
+  chunkManager.update(player.root.position.x, player.root.position.z);
 
   createNPCs(B, scene, shadowGenerator, 11);
 
@@ -211,7 +215,10 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     if (!target) return;
     player.root.position.x = target.x;
     player.root.position.z = target.z + 7;
+    player.collider.position.copyFrom(player.root.position);
+    player.visual.position.copyFrom(player.root.position);
     player.velocity.set(0, 0, 0);
+    chunkManager.update(player.root.position.x, player.root.position.z);
     directory?.classList.remove('open');
   }));
 
@@ -281,6 +288,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     player.collider.moveWithCollisions(motion);
     player.root.position.copyFrom(player.collider.position);
     player.visual.position.copyFrom(player.root.position);
+    chunkManager.update(player.root.position.x, player.root.position.z);
     camera.target = B.Vector3.Lerp(camera.target, player.root.position.add(new B.Vector3(0, 1.55, 0)), Math.min(1, dt * 8));
 
     nearest = getNearest(interactables, player.root.position, 6.7);
@@ -308,6 +316,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
       visualViewport?.removeEventListener('resize', syncViewport);
       visualViewport?.removeEventListener('scroll', syncViewport);
       joystick?.destroy?.();
+      chunkManager.dispose();
       root.style.height = '';
       shell?.style.removeProperty('height');
       document.body.classList.remove('world3d-game-mode');
@@ -404,59 +413,63 @@ function setupVirtualJoystick(root, touch) {
   };
 }
 
-function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat) {
+function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat, originX = 0, originZ = 0, extent = 190) {
   const roadPositions = [-56, -28, 0, 28, 56];
-  roadPositions.forEach(x => {
-    const road = B.MeshBuilder.CreateBox(`road-v-${x}`, { width: 9, height: 0.07, depth: 190 }, scene);
-    road.position.set(x, 0.045, 0);
+  roadPositions.forEach(localX => {
+    const x = originX + localX;
+    const road = B.MeshBuilder.CreateBox(`road-v-${originX}-${originZ}-${localX}`, { width: 9, height: 0.07, depth: extent }, scene);
+    road.position.set(x, 0.045, originZ);
     road.material = roadMat;
 
     for (const lane of [-2.15, 2.15]) {
-      const line = B.MeshBuilder.CreateBox(`lane-v-${x}-${lane}`, { width: 0.09, height: 0.082, depth: 190 }, scene);
-      line.position.set(x + lane, 0.092, 0);
+      const line = B.MeshBuilder.CreateBox(`lane-v-${originX}-${originZ}-${localX}-${lane}`, { width: 0.09, height: 0.082, depth: extent }, scene);
+      line.position.set(x + lane, 0.092, originZ);
       line.material = lineMat;
     }
     for (const side of [-1, 1]) {
-      const curb = B.MeshBuilder.CreateBox(`curb-v-${x}-${side}`, { width: 0.22, height: 0.22, depth: 190 }, scene);
-      curb.position.set(x + side * 4.62, 0.13, 0);
+      const curb = B.MeshBuilder.CreateBox(`curb-v-${originX}-${originZ}-${localX}-${side}`, { width: 0.22, height: 0.22, depth: extent }, scene);
+      curb.position.set(x + side * 4.62, 0.13, originZ);
       curb.material = curbMat;
       curb.checkCollisions = true;
     }
   });
 
-  roadPositions.forEach(z => {
-    const road = B.MeshBuilder.CreateBox(`road-h-${z}`, { width: 190, height: 0.075, depth: 9 }, scene);
-    road.position.set(0, 0.05, z);
+  roadPositions.forEach(localZ => {
+    const z = originZ + localZ;
+    const road = B.MeshBuilder.CreateBox(`road-h-${originX}-${originZ}-${localZ}`, { width: extent, height: 0.075, depth: 9 }, scene);
+    road.position.set(originX, 0.05, z);
     road.material = roadMat;
 
     for (const lane of [-2.15, 2.15]) {
-      const line = B.MeshBuilder.CreateBox(`lane-h-${z}-${lane}`, { width: 190, height: 0.082, depth: 0.09 }, scene);
-      line.position.set(0, 0.093, z + lane);
+      const line = B.MeshBuilder.CreateBox(`lane-h-${originX}-${originZ}-${localZ}-${lane}`, { width: extent, height: 0.082, depth: 0.09 }, scene);
+      line.position.set(originX, 0.093, z + lane);
       line.material = lineMat;
     }
     for (const side of [-1, 1]) {
-      const curb = B.MeshBuilder.CreateBox(`curb-h-${z}-${side}`, { width: 190, height: 0.22, depth: 0.22 }, scene);
-      curb.position.set(0, 0.13, z + side * 4.62);
+      const curb = B.MeshBuilder.CreateBox(`curb-h-${originX}-${originZ}-${localZ}-${side}`, { width: extent, height: 0.22, depth: 0.22 }, scene);
+      curb.position.set(originX, 0.13, z + side * 4.62);
       curb.material = curbMat;
       curb.checkCollisions = true;
     }
   });
 
   const blockCenters = [-70, -42, -14, 14, 42, 70];
-  blockCenters.forEach(x => blockCenters.forEach(z => {
-    const pad = B.MeshBuilder.CreateBox(`sidewalk-${x}-${z}`, { width: 17.2, height: 0.16, depth: 17.2 }, scene);
-    pad.position.set(x, 0.08, z);
+  blockCenters.forEach(localX => blockCenters.forEach(localZ => {
+    const pad = B.MeshBuilder.CreateBox(`sidewalk-${originX}-${originZ}-${localX}-${localZ}`, { width: 17.2, height: 0.16, depth: 17.2 }, scene);
+    pad.position.set(originX + localX, 0.08, originZ + localZ);
     pad.material = sidewalkMat;
     pad.checkCollisions = true;
   }));
 
-  for (const x of roadPositions) {
-    for (const z of roadPositions) {
+  for (const localX of roadPositions) {
+    for (const localZ of roadPositions) {
+      const x = originX + localX;
+      const z = originZ + localZ;
       for (const offset of [-3.15, 3.15]) {
-        const crossA = B.MeshBuilder.CreateBox(`cross-a-${x}-${z}-${offset}`, { width: 0.32, height: 0.085, depth: 2.3 }, scene);
+        const crossA = B.MeshBuilder.CreateBox(`cross-a-${originX}-${originZ}-${localX}-${localZ}-${offset}`, { width: 0.32, height: 0.085, depth: 2.3 }, scene);
         crossA.position.set(x + offset, 0.097, z);
         crossA.material = lineMat;
-        const crossB = B.MeshBuilder.CreateBox(`cross-b-${x}-${z}-${offset}`, { width: 2.3, height: 0.085, depth: 0.32 }, scene);
+        const crossB = B.MeshBuilder.CreateBox(`cross-b-${originX}-${originZ}-${localX}-${localZ}-${offset}`, { width: 2.3, height: 0.085, depth: 0.32 }, scene);
         crossB.position.set(x, 0.097, z + offset);
         crossB.material = lineMat;
       }
@@ -464,73 +477,62 @@ function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat) {
   }
 }
 
-function buildLocationLayout(locations) {
-  const pads = [];
-  const blockCenters = [-70, -42, -14, 14, 42, 70];
-  blockCenters.forEach(x => blockCenters.forEach(z => pads.push({ x, z })));
-  const ordered = [...locations].sort((a, b) => String(a.id).localeCompare(String(b.id)));
-  return ordered.slice(0, pads.length).map((location, index) => ({
-    id: location.id,
-    name: location.name,
-    code: location.code,
-    type: location.type,
-    status: location.status,
-    categoryId: location.categoryId,
-    shortDescription: location.shortDescription,
-    ...pads[index]
-  }));
-}
-
 function createBuilding(B, scene, entry, index, { accentMat, glassMat, shadowGenerator }) {
+  const ownedMeshes = [];
+  const own = mesh => {
+    ownedMeshes.push(mesh);
+    return mesh;
+  };
+
   const heights = [6, 8, 10, 12, 15, 18];
   const height = heights[index % heights.length];
   const width = 11 + (index % 3) * 1.6;
   const depth = 10 + ((index + 1) % 3) * 1.4;
-  const shellMat = new B.StandardMaterial(`building-mat-${index}`, scene);
+  const shellMat = new B.StandardMaterial(`building-mat-${entry.id}`, scene);
   const base = 0.12 + (index % 4) * 0.035;
   shellMat.diffuseColor = new B.Color3(base, base + 0.015, base + 0.025);
   shellMat.specularColor = new B.Color3(0.05, 0.05, 0.05);
 
-  const building = B.MeshBuilder.CreateBox(`building-${entry.id}`, { width, height, depth }, scene);
+  const building = own(B.MeshBuilder.CreateBox(`building-${entry.id}`, { width, height, depth }, scene));
   building.position.set(entry.x, height / 2 + 0.17, entry.z);
   building.material = shellMat;
   building.checkCollisions = true;
   building.receiveShadows = true;
   shadowGenerator.addShadowCaster(building);
 
-  const roof = B.MeshBuilder.CreateBox(`roof-${entry.id}`, {
+  const roof = own(B.MeshBuilder.CreateBox(`roof-${entry.id}`, {
     width: Math.max(3.5, width * 0.48),
     height: 0.65 + (index % 3) * 0.22,
     depth: Math.max(3.2, depth * 0.42)
-  }, scene);
+  }, scene));
   roof.position.set(entry.x + ((index % 2) ? 1.2 : -1.1), height + 0.48, entry.z - 0.4);
   roof.material = shellMat;
   shadowGenerator.addShadowCaster(roof);
 
   for (const side of [-1, 1]) {
-    const trim = B.MeshBuilder.CreateBox(`facade-trim-${entry.id}-${side}`, { width: 0.16, height: height * 0.82, depth: 0.16 }, scene);
+    const trim = own(B.MeshBuilder.CreateBox(`facade-trim-${entry.id}-${side}`, { width: 0.16, height: height * 0.82, depth: 0.16 }, scene));
     trim.position.set(entry.x + side * (width / 2 - 0.28), height * 0.52, entry.z + depth / 2 + 0.08);
     trim.material = accentMat;
   }
 
-  const door = B.MeshBuilder.CreateBox(`door-${entry.id}`, { width: 2.15, height: 3.2, depth: 0.12 }, scene);
+  const door = own(B.MeshBuilder.CreateBox(`door-${entry.id}`, { width: 2.15, height: 3.2, depth: 0.12 }, scene));
   door.position.set(entry.x, 1.76, entry.z + depth / 2 + 0.07);
   door.material = glassMat;
 
-  const canopy = B.MeshBuilder.CreateBox(`canopy-${entry.id}`, { width: 4.1, height: 0.22, depth: 1.35 }, scene);
+  const canopy = own(B.MeshBuilder.CreateBox(`canopy-${entry.id}`, { width: 4.1, height: 0.22, depth: 1.35 }, scene));
   canopy.position.set(entry.x, 3.6, entry.z + depth / 2 + 0.65);
   canopy.material = accentMat;
   shadowGenerator.addShadowCaster(canopy);
 
   for (let floor = 0; floor < Math.max(1, Math.floor(height / 3) - 1); floor++) {
     for (const side of [-1, 1]) {
-      const window = B.MeshBuilder.CreateBox(`window-${entry.id}-${floor}-${side}`, { width: 2.4, height: 1.15, depth: 0.08 }, scene);
-      window.position.set(entry.x + side * width * 0.25, 5 + floor * 2.5, entry.z + depth / 2 + 0.05);
-      window.material = glassMat;
+      const windowMesh = own(B.MeshBuilder.CreateBox(`window-${entry.id}-${floor}-${side}`, { width: 2.4, height: 1.15, depth: 0.08 }, scene));
+      windowMesh.position.set(entry.x + side * width * 0.25, 5 + floor * 2.5, entry.z + depth / 2 + 0.05);
+      windowMesh.material = glassMat;
     }
   }
 
-  const signPlane = B.MeshBuilder.CreatePlane(`sign-${entry.id}`, { width: Math.min(width - 1, 9), height: 1.4 }, scene);
+  const signPlane = own(B.MeshBuilder.CreatePlane(`sign-${entry.id}`, { width: Math.min(width - 1, 9), height: 1.4 }, scene));
   signPlane.position.set(entry.x, Math.min(height - 1.2, 5.05), entry.z + depth / 2 + 0.11);
   const signMat = new B.StandardMaterial(`sign-mat-${entry.id}`, scene);
   const texture = new B.DynamicTexture(`sign-texture-${entry.id}`, { width: 1024, height: 256 }, scene, false);
@@ -541,10 +543,58 @@ function createBuilding(B, scene, entry, index, { accentMat, glassMat, shadowGen
   signMat.opacityTexture = texture;
   signPlane.material = signMat;
 
-  const marker = B.MeshBuilder.CreateCylinder(`marker-${entry.id}`, { height: 0.16, diameter: 3.3, tessellation: 40 }, scene);
+  const marker = own(B.MeshBuilder.CreateCylinder(`marker-${entry.id}`, { height: 0.16, diameter: 3.3, tessellation: 40 }, scene));
   marker.position.set(entry.x, 0.2, entry.z + depth / 2 + 2.0);
   marker.material = accentMat;
-  return { pickMesh: marker };
+
+  return {
+    pickMesh: marker,
+    dispose() {
+      ownedMeshes.forEach(mesh => {
+        try { mesh.dispose(false, false); } catch (_) {}
+      });
+      try { texture.dispose(); } catch (_) {}
+      try { signMat.dispose(); } catch (_) {}
+      try { shellMat.dispose(); } catch (_) {}
+    }
+  };
+}
+
+function createLocationChunkManager({ entries, create }) {
+  const active = new Map();
+  let lastCenter = '';
+
+  const update = (x, z) => {
+    const wanted = new Set(getNearbyChunkKeys(x, z));
+    const center = `${Math.floor(x / WORLD3D_CONFIG.chunkSize)}:${Math.floor(z / WORLD3D_CONFIG.chunkSize)}`;
+    if (center === lastCenter && active.size) return;
+    lastCenter = center;
+
+    for (const [id, record] of active) {
+      if (wanted.has(record.entry.chunkKey)) continue;
+      record.bundle.dispose();
+      record.entry.mesh = null;
+      active.delete(id);
+    }
+
+    entries.forEach((entry, index) => {
+      if (!wanted.has(entry.chunkKey) || active.has(entry.id)) return;
+      const bundle = create(entry, index);
+      entry.mesh = bundle.pickMesh;
+      active.set(entry.id, { entry, bundle });
+    });
+  };
+
+  return {
+    update,
+    dispose() {
+      for (const record of active.values()) {
+        record.bundle.dispose();
+        record.entry.mesh = null;
+      }
+      active.clear();
+    }
+  };
 }
 
 function createSkyline(B, scene, material, shadowGenerator) {
@@ -762,6 +812,7 @@ function getNearest(entries, position, maxDistance) {
   let nearest = null;
   let nearestDistance = maxDistance;
   for (const entry of entries) {
+    if (!entry.mesh || entry.mesh.isDisposed?.()) continue;
     const dx = position.x - entry.mesh.position.x;
     const dz = position.z - entry.mesh.position.z;
     const distance = Math.hypot(dx, dz);
