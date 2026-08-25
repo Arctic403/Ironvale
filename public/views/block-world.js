@@ -165,16 +165,41 @@ export async function renderBlockWorld(root){
     if(!file)return;
     try{
       const payload=JSON.parse(await file.text());
-      const list=payload?.format==='riftcity-asset-pack'&&Array.isArray(payload.assets)?payload.assets:[];
-      if(!list.length)throw new Error('This JSON is not a RiftCity asset pack or contains no assets.');
+
+      // Accept RiftAssets packs, a single RiftAssets asset object, and older
+      // asset JSON shapes so the importer is forgiving on mobile.
+      const packFormats=new Set(['riftcity-asset-pack','riftcity-assets','riftcity-asset']);
+      let list=[];
+      if(Array.isArray(payload?.assets)) list=payload.assets;
+      else if(Array.isArray(payload)) list=payload;
+      else if(payload && typeof payload==='object'){
+        const looksLikeAsset=payload.src||payload.dataUrl||payload.image||payload.imageData||payload.data;
+        if(looksLikeAsset) list=[payload];
+      }
+      if(payload?.format && !packFormats.has(payload.format) && !list.length){
+        throw new Error(`Unsupported asset format: ${payload.format}`);
+      }
+      if(!list.length)throw new Error('This JSON contains no importable RiftCity building assets.');
+
       let added=0;
       for(const raw of list){
-        const id=String(raw.id||raw.assetId||raw.name||'').trim();
-        const src=String(raw.src||raw.dataUrl||'');
+        const id=String(raw.id||raw.assetId||raw.slug||raw.name||`asset-${added+1}`).trim();
+        let src=String(raw.src||raw.dataUrl||raw.image||raw.imageData||raw.data||'').trim();
+        const mime=String(raw.mimeType||raw.mime||'image/png').trim()||'image/png';
+        if(src && !src.startsWith('data:image/') && /^[A-Za-z0-9+/=\s]+$/.test(src)){
+          src=`data:${mime};base64,${src.replace(/\s+/g,'')}`;
+        }
         if(!id||!src.startsWith('data:image/'))continue;
-        importedAssets.set(id,{id,name:raw.name||id,src,sourceWidth:raw.sourceWidth||0,sourceHeight:raw.sourceHeight||0});added++;
+        importedAssets.set(id,{
+          id,
+          name:raw.name||raw.label||id,
+          src,
+          sourceWidth:Number(raw.sourceWidth||raw.width||0),
+          sourceHeight:Number(raw.sourceHeight||raw.height||0)
+        });
+        added++;
       }
-      if(!added)throw new Error('No embedded image assets were found in this pack.');
+      if(!added)throw new Error('No embedded image data was found. Expected src/dataUrl/image containing a data:image URL or base64 image.');
       populateAssetSelect();assetStatus.textContent=`${added} asset${added===1?'':'s'} imported · ${file.name}`;syncAssetInspector();renderEditorObjects();
     }catch(err){assetStatus.textContent=`Import failed: ${err.message}`;}
     finally{assetFile.value='';}
