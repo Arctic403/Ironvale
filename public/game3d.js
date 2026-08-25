@@ -1,5 +1,6 @@
 import { escapeHtml } from './ui/helpers.js';
 import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, buildWorldLayout, getNearbyChunkKeys } from './world3d-layout.js';
+import { createStreamedEnvironment } from './world3d-environment.js';
 
 let activeWorld = null;
 
@@ -68,6 +69,13 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   const curbMat = material('curb', '#585b5f');
   const foliageMat = material('foliage', '#304337');
   const trunkMat = material('trunk', '#4a372b');
+  const metalMat = material('metal', '#24282c');
+  const buildingMats = [
+    material('filler-building-0', '#171b20'),
+    material('filler-building-1', '#1d2126'),
+    material('filler-building-2', '#20252a'),
+    material('filler-building-3', '#262328')
+  ];
   glassMat.alpha = 0.86;
 
   const ground = B.MeshBuilder.CreateGround('city-ground', { width: WORLD3D_CONFIG.worldSize, height: WORLD3D_CONFIG.worldSize }, scene);
@@ -87,10 +95,10 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   });
 
   createSkyline(B, scene, material, shadowGenerator);
-  createStreetLights(B, scene, accentMat);
-  createCityProps(B, scene, { foliageMat, trunkMat, sidewalkMat, shadowGenerator });
-  createTraffic(B, scene, shadowGenerator);
-  createParkedCars(B, scene, shadowGenerator);
+
+  const environmentManager = createStreamedEnvironment(B, scene, shadowGenerator, {
+    roadMat, sidewalkMat, lineMat, accentMat, glassMat, foliageMat, trunkMat, metalMat, buildingMats
+  });
 
   const player = createPlayer(B, scene, shadowGenerator);
   player.root.position = new B.Vector3(0, 0.92, 7);
@@ -100,6 +108,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   player.collider.position.copyFrom(player.root.position);
   player.visual.position.copyFrom(player.root.position);
   chunkManager.update(player.root.position.x, player.root.position.z);
+  environmentManager.update(player.root.position.x, player.root.position.z);
 
   createNPCs(B, scene, shadowGenerator, 11);
 
@@ -219,6 +228,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     player.visual.position.copyFrom(player.root.position);
     player.velocity.set(0, 0, 0);
     chunkManager.update(player.root.position.x, player.root.position.z);
+    environmentManager.update(player.root.position.x, player.root.position.z);
     directory?.classList.remove('open');
   }));
 
@@ -289,6 +299,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     player.root.position.copyFrom(player.collider.position);
     player.visual.position.copyFrom(player.root.position);
     chunkManager.update(player.root.position.x, player.root.position.z);
+    environmentManager.update(player.root.position.x, player.root.position.z);
     camera.target = B.Vector3.Lerp(camera.target, player.root.position.add(new B.Vector3(0, 1.55, 0)), Math.min(1, dt * 8));
 
     nearest = getNearest(interactables, player.root.position, 6.7);
@@ -317,6 +328,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
       visualViewport?.removeEventListener('scroll', syncViewport);
       joystick?.destroy?.();
       chunkManager.dispose();
+      environmentManager.dispose();
       root.style.height = '';
       shell?.style.removeProperty('height');
       document.body.classList.remove('world3d-game-mode');
