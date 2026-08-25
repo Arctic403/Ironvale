@@ -10,8 +10,10 @@ import { renderInventory } from './views/inventory.js';
 import { renderService } from './views/service.js';
 import { renderWiki } from './views/wiki.js';
 import { destroyCity3D } from './game3d.js';
+import { initPwaSupport } from './pwa.js';
 
 initShell();
+initPwaSupport();
 
 $('#login-form').addEventListener('submit', event=>{event.preventDefault();submitAuth('/api/auth/login',event.currentTarget);});
 $('#register-form').addEventListener('submit', event=>{event.preventDefault();submitAuth('/api/auth/register',event.currentTarget);});

@@ -95,3 +95,79 @@ body.world3d-game-mode .world3d-shell{width:100%;height:100%;min-height:0}
   body:not(.world3d-game-mode) .world3d-joystick-ring{width:96px;height:96px}
   body:not(.world3d-game-mode) .world3d-prompt{bottom:102px}
 }
+
+
+/* Home Screen / standalone RiftCity web app */
+html.pwa-standalone,
+body.pwa-standalone{
+  min-height:100dvh;
+  overscroll-behavior:none;
+  background:#10100e;
+}
+body.pwa-standalone{
+  padding-top:env(safe-area-inset-top);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+body.pwa-standalone .topbar{
+  top:0;
+  padding-left:max(14px,env(safe-area-inset-left));
+  padding-right:max(14px,env(safe-area-inset-right));
+}
+body.pwa-standalone .mobile-nav{
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+body.pwa-standalone.world3d-game-mode{
+  padding:0;
+}
+.riftcity-install-hint{
+  position:fixed;
+  left:max(10px,env(safe-area-inset-left));
+  right:max(10px,env(safe-area-inset-right));
+  bottom:max(74px,calc(env(safe-area-inset-bottom) + 68px));
+  z-index:95;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border:1px solid rgba(214,141,53,.6);
+  background:rgba(16,16,14,.96);
+  color:var(--text);
+  padding:10px 12px;
+  backdrop-filter:blur(14px);
+  box-shadow:0 10px 32px rgba(0,0,0,.3);
+}
+.riftcity-install-hint div{min-width:0}
+.riftcity-install-hint strong{
+  display:block;
+  color:var(--accent2);
+  font-size:.72rem;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.riftcity-install-hint span{
+  display:block;
+  margin-top:2px;
+  color:var(--muted);
+  font-size:.62rem;
+  line-height:1.35;
+}
+.riftcity-install-hint button{
+  flex:0 0 38px;
+  width:38px;
+  height:38px;
+  border:1px solid var(--line);
+  background:transparent;
+  color:var(--text);
+  font-size:1rem;
+}
+@media (orientation:landscape) and (pointer:coarse){
+  .riftcity-install-hint{
+    left:auto;
+    width:min(420px,calc(100vw - 24px));
+    bottom:max(12px,env(safe-area-inset-bottom));
+  }
+}

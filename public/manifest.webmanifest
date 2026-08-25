@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "RiftCity",
+  "short_name": "RiftCity",
+  "description": "RiftCity browser MMO",
+  "start_url": "/#city",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "browser"
+  ],
+  "orientation": "landscape",
+  "background_color": "#10100e",
+  "theme_color": "#11110f",
+  "categories": [
+    "games"
+  ],
+  "icons": [
+    {
+      "src": "/riftcity-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
