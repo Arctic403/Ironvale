@@ -9,6 +9,7 @@ import {
   getItemDefinition,
   toPublicItemDefinition
 } from './plugins/index.js';
+import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast } from './services/gameplay.js';
 
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -176,6 +177,13 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'GET' && url.pathname.startsWith('/api/world/districts/')) return getDistrict(request, env, url);
   if (method === 'GET' && url.pathname.startsWith('/api/world/locations/')) return getLocation(request, env, url);
   if (method === 'POST' && url.pathname === '/api/world/travel') return travelToLocation(request, env, requestId);
+  if (url.pathname.startsWith('/api/services')) {
+    const response = await handleGameplayApi(request, env, url, requestId, {
+      authenticate, json, readJson, ensureActivePlayerState, toPublicPlayerState,
+      writeAudit, addItemToInventory, removeItemFromInventory, applyXpAndLevels
+    });
+    if (response) return response;
+  }
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
   if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
   if (method === 'POST' && url.pathname.startsWith('/api/admin/logs/') && url.pathname.endsWith('/resolve')) {
@@ -509,6 +517,12 @@ async function executeCrime(request, env, requestId) {
   }
 
   await env.DB.batch(statements);
+  await ensureGameplayTables(env);
+  if (success) await incrementProgress(auth.user.id, 'crime', 1, env);
+  if (cashDelta > 0) {
+    const cashRow = await env.DB.prepare('SELECT cash FROM player_state WHERE user_id = ?').bind(auth.user.id).first();
+    await setProgressAtLeast(auth.user.id, 'cash', Number(cashRow?.cash) || 0, env);
+  }
   const updatedPlayer = await ensureActivePlayerState(env, auth.user.id);
   const updatedProgressRow = await env.DB.prepare(`
     SELECT crime_id, mastery, attempts, successes, failures, last_attempt_at, updated_at
@@ -995,6 +1009,9 @@ async function travelToLocation(request, env, requestId) {
       updated_at = excluded.updated_at
   `).bind(auth.user.id, location.categoryId, location.id, now).run();
 
+  await ensureGameplayTables(env);
+  await incrementProgress(auth.user.id, 'travel', 1, env);
+
   await writeAudit(env, auth.user.id, 'world.travel', auth.user.id, {
     categoryId: location.categoryId,
     locationId: location.id
@@ -1016,7 +1033,7 @@ async function travelToLocation(request, env, requestId) {
 }
 
 async function health(env) {
-  const result = { ok: true, service: 'riftcity-v2-phase4', database: 'unknown' };
+  const result = { ok: true, service: 'riftcity-v2-phase6-foundation', database: 'unknown' };
   try {
     await env.DB.prepare('SELECT 1 AS ok').first();
     result.database = 'connected';

@@ -1,10 +1,10 @@
 {
-  "name": "riftcity-v2-phase5",
-  "version": "0.5.0",
+  "name": "riftcity-v2-phase6-foundation",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node --check src/index.js && node --check src/items.js && node --check src/plugins/index.js && node --check src/plugins/items.js && node --check src/plugins/crimes.js && node --check src/plugins/world.js && node --check public/app.js && node --check public/admin-logs.js && node --check scripts/verify-js-only.js",
+    "build": "npm run verify:js-only && node --check src/index.js && node --check src/items.js && node --check src/plugins/index.js && node --check src/plugins/items.js && node --check src/plugins/crimes.js && node --check src/plugins/world.js && node --check src/plugins/jobs.js && node --check src/plugins/education.js && node --check src/plugins/gym.js && node --check src/plugins/banking.js && node --check src/plugins/properties.js && node --check src/plugins/factions.js && node --check src/plugins/missions.js && node --check src/plugins/markets.js && node --check src/plugins/events.js && node --check src/plugins/shops.js && node --check src/plugins/casino.js && node --check src/services/gameplay.js && node --check public/app.js && node --check public/admin-logs.js && node --check scripts/verify-js-only.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",

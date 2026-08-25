@@ -1,0 +1,10 @@
+// Server-owned job/career content.
+export const JOB_REGISTRY = Object.freeze([
+  {id:'delivery',company:'RiftExpress',title:'Courier',description:'Deliver packages across RiftCity.',energyCost:6,basePay:100,skills:['logistics','efficiency','communication'],positions:[{tier:1,title:'Courier',skill:0,pay:100},{tier:2,title:'Route Specialist',skill:5,pay:140},{tier:3,title:'Senior Dispatcher',skill:10,pay:190}]},
+  {id:'security',company:'RiftShield',title:'Security Guard',description:'Protect businesses and keep troublemakers out.',energyCost:7,basePay:180,skills:['security','discipline','communication'],positions:[{tier:1,title:'Security Guard',skill:0,pay:180},{tier:2,title:'Shift Lead',skill:5,pay:250},{tier:3,title:'Security Supervisor',skill:10,pay:340}]},
+  {id:'construction',company:'Ironworks',title:'Construction Worker',description:'Build the city while building your wallet.',energyCost:8,basePay:300,skills:['strength','efficiency','discipline'],positions:[{tier:1,title:'Construction Worker',skill:0,pay:300},{tier:2,title:'Crew Lead',skill:5,pay:420},{tier:3,title:'Site Foreman',skill:10,pay:575}]},
+  {id:'technician',company:'RiftTech',title:'Technician',description:'Keep RiftCity technology running.',energyCost:8,basePay:500,skills:['technology','efficiency','discipline'],positions:[{tier:1,title:'Technician',skill:0,pay:500},{tier:2,title:'Systems Specialist',skill:5,pay:700},{tier:3,title:'Senior Engineer',skill:10,pay:950}]},
+  {id:'finance',company:'Rift Capital',title:'Finance Associate',description:'Work the financial side of RiftCity.',energyCost:9,basePay:800,skills:['finance','communication','discipline'],positions:[{tier:1,title:'Finance Associate',skill:0,pay:800},{tier:2,title:'Portfolio Analyst',skill:5,pay:1100},{tier:3,title:'Senior Broker',skill:10,pay:1500}]}
+]);
+export const getJobDefinition=id=>JOB_REGISTRY.find(job=>job.id===id)||null;
+export function getJobPosition(job, skillLevel=0){return [...job.positions].reverse().find(p=>skillLevel>=p.skill)||job.positions[0];}

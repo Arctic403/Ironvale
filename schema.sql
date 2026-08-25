@@ -152,3 +152,81 @@ CREATE TABLE IF NOT EXISTS crime_history (
 CREATE INDEX IF NOT EXISTS idx_crime_history_user_created ON crime_history(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_crime_history_crime ON crime_history(user_id, crime_id, created_at DESC);
 
+
+
+-- Massive backend expansion: server-authoritative gameplay services.
+CREATE TABLE IF NOT EXISTS player_bank_accounts (
+  user_id TEXT PRIMARY KEY,
+  checking INTEGER NOT NULL DEFAULT 0 CHECK(checking>=0),
+  savings INTEGER NOT NULL DEFAULT 0 CHECK(savings>=0),
+  lifetime_deposits INTEGER NOT NULL DEFAULT 0 CHECK(lifetime_deposits>=0),
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS bank_ledger (
+  id TEXT PRIMARY KEY,user_id TEXT NOT NULL,kind TEXT NOT NULL,amount INTEGER NOT NULL,
+  fee INTEGER NOT NULL DEFAULT 0,balance_after INTEGER NOT NULL,created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_bank_ledger_user ON bank_ledger(user_id,created_at);
+CREATE TABLE IF NOT EXISTS player_investments (
+  id TEXT PRIMARY KEY,user_id TEXT NOT NULL,tier_id TEXT NOT NULL,principal INTEGER NOT NULL,
+  rate REAL NOT NULL,matures_at INTEGER NOT NULL,claimed INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_investments_user ON player_investments(user_id,matures_at);
+
+CREATE TABLE IF NOT EXISTS player_jobs (
+  user_id TEXT PRIMARY KEY,job_id TEXT,skill_level INTEGER NOT NULL DEFAULT 0,
+  skill_xp INTEGER NOT NULL DEFAULT 0,shifts INTEGER NOT NULL DEFAULT 0,last_work_at INTEGER,updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_education (
+  user_id TEXT NOT NULL,course_id TEXT NOT NULL,status TEXT NOT NULL,
+  started_at INTEGER,completes_at INTEGER,completed_at INTEGER,
+  PRIMARY KEY(user_id,course_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_gym (
+  user_id TEXT PRIMARY KEY,gym_exp INTEGER NOT NULL DEFAULT 0,streak INTEGER NOT NULL DEFAULT 0,
+  sessions INTEGER NOT NULL DEFAULT 0,last_train_at INTEGER,updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_properties (
+  user_id TEXT NOT NULL,property_id TEXT NOT NULL,is_home INTEGER NOT NULL DEFAULT 0,
+  purchased_at INTEGER NOT NULL,PRIMARY KEY(user_id,property_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_factions (
+  user_id TEXT PRIMARY KEY,faction_id TEXT,reputation INTEGER NOT NULL DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0,jobs_done INTEGER NOT NULL DEFAULT 0,last_work_at INTEGER,updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_progress_counters (
+  user_id TEXT NOT NULL,metric TEXT NOT NULL,value INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,metric),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_missions (
+  user_id TEXT NOT NULL,mission_id TEXT NOT NULL,claimed INTEGER NOT NULL DEFAULT 0,claimed_at INTEGER,
+  PRIMARY KEY(user_id,mission_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS player_market_positions (
+  user_id TEXT NOT NULL,asset_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,
+  average_cost INTEGER NOT NULL DEFAULT 0,updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,asset_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS auction_listings (
+  id TEXT PRIMARY KEY,seller_user_id TEXT NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL,
+  unit_price INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'active',buyer_user_id TEXT,
+  created_at INTEGER NOT NULL,completed_at INTEGER,
+  FOREIGN KEY (seller_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (buyer_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_auction_active ON auction_listings(status,created_at);
+CREATE TABLE IF NOT EXISTS player_casino (
+  user_id TEXT PRIMARY KEY,chips INTEGER NOT NULL DEFAULT 0,last_daily_grant INTEGER,updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

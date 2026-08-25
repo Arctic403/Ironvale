@@ -91,3 +91,47 @@ This means content can be added/tuned without rewriting the generic crime, inven
 
 Crime attempts now render their server result directly inside the crime card that was attempted. Successes, failures and blocked/error results stay attached to that crime and display reward/progression details without using the global toast as the result surface.
 
+
+
+## Phase 6 — Massive server-authoritative backend foundation
+
+The V1 feature build is now treated as a feature target, not as code to copy. Phase 6 rebuilds the reusable backend spine in JavaScript/Cloudflare/D1.
+
+### New plugin families
+- `jobs.js` — five career ladders and pay/skill tuning.
+- `education.js` — timed courses, costs, level requirements and bonuses.
+- `gym.js` — RiftCity's program-based gym progression.
+- `banking.js` — checking/savings rules and investment tiers.
+- `properties.js` — residence catalog and home bonuses.
+- `factions.js` — faction identities and rank thresholds.
+- `missions.js` — connected mission targets/rewards.
+- `markets.js` — fictional RiftCity market assets/pricing.
+- `events.js` — rotating world-event definitions.
+- `shops.js` — location-aware store inventories and pricing.
+- `casino.js` — in-game chip account/game catalog foundation; no real-money wagering.
+
+### Persistent service engine
+`src/services/gameplay.js` owns the generic D1-backed service engine. It creates/uses persistent tables for banking, investments, careers, education, gym progression, properties, factions, shared progression counters, missions, fictional market holdings, player auction listings and casino chips.
+
+All service routes are authenticated:
+- `GET /api/services` — installed service catalog.
+- `GET /api/services/:service` — current catalog + player state for that system.
+- `POST /api/services/:service` — execute a server-authoritative action.
+
+Implemented service IDs:
+`bank`, `jobs`, `education`, `gym`, `properties`, `factions`, `missions`, `market`, `shop`, `auction`, `status`, `events`, `casino`.
+
+Important POST actions include:
+- bank: `deposit`, `withdraw`, `to-savings`, `from-savings`, `invest`, `claim-investment`
+- jobs: `join`, `work`
+- education: `enroll`
+- gym: `train`
+- properties: `buy`, `set-home`
+- factions: `join`, `work`, `leave`
+- missions: `claim`
+- market: `buy`, `sell`
+- shop: `buy`, `sell`
+- auction: `list`, `buy`, `cancel`
+- casino: `claim-daily` (game implementations remain a later tuning pass)
+
+Crime successes, city travel, job shifts, gym sessions, faction work and cash milestones now feed shared server-side progression counters used by missions. Existing crime/item/world engines remain intact.
