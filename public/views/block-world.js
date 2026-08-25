@@ -16,7 +16,23 @@ export async function renderBlockWorld(root){
       <div class="blockworld-viewport" id="blockworld-viewport">
         <div class="blockworld-scene" id="blockworld-scene">
           <div class="bw-sky"></div>
-          <div class="bw-backdrop"><span></span><span></span><span></span><span></span></div>
+          <div class="bw-backdrop">
+            <div class="bw-haze"></div>
+            <div class="bw-skyline bw-skyline-far">
+              ${'<span></span>'.repeat(12)}
+            </div>
+            <div class="bw-skyline bw-skyline-near">
+              ${'<i></i>'.repeat(10)}
+            </div>
+            <div class="bw-rooftop-life">
+              <span class="bw-water-tank"></span>
+              <span class="bw-distant-antenna"></span>
+              <span class="bw-distant-hvac"></span>
+              <span class="bw-distant-hvac second"></span>
+            </div>
+            <div class="bw-wire wire-a"></div>
+            <div class="bw-wire wire-b"></div>
+          </div>
           <div class="bw-ground"></div>
           <div class="bw-road">
             <div class="bw-road-line"></div><div class="bw-road-line second"></div>
@@ -168,28 +184,43 @@ export async function renderBlockWorld(root){
     el.className=`bw-building tone-${b.tone} style-${b.style||b.tone}`; el.dataset.buildingId=b.id;
     el.style.cssText=`left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px`;
     const upperCount=b.style==='apartments'?10:(b.style==='realty'?6:5);
+    const sideSign=b.style==='pharmacy'?'✚':b.style==='pawn'?'$':b.style==='noodle'?'NOODLES':'';
     el.innerHTML=`
-      <div class="bw-roof"><span class="bw-roof-unit"></span></div>
+      <div class="bw-roof">
+        <span class="bw-roof-unit"></span>
+        <span class="bw-roof-pipe"></span>
+        <span class="bw-roof-vent"></span>
+      </div>
+      <div class="bw-cornice"></div>
       <div class="bw-upper">${'<i></i>'.repeat(upperCount)}</div>
+      <div class="bw-balcony"><i></i><i></i><i></i></div>
       <div class="bw-storefront">
         <b>${b.sign}</b><em>${b.detail||''}</em>
-        <span class="bw-awning"></span><span class="bw-door"></span><span class="bw-window"></span>
+        <span class="bw-awning"></span>
+        <span class="bw-door"><i></i></span>
+        <span class="bw-window"></span>
         <span class="bw-window-display"></span>
+        <span class="bw-security-grille"></span>
+        <span class="bw-menu-board"></span>
+        <span class="bw-neon-open">OPEN</span>
+        <span class="bw-address"></span>
       </div>
-      <span class="bw-side-sign">${b.style==='pharmacy'?'✚':b.style==='pawn'?'$':b.style==='noodle'?'NOODLES':''}</span>`;
+      <span class="bw-side-sign">${sideSign}</span>
+      <span class="bw-fire-escape-small"><i></i><i></i><i></i></span>`;
     buildings.appendChild(el);
   }
   const alley=document.createElement('div');
   alley.className='bw-alley';
   alley.style.cssText=`left:${BLOCK1.alley.x}px;top:${BLOCK1.alley.y}px;width:${BLOCK1.alley.width}px;height:${BLOCK1.alley.height}px`;
-  alley.innerHTML=`<span class="bw-fireescape"></span><span class="bw-dumpster"></span><span class="bw-bins"></span><span class="bw-graffiti">RIFT</span><span class="bw-puddle"></span>`;
+  alley.innerHTML=`<span class="bw-fireescape"></span><span class="bw-dumpster"></span><span class="bw-bins"></span><span class="bw-graffiti">RIFT</span><span class="bw-puddle"></span><span class="bw-alley-pipe"></span><span class="bw-alley-light"></span><span class="bw-alley-crates"></span><span class="bw-alley-steam"></span>`;
   buildings.appendChild(alley);
 
   // Street life is decorative only: parked cars, hydrants, benches and utility clutter.
   const life=[
     ['car',610,1015],['car',2210,690],['van',2750,1010],
     ['hydrant',1150,615],['bench',1430,600],['box',1835,600],
-    ['news',2490,605],['bench',3300,600]
+    ['news',2490,605],['bench',3300,600],['bollard',430,610],
+    ['trashbag',1718,602],['planter',3060,602],['bike',1045,600]
   ];
   for(const [kind,x,y] of life){
     const el=document.createElement('div'); el.className=`bw-life bw-${kind}`;

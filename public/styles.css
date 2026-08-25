@@ -697,3 +697,196 @@ body.bw-fullscreen-mode .blockworld-shell{
  .bw-editor{left:8px;right:8px;top:auto;bottom:max(8px,env(safe-area-inset-bottom));width:auto;max-height:55%}
  .bw-dev-buttons{transform:scale(.9);transform-origin:top right}
 }
+
+
+/* Phase 11.5 — Commerce Street mid-detail art pass
+   Layout/gameplay coordinates are unchanged. This layer replaces the "same box,
+   different sign" look with six distinct silhouettes/material languages. */
+
+.blockworld-viewport{
+  background:linear-gradient(#90aab4 0 22%,#aeb8b5 40%,#7d8582 56%,#6f7470 100%);
+}
+.bw-sky{
+  background:
+    radial-gradient(circle at 18% 18%,#eef1e5aa 0 2%,transparent 11%),
+    linear-gradient(#92acb8 0%,#c0c6be 62%,#9d9f96 100%);
+}
+.bw-backdrop{
+  top:42px;height:470px;overflow:hidden;opacity:1;
+  background:linear-gradient(transparent 0 72%,#53605f22 100%);
+}
+.bw-haze{position:absolute;inset:0;background:linear-gradient(180deg,transparent,#e3ded042);pointer-events:none}
+.bw-skyline{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;gap:42px;pointer-events:none}
+.bw-skyline-far{height:340px;opacity:.28;transform:translateX(-60px)}
+.bw-skyline-far span{
+  flex:0 0 220px;height:190px;background:
+  repeating-linear-gradient(90deg,transparent 0 24px,#bfd0cf2e 25px 31px),
+  repeating-linear-gradient(0deg,transparent 0 32px,#d9ddd12d 33px 39px),
+  #53636a;border-top:9px solid #48575d;
+}
+.bw-skyline-far span:nth-child(3n){height:310px;flex-basis:175px}
+.bw-skyline-far span:nth-child(4n){height:240px;flex-basis:280px}
+.bw-skyline-near{height:270px;opacity:.43;transform:translateX(80px)}
+.bw-skyline-near i{
+  flex:0 0 285px;height:175px;background:
+  repeating-linear-gradient(90deg,#4d5c61 0 44px,#39494e 45px 55px);
+  border-top:8px solid #3e4c50;box-shadow:inset 0 18px 0 #ffffff08;
+}
+.bw-skyline-near i:nth-child(even){height:225px}
+.bw-rooftop-life{position:absolute;left:0;right:0;bottom:155px;height:100px;opacity:.45}
+.bw-water-tank{position:absolute;left:420px;bottom:0;width:72px;height:70px;border-radius:45% 45% 16% 16%;background:#465457;border:5px solid #394548}
+.bw-water-tank:after{content:"";position:absolute;left:8px;right:8px;bottom:-24px;height:25px;border-left:6px solid #394548;border-right:6px solid #394548}
+.bw-distant-antenna{position:absolute;left:1210px;bottom:0;width:6px;height:118px;background:#435055}
+.bw-distant-antenna:before,.bw-distant-antenna:after{content:"";position:absolute;left:-27px;width:60px;border-top:3px solid #435055}
+.bw-distant-antenna:before{top:28px}.bw-distant-antenna:after{top:49px}
+.bw-distant-hvac{position:absolute;left:2100px;bottom:0;width:95px;height:45px;background:#596467;border:5px solid #414b4d}
+.bw-distant-hvac.second{left:2850px;width:120px}
+.bw-wire{position:absolute;left:-80px;width:3800px;height:2px;background:#26363b70;transform-origin:left center}
+.bw-wire.wire-a{top:145px;transform:rotate(.7deg)}.bw-wire.wire-b{top:205px;transform:rotate(-.45deg)}
+
+.bw-ground{
+  background:
+    linear-gradient(#9d9a8f 0 2px,transparent 2px),
+    repeating-linear-gradient(90deg,#9f9c91 0 118px,#8e8c83 119px 122px);
+}
+.bw-road{
+  background:
+    radial-gradient(ellipse at 18% 40%,#24292c55 0 2%,transparent 12%),
+    radial-gradient(ellipse at 64% 70%,#22272a44 0 3%,transparent 14%),
+    linear-gradient(#3a3e40,#303537);
+  box-shadow:inset 0 18px 30px #0002,inset 0 -15px 25px #0002;
+}
+.bw-road:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(175deg,transparent 0 95px,#ffffff08 96px 98px);opacity:.35;pointer-events:none}
+
+/* Shared architecture details */
+.bw-building{
+  border-color:#2b3031;box-shadow:16px 20px 0 #00000030,0 10px 30px #00000020;
+  background:#716d64;
+}
+.bw-building:before{
+  content:"";position:absolute;inset:0;pointer-events:none;opacity:.38;
+  background:repeating-linear-gradient(0deg,transparent 0 23px,#ffffff0b 24px 25px);
+}
+.bw-cornice{position:absolute;left:-7px;right:-7px;top:-2px;height:15px;background:#393f40;border-top:3px solid #8b8b7d;z-index:6}
+.bw-roof{height:34px;top:-34px;background:#444c4d;border-color:#2f3637}
+.bw-roof-unit{right:42px!important;top:-23px!important;width:70px!important;height:27px!important;background:repeating-linear-gradient(0deg,#4b5658 0 5px,#333d3f 6px 8px)!important}
+.bw-roof-pipe{position:absolute;left:50px;top:-24px;width:13px;height:28px;background:#4b4d48;border:2px solid #303532}
+.bw-roof-vent{position:absolute;left:82px;top:-14px;width:28px;height:17px;border-radius:4px 4px 0 0;background:#585e5c;border:2px solid #353b39}
+.bw-upper{position:relative;z-index:2}
+.bw-upper i{border-width:4px;box-shadow:inset 0 0 0 2px #0c171b88,0 4px 0 #0003}
+.bw-storefront{z-index:7}
+.bw-storefront b{font-size:15px;line-height:1.1;text-shadow:0 2px 0 #0008;box-shadow:0 4px 0 #0004}
+.bw-storefront em{text-shadow:0 1px 0 #000}
+.bw-door{overflow:hidden}.bw-door i{position:absolute;right:10px;top:45%;width:5px;height:5px;border-radius:50%;background:#d9b86c}
+.bw-address{position:absolute;left:8px;bottom:4px;font-size:8px;color:#d3c9ae99}
+.bw-neon-open,.bw-security-grille,.bw-menu-board,.bw-balcony,.bw-fire-escape-small{display:none}
+
+/* 1. Corner Mart — low, wide, worn neighborhood convenience store */
+.style-mart{
+  background:#8b7f69;border-color:#4d493f;
+  clip-path:polygon(0 7%,96% 7%,100% 0,100% 100%,0 100%);
+}
+.style-mart .bw-cornice{top:16px;background:#5e5a4d;border-top-color:#a69f89}
+.style-mart .bw-roof{top:-10px;height:22px;left:-4px;right:10px;transform:none;background:#55594f}
+.style-mart .bw-roof-unit{display:none}
+.style-mart .bw-upper{height:42%;padding:28px 22px 8px;grid-template-columns:repeat(3,1fr);background:linear-gradient(#938c79,#7c7666)}
+.style-mart .bw-upper i{height:45px;background:#2a3b3c;border-color:#6d6e62}
+.style-mart .bw-storefront{height:58%;background:#403f36}
+.style-mart .bw-storefront b{top:13px;background:#e8dfc6;color:#315742;border:4px solid #5a584e;text-shadow:none}
+.style-mart .bw-awning{display:block;left:9px;right:9px;bottom:91px;height:26px;background:repeating-linear-gradient(90deg,#416044 0 30px,#d8cfb7 30px 60px);transform:skewX(-8deg);border-bottom:4px solid #243c2d}
+.style-mart .bw-window{left:18px;right:18px;bottom:10px;height:72px;background:repeating-linear-gradient(90deg,#29464d 0 72px,#17282d 73px 77px);border-color:#77776d}
+.style-mart .bw-window-display{display:block;left:35px;bottom:23px;width:82px;height:42px;background:linear-gradient(#eab85b44,#253b41);border:2px solid #d1c38a}
+.style-mart .bw-neon-open{display:block;right:35px;bottom:35px;color:#ffb179;border:2px solid #ff9c67;padding:2px 5px;font:900 9px/1 sans-serif;background:#182227}
+
+/* 2. Pharmacy — clean white/blue facade with strong medical identity */
+.style-pharmacy{background:#d0cfc6;border-color:#737974}
+.style-pharmacy:before{opacity:.18}
+.style-pharmacy .bw-roof{background:#adb3af}
+.style-pharmacy .bw-cornice{background:#e1e0d7;border-top-color:#faf9ee}
+.style-pharmacy .bw-upper{height:54%;background:linear-gradient(#d8d7ce,#babeb9);padding:29px 22px 10px}
+.style-pharmacy .bw-upper i{background:#284550;border-color:#f1eee1}
+.style-pharmacy .bw-storefront{height:46%;background:#eef0eb;border-top-color:#4c6a7d}
+.style-pharmacy .bw-storefront b{background:#315a7b;color:#f4f5ed;border-color:#dbe5e5}
+.style-pharmacy .bw-storefront em{color:#315a7b}
+.style-pharmacy .bw-side-sign{display:block;right:-28px;top:108px;width:52px;height:52px;background:#356d8d;color:white;border:4px solid white;text-align:center;line-height:42px;font-size:28px;box-shadow:0 5px 0 #0004;z-index:10}
+.style-pharmacy .bw-door{background:#dce7e4;border-color:#6e7c79}
+.style-pharmacy .bw-window{background:#496a73;border-color:#9da9a4}
+
+/* 3. Keystone Realty — taller glass/brick professional office */
+.style-realty{background:#776452;border-color:#473b32}
+.style-realty:before{background:repeating-linear-gradient(0deg,transparent 0 16px,#2a1f1822 17px 18px);opacity:.6}
+.style-realty .bw-cornice{background:#54473b;border-top-color:#a38d73}
+.style-realty .bw-roof{background:#4b4741}
+.style-realty .bw-upper{height:66%;grid-template-columns:repeat(3,1fr);padding:24px 18px 10px;gap:12px;background:linear-gradient(#775f4e,#655448)}
+.style-realty .bw-upper i{height:80px;background:linear-gradient(#304d59,#253d47);border:3px solid #a79780}
+.style-realty .bw-storefront{height:34%;background:#333a3d}
+.style-realty .bw-storefront b{top:8px;background:#233d52;color:#f3e8ce;border-color:#9b7a55}
+.style-realty .bw-storefront em{top:43px;color:#c89c67}
+.style-realty .bw-window{bottom:7px;height:50px;background:repeating-linear-gradient(90deg,#29414c 0 54px,#18292e 55px 59px);border-color:#685d50}
+.style-realty .bw-door{height:78px;background:#263c45;border-color:#867a69}
+
+/* 4. Noodle House — brick restaurant, striped awning, vertical sign, menu */
+.style-noodle{background:#8f4c3e;border-color:#4e2922}
+.style-noodle:before{opacity:.7;background:repeating-linear-gradient(0deg,transparent 0 15px,#3e1e192d 16px 18px)}
+.style-noodle .bw-roof{background:#60382f}
+.style-noodle .bw-cornice{background:#6c3329;border-top-color:#aa6b54}
+.style-noodle .bw-upper{height:50%;background:linear-gradient(#9a5442,#7e3f34);padding:28px 20px 8px}
+.style-noodle .bw-upper i{background:#382c29;border-color:#b18065}
+.style-noodle .bw-storefront{height:50%;background:#4c2d27}
+.style-noodle .bw-storefront b{background:#692b26;color:#f1d4a7;border-color:#ba7b5a}
+.style-noodle .bw-awning{display:block;left:10px;right:10px;bottom:88px;height:27px;background:repeating-linear-gradient(90deg,#8a302b 0 28px,#d6b489 28px 56px);border-bottom:4px solid #5c2622}
+.style-noodle .bw-side-sign{display:block;right:-27px;top:74px;padding:10px 7px;background:#7c2924;color:#f4c98d;border:3px solid #c38a62;font-size:9px;writing-mode:vertical-rl;letter-spacing:2px;box-shadow:5px 6px 0 #0004;z-index:11}
+.style-noodle .bw-menu-board{display:block;left:18px;bottom:9px;width:54px;height:62px;background:#1e201c;border:3px solid #85684e;box-shadow:inset 0 0 0 2px #ffffff0b}
+.style-noodle .bw-neon-open{display:block;right:28px;bottom:29px;color:#ff8e73;border:2px solid #ff7159;padding:3px 5px;font:900 9px/1 sans-serif;background:#261b1b}
+
+/* 5. Rift Exchange — dark old masonry, bars, gold signage */
+.style-pawn{background:#504b42;border-color:#262821}
+.style-pawn:before{opacity:.75;background:repeating-linear-gradient(0deg,transparent 0 14px,#17191535 15px 17px)}
+.style-pawn .bw-roof{background:#363832}
+.style-pawn .bw-cornice{background:#34352f;border-top-color:#68675a}
+.style-pawn .bw-upper{height:49%;background:linear-gradient(#5a5549,#45463e);padding:30px 20px 8px}
+.style-pawn .bw-upper i{background:#28383b;border-color:#686657}
+.style-pawn .bw-storefront{height:51%;background:#282b27}
+.style-pawn .bw-storefront b{background:#171b19;color:#e4bd55;border-color:#7a672e}
+.style-pawn .bw-storefront em{color:#d2b25c}
+.style-pawn .bw-security-grille{display:block;left:18px;right:18px;bottom:8px;height:73px;z-index:5;background:repeating-linear-gradient(45deg,transparent 0 11px,#8c8f8745 12px 14px),repeating-linear-gradient(-45deg,transparent 0 11px,#8c8f8745 12px 14px);pointer-events:none}
+.style-pawn .bw-side-sign{display:block;right:18px;top:16px;width:42px;height:42px;border-radius:50%;background:#b59139;color:#171a16;text-align:center;line-height:42px;font-size:25px;font-weight:950;border:3px solid #e1c05f}
+
+/* 6. Mercer Apartments — clearly residential, balconies + fire escape */
+.style-apartments{background:#77736b;border-color:#484843}
+.style-apartments .bw-roof{height:40px;top:-40px;background:#575a55}
+.style-apartments .bw-cornice{height:18px;background:#6b6c65;border-top-color:#aaa79d}
+.style-apartments .bw-upper{height:72%;grid-template-columns:repeat(5,1fr);padding:20px 18px 12px;gap:11px;background:linear-gradient(#7e7b73,#686760)}
+.style-apartments .bw-upper i{height:48px;background:#273d44;border-color:#a29d8f}
+.style-apartments .bw-storefront{height:28%;background:#4f4c46}
+.style-apartments .bw-storefront b{top:8px;background:#423f3a;color:#e4dfd3;border-color:#858178}
+.style-apartments .bw-storefront em{top:42px}
+.style-apartments .bw-window{display:none}
+.style-apartments .bw-door{height:78px;background:#3f3028;border-color:#958778}
+.style-apartments .bw-balcony{display:block;position:absolute;left:88px;right:55px;top:145px;height:42px;border:4px solid #3b4141;border-top:0;z-index:8;background:repeating-linear-gradient(90deg,transparent 0 28px,#3b4141 29px 33px)}
+.style-apartments .bw-fire-escape-small{display:block;position:absolute;right:-20px;top:58px;width:70px;height:220px;z-index:9;border-right:5px solid #343939}
+.style-apartments .bw-fire-escape-small i{display:block;width:60px;height:42px;margin-bottom:25px;border:4px solid #343939;background:repeating-linear-gradient(90deg,transparent 0 12px,#343939 13px 16px)}
+
+/* Alley depth/life */
+.bw-alley{background:linear-gradient(90deg,#343b3b,#171d1e 42%,#262d2d 82%);box-shadow:inset 0 0 45px #000}
+.bw-alley-pipe{position:absolute;right:7px;top:22px;width:11px;height:210px;background:#525d5b;border:2px solid #303938;border-radius:8px}
+.bw-alley-light{position:absolute;left:8px;top:16px;width:36px;height:15px;background:#d9c98b;border:4px solid #2c3434;box-shadow:0 0 18px #e1cb7b55}
+.bw-alley-crates{position:absolute;left:27px;bottom:52px;width:45px;height:36px;background:repeating-linear-gradient(0deg,#684e36 0 7px,#3d3025 8px 10px);transform:rotate(-3deg)}
+.bw-alley-steam{position:absolute;left:25px;bottom:0;width:24px;height:65px;filter:blur(3px);opacity:.34;background:radial-gradient(ellipse,#d8e0dd88 0 24%,transparent 65%)}
+@media (prefers-reduced-motion:no-preference){
+  .bw-alley-steam{animation:bwSteam 2.8s ease-in-out infinite alternate}
+}
+@keyframes bwSteam{from{transform:translateY(16px) scale(.8);opacity:.18}to{transform:translateY(-18px) scale(1.3);opacity:.42}}
+
+/* Added lightweight street props */
+.bw-bollard{width:14px;height:42px;border-radius:7px 7px 2px 2px;background:#897b55;border:2px solid #413b2f}
+.bw-trashbag{width:34px;height:30px;border-radius:45% 45% 38% 38%;background:#252927;box-shadow:24px 7px 0 -5px #1d201f}
+.bw-planter{width:64px;height:34px;background:#6e624d;border:4px solid #4b4335}
+.bw-planter:before{content:"";position:absolute;left:8px;right:8px;bottom:25px;height:45px;border-radius:50% 50% 30% 30%;background:#486044}
+.bw-bike{width:70px;height:36px;border-bottom:4px solid #343a39}
+.bw-bike:before,.bw-bike:after{content:"";position:absolute;bottom:-9px;width:31px;height:31px;border:4px solid #343a39;border-radius:50%}
+.bw-bike:before{left:0}.bw-bike:after{right:0}
+
+/* Keep the live editor readable over the upgraded art. */
+.bw-edit-mode .bw-building{filter:saturate(.72) brightness(.92)}
+.bw-edit-mode .bw-edit-selected{filter:none!important}

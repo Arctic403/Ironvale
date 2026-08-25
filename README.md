@@ -359,3 +359,20 @@ Editor capabilities:
 - export the complete working block as a versioned `riftcity-block-edit` JSON file.
 
 The export is intentionally source-neutral: it can be sent with the newest RiftCity workspace and integrated back into `public/block1.js`. The editor changes only its browser working copy until an exported layout is deliberately integrated into source.
+
+
+## Phase 11.5 — Commerce Street mid-detail art direction
+
+Commerce Street received a visual-only art pass based on the approved stylized mobile/indie target. The block layout, movement, collision geometry, storefront door coordinates, location routing, fullscreen behavior and live editor are unchanged.
+
+Visual changes:
+- Corner Mart is now a low, worn neighborhood convenience store with green striped awning, cluttered glazing and neon/open details.
+- Rift Pharmacy uses a clean pale facade, blue medical identity and projecting cross sign.
+- Keystone Realty reads as a taller brick-and-glass professional office.
+- Noodle House uses warm brick, a striped restaurant awning, vertical sign, menu board and neon.
+- Rift Exchange is darker old masonry with gold signage and visible security grilles.
+- Mercer Apartments reads as residential with a taller silhouette, balconies and an exterior fire escape.
+- The block background now has layered distant buildings, rooftop equipment, haze, utility wires and a water tank rather than a few identical flat rectangles.
+- The alley gains pipes, lighting, crates and subtle steam; the street gains additional small props.
+
+This remains deliberately mid-detail rather than photorealistic so Block 01 stays lightweight on mobile and can serve as the art baseline for future streamed blocks.
