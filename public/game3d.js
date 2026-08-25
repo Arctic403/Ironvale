@@ -1,5 +1,5 @@
 import { escapeHtml } from './ui/helpers.js';
-import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, buildWorldLayout, getNearbyChunkKeys } from './world3d-layout.js';
+import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, buildWorldLayout, getNearbyChunkKeys, getChunkKey } from './world3d-layout.js';
 import { createStreamedEnvironment } from './world3d-environment.js';
 import { WORLD3D_CITY_LAYOUT } from './world3d-city-layout.js';
 import { cloneCityLayout, createLayoutObjectManager, mountWorldEditor } from './world3d-editor.js';
