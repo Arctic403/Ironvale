@@ -20,9 +20,15 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   const B = window.BABYLON;
   const engine = new B.Engine(canvas, true, { preserveDrawingBuffer: false, stencil: true, adaptToDeviceRatio: true });
   const scene = new B.Scene(engine);
-  scene.clearColor = new B.Color4(0.035, 0.045, 0.055, 1);
+  scene.clearColor = new B.Color4(0.028, 0.036, 0.047, 1);
   scene.collisionsEnabled = true;
   scene.gravity = new B.Vector3(0, -0.38, 0);
+  scene.fogMode = B.Scene.FOGMODE_LINEAR;
+  scene.fogColor = new B.Color3(0.055, 0.07, 0.085);
+  scene.fogStart = 72;
+  scene.fogEnd = 175;
+  scene.imageProcessingConfiguration.contrast = 1.12;
+  scene.imageProcessingConfiguration.exposure = 1.04;
 
   const camera = new B.ArcRotateCamera('player-camera', Math.PI * 1.5, 1.05, 11, new B.Vector3(0, 2.2, 0), scene);
   camera.lowerRadiusLimit = 5;
@@ -34,10 +40,11 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   camera.attachControl(canvas, true);
 
   const hemi = new B.HemisphericLight('sky-light', new B.Vector3(0.2, 1, 0.1), scene);
-  hemi.intensity = 0.72;
+  hemi.intensity = 0.66;
+  hemi.groundColor = new B.Color3(0.08, 0.09, 0.11);
   const sun = new B.DirectionalLight('sun', new B.Vector3(-0.45, -1, 0.35), scene);
   sun.position = new B.Vector3(25, 50, -25);
-  sun.intensity = 0.8;
+  sun.intensity = 0.92;
 
   const shadowGenerator = new B.ShadowGenerator(1024, sun);
   shadowGenerator.useBlurExponentialShadowMap = true;
@@ -57,6 +64,9 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   const lineMat = material('road-lines', '#b98743', 0.1);
   const accentMat = material('accent', '#d68d35', 0.22);
   const glassMat = material('glass', '#203544', 0.18);
+  const curbMat = material('curb', '#585b5f');
+  const foliageMat = material('foliage', '#304337');
+  const trunkMat = material('trunk', '#4a372b');
   glassMat.alpha = 0.86;
 
   const ground = B.MeshBuilder.CreateGround('city-ground', { width: 190, height: 190 }, scene);
@@ -64,7 +74,7 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   ground.checkCollisions = true;
   ground.receiveShadows = true;
 
-  createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat);
+  createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat);
 
   const locationEntries = buildLocationLayout(world?.locations || []);
   const interactables = [];
@@ -75,6 +85,9 @@ export function mountCity3D({ root, world, onEnterLocation }) {
 
   createSkyline(B, scene, material, shadowGenerator);
   createStreetLights(B, scene, accentMat);
+  createCityProps(B, scene, { foliageMat, trunkMat, sidewalkMat, shadowGenerator });
+  createTraffic(B, scene, shadowGenerator);
+  createParkedCars(B, scene, shadowGenerator);
 
   const player = createPlayer(B, scene, shadowGenerator);
   player.root.position = new B.Vector3(0, 0.92, 7);
@@ -156,7 +169,10 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     }
 
     updateOrientationUi();
-    setTimeout(() => engine.resize(), 80);
+    setTimeout(() => {
+      if (!enabled) syncViewport?.();
+      engine.resize();
+    }, 80);
   };
 
   fullscreenButton?.addEventListener('click', () => setGameMode(!gameMode));
@@ -166,6 +182,26 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   };
   window.addEventListener('orientationchange', onOrientationChange);
   window.addEventListener('resize', onOrientationChange);
+
+  const syncViewport = () => {
+    if (!shell || gameMode) return;
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const shellTop = Math.max(0, shell.getBoundingClientRect().top);
+    const mobileNav = document.querySelector('#mobile-nav');
+    const navHeight = mobileNav && getComputedStyle(mobileNav).display !== 'none'
+      ? mobileNav.getBoundingClientRect().height
+      : 0;
+    const safeGap = 4;
+    const available = Math.max(320, Math.floor(viewportHeight - shellTop - navHeight - safeGap));
+    shell.style.height = `${available}px`;
+    root.style.height = `${available}px`;
+    engine.resize();
+  };
+  const visualViewport = window.visualViewport;
+  visualViewport?.addEventListener('resize', syncViewport);
+  visualViewport?.addEventListener('scroll', syncViewport);
+  setTimeout(syncViewport, 0);
+
   const directoryButton = root.querySelector('#world3d-directory-button');
   const directory = root.querySelector('#world3d-directory');
   directoryButton?.addEventListener('click', () => directory?.classList.toggle('open'));
@@ -269,7 +305,11 @@ export function mountCity3D({ root, world, onEnterLocation }) {
       window.removeEventListener('resize', resize);
       window.removeEventListener('orientationchange', onOrientationChange);
       window.removeEventListener('resize', onOrientationChange);
+      visualViewport?.removeEventListener('resize', syncViewport);
+      visualViewport?.removeEventListener('scroll', syncViewport);
       joystick?.destroy?.();
+      root.style.height = '';
+      shell?.style.removeProperty('height');
       document.body.classList.remove('world3d-game-mode');
       try { screen.orientation?.unlock?.(); } catch (_) {}
       try {
@@ -364,24 +404,44 @@ function setupVirtualJoystick(root, touch) {
   };
 }
 
-function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat) {
+function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat) {
   const roadPositions = [-56, -28, 0, 28, 56];
   roadPositions.forEach(x => {
     const road = B.MeshBuilder.CreateBox(`road-v-${x}`, { width: 9, height: 0.07, depth: 190 }, scene);
     road.position.set(x, 0.045, 0);
     road.material = roadMat;
-    const line = B.MeshBuilder.CreateBox(`line-v-${x}`, { width: 0.15, height: 0.08, depth: 190 }, scene);
-    line.position.set(x, 0.09, 0);
-    line.material = lineMat;
+
+    for (const lane of [-2.15, 2.15]) {
+      const line = B.MeshBuilder.CreateBox(`lane-v-${x}-${lane}`, { width: 0.09, height: 0.082, depth: 190 }, scene);
+      line.position.set(x + lane, 0.092, 0);
+      line.material = lineMat;
+    }
+    for (const side of [-1, 1]) {
+      const curb = B.MeshBuilder.CreateBox(`curb-v-${x}-${side}`, { width: 0.22, height: 0.22, depth: 190 }, scene);
+      curb.position.set(x + side * 4.62, 0.13, 0);
+      curb.material = curbMat;
+      curb.checkCollisions = true;
+    }
   });
+
   roadPositions.forEach(z => {
     const road = B.MeshBuilder.CreateBox(`road-h-${z}`, { width: 190, height: 0.075, depth: 9 }, scene);
     road.position.set(0, 0.05, z);
     road.material = roadMat;
-    const line = B.MeshBuilder.CreateBox(`line-h-${z}`, { width: 190, height: 0.08, depth: 0.15 }, scene);
-    line.position.set(0, 0.095, z);
-    line.material = lineMat;
+
+    for (const lane of [-2.15, 2.15]) {
+      const line = B.MeshBuilder.CreateBox(`lane-h-${z}-${lane}`, { width: 190, height: 0.082, depth: 0.09 }, scene);
+      line.position.set(0, 0.093, z + lane);
+      line.material = lineMat;
+    }
+    for (const side of [-1, 1]) {
+      const curb = B.MeshBuilder.CreateBox(`curb-h-${z}-${side}`, { width: 190, height: 0.22, depth: 0.22 }, scene);
+      curb.position.set(0, 0.13, z + side * 4.62);
+      curb.material = curbMat;
+      curb.checkCollisions = true;
+    }
   });
+
   const blockCenters = [-70, -42, -14, 14, 42, 70];
   blockCenters.forEach(x => blockCenters.forEach(z => {
     const pad = B.MeshBuilder.CreateBox(`sidewalk-${x}-${z}`, { width: 17.2, height: 0.16, depth: 17.2 }, scene);
@@ -389,6 +449,19 @@ function createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat) {
     pad.material = sidewalkMat;
     pad.checkCollisions = true;
   }));
+
+  for (const x of roadPositions) {
+    for (const z of roadPositions) {
+      for (const offset of [-3.15, 3.15]) {
+        const crossA = B.MeshBuilder.CreateBox(`cross-a-${x}-${z}-${offset}`, { width: 0.32, height: 0.085, depth: 2.3 }, scene);
+        crossA.position.set(x + offset, 0.097, z);
+        crossA.material = lineMat;
+        const crossB = B.MeshBuilder.CreateBox(`cross-b-${x}-${z}-${offset}`, { width: 2.3, height: 0.085, depth: 0.32 }, scene);
+        crossB.position.set(x, 0.097, z + offset);
+        crossB.material = lineMat;
+      }
+    }
+  }
 }
 
 function buildLocationLayout(locations) {
@@ -424,6 +497,21 @@ function createBuilding(B, scene, entry, index, { accentMat, glassMat, shadowGen
   building.checkCollisions = true;
   building.receiveShadows = true;
   shadowGenerator.addShadowCaster(building);
+
+  const roof = B.MeshBuilder.CreateBox(`roof-${entry.id}`, {
+    width: Math.max(3.5, width * 0.48),
+    height: 0.65 + (index % 3) * 0.22,
+    depth: Math.max(3.2, depth * 0.42)
+  }, scene);
+  roof.position.set(entry.x + ((index % 2) ? 1.2 : -1.1), height + 0.48, entry.z - 0.4);
+  roof.material = shellMat;
+  shadowGenerator.addShadowCaster(roof);
+
+  for (const side of [-1, 1]) {
+    const trim = B.MeshBuilder.CreateBox(`facade-trim-${entry.id}-${side}`, { width: 0.16, height: height * 0.82, depth: 0.16 }, scene);
+    trim.position.set(entry.x + side * (width / 2 - 0.28), height * 0.52, entry.z + depth / 2 + 0.08);
+    trim.material = accentMat;
+  }
 
   const door = B.MeshBuilder.CreateBox(`door-${entry.id}`, { width: 2.15, height: 3.2, depth: 0.12 }, scene);
   door.position.set(entry.x, 1.76, entry.z + depth / 2 + 0.07);
@@ -482,6 +570,133 @@ function createStreetLights(B, scene, accentMat) {
       bulb.material = accentMat;
     }
   }
+}
+
+function createCityProps(B, scene, { foliageMat, trunkMat, sidewalkMat, shadowGenerator }) {
+  const treeSpots = [
+    [-49,-42],[-35,-42],[-21,-14],[-7,-14],[7,14],[21,14],[35,42],[49,42],
+    [-70,-49],[-42,-21],[-14,7],[14,35],[42,-49],[70,-21],[-70,35],[70,7]
+  ];
+  treeSpots.forEach(([x,z], index) => {
+    const trunk = B.MeshBuilder.CreateCylinder(`tree-trunk-${index}`, { height: 2.4, diameter: 0.34, tessellation: 8 }, scene);
+    trunk.position.set(x, 1.25, z);
+    trunk.material = trunkMat;
+    const crown = B.MeshBuilder.CreateSphere(`tree-crown-${index}`, { diameter: 2.5 + (index % 3) * 0.25, segments: 8 }, scene);
+    crown.scaling.y = 1.25;
+    crown.position.set(x, 3.15, z);
+    crown.material = foliageMat;
+    shadowGenerator.addShadowCaster(trunk);
+    shadowGenerator.addShadowCaster(crown);
+  });
+
+  const benchSpots = [[-35,-7],[-7,21],[21,-35],[49,21],[-49,49],[7,-49]];
+  benchSpots.forEach(([x,z], index) => {
+    const seat = B.MeshBuilder.CreateBox(`bench-seat-${index}`, { width: 2.1, height: 0.18, depth: 0.58 }, scene);
+    seat.position.set(x, 0.68, z);
+    seat.material = trunkMat;
+    const back = B.MeshBuilder.CreateBox(`bench-back-${index}`, { width: 2.1, height: 0.72, depth: 0.14 }, scene);
+    back.position.set(x, 1.03, z - 0.28);
+    back.material = trunkMat;
+  });
+
+  const bollardSpots = [-42,-14,14,42];
+  for (const x of bollardSpots) {
+    for (const z of [-63,63]) {
+      const bollard = B.MeshBuilder.CreateCylinder(`bollard-${x}-${z}`, { height: 0.8, diameter: 0.22, tessellation: 10 }, scene);
+      bollard.position.set(x, 0.48, z);
+      bollard.material = sidewalkMat;
+    }
+  }
+}
+
+function createCar(B, scene, shadowGenerator, name, color, scale = 1) {
+  const root = new B.TransformNode(name, scene);
+  const bodyMat = new B.StandardMaterial(`${name}-body-mat`, scene);
+  bodyMat.diffuseColor = B.Color3.FromHexString(color);
+  bodyMat.specularColor = new B.Color3(0.32, 0.32, 0.32);
+
+  const darkMat = new B.StandardMaterial(`${name}-dark-mat`, scene);
+  darkMat.diffuseColor = B.Color3.FromHexString('#111820');
+  darkMat.specularColor = new B.Color3(0.18, 0.18, 0.18);
+
+  const body = B.MeshBuilder.CreateBox(`${name}-body`, { width: 1.85, height: 0.62, depth: 4.15 }, scene);
+  body.parent = root;
+  body.position.y = 0.58;
+  body.material = bodyMat;
+
+  const cabin = B.MeshBuilder.CreateBox(`${name}-cabin`, { width: 1.62, height: 0.65, depth: 1.85 }, scene);
+  cabin.parent = root;
+  cabin.position.set(0, 1.08, -0.15);
+  cabin.material = darkMat;
+
+  const bumperFront = B.MeshBuilder.CreateBox(`${name}-front`, { width: 1.7, height: 0.18, depth: 0.16 }, scene);
+  bumperFront.parent = root;
+  bumperFront.position.set(0, 0.45, 2.1);
+  bumperFront.material = darkMat;
+
+  const wheelPositions = [[-0.93,0.36,-1.35],[0.93,0.36,-1.35],[-0.93,0.36,1.35],[0.93,0.36,1.35]];
+  wheelPositions.forEach(([x,y,z], index) => {
+    const wheel = B.MeshBuilder.CreateCylinder(`${name}-wheel-${index}`, { height: 0.28, diameter: 0.62, tessellation: 12 }, scene);
+    wheel.parent = root;
+    wheel.position.set(x,y,z);
+    wheel.rotation.z = Math.PI / 2;
+    wheel.material = darkMat;
+  });
+
+  root.scaling.setAll(scale);
+  [body, cabin].forEach(mesh => shadowGenerator.addShadowCaster(mesh));
+  return root;
+}
+
+function createTraffic(B, scene, shadowGenerator) {
+  const colors = ['#a93e37','#c7c8ca','#2f536f','#6e7142','#8a5e39','#373a3e','#7d394d','#b08a3f'];
+  const traffic = [];
+  const lanes = [-56,-28,0,28,56];
+
+  for (let i = 0; i < 10; i++) {
+    const vertical = i % 2 === 0;
+    const road = lanes[(i * 2 + 1) % lanes.length];
+    const direction = i % 4 < 2 ? 1 : -1;
+    const car = createCar(B, scene, shadowGenerator, `traffic-car-${i}`, colors[i % colors.length], 0.88 + (i % 3) * 0.05);
+    const laneOffset = direction > 0 ? -2.05 : 2.05;
+    const start = -86 + (i * 19) % 172;
+    if (vertical) {
+      car.position.set(road + laneOffset, 0.12, start);
+      car.rotation.y = direction > 0 ? 0 : Math.PI;
+    } else {
+      car.position.set(start, 0.12, road - laneOffset);
+      car.rotation.y = direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+    }
+    traffic.push({ car, vertical, direction, speed: 4.2 + (i % 4) * 0.65 });
+  }
+
+  scene.onBeforeRenderObservable.add(() => {
+    const dt = Math.min(scene.getEngine().getDeltaTime() / 1000, 0.05);
+    for (const item of traffic) {
+      if (item.vertical) {
+        item.car.position.z += item.direction * item.speed * dt;
+        if (item.car.position.z > 94) item.car.position.z = -94;
+        if (item.car.position.z < -94) item.car.position.z = 94;
+      } else {
+        item.car.position.x += item.direction * item.speed * dt;
+        if (item.car.position.x > 94) item.car.position.x = -94;
+        if (item.car.position.x < -94) item.car.position.x = 94;
+      }
+    }
+  });
+}
+
+function createParkedCars(B, scene, shadowGenerator) {
+  const colors = ['#4f5962','#8b3f38','#334b63','#70634f','#2e3034','#8a824d'];
+  const spots = [
+    [-66,-58,Math.PI/2],[-38,-30,Math.PI/2],[-10,-2,Math.PI/2],[18,26,Math.PI/2],
+    [46,54,Math.PI/2],[58,-66,0],[30,-38,0],[2,-10,0],[-26,18,0],[-54,46,0]
+  ];
+  spots.forEach(([x,z,rotation], index) => {
+    const car = createCar(B, scene, shadowGenerator, `parked-car-${index}`, colors[index % colors.length], 0.86);
+    car.position.set(x, 0.12, z);
+    car.rotation.y = rotation;
+  });
 }
 
 function createPlayer(B, scene, shadowGenerator) {

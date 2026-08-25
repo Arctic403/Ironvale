@@ -75,3 +75,23 @@ body.world3d-game-mode .world3d-shell{width:100%;height:100%;min-height:0}
 @media(max-width:560px){.world3d-top-left{max-width:calc(100vw - 205px)}.world3d-top-left strong{font-size:.68rem}.world3d-hud-button{font-size:.47rem;padding:7px}.world3d-prompt{min-width:210px}.world3d-joystick{width:118px;height:118px}.world3d-joystick-ring{width:100px;height:100px}.world3d-action-pad{grid-template-columns:62px 62px;gap:9px}.world3d-action{width:62px;height:62px}.world3d-directory-group button{grid-template-columns:42px 1fr}.world3d-directory-group button small{display:none}}
 
 @media (orientation:landscape) and (pointer:coarse){body.world3d-game-mode .world3d-top-left{top:max(8px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left))}body.world3d-game-mode .world3d-top-right{top:max(8px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right))}body.world3d-game-mode .world3d-prompt{bottom:24px}.world3d-touch{padding-bottom:max(12px,env(safe-area-inset-bottom))}}
+
+
+/* Phase 9.2: mobile viewport fit + denser 3D world */
+@media (max-width:900px), (pointer:coarse){
+  body:has(.world3d-shell):not(.world3d-game-mode){overflow:hidden;overscroll-behavior:none}
+  body:has(.world3d-shell):not(.world3d-game-mode) #app-shell{height:100dvh;overflow:hidden}
+  body:has(.world3d-shell):not(.world3d-game-mode) .game-root{padding:0;width:100%;max-width:none;margin:0;overflow:hidden}
+  body:has(.world3d-shell):not(.world3d-game-mode) .world3d-shell{min-height:320px;height:100%}
+  body:has(.world3d-shell):not(.world3d-game-mode) .world3d-directory{bottom:0}
+  body:has(.world3d-shell):not(.world3d-game-mode) .world3d-touch{
+    padding-bottom:max(14px,env(safe-area-inset-bottom));
+  }
+}
+@media (orientation:portrait) and (pointer:coarse){
+  body:not(.world3d-game-mode) .world3d-action-pad{grid-template-columns:60px 60px;gap:8px}
+  body:not(.world3d-game-mode) .world3d-action{width:60px;height:60px}
+  body:not(.world3d-game-mode) .world3d-joystick{width:112px;height:112px}
+  body:not(.world3d-game-mode) .world3d-joystick-ring{width:96px;height:96px}
+  body:not(.world3d-game-mode) .world3d-prompt{bottom:102px}
+}
