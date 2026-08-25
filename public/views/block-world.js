@@ -32,6 +32,7 @@ export async function renderBlockWorld(root){
         </div>
       </div>
       <div class="bw-block-label"><small>DOWNTOWN / BLOCK 01</small><strong>Commerce Street</strong></div>
+      <button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button>
       <div class="bw-controls">
         <div class="bw-stick" id="bw-stick"><div class="bw-knob" id="bw-knob"></div></div>
         <button class="bw-run" id="bw-run">RUN</button>
@@ -47,6 +48,8 @@ export async function renderBlockWorld(root){
   const prompt=scene.querySelector('#bw-prompt');
   const interact=root.querySelector('#bw-interact');
   const run=root.querySelector('#bw-run');
+  const fullscreenButton=root.querySelector('#bw-fullscreen');
+  const shell=root.querySelector('.blockworld-shell');
   const stick=root.querySelector('#bw-stick');
   const knob=root.querySelector('#bw-knob');
 
@@ -115,8 +118,17 @@ export async function renderBlockWorld(root){
     if(ny<625)ny=625;
     state.x=nx;state.y=ny;
     player.style.left=`${state.x}px`; player.style.top=`${state.y}px`;
-    const cameraX=Math.max(0,Math.min(BLOCK1.width-viewport.clientWidth,state.x-viewport.clientWidth*.46));
-    scene.style.transform=`translate3d(${-cameraX}px,0,0)`;
+
+    // Scale Block 01 to the real viewport height so portrait mode never crops
+    // the buildings/road/controls. The camera then pans through world space.
+    const authoredHeight=1260;
+    const fitScale=Math.max(.26,Math.min(1,viewport.clientHeight/authoredHeight));
+    const visibleWorldWidth=viewport.clientWidth/fitScale;
+    const cameraX=Math.max(
+      0,
+      Math.min(Math.max(0,BLOCK1.width-visibleWorldWidth),state.x-visibleWorldWidth*.46)
+    );
+    scene.style.transform=`translate3d(${-cameraX*fitScale}px,0,0) scale(${fitScale})`;
     updatePrompt();
     raf=requestAnimationFrame(tick);
   }
@@ -136,6 +148,92 @@ export async function renderBlockWorld(root){
   function move(e){if(e.pointerId===pointerId)joy(e);}
   function up(e){if(e.pointerId!==pointerId)return;pointerId=null;joyX=joyY=0;knob.style.transform='translate(0,0)';}
 
+
+  let fullscreenMode=false;
+
+  function isiOS(){
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  }
+
+  function updateShellSize(){
+    if(fullscreenMode)return;
+    const vv=window.visualViewport;
+    const viewportHeight=vv?.height||window.innerHeight;
+    const rect=shell.getBoundingClientRect();
+    const mobileNav=document.querySelector('#mobile-nav');
+    const navHeight=mobileNav && getComputedStyle(mobileNav).display!=='none'
+      ? mobileNav.getBoundingClientRect().height : 0;
+    const available=Math.max(330,Math.floor(viewportHeight-Math.max(0,rect.top)-navHeight-4));
+    shell.style.height=`${available}px`;
+  }
+
+  async function enterFullscreen(){
+    fullscreenMode=true;
+    document.body.classList.add('bw-fullscreen-mode');
+    shell.classList.add('bw-fullscreen-active');
+    fullscreenButton.textContent='EXIT';
+
+    if(!isiOS()){
+      // Samsung / Android: use real browser fullscreen and request landscape.
+      try{
+        if(!document.fullscreenElement && shell.requestFullscreen){
+          await shell.requestFullscreen({navigationUI:'hide'});
+        }
+      }catch(_){}
+      try{
+        if(screen.orientation?.lock) await screen.orientation.lock('landscape');
+      }catch(_){}
+    }else{
+      // iPhone Safari cannot reliably orientation-lock ordinary webpages.
+      // We still attempt native fullscreen where Safari exposes it, then
+      // rotate the game shell in CSS when the phone itself is portrait.
+      try{
+        if(!document.fullscreenElement && shell.requestFullscreen){
+          await shell.requestFullscreen();
+        }
+      }catch(_){}
+    }
+  }
+
+  async function exitFullscreen(){
+    fullscreenMode=false;
+    document.body.classList.remove('bw-fullscreen-mode');
+    shell.classList.remove('bw-fullscreen-active');
+    fullscreenButton.textContent='FULLSCREEN';
+    try{screen.orientation?.unlock?.();}catch(_){}
+    try{
+      if(document.fullscreenElement)await document.exitFullscreen?.();
+    }catch(_){}
+    requestAnimationFrame(updateShellSize);
+  }
+
+  async function toggleFullscreen(){
+    if(fullscreenMode)await exitFullscreen();
+    else await enterFullscreen();
+  }
+
+  function onFullscreenChange(){
+    // Android can leave browser fullscreen with Back/system gestures.
+    if(!document.fullscreenElement && fullscreenMode && !isiOS()){
+      fullscreenMode=false;
+      document.body.classList.remove('bw-fullscreen-mode');
+      shell.classList.remove('bw-fullscreen-active');
+      fullscreenButton.textContent='FULLSCREEN';
+      requestAnimationFrame(updateShellSize);
+    }
+  }
+
+  function onViewportChange(){
+    if(!fullscreenMode)updateShellSize();
+  }
+
+  fullscreenButton.addEventListener('click',toggleFullscreen);
+  document.addEventListener('fullscreenchange',onFullscreenChange);
+  window.addEventListener('resize',onViewportChange);
+  window.visualViewport?.addEventListener('resize',onViewportChange);
+  updateShellSize();
+
   addEventListener('keydown',keydown,{passive:false});
   addEventListener('keyup',keyup);
   stick.addEventListener('pointerdown',down);
@@ -154,5 +252,12 @@ export async function renderBlockWorld(root){
     removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);
     stick.removeEventListener('pointerdown',down);stick.removeEventListener('pointermove',move);
     stick.removeEventListener('pointerup',up);stick.removeEventListener('pointercancel',up);
+    fullscreenButton.removeEventListener('click',toggleFullscreen);
+    document.removeEventListener('fullscreenchange',onFullscreenChange);
+    window.removeEventListener('resize',onViewportChange);
+    window.visualViewport?.removeEventListener('resize',onViewportChange);
+    document.body.classList.remove('bw-fullscreen-mode');
+    shell.classList.remove('bw-fullscreen-active');
+    try{screen.orientation?.unlock?.();}catch(_){}
   };
 }

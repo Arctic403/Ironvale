@@ -322,3 +322,13 @@ This removes the worst browser interpolation blur and establishes a real tile-st
 The active City route now starts with Downtown Block 01, Commerce Street, rather than the giant Downtown raster map. The block is an authored side-on/2.5D street scene with six spaced destinations, road, sidewalks, an alley, street furniture, depth-layered storefronts, keyboard/touch movement, run input, nearby-building interaction and future west/east block exits.
 
 This is the new city-world scaling model: individual blocks are authored and later streamed/preloaded as neighbors rather than rendering the entire district simultaneously. Existing location/service routes and server-authoritative systems remain intact.
+
+
+## Phase 11.1 — mobile fit + landscape fullscreen
+
+Block 01 now scales its authored 2.5D scene to the available mobile viewport in normal portrait play instead of cropping the street. Horizontal camera travel remains world-space based.
+
+Fullscreen behavior is device-aware:
+- Samsung/Android requests native Fullscreen API mode and attempts `screen.orientation.lock('landscape')`.
+- iPhone/iPad attempts native fullscreen when Safari exposes it; because Safari does not reliably permit webpage orientation locking, portrait iPhones use a CSS-rotated edge-to-edge landscape game canvas.
+- Leaving fullscreen restores RiftCity's normal portrait shell/navigation.

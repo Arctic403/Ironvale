@@ -483,3 +483,136 @@ body.city2d-game-mode{overflow:hidden}.city2d-game-mode .topbar,.city2d-game-mod
 .bw-controls{position:absolute;inset:0;z-index:45;pointer-events:none}.bw-stick{position:absolute;left:24px;bottom:30px;width:120px;height:120px;border-radius:50%;background:#10182088;border:2px solid #fff3;pointer-events:auto}.bw-knob{position:absolute;left:34px;top:34px;width:48px;height:48px;border-radius:50%;background:#d9e0dfbb;border:2px solid #fff8}
 .bw-run,.bw-interact{position:absolute;bottom:38px;border-radius:50%;width:72px;height:72px;background:#16252ddd;color:white;border:2px solid #fff4;font-weight:900;pointer-events:auto}.bw-run{right:108px}.bw-interact{right:24px;width:78px;height:78px;background:#284c58ee}.bw-interact:disabled{opacity:.3}
 @media(min-width:800px){.bw-stick{opacity:.5}.bw-run{right:120px}.bw-interact{right:30px}}
+
+
+/* Phase 11.1 — mobile-fit Block 01 + landscape fullscreen */
+.bw-fullscreen{
+  position:absolute;
+  top:max(10px,env(safe-area-inset-top));
+  right:max(10px,env(safe-area-inset-right));
+  z-index:48;
+  min-height:38px;
+  padding:8px 11px;
+  border:1px solid #ffffff45;
+  border-radius:9px;
+  background:#101820e8;
+  color:#fff;
+  font-size:10px;
+  font-weight:950;
+  letter-spacing:.08em;
+  touch-action:manipulation;
+}
+
+@media(max-width:700px){
+  .game-root:has(.blockworld-shell){
+    overflow:hidden;
+    padding:0;
+  }
+  .blockworld-shell{
+    position:relative;
+    inset:auto;
+    width:100%;
+    min-height:330px;
+    max-height:100dvh;
+  }
+  .blockworld-viewport{height:100%}
+  .blockworld-scene{
+    height:1260px;
+    min-height:1260px;
+  }
+  .bw-block-label{
+    top:max(8px,env(safe-area-inset-top));
+    left:max(8px,env(safe-area-inset-left));
+  }
+  .bw-stick{
+    left:max(12px,env(safe-area-inset-left));
+    bottom:max(12px,env(safe-area-inset-bottom));
+    width:104px;
+    height:104px;
+  }
+  .bw-knob{
+    left:30px;
+    top:30px;
+    width:44px;
+    height:44px;
+  }
+  .bw-run{
+    right:92px;
+    bottom:max(18px,env(safe-area-inset-bottom));
+    width:62px;
+    height:62px;
+  }
+  .bw-interact{
+    right:max(16px,env(safe-area-inset-right));
+    bottom:max(15px,env(safe-area-inset-bottom));
+    width:68px;
+    height:68px;
+  }
+}
+
+/* Fullscreen game mode strips the app chrome and gives the block the device canvas. */
+body.bw-fullscreen-mode{
+  overflow:hidden!important;
+  overscroll-behavior:none;
+  background:#000!important;
+}
+body.bw-fullscreen-mode .topbar,
+body.bw-fullscreen-mode .hud-shell,
+body.bw-fullscreen-mode .effects-strip,
+body.bw-fullscreen-mode #mobile-nav,
+body.bw-fullscreen-mode #session-status{
+  display:none!important;
+}
+body.bw-fullscreen-mode #game-root{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100dvh!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  z-index:9998!important;
+}
+body.bw-fullscreen-mode .blockworld-shell{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  max-height:none!important;
+  min-height:0!important;
+  z-index:9999!important;
+}
+
+/* Samsung/Android after orientation.lock() or a physically-landscape device. */
+@media(orientation:landscape){
+  body.bw-fullscreen-mode #game-root,
+  body.bw-fullscreen-mode .blockworld-shell{
+    width:100vw!important;
+    height:100dvh!important;
+    transform:none!important;
+  }
+}
+
+/* iPhone portrait fallback:
+   Safari does not reliably allow webpage orientation locking, so rotate only
+   the game canvas while fullscreen mode is active. This gives a landscape
+   gameplay surface without requiring the rest of RiftCity to rotate. */
+@supports (-webkit-touch-callout:none){
+  @media(orientation:portrait){
+    body.bw-fullscreen-mode #game-root{
+      width:100dvh!important;
+      height:100vw!important;
+      left:50%!important;
+      top:50%!important;
+      right:auto!important;
+      bottom:auto!important;
+      transform:translate(-50%,-50%) rotate(90deg)!important;
+      transform-origin:center center!important;
+    }
+    body.bw-fullscreen-mode .blockworld-shell{
+      width:100%!important;
+      height:100%!important;
+    }
+  }
+}
