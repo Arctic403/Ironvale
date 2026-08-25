@@ -180,3 +180,72 @@ The service contract remains:
 - `POST /api/services/:service`
 
 The browser UI is intentionally not expanded in this backend pass; location/service UI can be wired after the backend behavior is tested.
+
+
+## Phase 8 — Frontend restoration + full service integration
+
+Phase 8 rebuilds the browser client around the server-authoritative backend instead of reviving the original V1 React/TypeScript/local-simulation architecture.
+
+### Frontend architecture
+
+The browser remains plain ES-module JavaScript:
+
+- `public/ui/api.js` — authenticated API helper.
+- `public/ui/state.js` — small shared render/session state.
+- `public/ui/router.js` — hash routing and legacy route aliases.
+- `public/ui/shell.js` — compact HUD, effects strip, drawer navigation, session/auth UI.
+- `public/views/character.js` — player dashboard.
+- `public/views/city.js` — city network, district map presentation and real location/service launching.
+- `public/views/crimes.js` — server-authoritative crime careers with inline results.
+- `public/views/inventory.js` — filterable inventory and item inspector.
+- `public/views/service.js` — service-page dispatcher.
+- `public/views/services/*.js` — finance, progression, world and combat service screens.
+- `public/views/wiki.js` — RiftCity Field Manual.
+
+`public/app.js` is now the bootstrap/router entry point instead of the entire frontend.
+
+### Restored V1-style game coverage
+
+The browser now has usable screens for:
+
+- Character / progression overview
+- City and individual locations
+- Crimes and attempt history
+- Inventory / item actions
+- Combat / NPC and asynchronous player attacks
+- Bank / savings / investments
+- Offshore banking
+- Jobs / careers
+- Education
+- Gym programs
+- Properties
+- Factions
+- Missions
+- Achievements
+- Daily / weekly challenges
+- Fictional city market
+- Shops
+- Player Exchange / Black Market
+- International travel
+- Production
+- Hospital / jail status
+- World events
+- Casino chip account + game-floor catalog
+- Field Manual
+
+Nightclub, police, park and downtown route shells are restored without inventing client-side outcomes; they clearly remain locked until matching server engines are installed.
+
+### UI rules
+
+- Compact sticky HUD for level/resources/stats.
+- Active server-timed effects strip.
+- Mobile-first bottom navigation plus a full drawer.
+- Inline action results where practical.
+- Location actions route to real service pages.
+- Browser back/forward and deep hash routes work.
+- No frontend-generated crime/combat/economy outcomes.
+- Casino UI does not fabricate games that the backend has not enabled.
+
+### Build validation
+
+`npm run build` now uses `scripts/check-js.js` to recursively syntax-check every JavaScript module under `src`, `public` and `scripts`, so future frontend modules are automatically included without manually extending the package script.

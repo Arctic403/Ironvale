@@ -3,285 +3,65 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#07090d" />
-  <title>RiftCity V2</title>
+  <meta name="theme-color" content="#11110f" />
+  <title>RiftCity</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="desktop-rail" aria-label="RiftCity navigation">
-      <div class="brand-lockup">
-        <span class="brand-mark">R</span>
-        <div>
-          <strong>RiftCity</strong>
-          <small>V2</small>
-        </div>
+  <div id="app-shell">
+    <header class="topbar">
+      <button id="menu-button" class="icon-button" aria-label="Open menu">☰</button>
+      <a class="brand" href="#city" data-route="city"><span class="brand-mark">R</span><strong>RiftCity</strong></a>
+      <div class="page-title"><span id="page-eyebrow" class="eyebrow">RIFTCITY</span><h1 id="page-title-text">Character</h1></div>
+      <div class="top-actions">
+        <span id="hud-status" class="hud-status status-active">OFFLINE</span>
+        <button id="logout-btn" class="ghost-button">Logout</button>
       </div>
+    </header>
 
-      <nav class="rail-nav">
-        <a class="rail-link active" href="#overview" data-view-link="overview" aria-current="page">
-          <span class="rail-icon">▦</span><span>Overview</span>
-        </a>
-        <a class="rail-link" href="#city" data-view-link="city">
-          <span class="rail-icon">⌂</span><span>City</span>
-        </a>
-        <a class="rail-link" href="#inventory" data-view-link="inventory">
-          <span class="rail-icon">▤</span><span>Inventory</span>
-        </a>
-        <a class="rail-link" href="#crimes" data-view-link="crimes">
-          <span class="rail-icon">◇</span><span>Crimes</span>
-        </a>
-        <a class="rail-link" href="/admin/logs">
-          <span class="rail-icon">⌁</span><span>Dev logs</span>
-        </a>
-      </nav>
+    <section id="status" class="session-status">Checking session…</section>
 
-      <div class="rail-footer">
-        <span class="phase-dot"></span>
-        <span>Phase 5 Crime Engine</span>
+    <section id="hud-shell" class="hud-shell hidden">
+      <div id="hud-primary" class="hud-scroll"></div>
+      <div id="effects-strip" class="effects-strip empty"></div>
+    </section>
+
+    <section id="auth-grid" class="auth-layout">
+      <div class="auth-copy">
+        <span class="eyebrow">RIFTCITY V2</span>
+        <h2>Enter the city.</h2>
+        <p>Server-authoritative crime, economy, progression, combat and world systems. Sign in to continue your player.</p>
+      </div>
+      <div class="auth-forms">
+        <form id="login-form" class="rc-panel auth-panel">
+          <span class="eyebrow">RETURNING PLAYER</span><h2>Login</h2>
+          <label>Username<input name="username" autocomplete="username" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+          <button class="rc-button primary">Enter RiftCity</button>
+        </form>
+        <form id="register-form" class="rc-panel auth-panel">
+          <span class="eyebrow">NEW PLAYER</span><h2>Create account</h2>
+          <label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+          <button class="rc-button">Create player</button>
+        </form>
+      </div>
+    </section>
+
+    <main id="game-root" class="game-root hidden" aria-live="polite"></main>
+
+    <aside id="game-drawer" class="game-drawer">
+      <button id="drawer-backdrop" class="drawer-backdrop" aria-label="Close menu"></button>
+      <div class="drawer-panel">
+        <header><div class="brand"><span class="brand-mark">R</span><strong>RiftCity</strong></div><button id="drawer-close" class="icon-button">×</button></header>
+        <nav id="drawer-nav"></nav>
+        <footer><a href="/admin/logs">Developer logs</a></footer>
       </div>
     </aside>
 
-    <main class="workspace">
-      <header class="topbar">
-        <div class="mobile-brand">
-          <span class="brand-mark">R</span>
-          <strong>RiftCity</strong>
-        </div>
-        <div class="page-title">
-          <span id="page-eyebrow" class="eyebrow">PLAYER CORE</span>
-          <h1 id="page-title-text">Overview</h1>
-        </div>
-        <a class="topbar-link" href="/admin/logs">Dev logs</a>
-      </header>
-
-      <section id="status" class="session-status">Checking session…</section>
-
-      <section id="auth-grid" class="auth-layout">
-        <div class="auth-copy">
-          <span class="eyebrow">RIFTCITY V2</span>
-          <h2>Enter the city.</h2>
-          <p>Create a player or sign back in. Your account, player state and current city location are stored persistently.</p>
-        </div>
-
-        <div class="auth-forms">
-          <form id="login-form" class="panel auth-panel">
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">RETURNING PLAYER</span>
-                <h2>Login</h2>
-              </div>
-            </div>
-            <label>Username<input name="username" autocomplete="username" required /></label>
-            <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
-            <button>Enter RiftCity</button>
-          </form>
-
-          <form id="register-form" class="panel auth-panel secondary-auth">
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">NEW PLAYER</span>
-                <h2>Create account</h2>
-              </div>
-            </div>
-            <label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" required /></label>
-            <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
-            <button class="secondary">Create player</button>
-          </form>
-        </div>
-      </section>
-
-      <section id="player-dashboard" class="hidden">
-        <section class="resource-strip" aria-label="Player resources">
-          <article class="resource-item resource-health">
-            <div class="resource-top"><span>Health</span><strong><span id="health-value">100</span><small>/<span id="health-max">100</span></small></strong></div>
-            <div class="meter"><span id="health-meter"></span></div>
-          </article>
-          <article class="resource-item resource-nerve">
-            <div class="resource-top"><span>Nerve</span><strong><span id="nerve-value">10</span><small>/<span id="nerve-max">10</span></small></strong></div>
-            <div class="meter"><span id="nerve-meter"></span></div>
-          </article>
-          <article class="resource-item resource-energy">
-            <div class="resource-top"><span>Energy</span><strong><span id="energy-value">100</span><small>/<span id="energy-max">100</span></small></strong></div>
-            <div class="meter"><span id="energy-meter"></span></div>
-          </article>
-          <article class="resource-item resource-cash">
-            <div class="resource-top"><span>Cash</span><strong id="cash-value">$0</strong></div>
-            <div class="resource-caption">On hand</div>
-          </article>
-        </section>
-
-        <section id="overview-view" class="game-view">
-          <section class="dashboard-layout">
-            <article class="panel progression-panel">
-              <div class="panel-heading split-heading">
-                <div>
-                  <span class="eyebrow">PROGRESSION</span>
-                  <h2>Level <span id="level-value">1</span></h2>
-                </div>
-                <span id="player-status-badge" class="badge status-active">ACTIVE</span>
-              </div>
-              <div class="xp-row"><span>XP</span><strong><span id="xp-value">0</span> / <span id="xp-next">100</span></strong></div>
-              <div class="meter xp-meter"><span id="xp-meter"></span></div>
-              <p id="status-detail" class="muted">Player is active in RiftCity.</p>
-            </article>
-
-            <article class="panel stats-panel">
-              <div class="panel-heading">
-                <div>
-                  <span class="eyebrow">CORE STATS</span>
-                  <h2>Attributes</h2>
-                </div>
-              </div>
-              <div class="combat-stats">
-                <div><span>Strength</span><strong id="strength-value">1</strong></div>
-                <div><span>Defense</span><strong id="defense-value">1</strong></div>
-                <div><span>Speed</span><strong id="speed-value">1</strong></div>
-                <div><span>Dexterity</span><strong id="dexterity-value">1</strong></div>
-              </div>
-            </article>
-
-            <article id="account-card" class="panel account-panel">
-              <div class="panel-heading split-heading">
-                <div>
-                  <span class="eyebrow">ACCOUNT</span>
-                  <h2 id="account-name">Player</h2>
-                </div>
-                <span id="account-role" class="badge">player</span>
-              </div>
-              <dl id="account-details"></dl>
-              <button id="logout-btn" class="ghost-button">Logout</button>
-            </article>
-          </section>
-        </section>
-
-        <section id="city-view" class="game-view hidden">
-          <div class="world-header">
-            <div>
-              <span class="eyebrow">CITY DIRECTORY / RC-01</span>
-              <h2>RiftCity</h2>
-              <p>All major city locations are available directly from this hub. Shops, services, travel, entertainment and future gameplay systems plug into these locations.</p>
-            </div>
-            <div class="current-location-block">
-              <span class="system-label">CURRENT LOCATION</span>
-              <strong id="current-location-name">Rift Civic Hall</strong>
-              <small id="current-location-category">Services</small>
-            </div>
-          </div>
-
-          <div class="city-hub city-hub-direct">
-            <section class="city-directory-shell" aria-label="RiftCity locations">
-              <div class="browser-heading city-directory-heading">
-                <span>LOCATIONS — TAP TO OPEN</span>
-                <small id="location-count">00</small>
-              </div>
-              <div id="city-directory" class="city-directory">
-                <div class="world-loading">Loading city directory…</div>
-              </div>
-            </section>
-          </div>
-        </section>
-
-        <section id="inventory-view" class="game-view hidden">
-          <div class="inventory-header">
-            <div>
-              <span class="eyebrow">ITEM SYSTEM / PHASE 4</span>
-              <h2>Inventory</h2>
-              <p>Your owned items are stored persistently in D1. Item definitions come from the shared RiftCity item registry.</p>
-            </div>
-            <div class="inventory-summary" aria-label="Inventory summary">
-              <div><span>OWNED TYPES</span><strong id="inventory-unique-count">00</strong></div>
-              <div><span>TOTAL ITEMS</span><strong id="inventory-total-count">00</strong></div>
-              <div><span>REGISTRY</span><strong id="inventory-registry-count">08</strong></div>
-            </div>
-          </div>
-
-          <div class="inventory-layout">
-            <section class="inventory-browser">
-              <div class="browser-heading">
-                <span>YOUR ITEMS</span>
-                <small id="inventory-owned-label">0 OWNED</small>
-              </div>
-              <div id="inventory-owned-list" class="inventory-list">
-                <div class="world-loading">Loading inventory…</div>
-              </div>
-
-              <div class="browser-heading registry-heading">
-                <span>ITEM REGISTRY</span>
-                <small>STARTER SET</small>
-              </div>
-              <div id="inventory-catalog-list" class="inventory-list catalog-list">
-                <div class="world-loading">Loading item registry…</div>
-              </div>
-            </section>
-
-            <aside id="inventory-detail" class="inventory-detail" aria-live="polite">
-              <div class="inventory-empty-detail">
-                <span class="eyebrow">ITEM INSPECTOR</span>
-                <h3>Select an item</h3>
-                <p>Choose an owned item or a registry entry to inspect its properties.</p>
-              </div>
-            </aside>
-          </div>
-        </section>
-
-
-        <section id="crimes-view" class="game-view hidden">
-          <div class="crime-header">
-            <div>
-              <span class="eyebrow">SERVER CRIME ENGINE / PHASE 5</span>
-              <h2>Crimes</h2>
-              <p>Every attempt is resolved by the Cloudflare Worker. Nerve, rewards, mastery, XP, item drops and consequences are committed to D1 server-side.</p>
-            </div>
-            <div class="crime-security-badge">
-              <span>AUTHORITY</span>
-              <strong>SERVER</strong>
-              <small>Client cannot choose outcomes</small>
-            </div>
-          </div>
-
-          <div class="crime-layout">
-            <section>
-              <div class="browser-heading">
-                <span>AVAILABLE CRIMES</span>
-                <small id="crime-count">00</small>
-              </div>
-              <div id="crime-list" class="crime-list">
-                <div class="world-loading">Loading crime engine…</div>
-              </div>
-            </section>
-
-            <aside class="crime-history-panel">
-              <div class="browser-heading">
-                <span>RECENT ATTEMPTS</span>
-                <small>D1 HISTORY</small>
-              </div>
-              <div id="crime-history" class="crime-history">
-                <div class="world-loading">No attempts loaded.</div>
-              </div>
-            </aside>
-          </div>
-        </section>
-
-        <section id="location-view" class="game-view hidden">
-          <section id="location-page-content" class="location-page">
-            <div class="world-loading">Opening location…</div>
-          </section>
-        </section>
-      </section>
-
-      <div id="message" class="message hidden" role="status"></div>
-    </main>
+    <div id="message" class="message hidden" role="status"></div>
+    <nav id="mobile-nav" class="mobile-nav hidden" aria-label="Primary navigation"></nav>
   </div>
-
-  <nav class="mobile-nav" aria-label="Mobile navigation">
-    <a class="mobile-nav-link active" href="#overview" data-view-link="overview" aria-current="page"><span>▦</span><small>Overview</small></a>
-    <a class="mobile-nav-link" href="#city" data-view-link="city"><span>⌂</span><small>City</small></a>
-    <a class="mobile-nav-link" href="#inventory" data-view-link="inventory"><span>▤</span><small>Items</small></a>
-    <a class="mobile-nav-link" href="#crimes" data-view-link="crimes"><span>◇</span><small>Crimes</small></a>
-    <a class="mobile-nav-link" href="/admin/logs"><span>⌁</span><small>Logs</small></a>
-  </nav>
-
   <script type="module" src="/app.js"></script>
 </body>
 </html>
