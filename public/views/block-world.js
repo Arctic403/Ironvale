@@ -70,6 +70,19 @@ export async function renderBlockWorld(root){
           <label>Add prop<select id="bw-editor-prop-kind"><option>tree</option><option>lamp</option><option>bench</option><option>hydrant</option><option>box</option><option>news</option><option>car</option><option>van</option></select></label>
           <button id="bw-editor-add-prop">ADD AT PLAYER</button>
           <div class="bw-editor-actions"><button id="bw-editor-undo">UNDO</button><button id="bw-editor-redo">REDO</button></div>
+          <div class="bw-asset-panel">
+            <strong>BUILDING ART ASSETS</strong>
+            <label class="bw-asset-import">Import RiftAssets JSON<input id="bw-asset-file" type="file" accept="application/json,.json"></label>
+            <div id="bw-asset-status">No art assets imported yet.</div>
+            <label>Asset<select id="bw-editor-asset"><option value="">No asset</option></select></label>
+            <div class="bw-editor-grid">
+              <label>Art scale<input id="bw-asset-scale" type="number" min="0.05" max="5" step="0.05" value="1"></label>
+              <label>Art Y<input id="bw-asset-y" type="number" step="5" value="0"></label>
+              <label>Art X<input id="bw-asset-x" type="number" step="5" value="0"></label>
+              <label>Fit<select id="bw-asset-fit"><option value="contain">Contain</option><option value="cover">Cover</option></select></label>
+            </div>
+            <div class="bw-editor-actions"><button id="bw-asset-apply">APPLY TO BUILDING</button><button id="bw-asset-clear">CLEAR ART</button></div>
+          </div>
           <button class="primary" id="bw-editor-export">EXPORT WORLD JSON</button>
           <button id="bw-editor-reset">RESET BLOCK</button>
           <small>Drag objects directly in the scene. Buildings also expose door markers. Export and send the JSON with your newest workspace.</small>
@@ -104,6 +117,13 @@ export async function renderBlockWorld(root){
   const undoButton=root.querySelector('#bw-editor-undo'),redoButton=root.querySelector('#bw-editor-redo');
   const exportButton=root.querySelector('#bw-editor-export'),resetButton=root.querySelector('#bw-editor-reset');
   const addPropButton=root.querySelector('#bw-editor-add-prop'),propKind=root.querySelector('#bw-editor-prop-kind');
+  const assetFile=root.querySelector('#bw-asset-file'),assetSelect=root.querySelector('#bw-editor-asset');
+  const assetStatus=root.querySelector('#bw-asset-status'),assetScale=root.querySelector('#bw-asset-scale');
+  const assetX=root.querySelector('#bw-asset-x'),assetY=root.querySelector('#bw-asset-y'),assetFit=root.querySelector('#bw-asset-fit');
+  const assetApply=root.querySelector('#bw-asset-apply'),assetClear=root.querySelector('#bw-asset-clear');
+
+  // Imported image data stays in the browser/editor session; block exports only keep the lightweight asset id + placement.
+  const importedAssets=new Map();
 
   // Editable working copy; the imported authored block remains untouched.
   let editMode=false, selectedKey='', drag=null;
@@ -128,11 +148,48 @@ export async function renderBlockWorld(root){
     objectSelect.innerHTML='<option value="">Choose object…</option>'+allEditable().map(x=>`<option value="${x.key}">${x.type.toUpperCase()} · ${x.label}</option>`).join('');
     if(allEditable().some(x=>x.key===current))objectSelect.value=current;
   }
+  function populateAssetSelect(){
+    const current=assetSelect.value;
+    assetSelect.innerHTML='<option value="">No asset</option>'+[...importedAssets.values()].map(a=>`<option value="${escapeAttr(a.id)}">${escapeText(a.name||a.id)}</option>`).join('');
+    if(importedAssets.has(current))assetSelect.value=current;
+  }
+  function escapeText(v){return String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  function escapeAttr(v){return escapeText(v).replace(/'/g,'&#39;');}
+  function syncAssetInspector(){
+    const item=currentEditable(); const b=item?.type==='building'?item.o:null;
+    assetSelect.disabled=!b;assetApply.disabled=!b;assetClear.disabled=!b;
+    assetSelect.value=b?.asset?.id&&importedAssets.has(b.asset.id)?b.asset.id:'';
+    assetScale.value=b?.asset?.scale??1;assetX.value=b?.asset?.x??0;assetY.value=b?.asset?.y??0;assetFit.value=b?.asset?.fit||'contain';
+  }
+  async function importAssetPack(file){
+    if(!file)return;
+    try{
+      const payload=JSON.parse(await file.text());
+      const list=payload?.format==='riftcity-asset-pack'&&Array.isArray(payload.assets)?payload.assets:[];
+      if(!list.length)throw new Error('This JSON is not a RiftCity asset pack or contains no assets.');
+      let added=0;
+      for(const raw of list){
+        const id=String(raw.id||raw.assetId||raw.name||'').trim();
+        const src=String(raw.src||raw.dataUrl||'');
+        if(!id||!src.startsWith('data:image/'))continue;
+        importedAssets.set(id,{id,name:raw.name||id,src,sourceWidth:raw.sourceWidth||0,sourceHeight:raw.sourceHeight||0});added++;
+      }
+      if(!added)throw new Error('No embedded image assets were found in this pack.');
+      populateAssetSelect();assetStatus.textContent=`${added} asset${added===1?'':'s'} imported · ${file.name}`;syncAssetInspector();renderEditorObjects();
+    }catch(err){assetStatus.textContent=`Import failed: ${err.message}`;}
+    finally{assetFile.value='';}
+  }
+  function applyBuildingAsset(){
+    const item=currentEditable();if(item?.type!=='building')return;
+    const id=assetSelect.value;if(!id||!importedAssets.has(id)){assetStatus.textContent='Choose an imported asset first.';return;}
+    const before=snapshot();item.o.asset={id,scale:Math.max(.05,Number(assetScale.value)||1),x:Number(assetX.value)||0,y:Number(assetY.value)||0,fit:assetFit.value==='cover'?'cover':'contain'};commit(before);renderEditorObjects();syncAssetInspector();
+  }
+  function clearBuildingAsset(){const item=currentEditable();if(item?.type!=='building')return;const before=snapshot();delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();}
   function syncInspector(){
     const item=currentEditable(); if(!item){inputX.value=inputY.value=inputW.value=inputH.value='';return;}
     const o=item.o; inputX.value=Math.round(o.x||0);inputY.value=Math.round(o.y||0);
     inputW.value=Math.round(o.w??o.width??0);inputH.value=Math.round(o.h??o.height??0);
-    inputW.disabled=item.type==='prop';inputH.disabled=item.type==='prop';
+    inputW.disabled=item.type==='prop';inputH.disabled=item.type==='prop';syncAssetInspector();
   }
   function select(key){
     selectedKey=key||'';populateObjectSelect();syncInspector();
@@ -148,6 +205,14 @@ export async function renderBlockWorld(root){
       let marker=el.querySelector('.bw-door-marker');
       if(!marker){marker=document.createElement('span');marker.className='bw-door-marker';el.appendChild(marker);}
       marker.style.left=`${(b.doorX??b.x+b.w/2)-b.x}px`;marker.title='Interaction door';
+      let art=el.querySelector('.bw-building-art');
+      const imported=b.asset?.id?importedAssets.get(b.asset.id):null;
+      if(imported){
+        if(!art){art=document.createElement('img');art.className='bw-building-art';art.draggable=false;el.prepend(art);}
+        art.src=imported.src;art.alt=b.name;art.style.objectFit=b.asset.fit||'contain';
+        art.style.transform=`translate(${Number(b.asset.x)||0}px,${Number(b.asset.y)||0}px) scale(${Number(b.asset.scale)||1})`;
+        el.classList.add('has-building-art');
+      }else{art?.remove();el.classList.remove('has-building-art');}
     });
     props.querySelectorAll('.bw-prop-authored').forEach(x=>x.remove());
     working.props.forEach((p,i)=>{
@@ -349,6 +414,9 @@ export async function renderBlockWorld(root){
   function onEditorPointerUp(e){
     if(!drag||e.pointerId!==drag.id)return;commit(drag.before);drag=null;
   }
+  assetFile.addEventListener('change',()=>importAssetPack(assetFile.files?.[0]));
+  assetApply.addEventListener('click',applyBuildingAsset);assetClear.addEventListener('click',clearBuildingAsset);
+  assetSelect.addEventListener('change',()=>{const item=currentEditable();if(item?.type==='building'&&item.o.asset?.id===assetSelect.value)syncAssetInspector();});
   editToggle.addEventListener('click',()=>setEditMode(!editMode));
   editorClose.addEventListener('click',()=>setEditMode(false));
   objectSelect.addEventListener('change',()=>select(objectSelect.value));

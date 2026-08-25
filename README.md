@@ -376,3 +376,8 @@ Visual changes:
 - The alley gains pipes, lighting, crates and subtle steam; the street gains additional small props.
 
 This remains deliberately mid-detail rather than photorealistic so Block 01 stays lightweight on mobile and can serve as the art baseline for future streamed blocks.
+
+
+## Phase 11.6 — RiftAssets building-art importer
+
+The temporary Block Editor can now import `riftcity-asset-pack` JSON files exported from RiftAssets. Imported transparent building art can be assigned to any selected Commerce Street building and previewed directly in the playable block. Per-building art scale, X/Y offset and contain/cover fit are editable without changing collision or interaction-door geometry. Imported image bytes stay in the current browser/editor session; exported block JSON stores only lightweight asset IDs and placement metadata, avoiding multi-megabyte image blobs in workspace patches.

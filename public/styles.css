@@ -890,3 +890,15 @@ body.bw-fullscreen-mode .blockworld-shell{
 /* Keep the live editor readable over the upgraded art. */
 .bw-edit-mode .bw-building{filter:saturate(.72) brightness(.92)}
 .bw-edit-mode .bw-edit-selected{filter:none!important}
+
+
+/* Phase 11.6 — RiftAssets building-art importer */
+.bw-building-art{position:absolute;left:0;bottom:0;width:100%;height:100%;z-index:20;display:block;transform-origin:50% 100%;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.bw-building.has-building-art{background:transparent;border-color:transparent;box-shadow:none}
+.bw-building.has-building-art:after,.bw-building.has-building-art>.bw-roof,.bw-building.has-building-art>.bw-cornice,.bw-building.has-building-art>.bw-upper,.bw-building.has-building-art>.bw-balcony,.bw-building.has-building-art>.bw-storefront,.bw-building.has-building-art>.bw-side-sign,.bw-building.has-building-art>.bw-fire-escape-small{opacity:0}
+.bw-building.has-building-art .bw-door-marker{z-index:30}
+.bw-asset-panel{display:grid;gap:8px;padding:10px;border:1px solid #ffffff24;border-radius:9px;background:#0b1418}
+.bw-asset-panel>strong{font-size:10px;letter-spacing:.1em;color:#e6b15f}
+.bw-asset-import{position:relative;overflow:hidden;display:grid!important;place-items:center;min-height:38px;padding:8px;border:1px dashed #ffffff40;border-radius:7px;color:#fff!important;background:#18262c;cursor:pointer}
+.bw-asset-import input{position:absolute;inset:0;opacity:0;cursor:pointer}
+#bw-asset-status{font-size:9px;line-height:1.35;color:#9fb0b7;overflow-wrap:anywhere}
