@@ -1,8 +1,9 @@
 import { api } from '../ui/api.js';
 import { state } from '../ui/state.js';
 import { escapeHtml, panel, empty } from '../ui/helpers.js';
-import { serviceRoute, go } from '../ui/router.js';
-import { renderPlayerHud, showToast } from '../ui/shell.js';
+import { go } from '../ui/router.js';
+import { showToast } from '../ui/shell.js';
+import { mountCity3D, renderWorldDirectory } from '../game3d.js';
 
 const ROUTE_BY_TYPE={bank:'bank',education:'education',gym:'gym',jobs:'jobs',properties:'properties',shop:'shop',status:'status',casino:'casino',travel:'travel',production:'production',market:'market',auction:'auction',law:'law',nightclub:'nightclub','city-activities':'city-activities'};
 
@@ -14,40 +15,40 @@ export async function renderCity(root) {
   }
   state.world=result.world;
   state.location=result.world?.current||state.location;
-  const categories=result.world?.categories||[], locations=result.world?.locations||[];
+  const current=state.location?.locationName||'RiftCity';
   root.innerHTML=`
-    <section class="city-hero">
-      <div><span class="eyebrow">RIFTCITY / RC-01</span><h2>City Network</h2><p>Select a destination. Server travel state and location requirements remain authoritative.</p></div>
-      <div class="current-location"><span>CURRENT LOCATION</span><strong>${escapeHtml(state.location?.locationName||'RiftCity')}</strong><small>${escapeHtml(state.location?.categoryName||'')}</small></div>
-    </section>
-    <section class="city-map-shell">
-      <div class="city-map-grid" aria-label="RiftCity district map">
-        ${categories.map((cat,index)=>`<button class="district-block district-${index+1}" data-city-category="${escapeHtml(cat.id)}"><span>${escapeHtml(cat.code)}</span><strong>${escapeHtml(cat.name)}</strong><small>${locations.filter(l=>l.categoryId===cat.id).length} locations</small></button>`).join('')}
+    <section class="world3d-shell" aria-label="Playable 3D RiftCity">
+      <canvas id="riftcity-3d-canvas" tabindex="0"></canvas>
+      <div class="world3d-vignette"></div>
+      <div class="world3d-top-left">
+        <span class="eyebrow">RIFTCITY / LIVE WORLD</span>
+        <strong id="world3d-status">Loading 3D city…</strong>
+        <small>WASD / arrows to move · Shift to run · drag to orbit · E to enter</small>
       </div>
-    </section>
-    <div class="city-directory">
-      ${categories.map(cat=>{
-        const rows=locations.filter(l=>l.categoryId===cat.id);
-        return `<section class="city-category" data-category-section="${escapeHtml(cat.id)}">
-          <header><div><span class="category-code">${escapeHtml(cat.code)}</span><h3>${escapeHtml(cat.name)}</h3></div><small>${rows.length}</small></header>
-          <div class="location-grid">${rows.map(location=>locationCard(location,result.world.current)).join('')}</div>
-        </section>`;
-      }).join('')}
-    </div>`;
-  root.querySelectorAll('[data-city-category]').forEach(btn=>btn.addEventListener('click',()=>{
-    root.querySelector(`[data-category-section="${CSS.escape(btn.dataset.cityCategory)}"]`)?.scrollIntoView({behavior:'smooth',block:'start'});
-  }));
-  root.querySelectorAll('[data-location-id]').forEach(btn=>btn.addEventListener('click',()=>openLocation(btn.dataset.locationId)));
-}
-
-function locationCard(location,current) {
-  const here=current?.locationId===location.id;
-  return `<button class="location-card ${here?'current':''}" data-location-id="${escapeHtml(location.id)}">
-    <span class="location-card-top"><b>${escapeHtml(location.code)}</b><em>${here?'HERE':escapeHtml(location.status)}</em></span>
-    <strong>${escapeHtml(location.name)}</strong>
-    <small>${escapeHtml(location.type)}</small>
-    <p>${escapeHtml(location.shortDescription)}</p>
-  </button>`;
+      <div class="world3d-top-right">
+        <button id="world3d-directory-button" class="world3d-hud-button">CITY DIRECTORY</button>
+      </div>
+      <div id="world3d-prompt" class="world3d-prompt">
+        <span>NEARBY</span><strong id="world3d-location">Location</strong>
+        <button id="world3d-interact">ENTER <kbd>E</kbd></button>
+      </div>
+      <div class="world3d-current"><span>CURRENT</span><strong>${escapeHtml(current)}</strong></div>
+      <div class="world3d-touch" aria-label="Touch movement controls">
+        <div class="world3d-dpad">
+          <button data-move="forward">▲</button>
+          <button data-move="left">◀</button>
+          <button data-move="back">▼</button>
+          <button data-move="right">▶</button>
+        </div>
+        <button class="world3d-run" data-move="run">RUN</button>
+      </div>
+      <aside id="world3d-directory" class="world3d-directory">
+        <header><div><span class="eyebrow">FAST NAV / DEV</span><strong>City Directory</strong></div><button id="world3d-directory-close">×</button></header>
+        <p>Dev teleport moves your character near a location. Walk onto its marker and enter normally to sync server travel.</p>
+        <div>${renderWorldDirectory(result.world)}</div>
+      </aside>
+    </section>`;
+  mountCity3D({root,world:result.world,onEnterLocation:openLocation});
 }
 
 async function openLocation(id) {
@@ -69,7 +70,7 @@ export async function renderLocation(root,id) {
   state.location=result.current||state.location;
   const actions=location.actions||[];
   root.innerHTML=`
-    <a class="back-link" href="#city" data-route="city">← Return to City</a>
+    <a class="back-link" href="#city" data-route="city">← Return to 3D City</a>
     <section class="location-hero">
       <div><span class="location-code">${escapeHtml(location.code)}</span><span class="eyebrow">${escapeHtml(category?.name||location.categoryId)}</span><h2>${escapeHtml(location.name)}</h2><p>${escapeHtml(location.description)}</p></div>
       <div class="location-status-box"><span>STATUS</span><strong>${escapeHtml(location.status)}</strong><small>${escapeHtml(location.type)}</small></div>
@@ -84,6 +85,6 @@ export async function renderLocation(root,id) {
     }).join('')}</div>`:empty('No services installed'),{eyebrow:'LOCATION MODULES'})}`;
   root.querySelectorAll('[data-service-route]').forEach(btn=>btn.addEventListener('click',()=>{
     if (!btn.dataset.serviceRoute) return showToast('This service is not installed yet.');
-    location.hash=`#${btn.dataset.serviceRoute}${btn.dataset.serviceQuery||''}`;
+    window.location.hash=`#${btn.dataset.serviceRoute}${btn.dataset.serviceQuery||''}`;
   }));
 }

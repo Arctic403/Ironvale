@@ -9,6 +9,7 @@ import { renderCrimes } from './views/crimes.js';
 import { renderInventory } from './views/inventory.js';
 import { renderService } from './views/service.js';
 import { renderWiki } from './views/wiki.js';
+import { destroyCity3D } from './game3d.js';
 
 initShell();
 
@@ -24,6 +25,7 @@ async function boot() {
 }
 
 async function route() {
+  destroyCity3D();
   const request=++state.activeRequest;
   const parsed=parseRoute();
   state.route=parsed;
