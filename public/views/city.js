@@ -26,6 +26,7 @@ export async function renderCity(root) {
         <small>WASD / arrows to move · Shift to run · drag to orbit · E to enter</small>
       </div>
       <div class="world3d-top-right">
+        <button id="world3d-editor-button" class="world3d-hud-button world3d-editor-toggle" type="button">DEV EDITOR</button>
         <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
         <button id="world3d-directory-button" class="world3d-hud-button" type="button">CITY DIRECTORY</button>
       </div>
@@ -51,6 +52,83 @@ export async function renderCity(root) {
         <strong>Rotate sideways</strong>
         <span>RiftCity plays best in landscape.</span>
       </div>
+      <aside id="world3d-editor" class="world3d-editor" aria-label="DEV world editor">
+        <header>
+          <div><span class="eyebrow">PUBLIC DEV TOOL</span><strong>World Editor</strong></div>
+          <button id="world3d-editor-close" type="button">×</button>
+        </header>
+        <div class="world3d-editor-scroll">
+          <p class="world3d-editor-note">Edits stay on this device until you export a patch. Import that patch into your custom Editor to make the city change permanent.</p>
+
+          <section class="world3d-editor-card">
+            <span class="editor-kicker">SELECTED</span>
+            <strong data-editor-selected>Nothing selected</strong>
+            <small data-editor-type>Tap a location/building or add an object.</small>
+            <div class="world3d-editor-readout">
+              <div><span>X</span><b data-editor-x>—</b></div>
+              <div><span>Z</span><b data-editor-z>—</b></div>
+              <div><span>ROT</span><b data-editor-rot>—</b></div>
+              <div><span>SCALE</span><b data-editor-scale>—</b></div>
+            </div>
+          </section>
+
+          <section class="world3d-editor-card">
+            <div class="world3d-editor-row">
+              <label>NUDGE
+                <select data-editor-step>
+                  <option value="0.5">0.5m</option>
+                  <option value="1" selected>1m</option>
+                  <option value="5">5m</option>
+                </select>
+              </label>
+            </div>
+            <div class="world3d-nudge-grid">
+              <span></span><button type="button" data-editor-nudge="z:-">Z−</button><span></span>
+              <button type="button" data-editor-nudge="x:-">X−</button><span class="world3d-nudge-center">MOVE</span><button type="button" data-editor-nudge="x:+">X+</button>
+              <span></span><button type="button" data-editor-nudge="z:+">Z+</button><span></span>
+            </div>
+            <div class="world3d-editor-button-row">
+              <button type="button" data-editor-rotate="-15">↶ 15°</button>
+              <button type="button" data-editor-rotate="15">15° ↷</button>
+            </div>
+            <div class="world3d-editor-button-row">
+              <button type="button" data-editor-scale="scaleX:-0.1">WIDTH −</button>
+              <button type="button" data-editor-scale="scaleX:0.1">WIDTH +</button>
+              <button type="button" data-editor-scale="scaleY:-0.1">HEIGHT −</button>
+              <button type="button" data-editor-scale="scaleY:0.1">HEIGHT +</button>
+            </div>
+            <div class="world3d-editor-button-row">
+              <button type="button" data-editor-reset>RESET SELECTED</button>
+              <button type="button" class="danger" data-editor-delete>DELETE</button>
+            </div>
+          </section>
+
+          <section class="world3d-editor-card">
+            <span class="editor-kicker">PLACE OBJECT</span>
+            <div class="world3d-editor-row">
+              <select data-editor-place-type>
+                <option value="building">Building</option>
+                <option value="tree">Tree</option>
+                <option value="light">Street light</option>
+                <option value="parked-car">Parked car</option>
+                <option value="prop">Street prop</option>
+              </select>
+              <button type="button" class="primary" data-editor-add>ADD HERE</button>
+            </div>
+          </section>
+
+          <section class="world3d-editor-card">
+            <div class="world3d-editor-button-row">
+              <button type="button" data-editor-undo>UNDO</button>
+              <button type="button" data-editor-redo>REDO</button>
+            </div>
+            <button type="button" class="world3d-editor-export" data-editor-export>EXPORT CITY PATCH</button>
+            <button type="button" class="world3d-editor-reset-draft" data-editor-clear-draft>RESET LOCAL DRAFT</button>
+            <textarea data-editor-json hidden aria-label="Exported patch JSON"></textarea>
+            <small data-editor-status>DEV editor loading…</small>
+          </section>
+        </div>
+      </aside>
       <aside id="world3d-directory" class="world3d-directory">
         <header><div><span class="eyebrow">FAST NAV / DEV</span><strong>City Directory</strong></div><button id="world3d-directory-close">×</button></header>
         <p>Dev teleport moves your character near a location. Walk onto its marker and enter normally to sync server travel.</p>

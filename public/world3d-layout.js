@@ -48,7 +48,7 @@ const LOCAL_PADS = Object.freeze([
   [-42,42],[-14,42],[14,42],[42,42]
 ]);
 
-export function buildWorldLayout(locations = []) {
+export function buildWorldLayout(locations = [], locationOverrides = {}) {
   const grouped = new Map(WORLD3D_DISTRICTS.map(d => [d.id, []]));
 
   for (const location of [...locations].sort((a,b) => String(a.id).localeCompare(String(b.id)))) {
@@ -62,12 +62,17 @@ export function buildWorldLayout(locations = []) {
     rows.forEach((location, index) => {
       const pad = LOCAL_PADS[index % LOCAL_PADS.length];
       const ring = Math.floor(index / LOCAL_PADS.length);
-      const x = district.x + pad[0] + ring * 18;
-      const z = district.z + pad[1] + ring * 18;
+      const generatedX = district.x + pad[0] + ring * 18;
+      const generatedZ = district.z + pad[1] + ring * 18;
+      const override = locationOverrides?.[location.id] || {};
+      const x = Number.isFinite(Number(override.x)) ? Number(override.x) : generatedX;
+      const z = Number.isFinite(Number(override.z)) ? Number(override.z) : generatedZ;
       output.push({
         ...location,
         districtId: district.id,
         districtName: district.name,
+        baseX: generatedX,
+        baseZ: generatedZ,
         x,
         z,
         chunkKey: getChunkKey(x, z)

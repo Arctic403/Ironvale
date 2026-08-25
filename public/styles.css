@@ -283,3 +283,101 @@ body.pwa-standalone.world3d-game-mode{
     bottom:12px;
   }
 }
+
+
+/* Phase 9.6 public mobile-first DEV world editor */
+.world3d-editor{
+  position:absolute;
+  z-index:12;
+  top:0;
+  right:0;
+  bottom:0;
+  width:min(390px,94vw);
+  display:flex;
+  flex-direction:column;
+  background:rgba(12,14,16,.98);
+  border-left:1px solid rgba(214,141,53,.35);
+  transform:translateX(102%);
+  transition:transform .18s ease;
+  box-shadow:-16px 0 42px rgba(0,0,0,.42);
+}
+.world3d-editor.open{transform:none}
+.world3d-editor>header{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px;
+  border-bottom:1px solid var(--line);
+  background:#101214;
+}
+.world3d-editor>header strong{display:block;font-size:.82rem;text-transform:uppercase;margin-top:2px}
+.world3d-editor>header button{
+  width:44px;height:44px;border:1px solid var(--line);background:#17191b;color:var(--text);font-size:1.15rem
+}
+.world3d-editor-scroll{overflow:auto;-webkit-overflow-scrolling:touch;padding:10px 10px max(18px,env(safe-area-inset-bottom))}
+.world3d-editor-note{margin:0 0 9px;color:var(--muted);font-size:.64rem;line-height:1.4}
+.world3d-editor-card{border:1px solid var(--line);background:#151719;padding:10px;margin-bottom:9px}
+.world3d-editor-card>strong{display:block;font-size:.84rem;margin:3px 0}
+.world3d-editor-card>small{display:block;color:var(--muted);font-size:.58rem;line-height:1.35}
+.editor-kicker{display:block;font-size:.48rem;font-weight:950;letter-spacing:.16em;color:var(--accent)}
+.world3d-editor-readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:9px}
+.world3d-editor-readout>div{min-width:0;background:#0e1012;border:1px solid #25282b;padding:7px}
+.world3d-editor-readout span{display:block;font-size:.43rem;color:var(--muted2);font-weight:900}
+.world3d-editor-readout b{display:block;margin-top:2px;font-size:.65rem;overflow-wrap:anywhere}
+.world3d-editor-row{display:flex;align-items:end;gap:8px}
+.world3d-editor-row label{display:grid;gap:4px;flex:1;font-size:.48rem;color:var(--muted2);font-weight:900}
+.world3d-editor select{min-height:44px;width:100%;background:#0d0f11;border:1px solid #32363b;color:var(--text);padding:8px;font-size:16px}
+.world3d-editor button{min-height:44px;border:1px solid #3a3e42;background:#202327;color:var(--text);font-weight:900;font-size:.56rem;letter-spacing:.04em}
+.world3d-editor button.primary,.world3d-editor-export{background:var(--accent)!important;color:#17130f!important;border-color:var(--accent)!important}
+.world3d-editor button.danger{border-color:rgba(201,72,72,.65);color:#f0a6a6}
+.world3d-nudge-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px}
+.world3d-nudge-grid button{height:52px;font-size:.66rem}
+.world3d-nudge-center{display:flex;align-items:center;justify-content:center;border:1px dashed #35393d;color:var(--muted2);font-size:.48rem;font-weight:950}
+.world3d-editor-button-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:7px}
+.world3d-editor-button-row:has(>button:nth-child(3)){grid-template-columns:repeat(2,minmax(0,1fr))}
+.world3d-editor-button-row>button{min-width:0}
+.world3d-editor-export,.world3d-editor-reset-draft{width:100%;margin-top:8px}
+.world3d-editor-reset-draft{background:transparent!important}
+.world3d-editor textarea{width:100%;min-height:150px;margin-top:8px;background:#090b0c;color:#d8d8d8;border:1px solid #333;font:11px/1.4 monospace;padding:8px}
+.world3d-editor-toggle.active{background:var(--accent);color:#17130f}
+@media (pointer:coarse){
+  .world3d-top-right{max-width:60vw;flex-wrap:wrap;justify-content:flex-end}
+  .world3d-editor{
+    top:auto;
+    left:0;
+    right:0;
+    bottom:0;
+    width:100%;
+    max-height:min(78%,560px);
+    border-left:0;
+    border-top:1px solid rgba(214,141,53,.4);
+    transform:translateY(102%);
+    box-shadow:0 -16px 42px rgba(0,0,0,.5);
+  }
+  .world3d-editor.open{transform:none}
+  .world3d-editor>header{
+    padding-left:max(10px,env(safe-area-inset-left));
+    padding-right:max(10px,env(safe-area-inset-right));
+  }
+  .world3d-editor-scroll{
+    padding-left:max(10px,env(safe-area-inset-left));
+    padding-right:max(10px,env(safe-area-inset-right));
+  }
+  .world3d-editor button{font-size:.62rem}
+}
+@media (orientation:landscape) and (pointer:coarse){
+  .world3d-editor{
+    top:0;
+    left:auto;
+    right:0;
+    bottom:0;
+    width:min(360px,48vw);
+    max-height:none;
+    border-top:0;
+    border-left:1px solid rgba(214,141,53,.4);
+    transform:translateX(102%);
+  }
+  .world3d-editor.open{transform:none}
+}

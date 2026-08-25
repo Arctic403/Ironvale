@@ -1,6 +1,8 @@
 import { escapeHtml } from './ui/helpers.js';
 import { WORLD3D_CONFIG, WORLD3D_DISTRICTS, buildWorldLayout, getNearbyChunkKeys } from './world3d-layout.js';
 import { createStreamedEnvironment } from './world3d-environment.js';
+import { WORLD3D_CITY_LAYOUT } from './world3d-city-layout.js';
+import { cloneCityLayout, createLayoutObjectManager, mountWorldEditor } from './world3d-editor.js';
 
 let activeWorld = null;
 
@@ -87,7 +89,8 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     createRoadGrid(B, scene, roadMat, sidewalkMat, lineMat, curbMat, district.x, district.z, 150);
   });
 
-  const locationEntries = buildWorldLayout(world?.locations || []);
+  const editorInitialLayout = cloneCityLayout();
+  const locationEntries = buildWorldLayout(world?.locations || [], editorInitialLayout.locationOverrides);
   const interactables = locationEntries;
   const chunkManager = createLocationChunkManager({
     entries: locationEntries,
@@ -97,8 +100,12 @@ export function mountCity3D({ root, world, onEnterLocation }) {
   createSkyline(B, scene, material, shadowGenerator);
 
   const environmentManager = createStreamedEnvironment(B, scene, shadowGenerator, {
-    roadMat, sidewalkMat, lineMat, accentMat, glassMat, foliageMat, trunkMat, metalMat, buildingMats
+    roadMat, sidewalkMat, groundMat, lineMat, accentMat, glassMat, foliageMat, trunkMat, metalMat, buildingMats
   });
+
+  const layoutObjectManager = createLayoutObjectManager(B, scene, shadowGenerator, {
+    roadMat, sidewalkMat, groundMat, lineMat, accentMat, glassMat, foliageMat, trunkMat, metalMat, buildingMats
+  }, editorInitialLayout.customObjects);
 
   const player = createPlayer(B, scene, shadowGenerator);
   player.root.position = new B.Vector3(0, 0.92, 7);
@@ -232,6 +239,20 @@ export function mountCity3D({ root, world, onEnterLocation }) {
     directory?.classList.remove('open');
   }));
 
+  const worldEditor = mountWorldEditor({
+    root,
+    scene,
+    camera,
+    player,
+    locationEntries,
+    chunkManager,
+    objectManager: layoutObjectManager,
+    initialLayout: editorInitialLayout,
+    onLayoutChange: () => {
+      chunkManager.update(player.root.position.x, player.root.position.z);
+    }
+  });
+
   let nearest = null;
   let lastTime = performance.now();
   let entering = false;
@@ -327,8 +348,10 @@ export function mountCity3D({ root, world, onEnterLocation }) {
       visualViewport?.removeEventListener('resize', syncViewport);
       visualViewport?.removeEventListener('scroll', syncViewport);
       joystick?.destroy?.();
+      worldEditor?.dispose?.();
       chunkManager.dispose();
       environmentManager.dispose();
+      layoutObjectManager.dispose();
       root.style.height = '';
       shell?.style.removeProperty('height');
       document.body.classList.remove('world3d-game-mode');
@@ -559,6 +582,10 @@ function createBuilding(B, scene, entry, index, { accentMat, glassMat, shadowGen
   marker.position.set(entry.x, 0.2, entry.z + depth / 2 + 2.0);
   marker.material = accentMat;
 
+  ownedMeshes.forEach(mesh => {
+    mesh.metadata = { ...(mesh.metadata || {}), worldEditor: { kind: 'location', id: entry.id } };
+  });
+
   return {
     pickMesh: marker,
     dispose() {
@@ -590,15 +617,30 @@ function createLocationChunkManager({ entries, create }) {
     }
 
     entries.forEach((entry, index) => {
+      entry.chunkKey = getChunkKey(entry.x, entry.z);
       if (!wanted.has(entry.chunkKey) || active.has(entry.id)) return;
       const bundle = create(entry, index);
       entry.mesh = bundle.pickMesh;
-      active.set(entry.id, { entry, bundle });
+      active.set(entry.id, { entry, bundle, index });
     });
+  };
+
+  const refreshEntry = id => {
+    const entry = entries.find(row => row.id === id);
+    if (!entry) return;
+    entry.chunkKey = getChunkKey(entry.x, entry.z);
+    const existing = active.get(id);
+    if (existing) {
+      existing.bundle.dispose();
+      entry.mesh = null;
+      active.delete(id);
+    }
+    lastCenter = '';
   };
 
   return {
     update,
+    refreshEntry,
     dispose() {
       for (const record of active.values()) {
         record.bundle.dispose();
