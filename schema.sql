@@ -230,3 +230,118 @@ CREATE TABLE IF NOT EXISTS player_casino (
   user_id TEXT PRIMARY KEY,chips INTEGER NOT NULL DEFAULT 0,last_daily_grant INTEGER,updated_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
+-- Phase 7 integrated backend engines.
+CREATE TABLE IF NOT EXISTS player_travel (
+  user_id TEXT PRIMARY KEY,
+  current_region TEXT NOT NULL DEFAULT 'riftcity',
+  traveling_to TEXT,
+  departed_at INTEGER,
+  arrives_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_offshore_accounts (
+  user_id TEXT NOT NULL,
+  region_id TEXT NOT NULL,
+  balance INTEGER NOT NULL DEFAULT 0 CHECK(balance>=0),
+  lifetime_deposits INTEGER NOT NULL DEFAULT 0 CHECK(lifetime_deposits>=0),
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,region_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_bank_security (
+  user_id TEXT PRIMARY KEY,
+  frozen_until INTEGER,
+  protection_until INTEGER,
+  last_risk_event_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS combat_history (
+  id TEXT PRIMARY KEY,
+  attacker_user_id TEXT NOT NULL,
+  defender_user_id TEXT,
+  opponent_type TEXT NOT NULL,
+  opponent_id TEXT NOT NULL,
+  winner TEXT NOT NULL,
+  rounds INTEGER NOT NULL,
+  attacker_damage INTEGER NOT NULL DEFAULT 0,
+  defender_damage INTEGER NOT NULL DEFAULT 0,
+  xp_gain INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (attacker_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (defender_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_combat_attacker ON combat_history(attacker_user_id,created_at);
+CREATE INDEX IF NOT EXISTS idx_combat_defender ON combat_history(defender_user_id,created_at);
+
+CREATE TABLE IF NOT EXISTS player_achievements (
+  user_id TEXT NOT NULL,
+  achievement_id TEXT NOT NULL,
+  unlocked_at INTEGER NOT NULL,
+  claimed INTEGER NOT NULL DEFAULT 0,
+  claimed_at INTEGER,
+  PRIMARY KEY(user_id,achievement_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_challenges (
+  user_id TEXT NOT NULL,
+  challenge_key TEXT NOT NULL,
+  cadence TEXT NOT NULL,
+  period_key TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  baseline_value INTEGER NOT NULL DEFAULT 0,
+  claimed INTEGER NOT NULL DEFAULT 0,
+  claimed_at INTEGER,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,challenge_key),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS player_production_facilities (
+  user_id TEXT NOT NULL,
+  facility_id TEXT NOT NULL,
+  purchased_at INTEGER NOT NULL,
+  PRIMARY KEY(user_id,facility_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS production_batches (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  facility_id TEXT NOT NULL,
+  recipe_id TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
+  completes_at INTEGER NOT NULL,
+  claimed INTEGER NOT NULL DEFAULT 0,
+  claimed_at INTEGER,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_production_user ON production_batches(user_id,completes_at);
+
+CREATE TABLE IF NOT EXISTS player_property_effects (
+  user_id TEXT PRIMARY KEY,
+  property_id TEXT NOT NULL DEFAULT 'shack',
+  applied_max_health INTEGER NOT NULL DEFAULT 0,
+  applied_max_nerve INTEGER NOT NULL DEFAULT 0,
+  last_income_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS property_ledger (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  property_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_property_ledger_user ON property_ledger(user_id,created_at);

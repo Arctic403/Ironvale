@@ -152,14 +152,14 @@ export const WORLD_LOCATIONS = [
     shortDescription: 'Freight terminals, shipping lanes and waterfront access.',
     description: 'RiftCity\'s working docks. Cargo, shipping, smuggling opportunities and waterfront crimes can plug into Greywater later.',
     tags: ['DOCKS', 'FREIGHT', 'WATERFRONT'], requirements: [],
-    actions: [{ id: 'docks', label: 'Dock services', type: 'transport', enabled: false, note: 'Dock gameplay arrives later.' }]
+    actions: [{ id: 'production', label: 'Workshop district', type: 'production', enabled: true, note: 'Production facilities and timed batches.' }]
   },
   {
     id: 'rift-international-airport', categoryId: 'transport', code: 'TR-02', name: 'Rift International Airport', type: 'Airport', status: 'OPEN',
     shortDescription: 'International travel and future offshore destinations.',
     description: 'The main gateway out of RiftCity. Travel, foreign destinations and future offshore banking access will begin here.',
     tags: ['AIRPORT', 'TRAVEL'], requirements: [],
-    actions: [{ id: 'travel', label: 'Travel terminal', type: 'travel', enabled: false, note: 'Travel gameplay is not installed yet.' }]
+    actions: [{ id: 'travel', label: 'Travel terminal', type: 'travel', enabled: true, note: 'International travel, travel timers and offshore destination access.' }]
   },
   {
     id: 'blacktop-motors', categoryId: 'transport', code: 'TR-03', name: 'Blacktop Motors', type: 'Car Dealer', status: 'OPEN',

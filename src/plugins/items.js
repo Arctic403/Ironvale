@@ -35,6 +35,7 @@ export const ITEM_REGISTRY = Object.freeze([
     equipable: true,
     equipmentSlot: 'weapon',
     effects: {},
+    combat: { damageMin: 5, damageMax: 10, accuracy: 0.02 },
     tags: ['WEAPON', 'EQUIPMENT']
   },
   {
@@ -164,6 +165,7 @@ export function toPublicItemDefinition(item) {
     equipable: item.equipable,
     equipmentSlot: item.equipmentSlot,
     effects: { ...item.effects },
+    combat: item.combat ? { ...item.combat } : null,
     tags: [...item.tags]
   };
 }

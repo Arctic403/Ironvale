@@ -135,3 +135,48 @@ Important POST actions include:
 - casino: `claim-daily` (game implementations remain a later tuning pass)
 
 Crime successes, city travel, job shifts, gym sessions, faction work and cash milestones now feed shared server-side progression counters used by missions. Existing crime/item/world engines remain intact.
+
+
+## Phase 7 — Integrated backend engines
+
+Phase 7 turns the Phase 6 service foundation into a connected game backend. This pass remains backend-first and keeps tunable content inside plugins.
+
+### New server-authoritative systems
+- `combat` — NPC encounters plus asynchronous player-vs-player resolution, equipped-weapon stats, XP, cooldowns, combat history and hospital consequences.
+- `travel` — persistent international regions, fares, level gates, travel timers and arrival settlement.
+- `offshore` — destination-gated offshore accounts with transfer fees and a bank-security state hook.
+- `achievements` — persistent lifetime unlocks driven by shared progression counters.
+- `challenges` — rotating daily/weekly challenges with period baselines so only progress made during the active period counts.
+- `production` — purchasable facilities, concurrent slots, timed batches, inventory outputs and server-side claiming.
+- property passive economy — upkeep/income values, hourly collection and a property ledger.
+
+### Cross-system modifiers
+Completed education and the active world event now feed a shared modifier layer:
+- crime courses and crime events affect server crime success chance;
+- fitness courses and training events affect gym stat gains;
+- combat education/events affect combat power;
+- job events can affect shift pay;
+- market events scale fictional city-market volatility.
+
+Active-home property bonuses are reconciled against stored applied bonuses so switching homes changes max health/nerve without stacking the same bonus repeatedly.
+
+### Connected progression
+Shared counters now cover combat wins, banking deposits, education completions, property ownership, market trades, international travel, casino visits and production completions in addition to the existing crime/job/gym/faction/cash counters. Missions, achievements and challenges reuse those counters instead of inventing separate progress systems.
+
+### New plugin files
+- `src/plugins/combat.js`
+- `src/plugins/travel.js`
+- `src/plugins/achievements.js`
+- `src/plugins/challenges.js`
+- `src/plugins/production.js`
+
+`src/services/advanced.js` owns the new D1-backed engines while `src/services/gameplay.js` remains the service router and Phase 6 engine collection.
+
+### New service IDs
+`combat`, `travel`, `offshore`, `achievements`, `challenges`, `production`
+
+The service contract remains:
+- `GET /api/services/:service`
+- `POST /api/services/:service`
+
+The browser UI is intentionally not expanded in this backend pass; location/service UI can be wired after the backend behavior is tested.

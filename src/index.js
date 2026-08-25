@@ -9,7 +9,7 @@ import {
   getItemDefinition,
   toPublicItemDefinition
 } from './plugins/index.js';
-import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast } from './services/gameplay.js';
+import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast, getGameplayModifiers } from './services/gameplay.js';
 
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -346,6 +346,7 @@ async function getCrimes(request, env) {
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
 
   await ensureCrimeTables(env);
+  await ensureGameplayTables(env);
   const player = await ensureActivePlayerState(env, auth.user.id);
   const location = await ensurePlayerLocation(env, auth.user.id);
   const progressRows = await env.DB.prepare(`
@@ -363,9 +364,10 @@ async function getCrimes(request, env) {
     FROM crime_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 8
   `).bind(auth.user.id).all();
 
+  const gameplayModifiers = await getGameplayModifiers(auth.user.id, env);
   const crimes = CRIME_REGISTRY.map(crime => {
     const progress = normalizeCrimeProgress(progressById.get(crime.id), crime.id);
-    return toPublicCrime(crime, progress, player, location, owned);
+    return toPublicCrime(crime, progress, player, location, owned, gameplayModifiers);
   });
 
   return json({
@@ -386,6 +388,7 @@ async function executeCrime(request, env, requestId) {
   if (!crime) return json({ ok: false, error: 'Unknown crime' }, 404);
 
   await ensureCrimeTables(env);
+  await ensureGameplayTables(env);
   await ensureInventoryTable(env);
   const player = await ensureActivePlayerState(env, auth.user.id);
   const location = await ensurePlayerLocation(env, auth.user.id);
@@ -420,7 +423,8 @@ async function executeCrime(request, env, requestId) {
     }
   }
 
-  const chance = calculateCrimeChance(crime, progress, player);
+  const gameplayModifiers = await getGameplayModifiers(auth.user.id, env);
+  const chance = calculateCrimeChance(crime, progress, player, gameplayModifiers);
   const success = randomFloat() < chance;
   const masteryDelta = success ? 2 : 1;
   const nextMastery = Math.min(100, progress.mastery + masteryDelta);
@@ -829,7 +833,9 @@ async function ensureActivePlayerState(env, userId) {
   if (player.status !== 'active' && player.status_until && Number(player.status_until) <= Date.now()) {
     const now = Date.now();
     await env.DB.prepare(`
-      UPDATE player_state SET status = 'active', status_until = NULL, status_reason = NULL, updated_at = ? WHERE user_id = ?
+      UPDATE player_state SET status = 'active', status_until = NULL, status_reason = NULL,
+        health = CASE WHEN health <= 0 THEN MAX(1, CAST(max_health * 0.25 AS INTEGER)) ELSE health END,
+        updated_at = ? WHERE user_id = ?
     `).bind(now, userId).run();
     player = await getPlayerStateRow(env, userId);
   }
@@ -848,13 +854,14 @@ function normalizeCrimeProgress(row, crimeId) {
   };
 }
 
-function calculateCrimeChance(crime, progress, player) {
+function calculateCrimeChance(crime, progress, player, modifiers = {}) {
   const masteryBonus = (progress.mastery / 100) * 0.12;
   const dexterityBonus = Math.min(0.04, Math.max(0, (Number(player.dexterity) - 1) * 0.002));
-  return Math.max(0.05, Math.min(0.97, crime.baseChance + masteryBonus + dexterityBonus));
+  const externalBonus = Number(modifiers.crimeChanceBonus) || 0;
+  return Math.max(0.05, Math.min(0.97, crime.baseChance + masteryBonus + dexterityBonus + externalBonus));
 }
 
-function toPublicCrime(crime, progress, player, location, owned) {
+function toPublicCrime(crime, progress, player, location, owned, modifiers = {}) {
   const requiredItem = crime.requiredItemId ? getItemDefinition(crime.requiredItemId) : null;
   const requiredLocation = crime.requiredLocationId ? getWorldLocation(crime.requiredLocationId) : null;
   const lockedReasons = [];
@@ -869,7 +876,7 @@ function toPublicCrime(crime, progress, player, location, owned) {
     category: crime.category,
     description: crime.description,
     nerveCost: crime.nerveCost,
-    successChance: calculateCrimeChance(crime, progress, player),
+    successChance: calculateCrimeChance(crime, progress, player, modifiers),
     mastery: progress.mastery,
     attempts: progress.attempts,
     successes: progress.successes,
@@ -877,7 +884,8 @@ function toPublicCrime(crime, progress, player, location, owned) {
     requiredItem: requiredItem ? { id: requiredItem.id, name: requiredItem.name, owned: owned.get(requiredItem.id) || 0 } : null,
     requiredLocation: requiredLocation ? { id: requiredLocation.id, name: requiredLocation.name, current: location.location_id === requiredLocation.id } : null,
     available: lockedReasons.length === 0,
-    lockedReasons
+    lockedReasons,
+    modifiers: { crimeChanceBonus: Number(modifiers.crimeChanceBonus) || 0, event: modifiers.event || null }
   };
 }
 
