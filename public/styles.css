@@ -626,3 +626,52 @@ body.bw-fullscreen-mode .blockworld-shell{
 .bw-prompt{
   pointer-events:none;
 }
+
+
+/* Phase 11.3 — Block 01 visual identity + living street */
+.bw-backdrop{opacity:1;pointer-events:none}
+.bw-skyline{position:absolute;left:0;right:0;bottom:0;white-space:nowrap}
+.bw-skyline.far{height:300px;opacity:.28}
+.bw-skyline.far span{display:inline-block;vertical-align:bottom;width:210px;margin-right:55px;background:#65757b;border-top:8px solid #56666c;height:210px}
+.bw-skyline.far span:nth-child(3n){height:285px;width:170px}.bw-skyline.far span:nth-child(4n){height:165px;width:260px}
+.bw-skyline.near{height:230px;opacity:.25}
+.bw-skyline.near i{display:inline-block;vertical-align:bottom;width:285px;height:155px;margin-right:40px;background:repeating-linear-gradient(90deg,#536269 0 38px,#46565c 39px 48px)}
+.bw-skyline.near i:nth-child(even){height:205px}
+.bw-wire{position:absolute;left:-40px;width:3700px;height:2px;background:#27363a66;transform-origin:left center}
+.bw-wire.wire-a{top:125px;transform:rotate(1.2deg)}.bw-wire.wire-b{top:175px;transform:rotate(-.7deg)}
+
+.bw-building{overflow:visible}
+.bw-building .bw-roof-unit{position:absolute;right:45px;top:-25px;width:66px;height:25px;background:#3c4648;border:2px solid #2c3436}
+.bw-storefront em{position:absolute;top:50px;left:0;right:0;text-align:center;font-style:normal;font-size:9px;letter-spacing:2px;color:#d8d1b8aa}
+.bw-awning,.bw-window-display,.bw-side-sign{display:none;position:absolute}
+.style-mart{background:#686b63}.style-mart .bw-upper{background:linear-gradient(#85877d,#656a65)}
+.style-mart .bw-awning{display:block;left:12px;right:12px;bottom:91px;height:20px;background:repeating-linear-gradient(90deg,#d8d0b6 0 34px,#6e483d 34px 68px);transform:skewX(-12deg)}
+.style-mart .bw-window-display{display:block;left:38px;bottom:22px;width:70px;height:38px;background:linear-gradient(#d3b46d55,#253d45);border:2px solid #a7a393}
+.style-pharmacy .bw-side-sign{display:block;right:-30px;top:120px;width:48px;height:48px;background:#355c4e;color:#e8f2e7;border:3px solid #d4ded8;text-align:center;line-height:42px;font-size:28px;z-index:9}
+.style-pharmacy .bw-upper i{border-color:#c8d4ca}.style-pharmacy .bw-door{background:#d8ded9}
+.style-realty{border-radius:2px}.style-realty .bw-upper{background:linear-gradient(#68777e,#4c5d64)}
+.style-realty .bw-upper i{height:74px;border-width:3px}.style-realty .bw-storefront{background:#334149}
+.style-noodle .bw-awning{display:block;left:18px;right:18px;bottom:88px;height:24px;background:repeating-linear-gradient(90deg,#6f302b 0 30px,#d0b78d 30px 60px)}
+.style-noodle .bw-side-sign{display:block;right:-20px;top:95px;padding:8px 5px;background:#722f2b;color:#f3dca9;border:2px solid #b78e62;font-size:9px;writing-mode:vertical-rl;letter-spacing:2px;z-index:9}
+.style-pawn .bw-storefront{background:#39372f}.style-pawn .bw-upper{background:linear-gradient(#777362,#56574f)}
+.style-pawn .bw-side-sign{display:block;right:16px;top:20px;width:40px;height:40px;border-radius:50%;background:#b38b39;color:#1c211f;text-align:center;line-height:40px;font-size:25px;font-weight:950}
+.style-pawn .bw-window{background:repeating-linear-gradient(90deg,#263b40 0 12px,#151d1f 13px 16px)}
+.style-apartments{background:#635b58}.style-apartments .bw-upper{grid-template-columns:repeat(5,1fr);padding:24px 20px 12px;gap:13px;background:linear-gradient(#756b67,#5d5958)}
+.style-apartments .bw-upper i{height:45px}.style-apartments .bw-storefront{height:31%;background:#4a4745}
+.style-apartments .bw-storefront b{top:9px;background:#473f3a}.style-apartments .bw-storefront em{top:43px}
+
+.bw-alley{overflow:hidden}
+.bw-fireescape{position:absolute;left:8px;top:38px;width:60px;height:145px;border:5px solid #667073;border-top:0;background:repeating-linear-gradient(0deg,transparent 0 27px,#667073 28px 33px)}
+.bw-dumpster{position:absolute;left:7px;bottom:14px;width:64px;height:45px;background:#354d43;border:3px solid #1d2925;transform:skewX(-4deg)}
+.bw-bins{position:absolute;left:5px;bottom:65px;width:22px;height:34px;background:#222b2c;border-radius:4px}
+.bw-graffiti{position:absolute;right:-5px;top:210px;color:#8a586d99;font:bold 17px/1 sans-serif;transform:rotate(-9deg)}
+.bw-puddle{position:absolute;left:15px;bottom:5px;width:55px;height:8px;border-radius:50%;background:#63777c44}
+
+.bw-life{position:absolute;z-index:6}
+.bw-car,.bw-van{width:145px;height:55px;border-radius:18px 28px 9px 9px;background:#4b5d65;border:4px solid #283338;box-shadow:0 12px 8px #0004}
+.bw-car:before,.bw-van:before{content:"";position:absolute;left:30px;top:-28px;width:75px;height:32px;background:#31444c;border:4px solid #283338;clip-path:polygon(15% 100%,30% 0,75% 0,100% 100%)}
+.bw-car i,.bw-car b,.bw-van i,.bw-van b{position:absolute;bottom:-13px;width:28px;height:28px;border-radius:50%;background:#202426;border:5px solid #111}
+.bw-car i,.bw-van i{left:20px}.bw-car b,.bw-van b{right:20px}.bw-van{width:175px;height:70px;border-radius:8px;background:#6a665d}
+.bw-hydrant{width:20px;height:40px;background:#8d4d3e;border-radius:5px}.bw-hydrant:before{content:"";position:absolute;left:-7px;top:10px;width:34px;height:10px;background:#754033}
+.bw-bench{width:85px;height:14px;background:#59483a;box-shadow:0 12px 0 -4px #31383a}.bw-bench:before,.bw-bench:after{content:"";position:absolute;top:12px;width:6px;height:24px;background:#343a3b}.bw-bench:before{left:10px}.bw-bench:after{right:10px}
+.bw-box{width:35px;height:46px;background:#495256;border:3px solid #333c3f}.bw-news{width:30px;height:43px;background:#596a70;border:3px solid #333c3f}

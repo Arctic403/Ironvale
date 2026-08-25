@@ -12,12 +12,12 @@ export const BLOCK1 = Object.freeze({
     {x:0,y:1080,width:3600,height:150}
   ],
   buildings:[
-    {id:'corner-mart',name:'Corner Mart',locationId:'mall',x:260,y:180,w:430,h:330,tone:'shop',sign:'CORNER MART',doorX:475,doorY:510},
-    {id:'rift-pharmacy',name:'Rift Pharmacy',locationId:'hospital',x:780,y:160,w:430,h:350,tone:'pharmacy',sign:'RIFT PHARMACY',doorX:995,doorY:510},
-    {id:'keystone',name:'Keystone Realty',locationId:'keystone-realty',x:1300,y:200,w:450,h:310,tone:'office',sign:'KEYSTONE REALTY',doorX:1525,doorY:510},
-    {id:'noodle-house',name:'Noodle House',locationId:'nightclub',x:1860,y:170,w:430,h:340,tone:'food',sign:'NOODLE HOUSE',doorX:2075,doorY:510},
-    {id:'pawn-exchange',name:'Rift Exchange',locationId:'black-market',x:2390,y:190,w:440,h:320,tone:'pawn',sign:'RIFT EXCHANGE',doorX:2610,doorY:510},
-    {id:'apartments',name:'Mercer Apartments',locationId:'properties',x:2940,y:130,w:470,h:380,tone:'apartment',sign:'MERCER APARTMENTS',doorX:3175,doorY:510}
+    {id:'corner-mart',name:'Corner Mart',locationId:'mall',x:260,y:180,w:430,h:330,tone:'shop',sign:'CORNER MART',doorX:475,doorY:510,style:'mart',detail:'24/7 • GROCERIES'},
+    {id:'rift-pharmacy',name:'Rift Pharmacy',locationId:'hospital',x:780,y:160,w:430,h:350,tone:'pharmacy',sign:'RIFT PHARMACY',doorX:995,doorY:510,style:'pharmacy',detail:'PRESCRIPTIONS • CLINIC'},
+    {id:'keystone',name:'Keystone Realty',locationId:'keystone-realty',x:1300,y:200,w:450,h:310,tone:'office',sign:'KEYSTONE REALTY',doorX:1525,doorY:510,style:'realty',detail:'LOFTS • COMMERCIAL'},
+    {id:'noodle-house',name:'Noodle House',locationId:'nightclub',x:1860,y:170,w:430,h:340,tone:'food',sign:'NOODLE HOUSE',doorX:2075,doorY:510,style:'noodle',detail:'OPEN LATE'},
+    {id:'pawn-exchange',name:'Rift Exchange',locationId:'black-market',x:2390,y:190,w:440,h:320,tone:'pawn',sign:'RIFT EXCHANGE',doorX:2610,doorY:510,style:'pawn',detail:'BUY • SELL • TRADE'},
+    {id:'apartments',name:'Mercer Apartments',locationId:'properties',x:2940,y:130,w:470,h:380,tone:'apartment',sign:'MERCER APARTMENTS',doorX:3175,doorY:510,style:'apartments',detail:'EST. 1978'}
   ],
   props:[
     {kind:'tree',x:120,y:570},{kind:'lamp',x:720,y:590},{kind:'tree',x:1240,y:570},
@@ -25,7 +25,7 @@ export const BLOCK1 = Object.freeze({
     {kind:'tree',x:3470,y:570},{kind:'lamp',x:520,y:1150},{kind:'tree',x:1510,y:1160},
     {kind:'lamp',x:2140,y:1150},{kind:'tree',x:3180,y:1160}
   ],
-  alley:{x:1760,y:170,width:80,height:340},
+  alley:{x:1760,y:170,width:80,height:340,details:['dumpster','bins','fire-escape','graffiti']},
   exits:[
     {id:'west',x:0,y:650,w:90,h:580,label:'West Downtown — future block'},
     {id:'east',x:3510,y:650,w:90,h:580,label:'East Downtown — future block'}

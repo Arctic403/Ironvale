@@ -55,15 +55,37 @@ export async function renderBlockWorld(root){
 
   for(const b of BLOCK1.buildings){
     const el=document.createElement('div');
-    el.className=`bw-building tone-${b.tone}`;
+    el.className=`bw-building tone-${b.tone} style-${b.style||b.tone}`;
     el.style.cssText=`left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px`;
-    el.innerHTML=`<div class="bw-roof"></div><div class="bw-upper">${'<i></i>'.repeat(b.tone==='apartment'?8:5)}</div><div class="bw-storefront"><b>${b.sign}</b><span class="bw-door"></span><span class="bw-window"></span></div>`;
+    const upperCount=b.style==='apartments'?10:(b.style==='realty'?6:5);
+    el.innerHTML=`
+      <div class="bw-roof"><span class="bw-roof-unit"></span></div>
+      <div class="bw-upper">${'<i></i>'.repeat(upperCount)}</div>
+      <div class="bw-storefront">
+        <b>${b.sign}</b><em>${b.detail||''}</em>
+        <span class="bw-awning"></span><span class="bw-door"></span><span class="bw-window"></span>
+        <span class="bw-window-display"></span>
+      </div>
+      <span class="bw-side-sign">${b.style==='pharmacy'?'✚':b.style==='pawn'?'$':b.style==='noodle'?'NOODLES':''}</span>`;
     buildings.appendChild(el);
   }
   const alley=document.createElement('div');
   alley.className='bw-alley';
   alley.style.cssText=`left:${BLOCK1.alley.x}px;top:${BLOCK1.alley.y}px;width:${BLOCK1.alley.width}px;height:${BLOCK1.alley.height}px`;
+  alley.innerHTML=`<span class="bw-fireescape"></span><span class="bw-dumpster"></span><span class="bw-bins"></span><span class="bw-graffiti">RIFT</span><span class="bw-puddle"></span>`;
   buildings.appendChild(alley);
+
+  // Street life is decorative only: parked cars, hydrants, benches and utility clutter.
+  const life=[
+    ['car',610,1015],['car',2210,690],['van',2750,1010],
+    ['hydrant',1150,615],['bench',1430,600],['box',1835,600],
+    ['news',2490,605],['bench',3300,600]
+  ];
+  for(const [kind,x,y] of life){
+    const el=document.createElement('div'); el.className=`bw-life bw-${kind}`;
+    el.style.cssText=`left:${x}px;top:${y}px`; el.innerHTML='<i></i><b></b>';
+    props.appendChild(el);
+  }
 
   for(const p of BLOCK1.props){
     const el=document.createElement('div');
