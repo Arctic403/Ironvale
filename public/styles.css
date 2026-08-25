@@ -422,7 +422,7 @@ body.pwa-standalone.world3d-game-mode{
 .city2d-shell{position:relative;width:100%;height:100%;min-height:380px;overflow:hidden;background:#090b0c;isolation:isolate;touch-action:none}
 .city2d-viewport{position:absolute;inset:0;overflow:hidden;background:#0b0e10}
 .city2d-world{position:absolute;left:0;top:0;will-change:transform}
-.city2d-ground-tiles{position:absolute;inset:0;pointer-events:none;overflow:visible}.city2d-ground-tile{position:absolute;display:block;pointer-events:none;user-select:none;-webkit-user-drag:none;image-rendering:auto;backface-visibility:hidden;transform:translateZ(0)}
+.city2d-ground-tiles{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;background-color:#1b211d}.city2d-ground-tile{position:absolute;display:block;pointer-events:none;user-select:none;-webkit-user-drag:none;image-rendering:auto;backface-visibility:hidden;transform:translateZ(0);opacity:0;transition:opacity .08s linear}.city2d-ground-tile.loaded{opacity:1}
 .city2d-location-layer{position:absolute;inset:0}
 .city2d-player{position:absolute;width:68px;height:68px;transform:translate(-50%,-50%);z-index:8;display:grid;place-items:center;pointer-events:none}
 .city2d-player-body{width:38px;height:38px;border-radius:50%;background:#f3eee6;border:6px solid #181a1c;box-shadow:0 8px 16px rgba(0,0,0,.45),0 0 0 5px rgba(214,141,53,.34);transition:transform .08s}

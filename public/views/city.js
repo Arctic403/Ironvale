@@ -84,6 +84,9 @@ export async function renderCity(root){
   const viewport=root.querySelector('#city2d-viewport');
   const world=root.querySelector('#city2d-world');
   const groundTiles=root.querySelector('#city2d-ground-tiles');
+  groundTiles.style.backgroundImage=`url("${DOWNTOWN_GROUND.fallback}")`;
+  groundTiles.style.backgroundSize='100% 100%';
+  groundTiles.style.backgroundRepeat='no-repeat';
   const playerEl=root.querySelector('#city2d-player');
   const layer=root.querySelector('#city2d-location-layer');
   const prompt=root.querySelector('#city2d-prompt');
@@ -108,13 +111,52 @@ export async function renderCity(root){
 
   const currentId=state.location?.locationId;
   const currentEntry=entries.find(e=>e.id===currentId);
-  let player={
+  const spawnRadius=WORLD2D_CONFIG.playerRadius;
+
+  function spawnIsClear(x,y){
+    for(const collider of querySpatialIndex(collisionIndex,x,y,1)){
+      if(playerHitsCollider(x,y,spawnRadius,collider))return false;
+    }
+    return true;
+  }
+
+  function findSafeSpawn(x,y){
+    const start=clampPlayer(x,y,spawnRadius);
+    if(spawnIsClear(start.x,start.y))return start;
+
+    // Search outward from the location marker until a real walkable point is found.
+    // This specifically prevents locations such as Keystone Realty from spawning
+    // the player inside their building/block collider.
+    for(const distance of [100,160,230,310,400,500,620,760]){
+      for(let step=0;step<24;step++){
+        const angle=(step/24)*Math.PI*2;
+        const candidate=clampPlayer(
+          start.x+Math.cos(angle)*distance,
+          start.y+Math.sin(angle)*distance,
+          spawnRadius
+        );
+        if(spawnIsClear(candidate.x,candidate.y))return candidate;
+      }
+    }
+
+    // Last-resort known road corridor near the center of Downtown.
+    const fallback=clampPlayer(WORLD2D_CONFIG.width*.5,1650,spawnRadius);
+    return spawnIsClear(fallback.x,fallback.y)
+      ? fallback
+      : clampPlayer(WORLD2D_CONFIG.width*.5,WORLD2D_CONFIG.height*.5,spawnRadius);
+  }
+
+  const requestedSpawn={
     x:currentEntry?.x??WORLD2D_CONFIG.width*.5,
-    y:(currentEntry?.y??WORLD2D_CONFIG.height*.46)+110,
-    radius:WORLD2D_CONFIG.playerRadius,
+    y:(currentEntry?.y??WORLD2D_CONFIG.height*.46)+110
+  };
+  const safeSpawn=findSafeSpawn(requestedSpawn.x,requestedSpawn.y);
+  let player={
+    x:safeSpawn.x,
+    y:safeSpawn.y,
+    radius:spawnRadius,
     facingX:0,facingY:1
   };
-  player=clampPlayer(player.x,player.y,player.radius);
 
   const input={x:0,y:0,run:false};
   const keys=new Set();
@@ -175,11 +217,16 @@ export async function renderCity(root){
       img.draggable=false;
       img.decoding='async';
       img.loading='eager';
-      img.src=tile.src;
       img.style.left=`${tile.x}px`;
       img.style.top=`${tile.y}px`;
-      img.style.width=`${tile.width+0.8}px`;
-      img.style.height=`${tile.height+0.8}px`;
+      img.style.width=`${tile.width+1}px`;
+      img.style.height=`${tile.height+1}px`;
+      img.addEventListener('load',()=>img.classList.add('loaded'),{once:true});
+      img.addEventListener('error',()=>{
+        img.remove();
+        mountedTiles.delete(tile.id);
+      },{once:true});
+      img.src=tile.src;
       groundTiles.appendChild(img);
       mountedTiles.set(tile.id,img);
     }
