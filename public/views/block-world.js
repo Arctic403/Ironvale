@@ -9,7 +9,11 @@ export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
 
 export async function renderBlockWorld(root){
   destroyBlockWorld();
-  const [worldData,playerData]=await Promise.all([api('/api/world'),api('/api/player')]);
+  const [worldData,playerData,publishedBlockData]=await Promise.all([
+    api('/api/world'),
+    api('/api/player'),
+    api(`/api/world/blocks/${encodeURIComponent(BLOCK1.id)}`)
+  ]);
   const locations=worldData.locations||[];
   const validLocationIds=new Set(locations.map(x=>x.id));
 
@@ -88,6 +92,9 @@ export async function renderBlockWorld(root){
   const duplicateButton=root.querySelector('#bw-editor-duplicate'),deleteButton=root.querySelector('#bw-editor-delete');
   const undoButton=root.querySelector('#bw-editor-undo'),redoButton=root.querySelector('#bw-editor-redo');
   const exportButton=root.querySelector('#bw-editor-export'),resetButton=root.querySelector('#bw-editor-reset');
+  const serverStatus=root.querySelector('#bw-editor-server-status');
+  const revertDraftButton=root.querySelector('#bw-editor-revert-draft');
+  const localExportButton=root.querySelector('#bw-editor-local-export');
   const addPropButton=root.querySelector('#bw-editor-add-prop'),propKind=root.querySelector('#bw-editor-prop-kind');
   const assetFile=root.querySelector('#bw-asset-file'),assetSelect=root.querySelector('#bw-editor-asset');
   const assetStatus=root.querySelector('#bw-asset-status');
@@ -155,10 +162,94 @@ export async function renderBlockWorld(root){
     }
   }
 
-  // Editable working copy; the imported authored block remains untouched.
+  // Published server layout is authoritative in Play Mode. BLOCK1 remains the source fallback.
+  const cloneBlock=value=>JSON.parse(JSON.stringify(value));
+  let publishedWorking=cloneBlock(publishedBlockData?.block||BLOCK1);
   let editMode=false, editorCollapsed=false, selectedKey='', drag=null;
-  let working=JSON.parse(JSON.stringify(BLOCK1));
+  let working=cloneBlock(publishedWorking);
   let undoStack=[],redoStack=[];
+  let draftDirty=false,draftSaving=false,draftTimer=null,draftInterval=null;
+  let draftRevision=0,publishedRevision=Number(publishedBlockData?.revision||0);
+
+  function setServerStatus(text,state=''){
+    if(!serverStatus)return;
+    serverStatus.textContent=text;
+    serverStatus.dataset.state=state;
+  }
+
+  function markDraftDirty(){
+    if(!editMode)return;
+    draftDirty=true;
+    setServerStatus('DRAFT · unsaved','dirty');
+    clearTimeout(draftTimer);
+    draftTimer=setTimeout(()=>saveDraftToServer(),1200);
+  }
+
+  async function saveDraftToServer({force=false}={}){
+    if(!editMode||draftSaving||(!draftDirty&&!force))return true;
+    draftSaving=true;
+    setServerStatus('DRAFT · saving…','saving');
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(working.id)}/draft`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({schemaVersion:BLOCK_EDITOR_SCHEMA_VERSION,block:working})
+    });
+    draftSaving=false;
+    if(!result.ok){
+      setServerStatus(`DRAFT · ${result.error||'save failed'}`,'error');
+      return false;
+    }
+    draftRevision=Number(result.draftRevision||draftRevision);
+    draftDirty=false;
+    setServerStatus(`DRAFT · saved r${draftRevision}`,'saved');
+    return true;
+  }
+
+  async function loadDraftForEditor(){
+    setServerStatus('SERVER · loading draft…','saving');
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/editor`);
+    if(!result.ok){
+      setServerStatus(result.status===403?'SERVER · admin role required':`SERVER · ${result.error||'unavailable'}`,'error');
+      return false;
+    }
+    draftRevision=Number(result.draftRevision||0);
+    publishedRevision=Number(result.publishedRevision||publishedRevision);
+    working=cloneBlock(result.draft||result.published||publishedWorking||BLOCK1);
+    undoStack=[];redoStack=[];draftDirty=false;
+    renderEditorObjects();syncInspector();
+    setServerStatus(`DRAFT · r${draftRevision} · LIVE r${publishedRevision}`,'saved');
+    return true;
+  }
+
+  async function publishDraft(){
+    const saved=await saveDraftToServer({force:true});
+    if(!saved)return;
+    setServerStatus('PUBLISHING…','saving');
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(working.id)}/publish`,{method:'POST'});
+    if(!result.ok){
+      setServerStatus(`PUBLISH · ${result.error||'failed'}`,'error');
+      return;
+    }
+    publishedRevision=Number(result.publishedRevision||publishedRevision+1);
+    publishedWorking=cloneBlock(result.block||working);
+    setServerStatus(`LIVE · r${publishedRevision}`,'published');
+  }
+
+  async function revertServerDraft(){
+    setServerStatus('DRAFT · reverting…','saving');
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/revert-draft`,{method:'POST'});
+    if(!result.ok){
+      setServerStatus(`REVERT · ${result.error||'failed'}`,'error');
+      return;
+    }
+    working=cloneBlock(result.block||publishedWorking||BLOCK1);
+    draftDirty=false;undoStack=[];redoStack=[];
+    renderEditorObjects();syncInspector();
+    setServerStatus(`DRAFT · reverted to ${result.revertedTo}`,'saved');
+  }
+
+  // Drag-end/change schedules a fast save; this interval is a second safety net.
+  draftInterval=setInterval(()=>{ if(editMode&&draftDirty)saveDraftToServer(); },5000);
 
   function allEditable(){
     return [
@@ -174,7 +265,13 @@ export async function renderBlockWorld(root){
   function currentEditable(){return allEditable().find(x=>x.key===selectedKey)||null;}
   function snapshot(){return JSON.stringify(working);}
   function commit(before){
-    const after=snapshot(); if(before!==after){undoStack.push(before);if(undoStack.length>60)undoStack.shift();redoStack=[];}
+    const after=snapshot();
+    if(before!==after){
+      undoStack.push(before);
+      if(undoStack.length>60)undoStack.shift();
+      redoStack=[];
+      markDraftDirty();
+    }
   }
   function snap(v){const n=Number(snapSelect.value)||1;return Math.round(v/n)*n;}
   function populateObjectSelect(){
@@ -339,7 +436,7 @@ export async function renderBlockWorld(root){
     }
     populateObjectSelect(); if(selectedKey)select(selectedKey);
   }
-  function setEditMode(on){
+  async function setEditMode(on){
     editMode=!!on;
     shell.classList.toggle('bw-edit-mode',editMode);
     if(editMode){
@@ -349,17 +446,24 @@ export async function renderBlockWorld(root){
       editToggle.textContent='PLAY MODE';
       editToggle.setAttribute('aria-label','Return to play mode');
       editorMinimize.textContent='—';
+      await loadDraftForEditor();
       populateObjectSelect();syncInspector();renderEditorObjects();
     }else{
+      clearTimeout(draftTimer);
+      if(draftDirty)await saveDraftToServer();
       editorCollapsed=false;
       editor.classList.remove('show','minimized');
       editor.setAttribute('aria-hidden','true');
       editToggle.textContent='EDIT BLOCK';
       editToggle.setAttribute('aria-label','Enter block edit mode');
-      drag=null;select('');renderEditorObjects();
+      drag=null;
+      working=cloneBlock(publishedWorking);
+      select('');renderEditorObjects();
       joyX=0;joyY=0;state.running=false;
+      setServerStatus(`LIVE · r${publishedRevision}`,'published');
     }
   }
+
   function toggleEditorMinimized(){
     if(!editMode)return;
     editorCollapsed=!editorCollapsed;
@@ -367,9 +471,9 @@ export async function renderBlockWorld(root){
     editor.setAttribute('aria-hidden',String(editorCollapsed));
     editorMinimize.textContent='—';
   }
-  function toggleTopEditor(){
-    if(editMode)setEditMode(false);
-    else setEditMode(true);
+
+  async function toggleTopEditor(){
+    await setEditMode(!editMode);
   }
   function applyInspector(){
     const item=currentEditable();if(!item)return;const before=snapshot(),o=item.o;
@@ -381,8 +485,8 @@ export async function renderBlockWorld(root){
     if(item.type==='building'){o.doorX=Math.max(o.x,Math.min(o.x+o.w,o.doorX));o.doorY=o.y+o.h;}
     commit(before);renderEditorObjects();syncInspector();
   }
-  function undo(){if(!undoStack.length)return;redoStack.push(snapshot());working=JSON.parse(undoStack.pop());renderEditorObjects();syncInspector();}
-  function redo(){if(!redoStack.length)return;undoStack.push(snapshot());working=JSON.parse(redoStack.pop());renderEditorObjects();syncInspector();}
+  function undo(){if(!undoStack.length)return;redoStack.push(snapshot());working=JSON.parse(undoStack.pop());renderEditorObjects();syncInspector();markDraftDirty();}
+  function redo(){if(!redoStack.length)return;undoStack.push(snapshot());working=JSON.parse(redoStack.pop());renderEditorObjects();syncInspector();markDraftDirty();}
   function downloadWorld(){
     const payload={format:'riftcity-block-edit',version:BLOCK_EDITOR_SCHEMA_VERSION,exportedAt:new Date().toISOString(),block:working};
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
@@ -391,7 +495,7 @@ export async function renderBlockWorld(root){
 
   // Buildings are gameplay geometry only. Visible storefront art comes exclusively
   // from Asset Lab packs; no legacy procedural facade is generated.
-  for(const b of BLOCK1.buildings){
+  for(const b of working.buildings){
     const el=document.createElement('div');
     el.className='bw-building bw-building-geometry';
     el.dataset.buildingId=b.id;
@@ -400,7 +504,7 @@ export async function renderBlockWorld(root){
   }
   const alley=document.createElement('div');
   alley.className='bw-alley';
-  alley.style.cssText=`left:${BLOCK1.alley.x}px;top:${BLOCK1.alley.y}px;width:${BLOCK1.alley.width}px;height:${BLOCK1.alley.height}px`;
+  alley.style.cssText=`left:${working.alley.x}px;top:${working.alley.y}px;width:${working.alley.width}px;height:${working.alley.height}px`;
   alley.innerHTML=`<span class="bw-fireescape"></span><span class="bw-dumpster"></span><span class="bw-bins"></span><span class="bw-graffiti">RIFT</span><span class="bw-puddle"></span><span class="bw-alley-pipe"></span><span class="bw-alley-light"></span><span class="bw-alley-crates"></span><span class="bw-alley-steam"></span>`;
   buildings.appendChild(alley);
 
@@ -425,7 +529,7 @@ export async function renderBlockWorld(root){
     props.appendChild(el);
   }
 
-  const state={x:BLOCK1.spawn.x,y:BLOCK1.spawn.y,vx:0,vy:0,running:false,near:null,last:performance.now()};
+  const state={x:working.spawn.x,y:working.spawn.y,vx:0,vy:0,running:false,near:null,last:performance.now()};
   const keys=new Set();
   let raf=0, pointerId=null, joyX=0,joyY=0;
 
@@ -611,7 +715,9 @@ export async function renderBlockWorld(root){
   objectSelect.addEventListener('change',()=>select(objectSelect.value));
   [inputX,inputY,inputW,inputH].forEach(el=>el.addEventListener('change',applyInspector));
   undoButton.addEventListener('click',undo);redoButton.addEventListener('click',redo);
-  exportButton.addEventListener('click',downloadWorld);
+  exportButton.addEventListener('click',publishDraft);
+  localExportButton?.addEventListener('click',downloadWorld);
+  revertDraftButton?.addEventListener('click',revertServerDraft);
   resetButton.addEventListener('click',()=>{const before=snapshot();working=JSON.parse(JSON.stringify(BLOCK1));commit(before);select('');renderEditorObjects();});
   addPropButton.addEventListener('click',()=>{const before=snapshot();working.props.push({kind:propKind.value,x:snap(state.x+70),y:snap(state.y)});commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);});
   duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item)return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}});
@@ -728,6 +834,8 @@ export async function renderBlockWorld(root){
   raf=requestAnimationFrame(tick);
   cleanup=()=>{
     cancelAnimationFrame(raf);
+    clearTimeout(draftTimer);
+    clearInterval(draftInterval);
     unmountReactEditor?.();
     removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);
     stick.removeEventListener('pointerdown',down);stick.removeEventListener('pointermove',move);

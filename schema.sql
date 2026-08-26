@@ -525,3 +525,31 @@ CREATE TABLE IF NOT EXISTS casino_history (
   created_at INTEGER NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
+-- Development world-authoring layouts.
+-- Images/assets remain source-controlled; only lightweight block geometry/config is stored here.
+CREATE TABLE IF NOT EXISTS block_layouts (
+  block_id TEXT PRIMARY KEY,
+  draft_json TEXT,
+  draft_revision INTEGER NOT NULL DEFAULT 0,
+  published_json TEXT,
+  published_revision INTEGER NOT NULL DEFAULT 0,
+  updated_by TEXT,
+  updated_at INTEGER,
+  published_at INTEGER,
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS block_layout_history (
+  id TEXT PRIMARY KEY,
+  block_id TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  layout_json TEXT NOT NULL,
+  published_by TEXT,
+  published_at INTEGER NOT NULL,
+  FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_block_layout_history_block
+  ON block_layout_history(block_id, published_at DESC);

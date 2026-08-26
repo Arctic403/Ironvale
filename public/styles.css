@@ -1441,3 +1441,76 @@ body.bw-fullscreen-mode .bw-editor{
   max-height:92px!important;
 }
 body.bw-fullscreen-mode .bw-editor-more{display:none!important}
+
+
+/* Hybrid H1.5 — server authoring + scrollable mobile precision toolbar */
+.bw-editor-mainrow{
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  overscroll-behavior-x:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-x!important;
+  scrollbar-width:thin!important;
+  scroll-snap-type:x proximity;
+}
+.bw-editor-mainrow>*{scroll-snap-align:start}
+.bw-editor-object-row{min-width:245px!important;flex:0 0 245px!important}
+.bw-editor-transform-grid{min-width:410px!important;flex:0 0 410px!important}
+.bw-editor-quickbar{min-width:225px!important;flex:0 0 225px!important}
+
+.bw-editor-server-status{
+  display:block!important;
+  margin-top:1px!important;
+  max-width:190px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:7px!important;
+  line-height:1!important;
+  letter-spacing:.06em!important;
+  color:#9fb2b6!important;
+}
+.bw-editor-server-status[data-state="dirty"]{color:#ffc766!important}
+.bw-editor-server-status[data-state="saving"]{color:#8fd7ff!important}
+.bw-editor-server-status[data-state="saved"]{color:#8ce3b0!important}
+.bw-editor-server-status[data-state="published"]{color:#9cffbe!important}
+.bw-editor-server-status[data-state="error"]{color:#ff9b9b!important}
+
+/* Make gizmos easier to actually grab with a thumb while keeping the visible dot modest. */
+.bw-resize-handle{
+  width:52px!important;
+  height:52px!important;
+  min-width:52px!important;
+  min-height:52px!important;
+}
+.bw-resize-handle::after{
+  width:18px!important;
+  height:18px!important;
+  border-width:3px!important;
+}
+@media (pointer:coarse){
+  .bw-resize-handle{
+    width:58px!important;
+    height:58px!important;
+    min-width:58px!important;
+    min-height:58px!important;
+  }
+  .bw-resize-handle::after{
+    width:20px!important;
+    height:20px!important;
+  }
+}
+
+/* iPhone landscape/fullscreen: horizontal pan is intentional; don't clip controls. */
+@media (orientation:landscape) and (max-height:700px),
+       (max-width:700px) and (min-aspect-ratio:4/3){
+  .bw-editor-mainrow{
+    display:flex!important;
+    align-items:end!important;
+    gap:5px!important;
+    padding:5px!important;
+  }
+  .bw-editor-object-row{min-width:225px!important;flex-basis:225px!important}
+  .bw-editor-transform-grid{min-width:390px!important;flex-basis:390px!important}
+  .bw-editor-quickbar{min-width:220px!important;flex-basis:220px!important}
+}

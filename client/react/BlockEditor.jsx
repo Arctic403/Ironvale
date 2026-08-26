@@ -7,6 +7,7 @@ export function BlockEditor() {
         <div className="bw-editor-title">
           <strong>BLOCK EDITOR</strong>
           <small id="bw-editor-selection">Tap an object</small>
+          <small id="bw-editor-server-status" className="bw-editor-server-status">SERVER · loading…</small>
         </div>
         <div className="bw-editor-head-actions">
           <button id="bw-editor-minimize" type="button" aria-label="Hide editor panel">—</button>
@@ -39,7 +40,7 @@ export function BlockEditor() {
               <option value="25">25</option>
             </select>
           </label>
-          <button type="button" id="bw-editor-export">SAVE</button>
+          <button type="button" id="bw-editor-export">PUBLISH</button>
         </div>
       </div>
 
@@ -49,6 +50,8 @@ export function BlockEditor() {
           <div className="bw-editor-actions">
             <button type="button" id="bw-editor-duplicate">DUPLICATE</button>
             <button type="button" id="bw-editor-delete">DELETE</button>
+            <button type="button" id="bw-editor-revert-draft">REVERT DRAFT</button>
+            <button type="button" id="bw-editor-local-export">EXPORT JSON</button>
           </div>
 
           <div className="bw-editor-add-prop">

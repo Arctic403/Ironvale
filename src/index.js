@@ -179,6 +179,7 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'GET' && url.pathname === '/api/crimes') return getCrimes(request, env);
   if (method === 'POST' && url.pathname === '/api/crimes/execute') return executeCrime(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/world') return getWorld(request, env);
+  if (method === 'GET' && url.pathname.startsWith('/api/world/blocks/')) return getPublishedBlockLayout(request, env, url);
   if (method === 'GET' && url.pathname.startsWith('/api/world/districts/')) return getDistrict(request, env, url);
   if (method === 'GET' && url.pathname.startsWith('/api/world/locations/')) return getLocation(request, env, url);
   if (method === 'POST' && url.pathname === '/api/world/travel') return travelToLocation(request, env, requestId);
@@ -191,6 +192,15 @@ async function handleApi(request, env, url, requestId) {
   }
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
   if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
+
+  if (url.pathname.startsWith('/api/admin/blocks/')) {
+    if (method === 'GET' && url.pathname.endsWith('/editor')) return getBlockEditorState(request, env, url);
+    if (method === 'GET' && url.pathname.endsWith('/history')) return getBlockLayoutHistory(request, env, url);
+    if (method === 'PUT' && url.pathname.endsWith('/draft')) return saveBlockDraft(request, env, url, requestId);
+    if (method === 'POST' && url.pathname.endsWith('/publish')) return publishBlockDraft(request, env, url, requestId);
+    if (method === 'POST' && url.pathname.endsWith('/revert-draft')) return revertBlockDraft(request, env, url, requestId);
+  }
+
   if (method === 'POST' && url.pathname.startsWith('/api/admin/logs/') && url.pathname.endsWith('/resolve')) {
     return resolveSystemLog(request, env, url);
   }
@@ -1056,6 +1066,270 @@ async function health(env) {
     result.database = 'error';
   }
   return json(result, result.ok ? 200 : 503);
+}
+
+
+const BLOCK_LAYOUT_MAX_BYTES = 350_000;
+
+async function ensureBlockEditorTables(env) {
+  await env.DB.batch([
+    env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS block_layouts (
+        block_id TEXT PRIMARY KEY,
+        draft_json TEXT,
+        draft_revision INTEGER NOT NULL DEFAULT 0,
+        published_json TEXT,
+        published_revision INTEGER NOT NULL DEFAULT 0,
+        updated_by TEXT,
+        updated_at INTEGER,
+        published_at INTEGER,
+        FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `),
+    env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS block_layout_history (
+        id TEXT PRIMARY KEY,
+        block_id TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        layout_json TEXT NOT NULL,
+        published_by TEXT,
+        published_at INTEGER NOT NULL,
+        FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_block_layout_history_block ON block_layout_history(block_id, published_at DESC)`)
+  ]);
+}
+
+function blockIdFromPath(pathname, suffix='') {
+  const stripped = suffix && pathname.endsWith(suffix) ? pathname.slice(0, -suffix.length) : pathname;
+  const raw = stripped.split('/').filter(Boolean).pop() || '';
+  const id = decodeURIComponent(raw);
+  return /^[a-z0-9][a-z0-9-]{1,80}$/i.test(id) ? id : '';
+}
+
+function validateBlockLayout(block, expectedId) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return 'Block layout must be an object';
+  if (String(block.id || '') !== expectedId) return 'Block id does not match the route';
+  const width = Number(block.width), height = Number(block.height);
+  if (!Number.isFinite(width) || width < 320 || width > 20000) return 'Invalid block width';
+  if (!Number.isFinite(height) || height < 240 || height > 12000) return 'Invalid block height';
+  if (!Array.isArray(block.buildings) || block.buildings.length > 250) return 'Invalid buildings array';
+  if (!Array.isArray(block.props) || block.props.length > 1000) return 'Invalid props array';
+  if (!block.spawn || !Number.isFinite(Number(block.spawn.x)) || !Number.isFinite(Number(block.spawn.y))) return 'Invalid spawn';
+  if (!block.walkable || !Number.isFinite(Number(block.walkable.x)) || !Number.isFinite(Number(block.walkable.y))) return 'Invalid walkable area';
+
+  const jsonText = JSON.stringify(block);
+  if (new TextEncoder().encode(jsonText).byteLength > BLOCK_LAYOUT_MAX_BYTES) {
+    return 'Block layout is too large. Keep image/assets outside the layout JSON.';
+  }
+  return '';
+}
+
+async function getPublishedBlockLayout(request, env, url) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const blockId = blockIdFromPath(url.pathname);
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+  await ensureBlockEditorTables(env);
+  const row = await env.DB.prepare(`
+    SELECT published_json, published_revision, published_at
+    FROM block_layouts WHERE block_id = ?
+  `).bind(blockId).first();
+
+  if (!row?.published_json) {
+    return json({ ok: true, blockId, published: false, revision: 0, block: null });
+  }
+
+  try {
+    return json({
+      ok: true,
+      blockId,
+      published: true,
+      revision: Number(row.published_revision || 0),
+      publishedAt: row.published_at,
+      block: JSON.parse(row.published_json)
+    });
+  } catch {
+    return json({ ok: false, error: 'Published block layout is corrupted' }, 500);
+  }
+}
+
+async function getBlockEditorState(request, env, url) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const blockId = blockIdFromPath(url.pathname, '/editor');
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+  await ensureBlockEditorTables(env);
+
+  const row = await env.DB.prepare(`
+    SELECT draft_json, draft_revision, published_json, published_revision, updated_at, published_at
+    FROM block_layouts WHERE block_id = ?
+  `).bind(blockId).first();
+
+  let draft = null, published = null;
+  try { if (row?.draft_json) draft = JSON.parse(row.draft_json); } catch {}
+  try { if (row?.published_json) published = JSON.parse(row.published_json); } catch {}
+
+  return json({
+    ok: true,
+    blockId,
+    draft,
+    draftRevision: Number(row?.draft_revision || 0),
+    published,
+    publishedRevision: Number(row?.published_revision || 0),
+    updatedAt: row?.updated_at || null,
+    publishedAt: row?.published_at || null
+  });
+}
+
+async function saveBlockDraft(request, env, url, requestId) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const blockId = blockIdFromPath(url.pathname, '/draft');
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+
+  const body = await readJson(request);
+  const error = validateBlockLayout(body?.block, blockId);
+  if (error) return json({ ok: false, error }, 400);
+
+  await ensureBlockEditorTables(env);
+  const now = Date.now();
+  const layoutJson = JSON.stringify(body.block);
+
+  await env.DB.prepare(`
+    INSERT INTO block_layouts (
+      block_id, draft_json, draft_revision, published_json, published_revision,
+      updated_by, updated_at, published_at
+    ) VALUES (?, ?, 1, NULL, 0, ?, ?, NULL)
+    ON CONFLICT(block_id) DO UPDATE SET
+      draft_json = excluded.draft_json,
+      draft_revision = block_layouts.draft_revision + 1,
+      updated_by = excluded.updated_by,
+      updated_at = excluded.updated_at
+  `).bind(blockId, layoutJson, gate.auth.user.id, now).run();
+
+  const row = await env.DB.prepare(`
+    SELECT draft_revision FROM block_layouts WHERE block_id = ?
+  `).bind(blockId).first();
+
+  await writeAudit(env, gate.auth.user.id, 'block.draft_saved', gate.auth.user.id, {
+    blockId, revision: Number(row?.draft_revision || 0)
+  });
+
+  return json({
+    ok: true,
+    blockId,
+    draftRevision: Number(row?.draft_revision || 0),
+    savedAt: now,
+    requestId
+  });
+}
+
+async function publishBlockDraft(request, env, url, requestId) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const blockId = blockIdFromPath(url.pathname, '/publish');
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+  await ensureBlockEditorTables(env);
+
+  const row = await env.DB.prepare(`
+    SELECT draft_json, draft_revision, published_revision
+    FROM block_layouts WHERE block_id = ?
+  `).bind(blockId).first();
+
+  if (!row?.draft_json) return json({ ok: false, error: 'No saved draft to publish' }, 409);
+  let parsed;
+  try { parsed = JSON.parse(row.draft_json); } catch { return json({ ok: false, error: 'Draft JSON is corrupted' }, 500); }
+  const validationError = validateBlockLayout(parsed, blockId);
+  if (validationError) return json({ ok: false, error: validationError }, 400);
+
+  const nextRevision = Number(row.published_revision || 0) + 1;
+  const now = Date.now();
+  const historyId = crypto.randomUUID();
+
+  // D1 batch is transactional: the published row and history snapshot succeed or roll back together.
+  await env.DB.batch([
+    env.DB.prepare(`
+      UPDATE block_layouts
+      SET published_json = draft_json,
+          published_revision = ?,
+          published_at = ?,
+          updated_by = ?,
+          updated_at = ?
+      WHERE block_id = ?
+    `).bind(nextRevision, now, gate.auth.user.id, now, blockId),
+    env.DB.prepare(`
+      INSERT INTO block_layout_history (id, block_id, revision, layout_json, published_by, published_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(historyId, blockId, nextRevision, row.draft_json, gate.auth.user.id, now)
+  ]);
+
+  await writeAudit(env, gate.auth.user.id, 'block.published', gate.auth.user.id, {
+    blockId, revision: nextRevision
+  });
+
+  return json({
+    ok: true,
+    blockId,
+    publishedRevision: nextRevision,
+    publishedAt: now,
+    block: parsed,
+    requestId
+  });
+}
+
+async function revertBlockDraft(request, env, url, requestId) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const blockId = blockIdFromPath(url.pathname, '/revert-draft');
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+  await ensureBlockEditorTables(env);
+
+  const row = await env.DB.prepare(`
+    SELECT published_json FROM block_layouts WHERE block_id = ?
+  `).bind(blockId).first();
+
+  if (!row?.published_json) {
+    await env.DB.prepare(`DELETE FROM block_layouts WHERE block_id = ?`).bind(blockId).run();
+    return json({ ok: true, blockId, revertedTo: 'authored', block: null, requestId });
+  }
+
+  const now = Date.now();
+  await env.DB.prepare(`
+    UPDATE block_layouts
+    SET draft_json = published_json,
+        draft_revision = draft_revision + 1,
+        updated_by = ?,
+        updated_at = ?
+    WHERE block_id = ?
+  `).bind(gate.auth.user.id, now, blockId).run();
+
+  return json({
+    ok: true,
+    blockId,
+    revertedTo: 'published',
+    block: JSON.parse(row.published_json),
+    requestId
+  });
+}
+
+async function getBlockLayoutHistory(request, env, url) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const blockId = blockIdFromPath(url.pathname, '/history');
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+  await ensureBlockEditorTables(env);
+
+  const result = await env.DB.prepare(`
+    SELECT revision, published_by, published_at
+    FROM block_layout_history
+    WHERE block_id = ?
+    ORDER BY revision DESC
+    LIMIT 25
+  `).bind(blockId).all();
+
+  return json({ ok: true, blockId, history: result.results || [] });
 }
 
 async function getSystemLogs(request, env, url) {

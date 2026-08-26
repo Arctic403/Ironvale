@@ -184,3 +184,8 @@ the primary play area, and frequent touch targets should remain comfortably tapp
 therefore treats gizmos/dragging as the primary editor interaction and the React inspector as a
 small precision toolbar. It also restores an explicit Play/Edit mode boundary so editor overlays
 cannot remain active during normal gameplay.
+
+
+## H1.5 server-authoring note
+
+Block authoring now has explicit draft and published states. Direct manipulation remains local and responsive, lightweight layout JSON autosaves to an admin-only D1 draft, and only an explicit Publish makes the layout server-wide. Ordinary players read only the published layout. H1.4's explicit Play/Edit split remains intact.

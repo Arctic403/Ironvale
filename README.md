@@ -532,3 +532,18 @@ large enough hit regions for fingers while allowing pointer/keyboard precision.
 - Portrait uses a shallow precision inspector; secondary tools are hidden/collapsed.
 - Resize gizmos keep a 44px touch hit region but use a small visible dot so geometry stays readable.
 - Direct scene dragging/resizing remains plain JavaScript; React owns only the inspector shell.
+
+
+## Hybrid H1.5 — server-persistent world authoring
+
+The Block Editor is now a real development authoring tool rather than a browser-only scratchpad.
+
+- Play Mode loads the published block layout from D1, falling back to `public/block1.js` when no server layout has been published.
+- Edit Mode loads the current server draft for admin/developer accounts.
+- Geometry changes autosave to a D1 draft after a short debounce and again every few seconds while dirty.
+- `PUBLISH` promotes the saved draft to the live server-wide layout and creates a version-history row.
+- Leaving Edit Mode returns the local scene to the currently published layout, so unpublished drafts do not leak into Play Mode.
+- Draft and publish writes are protected by the existing admin/developer authorization gate.
+- Block layout JSON is validated and size-capped server-side; images/assets remain outside D1.
+- The compact mobile editor row scrolls horizontally instead of clipping controls.
+- Resize gizmos have larger touch targets on coarse-pointer mobile devices.
