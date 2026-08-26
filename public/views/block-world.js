@@ -3,6 +3,7 @@ import { go } from '../ui/router.js';
 import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
 import { BLOCK_ASSETS } from '../block-assets.js';
 import { getSubarea } from '../subareas.js';
+import { SceneManager } from '../scene-manager.js';
 import {
   sha256File,
   dataUrlToBlob,
@@ -63,8 +64,15 @@ export async function renderBlockWorld(root, options={}){
           <div class="bw-exit bw-exit-east">NEXT BLOCK →</div>
         </div>
         <div class="blockworld-subarea-scene" id="blockworld-subarea-scene" aria-hidden="true">
-          <img class="bw-subarea-plate" id="bw-subarea-plate" alt="" draggable="false" decoding="async" aria-hidden="true">
-          <div class="bw-subarea-debug" id="bw-subarea-debug" aria-hidden="true"></div>
+          <div class="bw-subarea-stage" id="bw-subarea-stage">
+            <img class="bw-subarea-plate" id="bw-subarea-plate" alt="" draggable="false" decoding="async" aria-hidden="true">
+            <div class="bw-subarea-world" id="bw-subarea-world">
+              <div class="bw-subarea-debug" id="bw-subarea-debug" aria-hidden="true"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bw-scene-transition" id="bw-scene-transition" aria-hidden="true">
+          <span id="bw-scene-transition-label">LOADING AREA…</span>
         </div>
       </div>
       <div class="bw-block-label"><small id="bw-area-kicker">DOWNTOWN / BLOCK 01</small><strong id="bw-area-name">Commerce Street</strong></div>
@@ -115,6 +123,10 @@ export async function renderBlockWorld(root, options={}){
   const viewport=root.querySelector('#blockworld-viewport');
   const scene=root.querySelector('#blockworld-scene');
   const subareaScene=root.querySelector('#blockworld-subarea-scene');
+  const subareaStage=root.querySelector('#bw-subarea-stage');
+  const subareaWorld=root.querySelector('#bw-subarea-world');
+  const sceneTransition=root.querySelector('#bw-scene-transition');
+  const sceneTransitionLabel=root.querySelector('#bw-scene-transition-label');
   const buildings=scene.querySelector('.bw-buildings');
   const props=scene.querySelector('.bw-props');
   const scenePlate=scene.querySelector('#bw-scene-plate');
@@ -130,15 +142,11 @@ export async function renderBlockWorld(root, options={}){
   const shell=root.querySelector('.blockworld-shell');
   const stick=root.querySelector('#bw-stick');
 
-  // A failed alley asset should never fall back visually to Commerce Street.
-  // Keep the sub-area canvas active and expose a dark fallback instead.
+  // Scene art is preloaded before the runtime swaps away from Commerce Street.
+  // If it fails, the dedicated sub-area canvas still opens with a diagnostic
+  // fallback; the old street scene is never reused as substitute artwork.
   subareaPlate?.addEventListener('load',()=>shell.classList.remove('bw-subarea-asset-error'));
   subareaPlate?.addEventListener('error',()=>shell.classList.add('bw-subarea-asset-error'));
-  const initialAlley=getSubarea('alley-commerce-01');
-  if(subareaPlate&&initialAlley?.scenePlate?.src){
-    subareaPlate.dataset.src=initialAlley.scenePlate.src;
-    subareaPlate.src=initialAlley.scenePlate.src;
-  }
   const editToggle=editorQuery('#bw-edit-toggle');
   const editorPanelToggle=editorQuery('#bw-editor-panel-toggle');
   const editor=editorQuery('#bw-editor');
@@ -508,11 +516,16 @@ export async function renderBlockWorld(root, options={}){
   let publishedWorking=cloneBlock(publishedBlockData?.block||BLOCK1);
   let editMode=false, editorCollapsed=false, selectedKey='', drag=null;
   let working=cloneBlock(publishedWorking);
+  const sceneManager=new SceneManager(getSubarea);
   let activeSubarea=null;
-  let streetReturnPoint=null;
+  let sceneTransitionBusy=false;
   let undoStack=[],redoStack=[];
   let draftDirty=false,draftSaving=false,draftTimer=null,draftInterval=null;
   let draftRevision=0,publishedRevision=Number(publishedBlockData?.revision||0);
+
+  // Warm the first room asset early so ENTER normally becomes an instant
+  // scene swap after the short fade, while still allowing a safe fallback.
+  sceneManager.preload('alley-commerce-01').catch(()=>{});
 
   function setServerStatus(text,state=''){
     if(!serverStatus)return;
@@ -1254,38 +1267,56 @@ export async function renderBlockWorld(root, options={}){
   }
 
   function activeSceneElement(){
-    return activeSubarea ? subareaScene : scene;
+    // The outer sub-area scene is a fixed viewport-sized clipping surface.
+    // Camera transforms apply only to the authored stage inside it.
+    return activeSubarea ? subareaStage : scene;
+  }
+
+  function setSceneTransition(active,label='LOADING AREA…'){
+    sceneTransitionBusy=!!active;
+    if(sceneTransitionLabel)sceneTransitionLabel.textContent=label;
+    if(sceneTransition){
+      sceneTransition.classList.toggle('show',!!active);
+      sceneTransition.setAttribute('aria-hidden',active?'false':'true');
+    }
+    if(interact)interact.disabled=!!active||!state.near;
   }
 
   function applyAreaVisuals(){
     if(activeSubarea){
       shell.classList.add('bw-subarea-active','bw-subarea-alley');
+      shell.classList.toggle('bw-subarea-asset-error',!!sceneManager.active?.assetError);
       shell.dataset.activeArea=activeSubarea.id;
       shell.style.setProperty('--bw-subarea-width',`${activeSubarea.width}px`);
       shell.style.setProperty('--bw-subarea-height',`${activeSubarea.height}px`);
 
-      // H1.19: the alley is a separate scene node. Do not resize/repaint the
-      // Commerce Street scene in-place; hide it completely while the sub-area
-      // is active so Safari cannot expose a stale street frame.
+      // Atomic scene swap: Commerce Street is removed from the render path
+      // before the alley becomes visible. The alley owns a viewport clip plus
+      // its own world stage; no Commerce Street transform can leak across.
       scene.style.display='none';
       scene.setAttribute('aria-hidden','true');
+      scene.style.transform='none';
+
       subareaScene.style.display='block';
       subareaScene.setAttribute('aria-hidden','false');
-      subareaScene.style.width=`${activeSubarea.width}px`;
-      subareaScene.style.height=`${activeSubarea.height}px`;
-      subareaScene.appendChild(player);
-      subareaScene.appendChild(prompt);
+      subareaScene.style.width='100%';
+      subareaScene.style.height='100%';
 
-      if(scenePlate)scenePlate.style.display='block';
+      subareaStage.style.width=`${activeSubarea.width}px`;
+      subareaStage.style.height=`${activeSubarea.height}px`;
+      subareaWorld.style.width=`${activeSubarea.width}px`;
+      subareaWorld.style.height=`${activeSubarea.height}px`;
+      subareaWorld.appendChild(player);
+      subareaWorld.appendChild(prompt);
+
       if(subareaPlate){
         const plate=activeSubarea.scenePlate||{};
         const nextSrc=plate.src||'';
         if(subareaPlate.dataset.src!==nextSrc){
-          shell.classList.remove('bw-subarea-asset-error');
           subareaPlate.dataset.src=nextSrc;
           subareaPlate.src=nextSrc;
         }
-        subareaPlate.style.display='block';
+        subareaPlate.style.display=nextSrc?'block':'none';
         subareaPlate.style.left=`${Number(plate.x)||0}px`;
         subareaPlate.style.top=`${Number(plate.y)||0}px`;
         subareaPlate.style.width=`${Number(plate.width)||activeSubarea.width}px`;
@@ -1307,7 +1338,7 @@ export async function renderBlockWorld(root, options={}){
 
     subareaScene.style.display='none';
     subareaScene.setAttribute('aria-hidden','true');
-    subareaScene.style.transform='none';
+    subareaStage.style.transform='none';
     scene.style.display='block';
     scene.setAttribute('aria-hidden','false');
     scene.style.width=`${working.width||BLOCK1.width}px`;
@@ -1352,40 +1383,48 @@ export async function renderBlockWorld(root, options={}){
     const authoredHeight=Math.max(1,Number(area.height)||1);
     const cameraScene=activeSceneElement();
 
-    let fitScale=1,cameraX=0,cameraY=0;
+    let fitScale=1,cameraX=0,cameraY=0,screenOffsetX=0,screenOffsetY=0;
 
     if(activeSubarea){
       const camera=area.camera||{};
       const containScale=Math.min(viewportWidth/authoredWidth,viewportHeight/authoredHeight);
       const coverScale=Math.max(viewportWidth/authoredWidth,viewportHeight/authoredHeight);
-      const requested=camera.mode==='contain'?containScale:coverScale;
+      const roomMode=camera.mode==='contain'||camera.mode==='room';
+      const requested=roomMode?containScale:coverScale;
       const minScale=Number(camera.minScale)||.20;
       const maxScale=Number(camera.maxScale)||1.5;
       fitScale=clampCamera(requested,minScale,maxScale);
 
-      const visibleWorldWidth=viewportWidth/fitScale;
-      const visibleWorldHeight=viewportHeight/fitScale;
-      const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.5;
-      const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.72;
-      const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
-      const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
+      if(roomMode){
+        // Small interiors/alleys behave like a self-contained room: show the
+        // whole authored scene and letterbox/center it when aspect ratios differ.
+        // There is no inherited Commerce Street camera position to track.
+        cameraX=0;
+        cameraY=0;
+        screenOffsetX=Math.max(0,(viewportWidth-authoredWidth*fitScale)/2);
+        screenOffsetY=Math.max(0,(viewportHeight-authoredHeight*fitScale)/2);
+      }else{
+        const visibleWorldWidth=viewportWidth/fitScale;
+        const visibleWorldHeight=viewportHeight/fitScale;
+        const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.5;
+        const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.72;
+        const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
+        const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
 
-      cameraX=clampCamera(
-        state.x-visibleWorldWidth*anchorX,
-        0,
-        maxX
-      );
+        cameraX=clampCamera(
+          state.x-visibleWorldWidth*anchorX,
+          0,
+          maxX
+        );
 
-      // Room/sub-area art is authored around the playable ground lane. On
-      // short landscape viewports, bottom-align the camera instead of tracking
-      // upward into skyline/ceiling space.
-      cameraY=camera.vertical==='ground'
-        ? maxY
-        : clampCamera(
-            state.y-visibleWorldHeight*anchorY,
-            0,
-            maxY
-          );
+        cameraY=camera.vertical==='ground'
+          ? maxY
+          : clampCamera(
+              state.y-visibleWorldHeight*anchorY,
+              0,
+              maxY
+            );
+      }
     }else{
       const editorBaseFit=Math.min(
         1,
@@ -1406,36 +1445,63 @@ export async function renderBlockWorld(root, options={}){
       );
     }
 
-    cameraScene.style.transform=`translate3d(${-cameraX*fitScale}px,${-cameraY*fitScale}px,0) scale(${fitScale})`;
+    cameraScene.style.transform=`translate3d(${screenOffsetX-cameraX*fitScale}px,${screenOffsetY-cameraY*fitScale}px,0) scale(${fitScale})`;
   }
 
-  function enterSubarea(targetId){
+  async function enterSubarea(targetId){
+    if(sceneTransitionBusy)return false;
     const next=getSubarea(targetId);
     if(!next)return false;
-    streetReturnPoint={x:state.x,y:state.y};
-    activeSubarea=next;
-    state.x=Number(next.spawn?.x)||220;
-    state.y=Number(next.spawn?.y)||800;
+
+    setSceneTransition(true,'LOADING ALLEY…');
     state.near=null;
-    state.running=false;
-    joyX=joyY=0;
-    keys.clear();
-    knob.style.transform='translate(0,0)';
-    applyAreaVisuals();
-    updatePlayer();
-    applyCamera();
-    requestAnimationFrame(applyCamera);
-    return true;
+    prompt.classList.remove('show');
+    interact.disabled=true;
+    try{
+      // Preload before changing scene ownership. This avoids Safari briefly
+      // presenting the previous decoded Commerce Street image as alley art.
+      const result=await sceneManager.enter(targetId,{x:state.x,y:state.y});
+      if(!result||result.cancelled)return false;
+      activeSubarea=result.scene;
+      state.x=Number(activeSubarea.spawn?.x)||220;
+      state.y=Number(activeSubarea.spawn?.y)||800;
+      state.running=false;
+      joyX=joyY=0;
+      keys.clear();
+      knob.style.transform='translate(0,0)';
+      applyAreaVisuals();
+      updatePlayer();
+      applyCamera();
+      updatePrompt();
+      requestAnimationFrame(()=>{
+        applyCamera();
+        requestAnimationFrame(()=>setSceneTransition(false));
+      });
+      return true;
+    }catch(error){
+      console.error('Could not enter sub-area',error);
+      sceneManager.cancel();
+      activeSubarea=null;
+      applyAreaVisuals();
+      updatePlayer();
+      applyCamera();
+      setSceneTransition(false);
+      return false;
+    }
   }
 
   function leaveSubarea(){
-    if(!activeSubarea)return false;
-    activeSubarea=null;
+    if(sceneTransitionBusy||!activeSubarea)return false;
+    setSceneTransition(true,'RETURNING TO STREET…');
+    const result=sceneManager.leave();
+    activeSubarea=sceneManager.active?.scene||null;
+
+    // Commerce Alley currently returns directly to Commerce Street. The stack
+    // shape is already scene-manager compatible for future nested interiors.
     const fallback=working.alley&&Number(working.alley.width)>0
       ? {x:Number(working.alley.x)+Number(working.alley.width)/2,y:Number(working.alley.y)+Number(working.alley.height)+35}
       : working.spawn;
-    const back=streetReturnPoint||fallback||working.spawn;
-    streetReturnPoint=null;
+    const back=result?.returnState||fallback||working.spawn;
     state.x=Number(back?.x)||working.spawn.x;
     state.y=Number(back?.y)||working.spawn.y;
     state.near=null;
@@ -1446,11 +1512,21 @@ export async function renderBlockWorld(root, options={}){
     applyAreaVisuals();
     updatePlayer();
     applyCamera();
-    requestAnimationFrame(applyCamera);
+    updatePrompt();
+    requestAnimationFrame(()=>{
+      applyCamera();
+      requestAnimationFrame(()=>setSceneTransition(false));
+    });
     return true;
   }
 
   function updatePrompt(){
+    if(sceneTransitionBusy){
+      state.near=null;
+      prompt.classList.remove('show');
+      interact.disabled=true;
+      return;
+    }
     state.near=activeSubarea?nearestSubareaInteraction():nearestStreetInteraction();
     if(state.near){
       const action=state.near.kind==='subarea-exit'?'Exit':'Enter';
@@ -1465,10 +1541,10 @@ export async function renderBlockWorld(root, options={}){
     }
   }
 
-  function enter(){
-    if(!state.near)return;
+  async function enter(){
+    if(sceneTransitionBusy||!state.near)return;
     if(state.near.kind==='subarea'){
-      enterSubarea(state.near.target);
+      await enterSubarea(state.near.target);
       return;
     }
     if(state.near.kind==='subarea-exit'){
@@ -1858,6 +1934,7 @@ export async function renderBlockWorld(root, options={}){
   if(editorWorkspace)await setEditMode(true);
   raf=requestAnimationFrame(tick);
   cleanup=()=>{
+    sceneManager.reset();
     cancelAnimationFrame(raf);
     clearTimeout(draftTimer);
     clearInterval(draftInterval);

@@ -726,3 +726,16 @@ The normal D1 schema migration also creates `approved_assets`. The Worker keeps 
 - Alley camera framing is ground-aligned on short landscape/iPhone fullscreen viewports so the camera cannot drift upward into mostly sky/ceiling.
 - The existing `commerce-alley.webp` scene plate remains the primary art. If that file fails to load, RiftCity shows a dark Commerce Alley diagnostic fallback instead of ever showing a stale Commerce Street frame.
 - R2/D1 asset verification from H1.18 is unchanged. Scavenging remains deferred until the alley enter → move → exit loop is visually verified.
+
+
+## Hybrid H1.20 — reusable room Scene Manager + Commerce Alley reset
+
+- Commerce Alley now uses a real scene-transition manager instead of directly mutating the active Commerce Street camera state.
+- ENTER preloads the alley scene plate before ownership changes, briefly fades the viewport, then atomically hides Commerce Street and activates the alley.
+- The sub-area has a fixed viewport clipping surface plus its own authored world stage. Camera transforms apply only to that stage, so Commerce Street transforms cannot leak into the alley.
+- Compact sub-areas use `room` framing: the complete alley scene is centered/letterboxed on different iPhone aspect ratios instead of tracking into skyline/ceiling space.
+- The player and interaction prompt are moved into the alley's own world layer while inside and restored to the street scene on exit.
+- EXIT restores the exact Commerce Street position captured when the player entered.
+- If the alley image fails to preload, the dedicated alley scene still opens with a dark diagnostic fallback; the Commerce Street panorama is never substituted.
+- The new `public/scene-manager.js` is intentionally generic so future shop, apartment, warehouse, garage and other interior scenes can reuse the same enter/leave/preload path.
+- Existing server-authoritative gameplay, Block Editor draft/publish behavior, and H1.18 D1/R2 asset verification are unchanged.

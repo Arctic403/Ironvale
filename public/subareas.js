@@ -1,4 +1,4 @@
-// RiftCity H1.17 — reusable 2.5D sub-area registry.
+// RiftCity H1.20 — reusable 2.5D room/sub-area registry.
 // Scene artwork is presentation only. Walkable bounds, collision, entry/exit,
 // camera framing and future interaction hotspots remain separate gameplay data.
 export const SUBAREAS = Object.freeze({
@@ -22,11 +22,10 @@ export const SUBAREAS = Object.freeze({
     walkable:{x:70,y:560,width:1530,height:330},
     exit:{id:'street-exit',x:18,y:535,width:250,height:355,label:'Commerce Street'},
 
-    // Cover the viewport like a real room/scene. Horizontal framing follows the
-    // player only when the viewport is narrower than the alley; vertical
-    // framing stays ground-aligned so short iPhone landscape viewports never
-    // drift upward into empty skyline/ceiling space.
-    camera:{mode:'cover',vertical:'ground',anchorX:.50,anchorY:.72,minScale:.24,maxScale:1.35},
+    // A compact alley behaves like a self-contained room. The runtime shows
+    // the entire authored scene and centers/letterboxes it if the viewport
+    // aspect ratio differs, rather than inheriting or following the street camera.
+    camera:{mode:'room',anchorX:.50,anchorY:.72,minScale:.18,maxScale:1.35},
 
     obstacles:[
       {id:'left-clutter',x:330,y:500,width:245,height:205},
