@@ -553,3 +553,26 @@ CREATE TABLE IF NOT EXISTS block_layout_history (
 
 CREATE INDEX IF NOT EXISTS idx_block_layout_history_block
   ON block_layout_history(block_id, published_at DESC);
+
+-- Hybrid H1.18 secure verified asset registry.
+-- Block layouts store only assetId + SHA-256 references; image bytes live in R2.
+CREATE TABLE IF NOT EXISTS approved_assets (
+  asset_id TEXT PRIMARY KEY,
+  sha256 TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  byte_size INTEGER NOT NULL,
+  storage_key TEXT NOT NULL,
+  metadata_json TEXT,
+  status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN ('approved','disabled')),
+  created_by TEXT,
+  created_at INTEGER NOT NULL,
+  approved_at INTEGER,
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_approved_assets_sha256
+  ON approved_assets(sha256);
+
+CREATE INDEX IF NOT EXISTS idx_approved_assets_status
+  ON approved_assets(status);
+

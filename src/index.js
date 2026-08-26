@@ -197,6 +197,10 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
   if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
 
+  if (method === 'POST' && url.pathname === '/api/admin/assets/register') return registerApprovedAsset(request, env, requestId);
+  if (method === 'GET' && url.pathname === '/api/admin/assets') return listApprovedAssets(request, env);
+  if (method === 'GET' && url.pathname.startsWith('/api/assets/')) return getApprovedAsset(request, env, url);
+
   if (url.pathname.startsWith('/api/admin/blocks/')) {
     if (method === 'GET' && url.pathname.endsWith('/editor')) return getBlockEditorState(request, env, url);
     if (method === 'GET' && url.pathname.endsWith('/history')) return getBlockLayoutHistory(request, env, url);
@@ -1075,6 +1079,10 @@ async function health(env) {
 
 
 const BLOCK_LAYOUT_MAX_BYTES = 350_000;
+const APPROVED_ASSET_MAX_BYTES = 10 * 1024 * 1024;
+const APPROVED_ASSET_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
+const ASSET_ID_RE = /^[a-z0-9][a-z0-9._-]{2,120}$/i;
 
 async function ensureBlockEditorTables(env) {
   await env.DB.batch([
@@ -1102,8 +1110,321 @@ async function ensureBlockEditorTables(env) {
         FOREIGN KEY (published_by) REFERENCES users(id) ON DELETE SET NULL
       )
     `),
-    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_block_layout_history_block ON block_layout_history(block_id, published_at DESC)`)
+    env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS approved_assets (
+        asset_id TEXT PRIMARY KEY,
+        sha256 TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        byte_size INTEGER NOT NULL,
+        storage_key TEXT NOT NULL,
+        metadata_json TEXT,
+        status TEXT NOT NULL DEFAULT 'approved' CHECK(status IN ('approved','disabled')),
+        created_by TEXT,
+        created_at INTEGER NOT NULL,
+        approved_at INTEGER,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_block_layout_history_block ON block_layout_history(block_id, published_at DESC)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_approved_assets_sha256 ON approved_assets(sha256)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_approved_assets_status ON approved_assets(status)`)
   ]);
+}
+
+function normalizeAssetId(value) {
+  const assetId = String(value || '').trim();
+  return ASSET_ID_RE.test(assetId) ? assetId : '';
+}
+
+function normalizeSha256(value) {
+  const hash = String(value || '').trim().toLowerCase();
+  return SHA256_HEX_RE.test(hash) ? hash : '';
+}
+
+async function sha256Bytes(bytes) {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+function sanitizeAssetMetadata(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const number = (value, fallback=0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+  return {
+    name: String(source.name || source.label || '').slice(0, 160),
+    sourceWidth: Math.max(0, Math.min(20000, number(source.sourceWidth ?? source.width))),
+    sourceHeight: Math.max(0, Math.min(20000, number(source.sourceHeight ?? source.height))),
+    x: Math.max(-20000, Math.min(20000, number(source.x))),
+    y: Math.max(-20000, Math.min(20000, number(source.y))),
+    scale: Math.max(0.01, Math.min(20, number(source.scale, 1))),
+    rotation: Math.max(-3600, Math.min(3600, number(source.rotation))),
+    opacity: Math.max(0, Math.min(1, number(source.opacity, 1))),
+    groundY: Math.max(-20000, Math.min(20000, number(source.groundY))),
+    shadow: source.shadow !== false
+  };
+}
+
+function assetIdFromPath(pathname) {
+  const raw = pathname.slice('/api/assets/'.length).split('/')[0] || '';
+  let decoded = '';
+  try { decoded = decodeURIComponent(raw); } catch { return ''; }
+  return normalizeAssetId(decoded);
+}
+
+function canonicalizeBlockAssetReferences(block) {
+  if (!block || typeof block !== 'object' || Array.isArray(block)) return block;
+  const clean = JSON.parse(JSON.stringify(block));
+  const normalizeHolder = holder => {
+    if (!holder || typeof holder !== 'object' || Array.isArray(holder)) return;
+    const legacy = holder.asset && typeof holder.asset === 'object' && !Array.isArray(holder.asset) ? holder.asset : {};
+    const assetId = normalizeAssetId(holder.assetId || legacy.assetId || legacy.id);
+    const assetHash = normalizeSha256(holder.assetHash || holder.assetSha256 || legacy.sha256 || legacy.hash);
+    if (assetId) {
+      holder.assetId = assetId;
+      if (assetHash) holder.assetHash = assetHash;
+    }
+    delete holder.asset;
+    delete holder.assetSha256;
+    delete holder.dataUrl;
+    delete holder.imageData;
+    delete holder.image;
+    delete holder.data;
+  };
+  for (const building of clean.buildings || []) normalizeHolder(building);
+  for (const prop of clean.props || []) normalizeHolder(prop);
+  normalizeHolder(clean.alley);
+  if (clean.scenePlate && typeof clean.scenePlate === 'object') {
+    normalizeHolder(clean.scenePlate);
+    if (clean.scenePlate.assetId) delete clean.scenePlate.src;
+  }
+  return clean;
+}
+
+function collectBlockAssetReferences(block) {
+  const refs = [];
+  const add = (holder, path) => {
+    if (!holder || typeof holder !== 'object' || Array.isArray(holder)) return;
+    const assetId = normalizeAssetId(holder.assetId);
+    const sha256 = normalizeSha256(holder.assetHash);
+    if (!assetId && !holder.assetId && !holder.assetHash) return;
+    refs.push({ assetId, sha256, path });
+  };
+  (block.buildings || []).forEach((item, index) => add(item, `buildings[${index}]`));
+  (block.props || []).forEach((item, index) => add(item, `props[${index}]`));
+  add(block.alley, 'alley');
+  add(block.scenePlate, 'scenePlate');
+  return refs;
+}
+
+async function validateApprovedBlockAssets(env, block) {
+  const sceneSrc = String(block?.scenePlate?.src || '');
+  if (!block?.scenePlate?.assetId && sceneSrc && !/^\/assets\/[a-z0-9/_\-.]+$/i.test(sceneSrc)) {
+    return 'Scene plate must use a built-in /assets/ path or an approved asset reference';
+  }
+
+  const refs = collectBlockAssetReferences(block);
+  for (const ref of refs) {
+    if (!ref.assetId) return `Invalid assetId at ${ref.path}`;
+    if (!ref.sha256) return `Approved asset ${ref.assetId} at ${ref.path} is missing its SHA-256 hash`;
+  }
+  if (!refs.length) return '';
+
+  await ensureBlockEditorTables(env);
+  const unique = [...new Map(refs.map(ref => [`${ref.assetId}:${ref.sha256}`, ref])).values()];
+  const statements = unique.map(ref => env.DB.prepare(`
+    SELECT asset_id, sha256, status
+    FROM approved_assets
+    WHERE asset_id = ? AND sha256 = ? AND status = 'approved'
+    LIMIT 1
+  `).bind(ref.assetId, ref.sha256));
+  const results = await env.DB.batch(statements);
+
+  for (let i = 0; i < unique.length; i++) {
+    const row = results[i]?.results?.[0];
+    if (!row) return `Asset ${unique[i].assetId} is not approved with hash ${unique[i].sha256}`;
+  }
+  return '';
+}
+
+async function registerApprovedAsset(request, env, requestId) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  if (!env.RIFT_ASSETS || typeof env.RIFT_ASSETS.put !== 'function') {
+    return json({ ok: false, error: 'RIFT_ASSETS storage is not configured' }, 503);
+  }
+
+  let form;
+  try { form = await request.formData(); }
+  catch { return json({ ok: false, error: 'Expected multipart/form-data' }, 400); }
+
+  const assetId = normalizeAssetId(form.get('assetId'));
+  const claimedSha256 = normalizeSha256(form.get('claimedSha256'));
+  const file = form.get('file');
+  if (!assetId) return json({ ok: false, error: 'Invalid assetId' }, 400);
+  if (!claimedSha256) return json({ ok: false, error: 'A valid claimedSha256 is required' }, 400);
+  if (!file || typeof file.arrayBuffer !== 'function') return json({ ok: false, error: 'Image file is required' }, 400);
+
+  const mimeType = String(file.type || '').toLowerCase();
+  if (!APPROVED_ASSET_MIME_TYPES.has(mimeType)) {
+    return json({ ok: false, error: 'Only PNG, JPEG and WebP assets are accepted' }, 415);
+  }
+  const bytes = await file.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > APPROVED_ASSET_MAX_BYTES) {
+    return json({ ok: false, error: 'Asset must be between 1 byte and 10 MB' }, 413);
+  }
+
+  const actualSha256 = await sha256Bytes(bytes);
+  if (!constantTimeEqual(actualSha256, claimedSha256)) {
+    return json({
+      ok: false,
+      error: 'Client SHA-256 does not match the uploaded bytes',
+      code: 'ASSET_HASH_MISMATCH'
+    }, 400);
+  }
+
+  await ensureBlockEditorTables(env);
+  const existing = await env.DB.prepare(`
+    SELECT asset_id, sha256, mime_type, byte_size, storage_key, metadata_json, status
+    FROM approved_assets WHERE asset_id = ?
+  `).bind(assetId).first();
+
+  if (existing && existing.sha256 !== actualSha256) {
+    return json({
+      ok: false,
+      error: 'This assetId is already bound to different approved bytes. Use a new versioned assetId.',
+      code: 'ASSET_ID_IMMUTABLE'
+    }, 409);
+  }
+
+  if (existing && existing.status === 'approved') {
+    let metadata = {};
+    try { metadata = JSON.parse(existing.metadata_json || '{}'); } catch {}
+    return json({
+      ok: true,
+      existing: true,
+      asset: {
+        assetId: existing.asset_id,
+        sha256: existing.sha256,
+        mimeType: existing.mime_type,
+        byteSize: Number(existing.byte_size || 0),
+        metadata
+      }
+    });
+  }
+
+  let submittedMetadata = {};
+  try { submittedMetadata = JSON.parse(String(form.get('metadata') || '{}')); } catch {}
+  const metadata = sanitizeAssetMetadata(submittedMetadata);
+  const storageKey = `approved/${actualSha256.slice(0, 2)}/${actualSha256}`;
+  const now = Date.now();
+
+  await env.RIFT_ASSETS.put(storageKey, bytes, {
+    httpMetadata: { contentType: mimeType, cacheControl: 'public, max-age=31536000, immutable' },
+    customMetadata: { assetId, sha256: actualSha256 }
+  });
+
+  await env.DB.prepare(`
+    INSERT INTO approved_assets (
+      asset_id, sha256, mime_type, byte_size, storage_key, metadata_json,
+      status, created_by, created_at, approved_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?)
+    ON CONFLICT(asset_id) DO UPDATE SET
+      status = 'approved',
+      approved_at = excluded.approved_at
+  `).bind(
+    assetId, actualSha256, mimeType, bytes.byteLength, storageKey,
+    JSON.stringify(metadata), gate.auth.user.id, now, now
+  ).run();
+
+  await writeAudit(env, gate.auth.user.id, 'asset.approved', gate.auth.user.id, {
+    assetId, sha256: actualSha256, byteSize: bytes.byteLength, mimeType
+  });
+
+  return json({
+    ok: true,
+    asset: { assetId, sha256: actualSha256, mimeType, byteSize: bytes.byteLength, metadata },
+    requestId
+  }, 201);
+}
+
+async function listApprovedAssets(request, env) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  await ensureBlockEditorTables(env);
+  const result = await env.DB.prepare(`
+    SELECT asset_id, sha256, mime_type, byte_size, metadata_json, status, created_at, approved_at
+    FROM approved_assets
+    ORDER BY approved_at DESC, created_at DESC
+    LIMIT 500
+  `).all();
+  return json({
+    ok: true,
+    assets: (result.results || []).map(row => {
+      let metadata = {};
+      try { metadata = JSON.parse(row.metadata_json || '{}'); } catch {}
+      return {
+        assetId: row.asset_id,
+        sha256: row.sha256,
+        mimeType: row.mime_type,
+        byteSize: Number(row.byte_size || 0),
+        status: row.status,
+        createdAt: row.created_at,
+        approvedAt: row.approved_at,
+        metadata
+      };
+    })
+  });
+}
+
+async function getApprovedAsset(request, env, url) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const assetId = assetIdFromPath(url.pathname);
+  const expectedHash = normalizeSha256(url.searchParams.get('sha256'));
+  if (!assetId || !expectedHash) return json({ ok: false, error: 'assetId and sha256 are required' }, 400);
+
+  await ensureBlockEditorTables(env);
+  const row = await env.DB.prepare(`
+    SELECT asset_id, sha256, mime_type, byte_size, storage_key, metadata_json
+    FROM approved_assets
+    WHERE asset_id = ? AND sha256 = ? AND status = 'approved'
+    LIMIT 1
+  `).bind(assetId, expectedHash).first();
+
+  if (!row) return json({ ok: false, error: 'Approved asset not found' }, 404);
+
+  if (url.searchParams.get('meta') === '1') {
+    let metadata = {};
+    try { metadata = JSON.parse(row.metadata_json || '{}'); } catch {}
+    return json({
+      ok: true,
+      asset: {
+        assetId: row.asset_id,
+        sha256: row.sha256,
+        mimeType: row.mime_type,
+        byteSize: Number(row.byte_size || 0),
+        metadata
+      }
+    });
+  }
+
+  if (!env.RIFT_ASSETS || typeof env.RIFT_ASSETS.get !== 'function') {
+    return json({ ok: false, error: 'RIFT_ASSETS storage is not configured' }, 503);
+  }
+  const object = await env.RIFT_ASSETS.get(row.storage_key);
+  if (!object) return json({ ok: false, error: 'Approved asset bytes are missing' }, 404);
+
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      'Content-Type': row.mime_type,
+      'Content-Length': String(row.byte_size),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'ETag': `"${row.sha256}"`,
+      'X-RiftCity-Asset-ID': row.asset_id,
+      'X-RiftCity-SHA256': row.sha256,
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
 }
 
 function blockIdFromPath(pathname, suffix='') {
@@ -1195,12 +1516,15 @@ async function saveBlockDraft(request, env, url, requestId) {
   if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
 
   const body = await readJson(request);
-  const error = validateBlockLayout(body?.block, blockId);
+  const canonicalBlock = canonicalizeBlockAssetReferences(body?.block);
+  const error = validateBlockLayout(canonicalBlock, blockId);
   if (error) return json({ ok: false, error }, 400);
+  const assetError = await validateApprovedBlockAssets(env, canonicalBlock);
+  if (assetError) return json({ ok: false, error: assetError, code: 'ASSET_NOT_APPROVED' }, 400);
 
   await ensureBlockEditorTables(env);
   const now = Date.now();
-  const layoutJson = JSON.stringify(body.block);
+  const layoutJson = JSON.stringify(canonicalBlock);
 
   await env.DB.prepare(`
     INSERT INTO block_layouts (
@@ -1246,28 +1570,33 @@ async function publishBlockDraft(request, env, url, requestId) {
   if (!row?.draft_json) return json({ ok: false, error: 'No saved draft to publish' }, 409);
   let parsed;
   try { parsed = JSON.parse(row.draft_json); } catch { return json({ ok: false, error: 'Draft JSON is corrupted' }, 500); }
+  parsed = canonicalizeBlockAssetReferences(parsed);
   const validationError = validateBlockLayout(parsed, blockId);
   if (validationError) return json({ ok: false, error: validationError }, 400);
+  const assetError = await validateApprovedBlockAssets(env, parsed);
+  if (assetError) return json({ ok: false, error: assetError, code: 'ASSET_NOT_APPROVED' }, 400);
+  const canonicalJson = JSON.stringify(parsed);
 
   const nextRevision = Number(row.published_revision || 0) + 1;
   const now = Date.now();
   const historyId = crypto.randomUUID();
 
-  // D1 batch is transactional: the published row and history snapshot succeed or roll back together.
+  // D1 batch is transactional: only canonical assetId+hash references reach published state/history.
   await env.DB.batch([
     env.DB.prepare(`
       UPDATE block_layouts
-      SET published_json = draft_json,
+      SET draft_json = ?,
+          published_json = ?,
           published_revision = ?,
           published_at = ?,
           updated_by = ?,
           updated_at = ?
       WHERE block_id = ?
-    `).bind(nextRevision, now, gate.auth.user.id, now, blockId),
+    `).bind(canonicalJson, canonicalJson, nextRevision, now, gate.auth.user.id, now, blockId),
     env.DB.prepare(`
       INSERT INTO block_layout_history (id, block_id, revision, layout_json, published_by, published_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(historyId, blockId, nextRevision, row.draft_json, gate.auth.user.id, now)
+    `).bind(historyId, blockId, nextRevision, canonicalJson, gate.auth.user.id, now)
   ]);
 
   await writeAudit(env, gate.auth.user.id, 'block.published', gate.auth.user.id, {
@@ -1345,11 +1674,14 @@ async function restoreBlockHistoryToDraft(request, env, url, requestId) {
   }
 
   let block;
-  try { block = JSON.parse(history.layout_json); }
+  try { block = canonicalizeBlockAssetReferences(JSON.parse(history.layout_json)); }
   catch { return json({ ok: false, error: 'Stored revision JSON is corrupted' }, 500); }
 
   const validationError = validateBlockLayout(block, blockId);
   if (validationError) return json({ ok: false, error: validationError }, 400);
+  const assetError = await validateApprovedBlockAssets(env, block);
+  if (assetError) return json({ ok: false, error: assetError, code: 'ASSET_NOT_APPROVED' }, 400);
+  const canonicalJson = JSON.stringify(block);
 
   const now = Date.now();
   await env.DB.prepare(`
@@ -1362,7 +1694,7 @@ async function restoreBlockHistoryToDraft(request, env, url, requestId) {
       draft_revision = block_layouts.draft_revision + 1,
       updated_by = excluded.updated_by,
       updated_at = excluded.updated_at
-  `).bind(blockId, history.layout_json, gate.auth.user.id, now).run();
+  `).bind(blockId, canonicalJson, gate.auth.user.id, now).run();
 
   const row = await env.DB.prepare(`
     SELECT draft_revision FROM block_layouts WHERE block_id = ?

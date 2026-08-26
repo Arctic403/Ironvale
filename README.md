@@ -681,3 +681,38 @@ Research-driven state cleanup:
 - If the alley art fails to load, the old street image is never shown as a false fallback; the sub-area remains active over a dark diagnostic-safe background.
 - Scavenging remains intentionally deferred until enter → move → exit behavior is verified on mobile.
 
+## Hybrid H1.18 — cryptographically verified custom assets
+
+RiftCity custom image assets now use a server-approved content-addressed pipeline instead of trusting browser-local image data.
+
+- The browser computes SHA-256 with Web Crypto before an Asset Lab image is registered.
+- `/api/admin/assets/register` is restricted to `developer` / `admin` accounts and independently hashes the actual uploaded bytes in the Worker. A client-supplied hash is never trusted by itself.
+- Approved asset metadata is stored in D1 (`approved_assets`); image bytes are stored in the `RIFT_ASSETS` R2 bucket.
+- Approved asset IDs are immutable: changing image bytes requires a new/versioned `assetId`.
+- Only PNG, JPEG and WebP uploads are accepted. SVG uploads are intentionally rejected rather than trying to sanitize active SVG content.
+- Block layout JSON stores only lightweight `assetId` + `assetHash` strings. Embedded `asset`, `dataUrl`, `imageData` and image byte fields are stripped from the authoritative layout.
+- Draft saves validate every referenced custom asset against the approved D1 registry.
+- Publish repeats the full approved-registry validation and writes the canonical layout to both the published row and history snapshot.
+- Static scene-plate paths must remain under `/assets/`; arbitrary external scene URLs are rejected by layout validation.
+- Runtime asset downloads use `/api/assets/:assetId?sha256=<hash>`. The browser verifies downloaded/cached bytes against SHA-256 before creating an object URL for rendering.
+- Cache Storage is keyed by SHA-256, so a local cached file with the wrong bytes is ignored instead of being trusted.
+- Asset Lab pack import still works in the private Block Editor, but each embedded image is registered/verified before it can be assigned to a building.
+
+### R2 setup
+
+H1.18 adds this Wrangler binding:
+
+```toml
+[[r2_buckets]]
+binding = "RIFT_ASSETS"
+bucket_name = "riftcity-assets"
+```
+
+Create the bucket once before deploying this build:
+
+```sh
+npx wrangler r2 bucket create riftcity-assets
+```
+
+The normal D1 schema migration also creates `approved_assets`. The Worker keeps the same `CREATE TABLE IF NOT EXISTS` guard for development deployments.
+

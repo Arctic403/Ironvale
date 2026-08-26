@@ -3,6 +3,14 @@ import { go } from '../ui/router.js';
 import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
 import { BLOCK_ASSETS } from '../block-assets.js';
 import { getSubarea } from '../subareas.js';
+import {
+  sha256File,
+  dataUrlToBlob,
+  cacheVerifiedBlob,
+  fetchApprovedAssetMetadata,
+  verifiedAssetObjectUrl,
+  normalizeSha256
+} from '../ui/asset-integrity.js';
 
 let cleanup=null;
 export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
@@ -369,27 +377,30 @@ export async function renderBlockWorld(root, options={}){
   }
   const destroyStudioPanels=setupStudioPanels();
 
-  // Asset Lab-compatible runtime library. Keep every imported asset object intact:
-  // internal id, stable assetId, embedded src, source dimensions and transform metadata.
-  // Buildings resolve by stable assetId; Asset Lab's internal id remains preserved.
-  const ASSET_CACHE_KEY='riftcity:block-assets:v3';
+  // Verified Asset Lab runtime library. Image bytes can be cached locally, but the
+  // published layout trusts only server-approved assetId + SHA-256 pairs.
+  const ASSET_CACHE_KEY='riftcity:block-assets:v4';
   const importedAssets=new Map();
   const sourceAssetIds=new Set();
+  const pendingAssetLoads=new Map();
+  const assetObjectUrls=new Set();
 
   function normalizeAsset(raw,preview={}){
     if(!raw||typeof raw!=='object')return null;
     const assetId=String(raw.assetId||raw.id||raw.slug||raw.name||'').trim();
     const internalId=String(raw.id||assetId).trim();
+    const sha256=normalizeSha256(raw.sha256||raw.assetHash);
     let src=String(raw.src||raw.dataUrl||raw.image||raw.imageData||raw.data||'').trim();
     const mime=String(raw.mimeType||raw.mime||'image/png').trim()||'image/png';
-    if(src&&!src.startsWith('data:image/')&&/^[A-Za-z0-9+/=\s]+$/.test(src)){
+    if(src&&!src.startsWith('data:image/')&&!src.startsWith('blob:')&&/^[A-Za-z0-9+/=\s]+$/.test(src)){
       src=`data:${mime};base64,${src.replace(/\s+/g,'')}`;
     }
-    if(!assetId||!src.startsWith('data:image/'))return null;
+    if(!assetId||(!src&&!sha256))return null;
     return {
       ...raw,
       id:internalId,
       assetId,
+      sha256,
       name:String(raw.name||raw.label||assetId),
       mime,
       src,
@@ -418,16 +429,74 @@ export async function renderBlockWorld(root, options={}){
     const cached=JSON.parse(localStorage.getItem(ASSET_CACHE_KEY)||'[]');
     for(const raw of Array.isArray(cached)?cached:[]){
       const asset=normalizeAsset(raw,raw.preview||{});
-      if(asset)importedAssets.set(asset.assetId,asset);
+      if(asset?.sha256)importedAssets.set(asset.assetId,asset);
     }
   }catch(_){}
+
   function persistImportedAssets(){
     try{
-      const cached=[...importedAssets.values()].filter(a=>!sourceAssetIds.has(a.assetId));
+      const cached=[...importedAssets.values()]
+        .filter(a=>!sourceAssetIds.has(a.assetId)&&a.sha256)
+        .map(a=>{
+          const {
+            src,dataUrl,image,imageData,data,preview,...metadata
+          }=a;
+          return {...metadata,preview:a.preview||{}};
+        });
       localStorage.setItem(ASSET_CACHE_KEY,JSON.stringify(cached));
     }catch(err){
-      console.warn('RiftCity asset library could not be saved',err);
-      assetStatus.textContent='Asset imported, but browser storage is full. Export/trim older assets before reloading.';
+      console.warn('RiftCity verified asset metadata could not be saved',err);
+      if(assetStatus)assetStatus.textContent='Asset verified, but local metadata storage is full.';
+    }
+  }
+
+  function assetRefMatches(asset,assetId,hash){
+    return !!asset&&asset.assetId===assetId&&normalizeSha256(asset.sha256)===normalizeSha256(hash);
+  }
+
+  async function ensureVerifiedAssetForRef(assetId,hash){
+    const normalizedHash=normalizeSha256(hash);
+    if(!assetId||!normalizedHash)return null;
+    const existing=importedAssets.get(assetId);
+    if(assetRefMatches(existing,assetId,normalizedHash)&&existing.src)return existing;
+    const key=`${assetId}:${normalizedHash}`;
+    if(pendingAssetLoads.has(key))return pendingAssetLoads.get(key);
+
+    const pending=(async()=>{
+      const [assetMeta,url]=await Promise.all([
+        fetchApprovedAssetMetadata(assetId,normalizedHash),
+        verifiedAssetObjectUrl(assetId,normalizedHash)
+      ]);
+      assetObjectUrls.add(url);
+      const metadata=assetMeta.metadata||{};
+      const asset=normalizeAsset({
+        ...metadata,
+        id:assetId,
+        assetId,
+        sha256:normalizedHash,
+        mimeType:assetMeta.mimeType,
+        src:url
+      },metadata.preview||{});
+      if(!asset)throw new Error(`Approved asset ${assetId} could not be normalized`);
+      importedAssets.set(assetId,asset);
+      persistImportedAssets();
+      populateAssetSelect();
+      return asset;
+    })();
+    pendingAssetLoads.set(key,pending);
+    try{return await pending;}
+    finally{pendingAssetLoads.delete(key);}
+  }
+
+  function warmLayoutAssets(layout){
+    for(const holder of [...(layout?.buildings||[]),...(layout?.props||[])]) {
+      const assetId=String(holder?.assetId||'').trim();
+      const hash=normalizeSha256(holder?.assetHash);
+      if(assetId&&hash){
+        ensureVerifiedAssetForRef(assetId,hash)
+          .then(()=>renderEditorObjects())
+          .catch(err=>console.warn(`Verified asset ${assetId} could not be loaded`,err));
+      }
     }
   }
 
@@ -649,16 +718,54 @@ export async function renderBlockWorld(root, options={}){
   }
   function populateAssetSelect(){
     const current=assetSelect.value;
-    assetSelect.innerHTML='<option value="">No asset</option>'+[...importedAssets.values()].map(a=>`<option value="${escapeAttr(a.assetId)}">${escapeText(a.name||a.assetId)}</option>`).join('');
-    if(importedAssets.has(current))assetSelect.value=current;
+    const verified=[...importedAssets.values()].filter(a=>normalizeSha256(a.sha256));
+    assetSelect.innerHTML='<option value="">No asset</option>'+verified.map(a=>`<option value="${escapeAttr(a.assetId)}">${escapeText(a.name||a.assetId)}</option>`).join('');
+    if(verified.some(a=>a.assetId===current))assetSelect.value=current;
   }
   function escapeText(v){return String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
   function escapeAttr(v){return escapeText(v).replace(/'/g,'&#39;');}
   function syncAssetInspector(){
     const item=currentEditable(); const b=item?.type==='building'?item.o:null;
     assetSelect.disabled=!b;assetApply.disabled=!b;assetClear.disabled=!b;
-    assetSelect.value=b?.assetId&&importedAssets.has(b.assetId)?b.assetId:'';
+    const asset=b?.assetId?importedAssets.get(b.assetId):null;
+    assetSelect.value=b&&assetRefMatches(asset,b.assetId,b.assetHash)?b.assetId:'';
   }
+
+  async function registerImportedAsset(imported){
+    const blob=await dataUrlToBlob(imported.src);
+    if(!['image/png','image/jpeg','image/webp'].includes(blob.type)){
+      throw new Error(`${imported.assetId}: convert this asset to PNG, JPEG or WebP before registration`);
+    }
+    const file=new File([blob],`${imported.assetId.replace(/[^a-z0-9._-]+/gi,'_')}`,{type:blob.type});
+    const claimedSha256=await sha256File(file);
+    const form=new FormData();
+    form.set('assetId',imported.assetId);
+    form.set('claimedSha256',claimedSha256);
+    form.set('file',file);
+    form.set('metadata',JSON.stringify({
+      name:imported.name,
+      sourceWidth:imported.sourceWidth,
+      sourceHeight:imported.sourceHeight,
+      x:imported.x,
+      y:imported.y,
+      scale:imported.scale,
+      rotation:imported.rotation,
+      opacity:imported.opacity,
+      groundY:imported.groundY,
+      shadow:imported.shadow
+    }));
+    const response=await fetch('/api/admin/assets/register',{
+      method:'POST',
+      credentials:'same-origin',
+      body:form
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok||!payload.ok||!payload.asset)throw new Error(payload.error||`${imported.assetId}: server verification failed`);
+    if(normalizeSha256(payload.asset.sha256)!==claimedSha256)throw new Error(`${imported.assetId}: server returned a different asset hash`);
+    await cacheVerifiedBlob(blob,claimedSha256);
+    return {...imported,sha256:claimedSha256,mime:payload.asset.mimeType||blob.type};
+  }
+
   async function importAssetPack(file){
     if(!file)return;
     try{
@@ -675,39 +782,49 @@ export async function renderBlockWorld(root, options={}){
       };
       let added=0,matched=0;
       for(const raw of payload.assets.slice(0,100)){
-        const imported=normalizeAsset(raw,preview);
-        if(!imported)continue;
+        const local=normalizeAsset(raw,preview);
+        if(!local||!local.src)continue;
+        assetStatus.textContent=`VERIFYING · ${local.assetId}…`;
+        const imported=await registerImportedAsset(local);
         importedAssets.set(imported.assetId,imported);
 
-        // Stable Asset Lab ids such as building.corner-mart.a target the matching
-        // authored building. The full Asset Lab transform remains on the asset
-        // object; runtime placement overrides are stored separately on the building.
         const hinted=imported.assetId.match(/^building\.([a-z0-9-]+)(?:\.|$)/i)?.[1];
         const target=working.buildings.find(b=>b.id===hinted)
           ||working.buildings.find(b=>String(b.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===hinted);
         if(target){
           target.assetId=imported.assetId;
+          target.assetHash=imported.sha256;
+          delete target.asset;
           selectedKey=`building:${working.buildings.indexOf(target)}`;
           matched++;
         }
         added++;
       }
-      if(!added)throw new Error('No valid embedded image assets were found in this pack.');
+      if(!added)throw new Error('No valid embedded PNG/JPEG/WebP assets were found in this pack.');
       persistImportedAssets();
       populateAssetSelect();
-      assetStatus.textContent=`${added} Asset Lab asset${added===1?'':'s'} imported & saved${matched?` · ${matched} auto-matched`:''}`;
+      assetStatus.textContent=`${added} verified asset${added===1?'':'s'} registered${matched?` · ${matched} auto-matched`:''}`;
       syncAssetInspector();renderEditorObjects();syncInspector();
+      markDraftDirty();
     }catch(err){assetStatus.textContent=`Import failed: ${err.message}`;}
     finally{assetFile.value='';}
   }
   function applyBuildingAsset(){
     const item=currentEditable();if(item?.type!=='building'||isLocked(item))return;
-    const id=assetSelect.value;if(!id||!importedAssets.has(id)){assetStatus.textContent='Choose an imported asset first.';return;}
-    const before=snapshot();item.o.assetId=id;commit(before);renderEditorObjects();syncAssetInspector();
+    const id=assetSelect.value;
+    const asset=importedAssets.get(id);
+    if(!id||!asset||!normalizeSha256(asset.sha256)){assetStatus.textContent='Choose a server-verified asset first.';return;}
+    const before=snapshot();
+    item.o.assetId=id;
+    item.o.assetHash=asset.sha256;
+    delete item.o.asset;
+    commit(before);renderEditorObjects();syncAssetInspector();
   }
   function clearBuildingAsset(){
     const item=currentEditable();if(item?.type!=='building'||isLocked(item))return;
-    const before=snapshot();delete item.o.assetId;delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();
+    const before=snapshot();
+    delete item.o.assetId;delete item.o.assetHash;delete item.o.assetSha256;delete item.o.asset;
+    commit(before);renderEditorObjects();syncAssetInspector();
   }
   function objectDisplayLabel(item){
     if(!item)return '';
@@ -810,9 +927,11 @@ export async function renderBlockWorld(root, options={}){
       if(!marker){marker=document.createElement('span');marker.className='bw-door-marker';el.appendChild(marker);}
       marker.style.left=`${(b.doorX??b.x+b.w/2)-b.x}px`;marker.title='Interaction door';
       let art=el.querySelector('.bw-building-art');
-      const assetKey=b.assetId||b.asset?.assetId||b.asset?.id;
+      const assetKey=String(b.assetId||'').trim();
+      const assetHash=normalizeSha256(b.assetHash);
       const imported=assetKey?importedAssets.get(assetKey):null;
-      if(imported){
+      const verified=assetRefMatches(imported,assetKey,assetHash)&&!!imported.src;
+      if(verified){
         if(!art){art=document.createElement('img');art.className='bw-building-art';art.draggable=false;el.prepend(art);}
         art.src=imported.src;art.alt=b.name;
         art.style.width=`${imported.sourceWidth||b.w}px`;
@@ -823,9 +942,17 @@ export async function renderBlockWorld(root, options={}){
         art.style.transformOrigin='50% 100%';
         art.style.transform=`translate(-50%,-100%) scale(${Number(imported.scale??1)}) rotate(${Number(imported.rotation)||0}deg)`;
         art.dataset.assetId=imported.assetId;
+        art.dataset.assetSha256=imported.sha256;
         art.dataset.assetInternalId=imported.id;
         el.classList.add('has-building-art');
-      }else{art?.remove();el.classList.remove('has-building-art');}
+      }else{
+        art?.remove();el.classList.remove('has-building-art');
+        if(assetKey&&assetHash&&!pendingAssetLoads.has(`${assetKey}:${assetHash}`)){
+          ensureVerifiedAssetForRef(assetKey,assetHash)
+            .then(()=>renderEditorObjects())
+            .catch(err=>console.warn(`Verified asset ${assetKey} could not be loaded`,err));
+        }
+      }
     });
     props.querySelectorAll('.bw-prop-authored').forEach(x=>x.remove());
     working.props.forEach((p,i)=>{
@@ -1718,5 +1845,7 @@ export async function renderBlockWorld(root, options={}){
     scene.removeEventListener('pointermove',onEditorPointerMove,true);
     scene.removeEventListener('pointerup',onEditorPointerUp,true);
     scene.removeEventListener('pointercancel',onEditorPointerUp,true);
+    for(const url of assetObjectUrls)try{URL.revokeObjectURL(url);}catch(_){}
+    assetObjectUrls.clear();
   };
 }
