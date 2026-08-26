@@ -494,3 +494,14 @@ while real-time city/gameplay code stays direct JavaScript.
 - Building geometry, spawn, exits and walkable boundaries remain draggable while the inspector is hidden.
 - The fix preserves the hybrid boundary: React owns the inspector UI; plain JavaScript owns world-space
   selection, dragging, camera, collision and fullscreen.
+
+
+## Hybrid H1.2 — compact mobile editor + resize gizmos
+
+- Block Editor inspector controls are compressed for iPhone portrait and landscape/fullscreen.
+- Undo/redo/save remain one-tap controls while secondary tools stay in collapsible sections.
+- Selected rectangular editor targets now expose eight touch-friendly resize gizmos.
+- Edge gizmos resize only that edge; corner gizmos resize two axes; dragging the body still moves the object.
+- Gizmos share one pointer path across iPhone touch, Apple mouse/trackpad and desktop pointers.
+- Building interaction doors remain aligned while building geometry is moved or resized.
+- Plain JavaScript continues to own world-space manipulation; React continues to own the inspector UI.

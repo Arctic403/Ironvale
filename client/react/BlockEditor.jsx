@@ -14,11 +14,11 @@ export function BlockEditor() {
         </div>
       </header>
 
-      <div className="bw-editor-quickbar">
-        <button type="button" id="bw-editor-undo">↶ UNDO</button>
-        <button type="button" id="bw-editor-redo">↷ REDO</button>
-        <label>
-          SNAP
+      <div className="bw-editor-quickbar bw-editor-compactbar">
+        <button type="button" id="bw-editor-undo" title="Undo" aria-label="Undo">↶</button>
+        <button type="button" id="bw-editor-redo" title="Redo" aria-label="Redo">↷</button>
+        <label className="bw-editor-snap-compact">
+          <span>SNAP</span>
           <select id="bw-editor-snap" defaultValue="10">
             <option value="1">OFF</option>
             <option value="5">5</option>
@@ -26,7 +26,7 @@ export function BlockEditor() {
             <option value="25">25</option>
           </select>
         </label>
-        <button type="button" id="bw-editor-export">SAVE JSON</button>
+        <button type="button" id="bw-editor-export">SAVE</button>
       </div>
 
       <div className="bw-editor-body">
@@ -35,9 +35,9 @@ export function BlockEditor() {
           <select id="bw-editor-object" />
         </label>
 
-        <details open className="bw-editor-section">
-          <summary>POSITION &amp; SIZE</summary>
-          <div className="bw-editor-grid">
+        <details open className="bw-editor-section bw-editor-transform-section">
+          <summary>TRANSFORM</summary>
+          <div className="bw-editor-grid bw-editor-transform-grid">
             <label>X<input id="bw-editor-x" inputMode="numeric" type="number" step="5" /></label>
             <label>Y<input id="bw-editor-y" inputMode="numeric" type="number" step="5" /></label>
             <label>W<input id="bw-editor-w" inputMode="numeric" type="number" step="5" /></label>
@@ -94,7 +94,8 @@ export function BlockEditor() {
 
         <button type="button" className="bw-editor-danger" id="bw-editor-reset">RESET BLOCK</button>
         <small className="bw-editor-help">
-          Touch: tap + drag geometry. Mouse works the same. Keyboard: arrows nudge selection,
+          Drag the selected box to move it. Drag an edge handle to resize that edge; drag a corner
+          to resize two edges. Mouse/trackpad uses the same gizmos. Keyboard: arrows nudge,
           Shift = faster, Delete removes, Ctrl/Cmd+Z undo, Ctrl/Cmd+Y redo, E toggles editor.
         </small>
       </div>

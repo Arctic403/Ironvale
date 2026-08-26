@@ -311,6 +311,26 @@ export async function renderBlockWorld(root){
       if(working.walkable)addGuide('walkable:0',working.walkable,'walkable','WALKABLE');
       if(working.scenePlate)addGuide('scene:0',working.scenePlate,'scene','SCENE');
     }
+    // H1.2: touch/mouse resize gizmos for the selected rectangular editable.
+    scene.querySelectorAll('.bw-resize-gizmos').forEach(x=>x.remove());
+    const gizmoItem=currentEditable();
+    if(editMode&&gizmoItem&&!['prop','spawn'].includes(gizmoItem.type)){
+      const target=scene.querySelector(`[data-edit-key="${selectedKey}"]`);
+      if(target){
+        const gizmos=document.createElement('div');
+        gizmos.className='bw-resize-gizmos';
+        gizmos.dataset.editKey=selectedKey;
+        const handles=['n','e','s','w','nw','ne','se','sw'];
+        handles.forEach(edge=>{
+          const h=document.createElement('button');
+          h.type='button';h.className=`bw-resize-handle bw-resize-${edge}`;
+          h.dataset.editKey=selectedKey;h.dataset.resize=edge;
+          h.setAttribute('aria-label',`Resize ${edge}`);
+          gizmos.appendChild(h);
+        });
+        target.appendChild(gizmos);
+      }
+    }
     const plate=root.querySelector('#bw-scene-plate');
     if(plate&&working.scenePlate){
       plate.style.left=`${working.scenePlate.x||0}px`;plate.style.top=`${working.scenePlate.y||0}px`;
@@ -528,13 +548,12 @@ export async function renderBlockWorld(root){
     e.preventDefault();e.stopPropagation();
     select(target.dataset.editKey);
     const item=currentEditable();if(!item)return;
+    const resize=e.target.closest('[data-resize]')?.dataset.resize||'';
     drag={
-      id:e.pointerId,
-      key:selectedKey,
-      startX:e.clientX,
-      startY:e.clientY,
-      ox:Number(item.o.x)||0,
-      oy:Number(item.o.y)||0,
+      id:e.pointerId,key:selectedKey,mode:resize?'resize':'move',resize,
+      startX:e.clientX,startY:e.clientY,
+      ox:Number(item.o.x)||0,oy:Number(item.o.y)||0,
+      ow:Number(item.o.w??item.o.width??0),oh:Number(item.o.h??item.o.height??0),
       doorX:item.type==='building'?(Number(item.o.doorX)||0):null,
       before:snapshot()
     };
@@ -545,19 +564,35 @@ export async function renderBlockWorld(root){
     e.preventDefault();e.stopPropagation();
     const item=allEditable().find(x=>x.key===drag.key);if(!item)return;
     const scale=scene.getBoundingClientRect().width/(working.width||BLOCK1.width)||1;
-    item.o.x=snap(drag.ox+(e.clientX-drag.startX)/scale);
-    item.o.y=snap(drag.oy+(e.clientY-drag.startY)/scale);
-    if(item.type==='building'){
-      item.o.doorX=(drag.doorX??item.o.doorX)+(item.o.x-drag.ox);
-      item.o.doorY=item.o.y+item.o.h;
+    const dx=(e.clientX-drag.startX)/scale,dy=(e.clientY-drag.startY)/scale;
+    if(drag.mode==='resize'){
+      const edge=drag.resize,min=30;
+      let x=drag.ox,y=drag.oy,w=drag.ow,h=drag.oh;
+      if(edge.includes('w')){x=snap(drag.ox+dx);w=snap(drag.ow-(x-drag.ox));if(w<min){x=drag.ox+drag.ow-min;w=min;}}
+      if(edge.includes('e'))w=Math.max(min,snap(drag.ow+dx));
+      if(edge.includes('n')){y=snap(drag.oy+dy);h=snap(drag.oh-(y-drag.oy));if(h<min){y=drag.oy+drag.oh-min;h=min;}}
+      if(edge.includes('s'))h=Math.max(min,snap(drag.oh+dy));
+      item.o.x=x;item.o.y=y;
+      if('w' in item.o)item.o.w=w;else item.o.width=w;
+      if('h' in item.o)item.o.h=h;else item.o.height=h;
+      if(item.type==='building'){
+        // Keep the door in the same relative horizontal position while its building is resized.
+        const ratio=drag.ow?((drag.doorX-drag.ox)/drag.ow):0.5;
+        item.o.doorX=item.o.x+Math.max(0,Math.min(1,ratio))*w;
+        item.o.doorY=item.o.y+h;
+      }
+    }else{
+      item.o.x=snap(drag.ox+dx);item.o.y=snap(drag.oy+dy);
+      if(item.type==='building'){
+        item.o.doorX=(drag.doorX??item.o.doorX)+(item.o.x-drag.ox);
+        item.o.doorY=item.o.y+item.o.h;
+      }
     }
-    selectedKey=drag.key;
-    renderEditorObjects();syncInspector();
+    selectedKey=drag.key;renderEditorObjects();syncInspector();
   }
   function onEditorPointerUp(e){
     if(!drag||e.pointerId!==drag.id)return;
-    e.preventDefault();e.stopPropagation();
-    commit(drag.before);
+    e.preventDefault();e.stopPropagation();commit(drag.before);
     try{scene.releasePointerCapture?.(e.pointerId);}catch(_){}
     drag=null;
   }

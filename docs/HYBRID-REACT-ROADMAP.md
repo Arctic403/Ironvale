@@ -169,3 +169,8 @@ explains the stuck top button, missing guides and non-working dragging.
 
 H1.1 fixes that root cause and also hardens pointer capture for iPhone Safari. Do not migrate more
 screens to React until the H1 exit criteria pass on mobile.
+
+
+## H1.2 mobile editor note
+
+The editor UI is now deliberately compact rather than becoming a full-screen form on phones. Direct manipulation is the primary workflow: select geometry, drag its body to move it, or use eight large edge/corner gizmos to resize it. React still owns only the inspector shell; pointer hit-testing, snapping, resize math, geometry updates and undo snapshots remain in the plain-JavaScript Block World runtime.
