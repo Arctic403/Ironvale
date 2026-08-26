@@ -11,4 +11,4 @@ database_id = "118e392b-e9d4-4d81-9a4f-ee2a2b3865cc"
 
 [[r2_buckets]]
 binding = "RIFT_ASSETS"
-bucket_name = "riftcity-assets"
+bucket_name = "riftcityassets"

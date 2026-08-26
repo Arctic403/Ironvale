@@ -705,13 +705,13 @@ H1.18 adds this Wrangler binding:
 ```toml
 [[r2_buckets]]
 binding = "RIFT_ASSETS"
-bucket_name = "riftcity-assets"
+bucket_name = "riftcityassets"
 ```
 
 Create the bucket once before deploying this build:
 
 ```sh
-npx wrangler r2 bucket create riftcity-assets
+npx wrangler r2 bucket create riftcityassets
 ```
 
 The normal D1 schema migration also creates `approved_assets`. The Worker keeps the same `CREATE TABLE IF NOT EXISTS` guard for development deployments.
