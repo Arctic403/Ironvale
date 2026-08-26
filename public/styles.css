@@ -1584,3 +1584,306 @@ body.bw-fullscreen-mode .bw-editor-more{display:none!important}
   .bw-editor-more[open]{max-height:27vh}
   .bw-editor-create-grid{grid-template-columns:repeat(5,minmax(125px,1fr));overflow-x:auto}
 }
+
+
+/* =====================================================================
+   Hybrid H1.10 — private mobile landscape Block Editor studio
+   ===================================================================== */
+html.dev-block-editor-document,
+body.dev-block-editor-page{
+  width:100%;
+  height:100%;
+  margin:0;
+  overflow:hidden;
+  overscroll-behavior:none;
+  background:#04090c;
+}
+body.dev-block-editor-page{
+  position:fixed;
+  inset:0;
+  min-height:100dvh;
+  max-height:100dvh;
+  padding:0!important;
+}
+#dev-block-editor-root{
+  position:fixed;
+  inset:0;
+  width:100dvw;
+  height:100dvh;
+  overflow:hidden;
+  background:#04090c;
+}
+.dev-editor-loading,.dev-editor-denied{
+  width:100%;height:100%;display:grid;place-content:center;gap:10px;text-align:center;
+  color:#e8f4f6;background:radial-gradient(circle at 50% 30%,#0d222a,#04090c 70%);
+  font-family:system-ui,sans-serif;
+}
+.dev-editor-loading strong{font-size:clamp(22px,4vw,42px);letter-spacing:.08em}
+.dev-editor-loading span,.dev-editor-denied small{color:#8da2a8}
+.dev-editor-denied a{color:#68edb1}
+
+.dev-block-editor-page .blockworld-shell.bw-editor-page{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100dvh!important;
+  min-height:0!important;
+  max-height:none!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  overflow:hidden!important;
+  background:#050b0e;
+}
+.dev-block-editor-page .bw-editor-page .blockworld-viewport{
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  border-radius:0!important;
+}
+.dev-block-editor-page .bw-editor-page .bw-block-label{display:none!important}
+.dev-block-editor-page .bw-editor-page .bw-controls{z-index:120}
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons{
+  position:absolute!important;
+  top:max(10px,env(safe-area-inset-top))!important;
+  right:max(12px,env(safe-area-inset-right))!important;
+  z-index:950!important;
+  display:flex!important;
+  gap:7px!important;
+  align-items:center!important;
+}
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons>*{
+  min-height:42px!important;
+  padding:8px 13px!important;
+  border-radius:9px!important;
+  font-size:10px!important;
+  letter-spacing:.08em!important;
+  white-space:nowrap!important;
+}
+.bw-editor-exit{
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid rgba(255,91,91,.7);color:#ff7676;background:rgba(32,8,10,.91);
+  text-decoration:none;font-weight:900;
+}
+
+/* The React editor becomes transparent chrome around the real scene. */
+.dev-block-editor-page .bw-editor-page .bw-react-editor-host{
+  position:absolute!important;inset:0!important;z-index:800!important;pointer-events:none!important;
+}
+.dev-block-editor-page .bw-editor-studio{
+  --be-left:220px;
+  --be-right:220px;
+  --be-bottom:112px;
+  --be-topbar:62px;
+  --be-transform:74px;
+  position:absolute!important;
+  inset:0!important;
+  display:block!important;
+  width:auto!important;
+  height:auto!important;
+  max-width:none!important;
+  max-height:none!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+  transform:none!important;
+}
+.dev-block-editor-page .bw-editor-studio.show{display:block!important}
+.dev-block-editor-page .bw-editor-studio[aria-hidden="true"]{display:none!important}
+.dev-block-editor-page .bw-editor-studio>*{pointer-events:auto}
+
+.bw-studio-topbar{
+  position:absolute;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));
+  top:max(7px,env(safe-area-inset-top));height:var(--be-topbar);
+  display:flex;align-items:center;gap:14px;padding:8px 12px 8px 14px;box-sizing:border-box;
+  border:1px solid rgba(86,170,186,.52);border-radius:12px;
+  background:linear-gradient(180deg,rgba(6,17,23,.97),rgba(6,15,20,.94));
+  box-shadow:0 10px 30px rgba(0,0,0,.28);color:#eaf4f5;z-index:900;
+}
+.bw-studio-topbar .bw-editor-title{min-width:230px;display:flex;flex-direction:column;gap:2px}
+.bw-studio-topbar .bw-editor-title strong{font-size:20px;line-height:1;letter-spacing:.04em}
+.bw-studio-topbar .bw-editor-title small{font-size:9px;color:#65e5a6;letter-spacing:.06em}
+.bw-studio-status{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:150px}
+.bw-studio-status #bw-editor-selection{font-size:9px;color:#aab8bc}
+.bw-editor-studio .bw-editor-server-status{font-size:9px!important;max-width:none!important}
+.bw-studio-topbar .bw-editor-head-actions{display:flex;gap:7px;align-items:center}
+.bw-studio-topbar .bw-editor-head-actions button{
+  min-height:40px;border-radius:8px;padding:8px 13px;font-weight:900;font-size:10px;
+}
+.bw-studio-publish{border-color:#895eea!important;background:rgba(51,26,93,.92)!important;color:#eadfff!important}
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons{top:max(15px,calc(env(safe-area-inset-top) + 7px))!important}
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons .bw-edit-toggle,
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons .bw-editor-panel-toggle,
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons .bw-fullscreen,
+.dev-block-editor-page .bw-editor-page .bw-dev-buttons .bw-editor-exit{
+  /* Leave room for the studio title/status area; these float over the topbar like the mockup. */
+  position:relative;
+}
+
+/* Transform/property strip */
+.bw-studio-transform{
+  position:absolute;
+  top:calc(max(7px,env(safe-area-inset-top)) + var(--be-topbar) + 7px);
+  left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));
+  height:var(--be-transform);
+  display:flex;align-items:end;gap:8px;padding:8px 10px;box-sizing:border-box;
+  border:1px solid rgba(86,170,186,.45);border-radius:11px;
+  background:rgba(6,17,22,.95);z-index:890;overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;scrollbar-width:thin;
+}
+.bw-studio-transform[data-collapsed="true"]{
+  height:38px!important;overflow:hidden;align-items:center;padding:4px 9px;
+}
+.bw-studio-transform[data-collapsed="true"]>*:not(.bw-transform-collapse){display:none!important}
+.bw-transform-collapse{flex:0 0 32px;min-width:32px;height:32px;order:99}
+.bw-editor-studio .bw-editor-object-row{min-width:235px!important;flex:0 0 235px!important}
+.bw-editor-studio .bw-editor-transform-grid{min-width:390px!important;flex:0 0 390px!important}
+.bw-editor-studio .bw-editor-transform-grid label{min-width:88px!important}
+.bw-editor-studio .bw-editor-quickbar{min-width:90px!important;flex:0 0 90px!important;display:flex!important}
+.bw-editor-studio .bw-editor-snap-compact{min-width:92px!important;flex:0 0 92px!important}
+
+/* Side and bottom dock panels */
+.bw-studio-panel{
+  position:absolute;z-index:860;color:#eaf4f5;
+  border:1px solid rgba(80,169,188,.52);border-radius:12px;
+  background:linear-gradient(180deg,rgba(5,17,23,.97),rgba(4,13,18,.96));
+  box-shadow:0 16px 40px rgba(0,0,0,.38);overflow:visible;
+}
+.bw-studio-left{
+  left:max(8px,env(safe-area-inset-left));
+  top:calc(max(7px,env(safe-area-inset-top)) + var(--be-topbar) + var(--be-transform) + 14px);
+  bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--be-bottom) + 8px);
+  width:var(--be-left);
+}
+.bw-studio-right{
+  right:max(8px,env(safe-area-inset-right));
+  top:calc(max(7px,env(safe-area-inset-top)) + var(--be-topbar) + var(--be-transform) + 14px);
+  bottom:calc(max(8px,env(safe-area-inset-bottom)) + var(--be-bottom) + 8px);
+  width:var(--be-right);
+}
+.bw-studio-bottom{
+  left:calc(max(8px,env(safe-area-inset-left)) + var(--be-left) + 8px);
+  right:calc(max(8px,env(safe-area-inset-right)) + var(--be-right) + 8px);
+  bottom:max(8px,env(safe-area-inset-bottom));
+  height:var(--be-bottom);
+}
+.bw-studio-panel-head{
+  height:38px;display:flex;align-items:center;justify-content:space-between;padding:6px 10px;
+  box-sizing:border-box;border-bottom:1px solid rgba(70,145,160,.28);color:#68eda5;
+}
+.bw-studio-panel-head strong{font-size:10px;letter-spacing:.11em}
+.bw-studio-panel-head button{width:31px;height:30px;min-height:30px;padding:0}
+.bw-studio-panel-body{height:calc(100% - 38px);overflow:auto;padding:8px;box-sizing:border-box;-webkit-overflow-scrolling:touch}
+.bw-studio-panel[data-collapsed="true"] .bw-studio-panel-body{display:none!important}
+.bw-studio-left[data-collapsed="true"]{width:42px!important}
+.bw-studio-right[data-collapsed="true"]{width:42px!important}
+.bw-studio-bottom[data-collapsed="true"]{height:38px!important}
+.bw-studio-panel[data-collapsed="true"] .bw-studio-panel-head{padding:4px;justify-content:center}
+.bw-studio-panel[data-collapsed="true"] .bw-studio-panel-head strong{display:none}
+
+/* Touch-friendly panel resizing. The visible divider is thin; the touch target is wide. */
+.bw-panel-resizer{position:absolute;z-index:10;touch-action:none}
+.bw-panel-resizer-x{top:42px;bottom:4px;width:22px;cursor:ew-resize}
+.bw-studio-left .bw-panel-resizer-x{right:-12px}
+.bw-studio-right .bw-panel-resizer-x{left:-12px}
+.bw-panel-resizer-x::after{
+  content:"";position:absolute;top:10%;bottom:10%;left:10px;width:2px;border-radius:2px;background:rgba(97,224,236,.42)
+}
+.bw-panel-resizer-y{left:44px;right:44px;top:-13px;height:24px;cursor:ns-resize}
+.bw-panel-resizer-y::after{
+  content:"";position:absolute;left:15%;right:15%;top:11px;height:2px;border-radius:2px;background:rgba(97,224,236,.42)
+}
+.bw-studio-panel[data-collapsed="true"] .bw-panel-resizer{display:none}
+
+/* Add-object palette */
+.bw-editor-studio .bw-editor-create-grid{
+  display:grid!important;grid-template-columns:1fr!important;gap:6px!important;
+}
+.bw-editor-studio .bw-editor-create-grid button{
+  min-height:44px!important;display:flex;align-items:center;gap:10px;justify-content:flex-start;
+  padding:8px 10px!important;text-align:left;border-color:rgba(78,126,139,.6);
+  background:rgba(10,27,34,.86);font-size:10px!important;
+}
+.bw-editor-studio .bw-editor-create-grid button:first-child{border-color:#00d8e8;color:#c8ffff}
+.bw-editor-studio .bw-editor-add-prop{display:grid;gap:6px;margin-top:10px}
+.bw-editor-studio .bw-editor-add-prop label{font-size:8px;letter-spacing:.1em;color:#9db2b7}
+.bw-editor-studio .bw-editor-add-prop select,
+.bw-editor-studio .bw-editor-add-prop button{min-height:40px!important;width:100%}
+
+/* Properties/tools */
+.bw-studio-property-copy{display:grid;gap:4px;padding:7px;border:1px solid rgba(73,123,136,.45);border-radius:8px;margin-bottom:8px}
+.bw-studio-property-copy strong{font-size:9px;color:#66e7a4}
+.bw-studio-property-copy small{font-size:8px;color:#9eb0b5;line-height:1.35}
+.bw-editor-studio .bw-asset-panel{display:grid;gap:6px}
+.bw-editor-studio .bw-asset-panel>*{min-height:38px}
+.bw-studio-danger-actions{margin-top:10px!important;display:grid!important;grid-template-columns:1fr!important}
+.bw-studio-bottom-body{display:grid!important;grid-template-columns:1.1fr 1.5fr .8fr;gap:10px!important;overflow:auto!important}
+.bw-studio-toolgroup{min-width:0;display:flex;flex-direction:column;gap:5px;padding-right:8px;border-right:1px solid rgba(71,125,137,.28)}
+.bw-studio-toolgroup:last-child{border-right:0}
+.bw-studio-toolgroup>small{font-size:8px;color:#67eaa6;letter-spacing:.1em}
+.bw-studio-bottom .bw-editor-actions{display:flex!important;flex-wrap:nowrap!important;gap:5px!important}
+.bw-studio-bottom .bw-editor-actions button{min-height:36px!important;font-size:8px!important;padding:6px 8px!important}
+.bw-studio-help{font-size:9px;color:#c1d0d3;white-space:normal;line-height:1.35}
+.bw-studio-status-summary span{font-size:8px;color:#9fb2b7}
+
+/* Keep the actual world clear between dock panels. */
+.dev-block-editor-page .bw-editor-page.bw-edit-mode .bw-controls{display:none!important}
+.dev-block-editor-page .bw-editor-page .bw-editor-guide .bw-resize-handle{
+  width:72px!important;height:72px!important;min-width:72px!important;min-height:72px!important;
+}
+.dev-block-editor-page .bw-editor-page .bw-editor-guide .bw-resize-handle::after{
+  width:26px!important;height:26px!important;border-width:4px!important;
+}
+@media (pointer:coarse){
+  .dev-block-editor-page .bw-editor-page .bw-editor-guide .bw-resize-handle{
+    width:84px!important;height:84px!important;min-width:84px!important;min-height:84px!important;
+  }
+  .dev-block-editor-page .bw-editor-page .bw-editor-guide .bw-resize-handle::after{
+    width:30px!important;height:30px!important;
+  }
+}
+
+/* True edge-to-edge shell while RiftCity fullscreen mode is active. */
+.dev-block-editor-page.bw-fullscreen-mode,
+.dev-block-editor-page .bw-fullscreen-active{
+  width:100dvw!important;height:100dvh!important;max-width:none!important;max-height:none!important;
+}
+.dev-block-editor-page .bw-fullscreen-active{
+  position:fixed!important;inset:0!important;margin:0!important;border-radius:0!important;
+}
+.dev-block-editor-page .bw-fullscreen-active .bw-react-editor-host{inset:0!important}
+
+/* Smaller iPhones: dock sizes start compact but remain resizable/collapsible. */
+@media (max-width:760px), (max-height:470px){
+  .dev-block-editor-page .bw-editor-studio{
+    --be-left:176px;--be-right:176px;--be-bottom:88px;--be-topbar:52px;--be-transform:62px;
+  }
+  .bw-studio-topbar{gap:7px;padding:6px 8px}
+  .bw-studio-topbar .bw-editor-title{min-width:170px}
+  .bw-studio-topbar .bw-editor-title strong{font-size:15px}
+  .bw-studio-topbar .bw-editor-title small{font-size:7px}
+  .bw-studio-status{min-width:110px}
+  .bw-studio-topbar .bw-editor-head-actions button{min-height:35px;padding:6px 8px;font-size:8px}
+  .dev-block-editor-page .bw-editor-page .bw-dev-buttons>*{min-height:35px!important;padding:6px 9px!important;font-size:8px!important}
+  .bw-editor-studio .bw-editor-object-row{min-width:185px!important;flex-basis:185px!important}
+  .bw-editor-studio .bw-editor-transform-grid{min-width:330px!important;flex-basis:330px!important}
+  .bw-editor-studio .bw-editor-transform-grid label{min-width:75px!important}
+  .bw-studio-panel-head{height:33px;padding:4px 7px}
+  .bw-studio-panel-body{height:calc(100% - 33px);padding:6px}
+  .bw-editor-studio .bw-editor-create-grid button{min-height:39px!important;padding:6px 8px!important}
+  .bw-studio-bottom-body{grid-template-columns:1fr 1fr!important}
+  .bw-studio-status-summary{display:none}
+}
+
+/* Portrait private page remains usable; the fullscreen button can invoke the existing iPhone rotated fallback. */
+@media (orientation:portrait) and (max-width:700px){
+  .dev-block-editor-page .bw-editor-page:not(.bw-fullscreen-active) .bw-studio-right{display:none}
+  .dev-block-editor-page .bw-editor-page:not(.bw-fullscreen-active) .bw-studio-bottom{
+    right:max(8px,env(safe-area-inset-right));left:calc(max(8px,env(safe-area-inset-left)) + var(--be-left) + 8px)
+  }
+}

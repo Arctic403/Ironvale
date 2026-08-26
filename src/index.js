@@ -153,6 +153,10 @@ export default {
       }
     }
 
+    if (url.pathname === '/dev/block-editor' || url.pathname === '/dev/block-editor/') {
+      return serveDeveloperBlockEditor(request, env);
+    }
+
     if (url.pathname === '/admin/logs' || url.pathname === '/admin/logs/') {
       const adminUrl = new URL('/admin-logs.html', request.url);
       return env.ASSETS.fetch(new Request(adminUrl, request));
@@ -1368,6 +1372,76 @@ async function resolveSystemLog(request, env, url) {
   const id = decodeURIComponent(match[1]);
   await env.DB.prepare('UPDATE system_logs SET resolved = 1 WHERE id = ?').bind(id).run();
   return json({ ok: true });
+}
+
+
+async function serveDeveloperBlockEditor(request, env) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) {
+    const status = gate.response.status === 401 ? 401 : 403;
+    return new Response(`<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RiftCity Developer Access</title>
+<style>
+html,body{height:100%;margin:0;background:#05090c;color:#eef8fa;font:700 16px system-ui}
+main{height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box;text-align:center}
+a{color:#63e6b1}
+</style></head><body><main><div><h1>Developer access required</h1>
+<p>This RiftCity authoring surface is restricted to developer/admin accounts.</p>
+<a href="/">Return to RiftCity</a></div></main></body></html>`, {
+      status,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, private',
+        'X-Robots-Tag': 'noindex, nofollow',
+        'Referrer-Policy': 'same-origin'
+      }
+    });
+  }
+
+  return new Response(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#061014">
+  <meta name="robots" content="noindex,nofollow">
+  <title>RiftCity — Block Editor</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="dev-block-editor-page">
+  <main id="dev-block-editor-root" aria-label="RiftCity Block Editor">
+    <div class="dev-editor-loading"><strong>BLOCK EDITOR</strong><span>Loading Commerce Street…</span></div>
+  </main>
+  <script type="module">
+import { renderBlockWorld, destroyBlockWorld } from '/views/block-world.js';
+const root=document.querySelector('#dev-block-editor-root');
+async function boot(){
+  const response=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!['admin','developer'].includes(data&&data.user&&data.user.role)){
+    root.innerHTML='<section class="dev-editor-denied"><strong>Developer access required</strong><a href="/">Return to RiftCity</a></section>';
+    return;
+  }
+  document.documentElement.classList.add('dev-block-editor-document');
+  await renderBlockWorld(root,{editorWorkspace:true});
+}
+window.addEventListener('pagehide',()=>destroyBlockWorld(),{once:true});
+boot().catch(error=>{
+  console.error(error);
+  root.innerHTML='<section class="dev-editor-denied"><strong>Block Editor failed to start</strong><a href="/">Return to RiftCity</a></section>';
+});
+</script>
+</body>
+</html>`, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, private',
+      'X-Robots-Tag': 'noindex, nofollow',
+      'Referrer-Policy': 'same-origin'
+    }
+  });
 }
 
 async function requireAdmin(request, env) {

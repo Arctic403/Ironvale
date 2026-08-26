@@ -7,7 +7,8 @@ import { mountBlockEditor } from '../react-ui.js';
 let cleanup=null;
 export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
 
-export async function renderBlockWorld(root){
+export async function renderBlockWorld(root, options={}){
+  const editorWorkspace=!!options.editorWorkspace;
   destroyBlockWorld();
   const [worldData,playerData,publishedBlockData]=await Promise.all([
     api('/api/world'),
@@ -18,7 +19,7 @@ export async function renderBlockWorld(root){
   const validLocationIds=new Set(locations.map(x=>x.id));
 
   root.innerHTML=`
-    <section class="blockworld-shell">
+    <section class="blockworld-shell${editorWorkspace?' bw-editor-page':''}">
       <div class="blockworld-viewport" id="blockworld-viewport">
         <div class="blockworld-scene" id="blockworld-scene">
           <img class="bw-scene-plate" src="/assets/blocks/commerce-street.svg" alt="" draggable="false" decoding="async" fetchpriority="high">
@@ -56,9 +57,10 @@ export async function renderBlockWorld(root){
       </div>
       <div class="bw-block-label"><small>DOWNTOWN / BLOCK 01</small><strong>Commerce Street</strong></div>
       <div class="bw-dev-buttons">
-        <button class="bw-edit-toggle" id="bw-edit-toggle" type="button">EDIT</button>
+        <button class="bw-edit-toggle" id="bw-edit-toggle" type="button">${editorWorkspace?'PLAY':'EDIT'}</button>
         <button class="bw-editor-panel-toggle" id="bw-editor-panel-toggle" type="button" hidden>HIDE PANEL</button>
         <button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button>
+        ${editorWorkspace?'<a class="bw-editor-exit" href="/#city">EXIT</a>':''}
       </div>
       <div id="bw-react-editor-root" class="bw-react-editor-host"></div>
       <div class="bw-controls">
@@ -101,6 +103,94 @@ export async function renderBlockWorld(root){
   const assetFile=root.querySelector('#bw-asset-file'),assetSelect=root.querySelector('#bw-editor-asset');
   const assetStatus=root.querySelector('#bw-asset-status');
   const assetApply=root.querySelector('#bw-asset-apply'),assetClear=root.querySelector('#bw-asset-clear');
+
+  const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v1';
+  function setupStudioPanels(){
+    if(!editorWorkspace||!editor)return ()=>{};
+    let saved={};
+    try{saved=JSON.parse(localStorage.getItem(STUDIO_LAYOUT_KEY)||'{}')||{};}catch(_){}
+    const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+
+    if(Number(saved.left))editor.style.setProperty('--be-left',`${clamp(saved.left,150,420)}px`);
+    if(Number(saved.right))editor.style.setProperty('--be-right',`${clamp(saved.right,150,420)}px`);
+    if(Number(saved.bottom))editor.style.setProperty('--be-bottom',`${clamp(saved.bottom,70,260)}px`);
+    if(Number(saved.top))editor.style.setProperty('--be-transform',`${clamp(saved.top,44,150)}px`);
+
+    const panels=[...editor.querySelectorAll('[data-editor-panel]')];
+    const collapsed=saved.collapsed||{};
+    panels.forEach(panel=>{
+      const name=panel.dataset.editorPanel;
+      panel.dataset.collapsed=collapsed[name]?'true':'false';
+    });
+
+    const persist=()=>{
+      const style=getComputedStyle(editor);
+      const payload={
+        left:parseFloat(style.getPropertyValue('--be-left'))||220,
+        right:parseFloat(style.getPropertyValue('--be-right'))||220,
+        bottom:parseFloat(style.getPropertyValue('--be-bottom'))||110,
+        top:parseFloat(style.getPropertyValue('--be-transform'))||72,
+        collapsed:Object.fromEntries(panels.map(p=>[p.dataset.editorPanel,p.dataset.collapsed==='true']))
+      };
+      try{localStorage.setItem(STUDIO_LAYOUT_KEY,JSON.stringify(payload));}catch(_){}
+    };
+
+    const collapseHandlers=[];
+    editor.querySelectorAll('[data-panel-collapse]').forEach(button=>{
+      const handler=e=>{
+        e.preventDefault();e.stopPropagation();
+        const name=button.dataset.panelCollapse;
+        const panel=editor.querySelector(`[data-editor-panel="${name}"]`);
+        if(!panel)return;
+        panel.dataset.collapsed=panel.dataset.collapsed==='true'?'false':'true';
+        persist();
+      };
+      button.addEventListener('click',handler);
+      collapseHandlers.push(()=>button.removeEventListener('click',handler));
+    });
+
+    let resize=null;
+    const down=e=>{
+      const handle=e.target.closest('[data-panel-resizer]');
+      if(!handle)return;
+      e.preventDefault();e.stopPropagation();
+      const name=handle.dataset.panelResizer;
+      const style=getComputedStyle(editor);
+      resize={
+        id:e.pointerId,name,startX:e.clientX,startY:e.clientY,
+        left:parseFloat(style.getPropertyValue('--be-left'))||220,
+        right:parseFloat(style.getPropertyValue('--be-right'))||220,
+        bottom:parseFloat(style.getPropertyValue('--be-bottom'))||110
+      };
+      handle.setPointerCapture?.(e.pointerId);
+    };
+    const move=e=>{
+      if(!resize||e.pointerId!==resize.id)return;
+      e.preventDefault();
+      const rawX=e.clientX-resize.startX,rawY=e.clientY-resize.startY;
+      const delta=typeof pointerVectorToWorld==='function'?pointerVectorToWorld(rawX,rawY):{x:rawX,y:rawY};
+      if(resize.name==='palette')editor.style.setProperty('--be-left',`${clamp(resize.left+delta.x,150,420)}px`);
+      if(resize.name==='properties')editor.style.setProperty('--be-right',`${clamp(resize.right-delta.x,150,420)}px`);
+      if(resize.name==='tools')editor.style.setProperty('--be-bottom',`${clamp(resize.bottom-delta.y,70,260)}px`);
+    };
+    const up=e=>{
+      if(!resize||e.pointerId!==resize.id)return;
+      resize=null;persist();
+    };
+    editor.addEventListener('pointerdown',down,true);
+    editor.addEventListener('pointermove',move,true);
+    editor.addEventListener('pointerup',up,true);
+    editor.addEventListener('pointercancel',up,true);
+
+    return ()=>{
+      collapseHandlers.forEach(fn=>fn());
+      editor.removeEventListener('pointerdown',down,true);
+      editor.removeEventListener('pointermove',move,true);
+      editor.removeEventListener('pointerup',up,true);
+      editor.removeEventListener('pointercancel',up,true);
+    };
+  }
+  const destroyStudioPanels=setupStudioPanels();
 
   // Asset Lab-compatible runtime library. Keep every imported asset object intact:
   // internal id, stable assetId, embedded src, source dimensions and transform metadata.
@@ -848,6 +938,11 @@ export async function renderBlockWorld(root){
     if(fullscreenMode)return;
     const vv=window.visualViewport;
     const viewportHeight=vv?.height||window.innerHeight;
+    if(editorWorkspace){
+      shell.style.height=`${Math.max(300,Math.floor(viewportHeight))}px`;
+      shell.style.width='100%';
+      return;
+    }
     const rect=shell.getBoundingClientRect();
     const mobileNav=document.querySelector('#mobile-nav');
     const navHeight=mobileNav && getComputedStyle(mobileNav).display!=='none'
@@ -934,11 +1029,13 @@ export async function renderBlockWorld(root){
   run.addEventListener('pointercancel',()=>state.running=false);
 
   player.style.left=`${state.x}px`;player.style.top=`${state.y}px`;
+  if(editorWorkspace)await setEditMode(true);
   raf=requestAnimationFrame(tick);
   cleanup=()=>{
     cancelAnimationFrame(raf);
     clearTimeout(draftTimer);
     clearInterval(draftInterval);
+    destroyStudioPanels?.();
     unmountReactEditor?.();
     removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);
     stick.removeEventListener('pointerdown',down);stick.removeEventListener('pointermove',move);

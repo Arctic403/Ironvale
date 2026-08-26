@@ -588,3 +588,16 @@ Research-driven state cleanup:
 - New objects are created at/around the player's current world position so mobile authoring does not require typing coordinates first.
 - The compact transform row remains horizontally scrollable in portrait and landscape/fullscreen.
 - Existing direct manipulation, large touch resize gizmos, draft autosave and authoritative Publish behavior are preserved.
+
+
+## Hybrid H1.10 — private developer Block Editor studio
+
+- Added `/dev/block-editor` as a dedicated Block Editor page served only after a server-side `admin` / `developer` role check.
+- The private page does not use the normal RiftCity HUD, drawer or mobile navigation; the Block World owns the entire dynamic viewport.
+- The editor now follows the approved mobile-landscape studio layout: top project/status bar, transform strip, left Add Object palette, right Properties panel, bottom Tools/Status tray and the playable scene in the center.
+- Left, right and bottom panels are independently collapsible and resize with touch/mouse drag dividers. Panel sizes/collapse states persist locally on the device.
+- Edit/Play mode, Show/Hide Panel and Fullscreen remain independent controls.
+- The dedicated page starts in Edit Mode and reuses the existing D1 draft autosave, explicit Publish and authoritative block hydration path.
+- Existing touch/mouse/keyboard world manipulation remains plain JavaScript; React owns the studio UI chrome.
+- Mobile editor gizmos have larger visible handles and touch targets on the private editor page.
+- Fullscreen uses the entire dynamic viewport and preserves the existing iPhone CSS-rotation fallback when Safari cannot orientation-lock.

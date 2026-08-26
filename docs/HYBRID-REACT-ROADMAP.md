@@ -205,3 +205,13 @@ render-state stores.
 ## H1.9 mobile authoring palette
 
 The editor now exposes creation as well as manipulation. The open inspector may use more screen space because SHOW/HIDE PANEL is independent from Edit/Play. Creation remains a semantic UI action in React while the plain-JavaScript runtime owns the resulting world geometry, selection, dragging, snapping, autosave and publishing.
+
+
+## H1.10 private editor studio
+
+The temporary in-game authoring overlay now has a dedicated developer/admin page boundary. The server
+guards `/dev/block-editor` before emitting the editor document. React owns docked/collapsible/resizable
+studio chrome; the existing Block World module continues to own scene rendering, pointer-to-world
+conversion, fullscreen, manipulation, draft autosave and Publish. Panel layout is local UI preference,
+while block geometry remains D1 draft/published state. This separation is the intended base for future
+multi-block authoring, object property schemas and asset-browser tooling.
