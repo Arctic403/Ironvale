@@ -565,3 +565,17 @@ The Block Editor is now a real development authoring tool rather than a browser-
 - The inspector minimize and close controls hide the panel instead of changing Play/Edit mode.
 - `PUBLISH` saves the draft, publishes it server-side, then reads the public block endpoint back and adopts that verified live layout as the local published state.
 - Exiting Edit Mode rebuilds gameplay geometry from that verified published state, preventing a successful publish from visually snapping back to the pre-publish layout.
+
+
+## Hybrid H1.8 — authoritative Publish + deterministic block hydration
+
+Research-driven state cleanup:
+
+- Publish now adopts the exact validated block returned by the successful D1 publish transaction; it no longer performs a second public GET merely to rediscover what was just committed.
+- A single `hydrateBlock(layout)` boundary now owns authoritative version transitions.
+- Hydration reconstructs building gameplay DOM from the supplied layout rather than assuming the old DOM has the same buildings/order.
+- Authored prop DOM is cleared/rebuilt from the supplied layout.
+- Scene plate, alley, guides, collision-facing working data, doors and editor geometry are refreshed through the same render path.
+- Play Mode always hydrates from `publishedWorking`; Edit Mode may continue using the server draft.
+- Publishing does not teleport the player to spawn; the current position is preserved and clamped to the newly published walkable region.
+- Autosave remains draft-only. Publish remains the only operation that changes the server-wide live block.

@@ -189,3 +189,14 @@ cannot remain active during normal gameplay.
 ## H1.5 server-authoring note
 
 Block authoring now has explicit draft and published states. Direct manipulation remains local and responsive, lightweight layout JSON autosaves to an admin-only D1 draft, and only an explicit Publish makes the layout server-wide. Ordinary players read only the published layout. H1.4's explicit Play/Edit split remains intact.
+
+
+## H1.8 authoritative block-state rule
+
+The Block World now treats state transitions as explicit boundaries: source `BLOCK1` is fallback data,
+D1 published JSON is Play Mode authority, and D1 draft JSON is Edit Mode authority. Incremental DOM
+mutation is allowed while directly manipulating a draft, but crossing into a published version uses
+`hydrateBlock(layout)` to reconstruct gameplay geometry from one authoritative layout. Publish adopts
+the validated block returned by the write transaction itself instead of issuing an immediate second
+read. Future block streaming should reuse this hydrate/unhydrate boundary rather than adding parallel
+render-state stores.

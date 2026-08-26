@@ -223,35 +223,61 @@ export async function renderBlockWorld(root){
     return true;
   }
 
-  function rebuildPublishedScene(){
-    // renderEditorObjects is also the canonical geometry/art renderer. Calling it after
-    // publishedWorking changes prevents Play Mode from retaining stale authored DOM.
-    working=cloneBlock(publishedWorking);
+  function hydrateBlock(layout,{preservePlayer=true}={}){
+    const next=cloneBlock(layout||BLOCK1);
+    working=next;
+
+    // Rebuild gameplay building DOM instead of only repositioning whatever happened
+    // to exist before. This makes add/delete/reorder/published version changes deterministic.
+    buildings.querySelectorAll('.bw-building').forEach(el=>el.remove());
+    for(const b of working.buildings){
+      const el=document.createElement('div');
+      el.className='bw-building bw-building-geometry';
+      el.dataset.buildingId=b.id;
+      buildings.insertBefore(el,alley);
+    }
+
+    // Rebuild the authored prop layer from the authoritative layout.
+    props.querySelectorAll('.bw-prop-authored').forEach(el=>el.remove());
+
+    // Clamp the player to the newly authoritative walkable area rather than silently
+    // restoring the authored spawn every time Publish is pressed.
+    if(!preservePlayer&&working.spawn){
+      state.x=Number(working.spawn.x)||state.x;
+      state.y=Number(working.spawn.y)||state.y;
+    }
+    const walk=working.walkable;
+    if(walk){
+      state.x=Math.max(walk.x,Math.min(walk.x+walk.width,state.x));
+      state.y=Math.max(walk.y,Math.min(walk.y+walk.height,state.y));
+    }
+
     renderEditorObjects();
+    updatePlayer();
+  }
+
+  function rebuildPublishedScene(){
+    hydrateBlock(publishedWorking,{preservePlayer:true});
   }
 
   async function publishDraft(){
     const saved=await saveDraftToServer({force:true});
     if(!saved)return;
     setServerStatus('PUBLISHING…','saving');
+
+    // The publish transaction already returns the exact validated JSON committed to D1.
+    // Adopt that response directly: no second GET/read-after-write race is required.
     const result=await api(`/api/admin/blocks/${encodeURIComponent(working.id)}/publish`,{method:'POST'});
-    if(!result.ok){
+    if(!result.ok||!result.block){
       setServerStatus(`PUBLISH · ${result.error||'failed'}`,'error');
       return;
     }
 
-    // Do not trust only the draft response: read the public endpoint back so the client
-    // uses the exact layout ordinary Play Mode/other players will receive.
-    const live=await api(`/api/world/blocks/${encodeURIComponent(working.id)}`);
-    if(!live.ok||!live.block){
-      setServerStatus(`PUBLISH · live verify failed`,'error');
-      return;
-    }
-    publishedRevision=Number(live.revision||result.publishedRevision||publishedRevision+1);
-    publishedWorking=cloneBlock(live.block);
-    working=cloneBlock(publishedWorking);
+    publishedRevision=Number(result.publishedRevision||publishedRevision+1);
+    publishedWorking=cloneBlock(result.block);
+    draftRevision=Math.max(draftRevision,publishedRevision);
     draftDirty=false;
-    renderEditorObjects();
+    hydrateBlock(publishedWorking,{preservePlayer:true});
     syncInspector();
     setServerStatus(`LIVE · r${publishedRevision}`,'published');
   }
@@ -485,7 +511,6 @@ export async function renderBlockWorld(root){
       editToggle.textContent='EDIT';
       editToggle.setAttribute('aria-label','Switch to edit mode');
       drag=null;
-      working=cloneBlock(publishedWorking);
       select('');
       rebuildPublishedScene();
       joyX=0;joyY=0;state.running=false;
