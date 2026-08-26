@@ -926,3 +926,25 @@ body.bw-fullscreen-mode .blockworld-shell{
 .bw-building:not(.has-building-art) { background: transparent !important; box-shadow: none !important; }
 .bw-building:not(.has-building-art)::before,
 .bw-building:not(.has-building-art)::after { content: none !important; }
+
+
+/* Phase 12 — authored Commerce Street panoramic scene plate.
+   The plate owns visuals; gameplay geometry stays independent and invisible. */
+.bw-scene-plate{
+  position:absolute;left:0;top:0;width:3600px;height:1440px;z-index:1;
+  display:block;max-width:none;max-height:none;object-fit:fill;
+  pointer-events:none;user-select:none;-webkit-user-drag:none;
+}
+.blockworld-scene>.bw-sky,
+.blockworld-scene>.bw-backdrop,
+.blockworld-scene>.bw-ground,
+.blockworld-scene>.bw-road,
+.blockworld-scene>.bw-sidewalk{display:none!important}
+.bw-buildings{position:absolute;inset:0;z-index:4}
+.bw-building-geometry{background:transparent!important;border:0!important;box-shadow:none!important}
+.bw-building-art{display:none!important}
+.bw-alley{display:none!important}
+.bw-props>.bw-life{display:none!important}
+.bw-edit-mode .bw-building-geometry{outline:3px dashed #65d9ff88!important;background:#65d9ff12!important}
+.bw-edit-mode .bw-building-geometry.bw-edit-selected{outline-color:#ffd166!important;background:#ffd1661c!important}
+.bw-edit-mode .bw-door-marker{display:block!important}

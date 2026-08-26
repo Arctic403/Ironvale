@@ -16,6 +16,7 @@ export async function renderBlockWorld(root){
     <section class="blockworld-shell">
       <div class="blockworld-viewport" id="blockworld-viewport">
         <div class="blockworld-scene" id="blockworld-scene">
+          <img class="bw-scene-plate" src="/assets/blocks/commerce-street.svg" alt="" draggable="false" decoding="async" fetchpriority="high">
           <div class="bw-sky"></div>
           <div class="bw-backdrop">
             <div class="bw-haze"></div>
@@ -419,19 +420,19 @@ export async function renderBlockWorld(root){
     nx=Math.max(45,Math.min(BLOCK1.width-45,nx));
     // The whole foreground street plane is walkable. Players can now walk
     // north across the road and right up to the storefront threshold.
-    ny=Math.max(510,Math.min(1225,ny));
+    ny=Math.max(990,Math.min(BLOCK1.height-45,ny));
 
     // Resolve axes separately so facades feel solid without sticky corners.
     if(!collidesWithFacade(nx,state.y))state.x=nx;
     if(!collidesWithFacade(state.x,ny))state.y=ny;
     player.style.left=`${state.x}px`; player.style.top=`${state.y}px`;
-    const playerDepth=.78+((state.y-510)/(1225-510))*.24;
+    const playerDepth=.82+((state.y-990)/(BLOCK1.height-45-990))*.20;
     player.style.transform=`translate(-50%,-100%) scale(${playerDepth})`;
     player.style.zIndex=String(30+Math.round(state.y));
 
     // Scale Block 01 to the real viewport height so portrait mode never crops
     // the buildings/road/controls. The camera then pans through world space.
-    const authoredHeight=1260;
+    const authoredHeight=BLOCK1.height;
     const fitScale=Math.max(.26,Math.min(1,viewport.clientHeight/authoredHeight));
     const visibleWorldWidth=viewport.clientWidth/fitScale;
     const cameraX=Math.max(

@@ -411,3 +411,13 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Asset Lab-authored source dimensions, X/Y, scale, rotation and opacity drive rendering; the duplicate RiftCity art-scale/X/Y/fit controls were removed.
 - Building rectangles remain only as invisible gameplay geometry for collision, door interaction and routing.
 - Buildings without an assigned Asset Lab asset no longer fall back to the old generated storefront.
+
+
+## Phase 12 — Commerce Street panoramic scene plate
+
+- Commerce Street now uses the supplied full-block panoramic artwork as one authored visual scene plate.
+- The scene plate is presentation only; building collision, interaction doors, routes and player movement remain separate data in `public/block1.js`.
+- The previous generated skyline, road, sidewalks, storefront art and decorative street props are suppressed while the scene plate is active, preventing duplicate visuals.
+- Invisible gameplay geometry was realigned to the visible Corner Mart, Northside Warehouse, Auto Repair, apartments, Pawn Shop and Apartment Rentals entrances.
+- The block keeps horizontal camera travel, 2-axis walk-up movement, mobile controls, fullscreen behavior and the live block editor.
+- Future blocks can use the same pattern and be preloaded/streamed as neighboring scene plates rather than building one giant city raster.
