@@ -639,3 +639,13 @@ Research-driven state cleanup:
 - The editor camera now fits the authored block to the actual center viewport by default, with zoom still available afterward.
 - Compact iPhone landscape keeps the same outside-chrome architecture with smaller controls and scrollable panel contents.
 - Fullscreen remains the same grid layout and the fullscreen action reads WINDOW while active so it is not confused with the red page EXIT action.
+
+## Hybrid H1.14 — clear-canvas editor + alley authoring repair
+
+- The private Block Editor now opens with the canvas mostly clear instead of reserving permanent left/right/bottom/transform docks.
+- Add Object, Properties, Transform and Tools are compact floating menus opened from a small quick dock and closed with one tap.
+- Play and Publish stay visible; panel visibility, fullscreen and editor exit move into one secondary action menu so the header no longer crowds the viewport.
+- No editor functions were removed: object creation, transform precision, properties, view toggles, nudge/focus, history, export, reset and status remain available in the popovers.
+- Fixed Alley Entrance creation when the authored fallback alley starts at `0 × 0`: placing an alley now assigns a usable default size and clamps it into the block bounds.
+- Fixed the Phase 12 scene-plate rule that hid `.bw-alley` even in Edit Mode. The alley now renders as a clear editable authoring zone while remaining visually suppressed in Play Mode, where the panoramic scene plate owns presentation.
+- Fixed mirrored precision/property fields so W/H, label and z-index changes made in either editor surface no longer overwrite each other.

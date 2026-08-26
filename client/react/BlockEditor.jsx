@@ -4,7 +4,7 @@ function PanelHeader({ title, panel }) {
   return (
     <header className="bw-studio-panel-head">
       <strong>{title}</strong>
-      <button type="button" data-panel-collapse={panel} aria-label={`Collapse ${title}`}>⌃</button>
+      <button type="button" data-panel-collapse={panel} aria-label={`Close ${title}`}>×</button>
     </header>
   );
 }
@@ -14,10 +14,15 @@ export function BlockEditor() {
     <>
       <div className="bw-studio-global-actions" aria-label="Block Editor actions">
         <button className="bw-edit-toggle bw-studio-play" id="bw-edit-toggle" type="button">PLAY</button>
-        <button className="bw-editor-panel-toggle" id="bw-editor-panel-toggle" type="button">HIDE PANEL</button>
         <button className="bw-studio-publish" type="button" id="bw-editor-export">PUBLISH</button>
-        <button className="bw-fullscreen" id="bw-fullscreen" type="button">FULLSCREEN</button>
-        <a className="bw-editor-exit" href="/#city">EXIT</a>
+        <details className="bw-studio-action-menu">
+          <summary aria-label="More editor actions">•••</summary>
+          <div className="bw-studio-action-popover">
+            <button className="bw-editor-panel-toggle" id="bw-editor-panel-toggle" type="button">HIDE PANEL</button>
+            <button className="bw-fullscreen" id="bw-fullscreen" type="button">FULLSCREEN</button>
+            <a className="bw-editor-exit" href="/#city">EXIT EDITOR</a>
+          </div>
+        </details>
       </div>
 
       <aside className="bw-editor bw-editor-studio" id="bw-editor" aria-hidden="true">
@@ -25,7 +30,7 @@ export function BlockEditor() {
         <button id="bw-editor-close" className="bw-runtime-only-control" type="button" aria-hidden="true">×</button>
 
         <header className="bw-studio-topbar">
-          <button className="bw-studio-menu-button" type="button" data-panel-collapse="palette" aria-label="Toggle Add Object panel">☰</button>
+          <button className="bw-studio-menu-button" type="button" data-panel-toggle="palette" aria-label="Open Add Object menu">＋</button>
           <div className="bw-editor-title">
             <strong>BLOCK EDITOR</strong>
             <small>DOWNTOWN / BLOCK 01&nbsp;&nbsp;•&nbsp;&nbsp;Commerce Street</small>
@@ -36,8 +41,15 @@ export function BlockEditor() {
           </div>
         </header>
 
+        <nav className="bw-studio-quickdock" aria-label="Editor menus">
+          <button type="button" data-panel-toggle="palette" title="Add Object"><b>＋</b><span>ADD</span></button>
+          <button type="button" data-panel-toggle="properties" title="Properties"><b>▤</b><span>PROPS</span></button>
+          <button type="button" data-panel-toggle="transform" title="Transform"><b>↔</b><span>MOVE</span></button>
+          <button type="button" data-panel-toggle="tools" title="Tools and View"><b>•••</b><span>TOOLS</span></button>
+        </nav>
+
         <section className="bw-studio-transform" data-editor-panel="transform">
-          <button className="bw-panel-collapse bw-transform-collapse" type="button" data-panel-collapse="transform" aria-label="Collapse transform bar">⌃</button>
+          <button className="bw-panel-collapse bw-transform-collapse" type="button" data-panel-collapse="transform" aria-label="Close transform panel">×</button>
           <label className="bw-editor-object-row"><span>OBJECT</span><select id="bw-editor-object" aria-label="Selected editor object" /></label>
           <label className="bw-studio-idlabel"><span>ID / LABEL</span><input id="bw-editor-idlabel" type="text" autoComplete="off" /></label>
           <div className="bw-editor-transform-grid" aria-label="Transform">
@@ -122,7 +134,7 @@ export function BlockEditor() {
         </div>
 
         <section className="bw-studio-panel bw-studio-bottom" data-editor-panel="tools">
-          <PanelHeader title="TOOLS · VIEW · SNAP & SETTINGS · STATUS" panel="tools" />
+          <PanelHeader title="TOOLS · VIEW · SETTINGS · STATUS" panel="tools" />
           <div className="bw-studio-panel-body bw-studio-bottom-body">
             <div className="bw-studio-toolgroup">
               <small>TOOLS</small>

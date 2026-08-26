@@ -145,7 +145,7 @@ export async function renderBlockWorld(root, options={}){
   const historySelect=editorQuery('#bw-editor-history'),historyLoadButton=editorQuery('#bw-editor-load-history');
   const focusButton=editorQuery('#bw-editor-focus'),resetLayoutButton=editorQuery('#bw-editor-reset-layout');
 
-  const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v2';
+  const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v3';
   function setupStudioPanels(){
     if(!editorWorkspace||!editor)return ()=>{};
     const layoutTarget=shell;
@@ -171,7 +171,9 @@ export async function renderBlockWorld(root, options={}){
       if(Number(saved.right))layoutTarget.style.setProperty('--be-right',`${clamp(saved.right,112,360)}px`);
       if(Number(saved.bottom))layoutTarget.style.setProperty('--be-bottom',`${clamp(saved.bottom,58,230)}px`);
       if(Number(saved.top))layoutTarget.style.setProperty('--be-transform',`${clamp(saved.top,42,120)}px`);
-      const collapsed=saved.collapsed||{};
+      // H1.14 starts with the scene clear. Each tool surface is one tap away
+      // as a floating popover, while an existing v3 preference is respected.
+      const collapsed={palette:true,properties:true,tools:true,transform:true,...(saved.collapsed||{})};
       panels.forEach(panel=>{
         const name=panel.dataset.editorPanel;
         panel.dataset.collapsed=collapsed[name]?'true':'false';
@@ -187,6 +189,11 @@ export async function renderBlockWorld(root, options={}){
       layoutTarget.classList.toggle('bw-dock-right-collapsed',isCollapsed('properties'));
       layoutTarget.classList.toggle('bw-dock-bottom-collapsed',isCollapsed('tools'));
       layoutTarget.classList.toggle('bw-dock-transform-collapsed',isCollapsed('transform'));
+      editor.querySelectorAll('[data-panel-toggle]').forEach(button=>{
+        const open=!isCollapsed(button.dataset.panelToggle);
+        button.classList.toggle('active',open);
+        button.setAttribute('aria-pressed',String(open));
+      });
     };
 
     const constrainLayout=(preferred='')=>{
@@ -248,16 +255,27 @@ export async function renderBlockWorld(root, options={}){
     };
 
     const collapseHandlers=[];
+    const togglePanel=(name,force)=>{
+      const panel=panelByName(name);
+      if(!panel)return;
+      const next=typeof force==='boolean'?force:panel.dataset.collapsed==='true';
+      panel.dataset.collapsed=next?'false':'true';
+      syncDockState();
+      constrainLayout();
+      persist();
+    };
     editor.querySelectorAll('[data-panel-collapse]').forEach(button=>{
       const handler=e=>{
         e.preventDefault();e.stopPropagation();
-        const name=button.dataset.panelCollapse;
-        const panel=panelByName(name);
-        if(!panel)return;
-        panel.dataset.collapsed=panel.dataset.collapsed==='true'?'false':'true';
-        syncDockState();
-        constrainLayout();
-        persist();
+        togglePanel(button.dataset.panelCollapse,false);
+      };
+      button.addEventListener('click',handler);
+      collapseHandlers.push(()=>button.removeEventListener('click',handler));
+    });
+    editor.querySelectorAll('[data-panel-toggle]').forEach(button=>{
+      const handler=e=>{
+        e.preventDefault();e.stopPropagation();
+        togglePanel(button.dataset.panelToggle);
       };
       button.addEventListener('click',handler);
       collapseHandlers.push(()=>button.removeEventListener('click',handler));
@@ -308,7 +326,7 @@ export async function renderBlockWorld(root, options={}){
     const resetLayout=()=>{
       try{localStorage.removeItem(STUDIO_LAYOUT_KEY);}catch(_){}
       ['--be-left','--be-right','--be-bottom','--be-transform'].forEach(name=>layoutTarget.style.removeProperty(name));
-      panels.forEach(panel=>panel.dataset.collapsed='false');
+      panels.forEach(panel=>panel.dataset.collapsed='true');
       syncDockState();
       requestAnimationFrame(()=>constrainLayout());
     };
@@ -866,17 +884,29 @@ export async function renderBlockWorld(root, options={}){
   async function toggleTopEditor(){
     await setEditMode(!editMode);
   }
-  function applyInspector(){
+  function applyInspector(event){
     const item=currentEditable();if(!item)return;
+    const source=event?.target;
+
+    // The compact transform popup and Properties popup expose a few mirrored
+    // fields. Keep the mirrors synchronized before reading values so changing
+    // W/H, label or z-index in either surface cannot be silently overwritten.
+    if(source===propWidth&&inputW)inputW.value=propWidth.value;
+    else if(source===inputW&&propWidth)propWidth.value=inputW.value;
+    if(source===propHeight&&inputH)inputH.value=propHeight.value;
+    else if(source===inputH&&propHeight)propHeight.value=inputH.value;
+    if(source===propLabel&&inputIdLabel)inputIdLabel.value=propLabel.value;
+    else if(source===inputIdLabel&&propLabel)propLabel.value=inputIdLabel.value;
+    if(source===propZIndex&&inputZIndex)inputZIndex.value=propZIndex.value;
+    else if(source===inputZIndex&&propZIndex)propZIndex.value=inputZIndex.value;
+
     const before=snapshot(),o=item.o;
     o.x=snap(inputX.value);o.y=snap(inputY.value);
     if(item.type!=='prop'&&item.type!=='spawn'){
       const wk='w' in o?'w':'width',hk='h' in o?'h':'height';
-      const desiredW=propWidth&&!propWidth.disabled?propWidth.value:inputW.value;
-      const desiredH=propHeight&&!propHeight.disabled?propHeight.value:inputH.value;
-      o[wk]=Math.max(20,snap(desiredW));o[hk]=Math.max(20,snap(desiredH));
+      o[wk]=Math.max(20,snap(inputW.value));o[hk]=Math.max(20,snap(inputH.value));
     }
-    const nextLabel=(propLabel?.value||inputIdLabel?.value||'').trim();
+    const nextLabel=(inputIdLabel?.value||propLabel?.value||'').trim();
     if(nextLabel){
       if(item.type==='building')o.name=nextLabel;
       else if(item.type==='exit')o.label=nextLabel;
@@ -886,10 +916,11 @@ export async function renderBlockWorld(root, options={}){
     if(item.type==='building')o.locationId=target;
     else if(item.type==='exit')o.targetBlock=target;
     else if(target)o.target=target;
+    else if('target' in o)delete o.target;
     if(propRequires)o.requires=propRequires.value.trim();
     if(propActive)o.active=!!propActive.checked;
     o.rotation=Number(inputRotation?.value||o.rotation||0);
-    o.zIndex=Number(propZIndex?.value||inputZIndex?.value||o.zIndex||0);
+    o.zIndex=Number(inputZIndex?.value||propZIndex?.value||o.zIndex||0);
     if(item.type==='building'){
       o.doorX=Math.max(o.x,Math.min(o.x+o.w,o.doorX));
       o.doorY=o.y+o.h;
@@ -1149,8 +1180,8 @@ export async function renderBlockWorld(root, options={}){
   [inputX,inputY,inputW,inputH,inputIdLabel,inputRotation,inputZIndex].filter(Boolean).forEach(el=>el.addEventListener('change',applyInspector));
   [propTarget,propRequires,propLabel,propZIndex].filter(Boolean).forEach(el=>el.addEventListener('change',applyInspector));
   propActive?.addEventListener('change',applyInspector);
-  propWidth?.addEventListener('change',()=>{inputW.value=propWidth.value;applyInspector();});
-  propHeight?.addEventListener('change',()=>{inputH.value=propHeight.value;applyInspector();});
+  propWidth?.addEventListener('change',applyInspector);
+  propHeight?.addEventListener('change',applyInspector);
   let editorZoom=1;
   const setEditorZoom=value=>{editorZoom=Math.max(.55,Math.min(1.8,value));};
   zoomInButton?.addEventListener('click',()=>setEditorZoom(editorZoom+.1));
@@ -1185,8 +1216,11 @@ export async function renderBlockWorld(root, options={}){
     const kind=button.dataset.bwAddObject;
     const before=snapshot();
     if(kind==='alley'){
-      if(!working.alley) working.alley={x:snap(state.x),y:snap(state.y),width:180,height:260};
-      else { working.alley.x=snap(state.x); working.alley.y=snap(state.y); }
+      const width=Math.max(20,Number(working.alley?.width)||200);
+      const height=Math.max(20,Number(working.alley?.height)||140);
+      const x=snap(Math.max(0,Math.min((working.width||BLOCK1.width)-width,state.x-width/2)));
+      const y=snap(Math.max(0,Math.min((working.height||BLOCK1.height)-height,state.y-height/2)));
+      working.alley={...(working.alley||{}),x,y,width,height,active:working.alley?.active!==false};
       commit(before);renderEditorObjects();select('alley:0');return;
     }
     if(kind==='exit'){

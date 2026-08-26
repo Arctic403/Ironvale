@@ -2525,3 +2525,336 @@ body.dev-block-editor-page{
   width:100dvw!important;
   height:100dvh!important;
 }
+
+/* =====================================================================
+   Hybrid H1.14 — CLEAR-CANVAS FLOATING MENUS + ALLEY AUTHORING REPAIR
+   The developer workspace now keeps the scene as the primary surface.
+   Add/Properties/Transform/Tools open as compact floating popovers and
+   disappear completely when closed. No editor function is removed.
+   ===================================================================== */
+
+.dev-block-editor-page .blockworld-shell.bw-editor-page{
+  --be-header:56px;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:var(--be-header) minmax(0,1fr)!important;
+  grid-template-areas:"head" "scene"!important;
+  gap:6px!important;
+  padding:
+    max(6px,env(safe-area-inset-top))
+    max(6px,env(safe-area-inset-right))
+    max(6px,env(safe-area-inset-bottom))
+    max(6px,env(safe-area-inset-left))!important;
+  position:fixed!important;
+}
+
+.dev-block-editor-page .bw-editor-page .blockworld-viewport{
+  grid-area:scene!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+}
+
+/* Header remains outside the canvas, but is intentionally shallow. */
+.dev-block-editor-page .bw-studio-topbar{
+  grid-area:head!important;
+  min-height:0!important;
+  height:100%!important;
+  padding:5px min(250px,43vw) 5px 6px!important;
+  gap:7px!important;
+  border-radius:9px!important;
+}
+.dev-block-editor-page .bw-studio-menu-button{
+  flex-basis:34px!important;
+  width:34px!important;
+  height:34px!important;
+  min-height:34px!important;
+  font-size:20px!important;
+}
+.dev-block-editor-page .bw-studio-topbar .bw-editor-title strong{font-size:16px!important}
+.dev-block-editor-page .bw-studio-topbar .bw-editor-title small{font-size:7px!important}
+.dev-block-editor-page .bw-studio-status{
+  min-width:0!important;
+  max-width:160px!important;
+  padding:3px 6px!important;
+}
+
+/* Only Play + Publish stay visible. Secondary actions live in one popover. */
+.dev-block-editor-page .bw-studio-global-actions{
+  grid-area:head!important;
+  position:relative!important;
+  justify-self:end!important;
+  align-self:center!important;
+  display:flex!important;
+  gap:5px!important;
+  max-width:min(245px,43vw)!important;
+  padding-right:5px!important;
+  overflow:visible!important;
+  z-index:120!important;
+}
+.dev-block-editor-page .bw-studio-global-actions>*{
+  min-height:34px!important;
+  padding:5px 9px!important;
+  font-size:8px!important;
+}
+.dev-block-editor-page .bw-studio-action-menu{
+  position:relative!important;
+  flex:0 0 auto!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.dev-block-editor-page .bw-studio-action-menu>summary{
+  list-style:none!important;
+  width:38px!important;
+  height:34px!important;
+  display:grid!important;
+  place-items:center!important;
+  cursor:pointer!important;
+  border:1px solid rgba(72,132,148,.72)!important;
+  border-radius:8px!important;
+  background:#0a1b22!important;
+  color:#edf8f9!important;
+  font:900 13px/1 system-ui,sans-serif!important;
+}
+.dev-block-editor-page .bw-studio-action-menu>summary::-webkit-details-marker{display:none!important}
+.dev-block-editor-page .bw-studio-action-popover{
+  position:absolute!important;
+  top:calc(100% + 7px)!important;
+  right:0!important;
+  width:150px!important;
+  display:grid!important;
+  gap:5px!important;
+  padding:7px!important;
+  border:1px solid rgba(69,142,158,.7)!important;
+  border-radius:10px!important;
+  background:#06141bf2!important;
+  box-shadow:0 14px 38px #000b!important;
+  z-index:400!important;
+}
+.dev-block-editor-page .bw-studio-action-popover>*{
+  width:100%!important;
+  min-height:34px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  font-size:8px!important;
+}
+
+/* Tiny always-available menu dock. */
+.dev-block-editor-page .bw-studio-quickdock{
+  position:absolute!important;
+  left:max(10px,env(safe-area-inset-left))!important;
+  top:calc(max(6px,env(safe-area-inset-top)) + var(--be-header) + 13px)!important;
+  z-index:250!important;
+  display:grid!important;
+  gap:5px!important;
+  padding:5px!important;
+  border:1px solid rgba(64,135,151,.6)!important;
+  border-radius:11px!important;
+  background:#06151bdc!important;
+  box-shadow:0 10px 30px #0008!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+  backdrop-filter:blur(12px)!important;
+}
+.dev-block-editor-page .bw-studio-quickdock button{
+  width:43px!important;
+  height:40px!important;
+  min-height:40px!important;
+  padding:3px!important;
+  display:grid!important;
+  place-items:center!important;
+  gap:0!important;
+  border-radius:8px!important;
+  font-size:7px!important;
+}
+.dev-block-editor-page .bw-studio-quickdock button b{font-size:14px!important;line-height:1!important}
+.dev-block-editor-page .bw-studio-quickdock button span{font-size:5px!important;letter-spacing:.08em!important}
+.dev-block-editor-page .bw-studio-quickdock button.active{
+  border-color:#54e8ac!important;
+  color:#72f0bb!important;
+  background:#0b2b24!important;
+}
+
+/* All former docks are popovers now. Closed means zero canvas cost. */
+.dev-block-editor-page .bw-studio-panel,
+.dev-block-editor-page .bw-studio-transform{
+  position:absolute!important;
+  inset:auto!important;
+  margin:0!important;
+  z-index:230!important;
+  border:1px solid rgba(67,143,160,.72)!important;
+  border-radius:12px!important;
+  background:#06151bed!important;
+  box-shadow:0 16px 48px #000c!important;
+  -webkit-backdrop-filter:blur(14px)!important;
+  backdrop-filter:blur(14px)!important;
+}
+.dev-block-editor-page [data-editor-panel][data-collapsed="true"]{display:none!important}
+.dev-block-editor-page [data-editor-panel][data-collapsed="false"]{display:block!important}
+
+.dev-block-editor-page .bw-studio-left{
+  left:max(62px,calc(env(safe-area-inset-left) + 62px))!important;
+  top:calc(max(6px,env(safe-area-inset-top)) + var(--be-header) + 13px)!important;
+  width:min(245px,42vw)!important;
+  max-height:calc(100% - var(--be-header) - 30px)!important;
+}
+.dev-block-editor-page .bw-studio-right{
+  right:max(10px,env(safe-area-inset-right))!important;
+  top:calc(max(6px,env(safe-area-inset-top)) + var(--be-header) + 13px)!important;
+  width:min(255px,43vw)!important;
+  max-height:calc(100% - var(--be-header) - 30px)!important;
+}
+.dev-block-editor-page .bw-studio-bottom{
+  left:50%!important;
+  bottom:max(10px,env(safe-area-inset-bottom))!important;
+  transform:translateX(-50%)!important;
+  width:min(900px,calc(100% - 125px))!important;
+  height:auto!important;
+  max-height:min(185px,46vh)!important;
+}
+.dev-block-editor-page .bw-studio-transform{
+  left:50%!important;
+  top:calc(max(6px,env(safe-area-inset-top)) + var(--be-header) + 13px)!important;
+  transform:translateX(-50%)!important;
+  width:min(900px,calc(100% - 125px))!important;
+  max-height:96px!important;
+  display:grid!important;
+  grid-template-columns:minmax(125px,1.3fr) minmax(110px,1fr) minmax(230px,2fr) 58px 58px 65px 66px 26px!important;
+  gap:4px!important;
+  padding:6px!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+}
+.dev-block-editor-page .bw-studio-transform[data-collapsed="true"]{display:none!important}
+.dev-block-editor-page .bw-transform-collapse{
+  grid-column:8!important;
+  width:24px!important;
+  min-width:24px!important;
+  height:24px!important;
+  min-height:24px!important;
+}
+.dev-block-editor-page .bw-studio-panel-head button{font-size:17px!important;line-height:1!important}
+.dev-block-editor-page .bw-panel-resizer{display:none!important}
+
+/* Zoom stays tiny and independent of menu state. */
+.dev-block-editor-page .bw-studio-viewport-tools{
+  position:absolute!important;
+  right:max(10px,env(safe-area-inset-right))!important;
+  bottom:max(10px,env(safe-area-inset-bottom))!important;
+  top:auto!important;
+  left:auto!important;
+  width:38px!important;
+  display:grid!important;
+  gap:4px!important;
+  padding:4px!important;
+  z-index:210!important;
+  border-radius:10px!important;
+  background:#06151bdc!important;
+  box-shadow:0 10px 28px #0008!important;
+}
+.dev-block-editor-page .bw-studio-viewport-tools button{
+  width:100%!important;
+  min-height:32px!important;
+  height:32px!important;
+}
+
+.dev-block-editor-page .bw-studio-bottom-body{
+  grid-template-columns:minmax(245px,1.45fr) minmax(170px,1fr) minmax(170px,1fr) minmax(95px,.65fr)!important;
+  min-width:690px!important;
+  width:max(100%,690px)!important;
+}
+
+/* H1.14 alley fix: Phase 12 intentionally hides procedural alley art in Play
+   Mode because the panoramic plate owns visuals. Edit Mode must still expose
+   the authored alley zone so it can actually be placed/resized. */
+.bw-edit-mode .bw-alley{
+  display:block!important;
+  background:rgba(52,220,170,.13)!important;
+  outline:2px dashed rgba(87,237,188,.92)!important;
+  box-shadow:inset 0 0 0 1px rgba(87,237,188,.18),0 0 0 1px #001!important;
+  overflow:visible!important;
+  min-width:20px!important;
+  min-height:20px!important;
+}
+.bw-edit-mode .bw-alley>span:not(.bw-resize-gizmos){display:none!important}
+.bw-edit-mode .bw-alley::after{
+  content:"ALLEY";
+  position:absolute;
+  left:5px;top:5px;
+  padding:2px 5px;
+  border-radius:5px;
+  background:#09261fdd;
+  color:#72efbb;
+  font:900 9px/1 system-ui,sans-serif;
+  letter-spacing:.1em;
+  pointer-events:none;
+}
+.bw-edit-mode .bw-alley.bw-edit-selected{
+  outline:3px solid #ffd166!important;
+  background:rgba(255,209,102,.12)!important;
+}
+
+/* When the whole editor panel is hidden, preserve the original full-canvas
+   behavior. The Play/Publish/action controls remain reachable in the header. */
+.dev-block-editor-page .blockworld-shell.bw-editor-page.bw-editor-chrome-hidden{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;
+  grid-template-areas:"scene"!important;
+  gap:0!important;
+  padding:0!important;
+}
+
+@media (max-width:760px), (max-height:470px){
+  .dev-block-editor-page .blockworld-shell.bw-editor-page{--be-header:44px;gap:4px!important;padding:4px!important}
+  .dev-block-editor-page .bw-studio-topbar{padding:3px min(180px,46vw) 3px 4px!important}
+  .dev-block-editor-page .bw-studio-menu-button{width:29px!important;height:29px!important;min-height:29px!important;flex-basis:29px!important;font-size:18px!important}
+  .dev-block-editor-page .bw-studio-topbar .bw-editor-title{max-width:180px!important}
+  .dev-block-editor-page .bw-studio-topbar .bw-editor-title strong{font-size:12px!important}
+  .dev-block-editor-page .bw-studio-topbar .bw-editor-title small{font-size:5px!important}
+  .dev-block-editor-page .bw-studio-status{display:none!important}
+  .dev-block-editor-page .bw-studio-global-actions{max-width:min(180px,46vw)!important;gap:3px!important;padding-right:3px!important}
+  .dev-block-editor-page .bw-studio-global-actions>*{min-height:29px!important;padding:3px 6px!important;font-size:6px!important}
+  .dev-block-editor-page .bw-studio-action-menu>summary{width:31px!important;height:29px!important;font-size:10px!important}
+  .dev-block-editor-page .bw-studio-action-popover{width:125px!important;top:calc(100% + 5px)!important;padding:5px!important}
+  .dev-block-editor-page .bw-studio-action-popover>*{min-height:29px!important;font-size:6px!important}
+
+  .dev-block-editor-page .bw-studio-quickdock{
+    left:7px!important;
+    top:calc(4px + var(--be-header) + 8px)!important;
+    gap:3px!important;
+    padding:3px!important;
+  }
+  .dev-block-editor-page .bw-studio-quickdock button{width:34px!important;height:32px!important;min-height:32px!important;padding:2px!important}
+  .dev-block-editor-page .bw-studio-quickdock button b{font-size:11px!important}
+  .dev-block-editor-page .bw-studio-quickdock button span{font-size:4px!important}
+
+  .dev-block-editor-page .bw-studio-left{
+    left:48px!important;
+    top:calc(4px + var(--be-header) + 8px)!important;
+    width:min(205px,43vw)!important;
+    max-height:calc(100% - var(--be-header) - 18px)!important;
+  }
+  .dev-block-editor-page .bw-studio-right{
+    right:7px!important;
+    top:calc(4px + var(--be-header) + 8px)!important;
+    width:min(205px,43vw)!important;
+    max-height:calc(100% - var(--be-header) - 18px)!important;
+  }
+  .dev-block-editor-page .bw-studio-bottom{
+    bottom:7px!important;
+    width:calc(100% - 96px)!important;
+    max-height:150px!important;
+  }
+  .dev-block-editor-page .bw-studio-transform{
+    top:calc(4px + var(--be-header) + 8px)!important;
+    width:calc(100% - 96px)!important;
+    grid-template-columns:115px 100px 210px 50px 50px 56px 60px 23px!important;
+    padding:4px!important;
+  }
+  .dev-block-editor-page .bw-studio-viewport-tools{right:7px!important;bottom:7px!important;width:32px!important;padding:3px!important}
+  .dev-block-editor-page .bw-studio-viewport-tools button{height:27px!important;min-height:27px!important;font-size:12px!important}
+}
