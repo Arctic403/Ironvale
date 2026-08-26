@@ -649,3 +649,11 @@ Research-driven state cleanup:
 - Fixed Alley Entrance creation when the authored fallback alley starts at `0 × 0`: placing an alley now assigns a usable default size and clamps it into the block bounds.
 - Fixed the Phase 12 scene-plate rule that hid `.bw-alley` even in Edit Mode. The alley now renders as a clear editable authoring zone while remaining visually suppressed in Play Mode, where the panoramic scene plate owns presentation.
 - Fixed mirrored precision/property fields so W/H, label and z-index changes made in either editor surface no longer overwrite each other.
+
+
+## Hybrid H1.15 — editor locking, repeatable props + iPhone popover scrolling
+
+- Added **LOCK SELECTED / UNLOCK SELECTED** to Block Editor Tools. Lock state is authored metadata, persists through draft/publish JSON, and prevents accidental scene selection, dragging, resizing, nudging, property edits, duplication and deletion until deliberately unlocked from the object selector.
+- Locked objects remain visible and are marked `LOCKED` in the object selector so they are always recoverable.
+- Props are explicitly multi-instance. Repeated adds of the same type now create unique prop IDs and stagger their initial placement instead of stacking every new copy at exactly the same coordinates. Duplicated props also receive a fresh ID.
+- Fixed private Block Editor popover scrolling on iPhone/Safari: Properties, Add Object and Tools use bounded independent scroll bodies, Transform can pan/scroll instead of clipping, and gameplay `touch-action:none` is limited back to the actual world viewport rather than blocking menu scrolling.

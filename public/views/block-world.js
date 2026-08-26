@@ -124,6 +124,7 @@ export async function renderBlockWorld(root, options={}){
   const inputZIndex=editorQuery('#bw-editor-zindex');
   const snapSelect=editorQuery('#bw-editor-snap');
   const duplicateButton=editorQuery('#bw-editor-duplicate'),deleteButton=editorQuery('#bw-editor-delete');
+  const lockButton=editorQuery('#bw-editor-lock');
   const undoButton=editorQuery('#bw-editor-undo'),redoButton=editorQuery('#bw-editor-redo');
   const exportButton=editorQuery('#bw-editor-export'),resetButton=editorQuery('#bw-editor-reset');
   const serverStatus=editorQuery('#bw-editor-server-status');
@@ -593,6 +594,7 @@ export async function renderBlockWorld(root, options={}){
     ];
   }
   function currentEditable(){return allEditable().find(x=>x.key===selectedKey)||null;}
+  function isLocked(item){return !!item?.o?.locked;}
   function snapshot(){return JSON.stringify(working);}
   function commit(before){
     const after=snapshot();
@@ -605,7 +607,7 @@ export async function renderBlockWorld(root, options={}){
   }
   function snap(v){const n=Number(snapSelect.value)||1;return Math.round(v/n)*n;}
   function nudgeSelected(dx,dy){
-    const item=currentEditable();if(!item)return;
+    const item=currentEditable();if(!item||isLocked(item))return;
     const before=snapshot(),step=Number(snapSelect.value)||1;
     item.o.x=(Number(item.o.x)||0)+dx*step;
     item.o.y=(Number(item.o.y)||0)+dy*step;
@@ -622,7 +624,7 @@ export async function renderBlockWorld(root, options={}){
   }
   function populateObjectSelect(){
     const current=selectedKey;
-    objectSelect.innerHTML='<option value="">Choose object…</option>'+allEditable().map(x=>`<option value="${x.key}">${x.type.toUpperCase()} · ${x.label}</option>`).join('');
+    objectSelect.innerHTML='<option value="">Choose object…</option>'+allEditable().map(x=>`<option value="${x.key}">${x.type.toUpperCase()} · ${x.label}${isLocked(x)?' · LOCKED':''}</option>`).join('');
     if(allEditable().some(x=>x.key===current))objectSelect.value=current;
   }
   function populateAssetSelect(){
@@ -679,12 +681,12 @@ export async function renderBlockWorld(root, options={}){
     finally{assetFile.value='';}
   }
   function applyBuildingAsset(){
-    const item=currentEditable();if(item?.type!=='building')return;
+    const item=currentEditable();if(item?.type!=='building'||isLocked(item))return;
     const id=assetSelect.value;if(!id||!importedAssets.has(id)){assetStatus.textContent='Choose an imported asset first.';return;}
     const before=snapshot();item.o.assetId=id;commit(before);renderEditorObjects();syncAssetInspector();
   }
   function clearBuildingAsset(){
-    const item=currentEditable();if(item?.type!=='building')return;
+    const item=currentEditable();if(item?.type!=='building'||isLocked(item))return;
     const before=snapshot();delete item.o.assetId;delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();
   }
   function objectDisplayLabel(item){
@@ -724,6 +726,7 @@ export async function renderBlockWorld(root, options={}){
       if(propWidth)propWidth.value='';
       if(propHeight)propHeight.value='';
       if(propZIndex)propZIndex.value='';
+      if(lockButton){lockButton.disabled=true;lockButton.textContent='LOCK SELECTED';lockButton.classList.remove('active');}
       syncStudioStatus();
       return;
     }
@@ -745,6 +748,23 @@ export async function renderBlockWorld(root, options={}){
     if(propHeight){propHeight.value=inputH.value;propHeight.disabled=pointOnly;}
     if(propZIndex)propZIndex.value=String(Number(o.zIndex||0));
     syncAssetInspector();
+
+    const locked=isLocked(item);
+    if(lockButton){
+      lockButton.disabled=false;
+      lockButton.textContent=locked?'UNLOCK SELECTED':'LOCK SELECTED';
+      lockButton.classList.toggle('active',locked);
+    }
+    [inputX,inputY,inputIdLabel,inputRotation,inputZIndex,propTarget,propRequires,propLabel,propActive,propZIndex].filter(Boolean).forEach(el=>{el.disabled=locked;});
+    inputW.disabled=pointOnly||locked;inputH.disabled=pointOnly||locked;
+    if(propWidth)propWidth.disabled=pointOnly||locked;
+    if(propHeight)propHeight.disabled=pointOnly||locked;
+    if(assetSelect)assetSelect.disabled=locked||item.type!=='building';
+    if(assetApply)assetApply.disabled=locked||item.type!=='building';
+    if(assetClear)assetClear.disabled=locked||item.type!=='building';
+    if(duplicateButton)duplicateButton.disabled=locked||!['building','prop'].includes(item.type);
+    if(deleteButton)deleteButton.disabled=locked||item.type==='alley'||!['building','prop'].includes(item.type);
+    editorScope.querySelectorAll('[data-bw-nudge]').forEach(button=>{button.disabled=locked;});
     syncStudioStatus();
   }
   function select(key){
@@ -763,6 +783,8 @@ export async function renderBlockWorld(root, options={}){
     working.buildings.forEach((b,i)=>{
       const el=buildings.querySelector(`[data-building-id="${b.id}"]`);
       if(!el)return; el.dataset.editKey=`building:${i}`;
+      el.classList.toggle('bw-edit-locked',!!b.locked);
+      el.dataset.editLocked=b.locked?'true':'false';
       el.style.left=`${b.x}px`;el.style.top=`${b.y}px`;el.style.width=`${b.w}px`;el.style.height=`${b.h}px`;
       let marker=el.querySelector('.bw-door-marker');
       if(!marker){marker=document.createElement('span');marker.className='bw-door-marker';el.appendChild(marker);}
@@ -788,15 +810,18 @@ export async function renderBlockWorld(root, options={}){
     props.querySelectorAll('.bw-prop-authored').forEach(x=>x.remove());
     working.props.forEach((p,i)=>{
       const el=document.createElement('div');el.className=`bw-prop bw-${p.kind} bw-prop-authored`;
-      el.dataset.editKey=`prop:${i}`;el.style.left=`${p.x}px`;el.style.top=`${p.y}px`;
+      el.dataset.editKey=`prop:${i}`;el.classList.toggle('bw-edit-locked',!!p.locked);el.dataset.editLocked=p.locked?'true':'false';
+      el.style.left=`${p.x}px`;el.style.top=`${p.y}px`;
       el.innerHTML=p.kind==='tree'?'<i></i>':'<i></i><b></b>';props.appendChild(el);
     });
-    alley.dataset.editKey='alley:0';alley.style.left=`${working.alley.x}px`;alley.style.top=`${working.alley.y}px`;
+    alley.dataset.editKey='alley:0';alley.classList.toggle('bw-edit-locked',!!working.alley.locked);alley.dataset.editLocked=working.alley.locked?'true':'false';
+    alley.style.left=`${working.alley.x}px`;alley.style.top=`${working.alley.y}px`;
     alley.style.width=`${working.alley.width}px`;alley.style.height=`${working.alley.height}px`;
     scene.querySelectorAll('.bw-editor-guide').forEach(x=>x.remove());
     if(editMode){
       const addGuide=(key,o,kind,label)=>{
         const g=document.createElement('div');g.className=`bw-editor-guide bw-guide-${kind}`;g.dataset.editKey=key;
+        g.classList.toggle('bw-edit-locked',!!o.locked);g.dataset.editLocked=o.locked?'true':'false';
         const point=kind==='spawn';
         g.style.left=`${o.x||0}px`;g.style.top=`${o.y||0}px`;
         if(!point){g.style.width=`${o.w??o.width??40}px`;g.style.height=`${o.h??o.height??40}px`;}
@@ -812,7 +837,7 @@ export async function renderBlockWorld(root, options={}){
     // H1.2: touch/mouse resize gizmos for the selected rectangular editable.
     scene.querySelectorAll('.bw-resize-gizmos').forEach(x=>x.remove());
     const gizmoItem=currentEditable();
-    if(editMode&&gizmoItem&&!['prop','spawn'].includes(gizmoItem.type)){
+    if(editMode&&gizmoItem&&!isLocked(gizmoItem)&&!['prop','spawn'].includes(gizmoItem.type)){
       const target=scene.querySelector(`[data-edit-key="${selectedKey}"]`);
       if(target){
         const gizmos=document.createElement('div');
@@ -885,7 +910,7 @@ export async function renderBlockWorld(root, options={}){
     await setEditMode(!editMode);
   }
   function applyInspector(event){
-    const item=currentEditable();if(!item)return;
+    const item=currentEditable();if(!item||isLocked(item))return;
     const source=event?.target;
 
     // The compact transform popup and Properties popup expose a few mirrored
@@ -1073,7 +1098,7 @@ export async function renderBlockWorld(root, options={}){
       if((e.ctrlKey||e.metaKey)&&k==='y'){redo();e.preventDefault();return;}
       if(k==='escape'){if(editorCollapsed)setEditMode(false);else toggleEditorPanel();e.preventDefault();return;}
       const item=currentEditable();
-      if(item&&!typing&&['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){
+      if(item&&!isLocked(item)&&!typing&&['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){
         const before=snapshot(),step=(Number(snapSelect.value)||1)*(e.shiftKey?5:1);
         if(k==='arrowleft')item.o.x=(Number(item.o.x)||0)-step;
         if(k==='arrowright')item.o.x=(Number(item.o.x)||0)+step;
@@ -1082,7 +1107,7 @@ export async function renderBlockWorld(root, options={}){
         if(item.type==='building'){item.o.doorX+=k==='arrowleft'?-step:k==='arrowright'?step:0;item.o.doorY=item.o.y+item.o.h;}
         commit(before);renderEditorObjects();syncInspector();e.preventDefault();return;
       }
-      if(item&&!typing&&(k==='delete'||k==='backspace')&&(item.type==='building'||item.type==='prop')){
+      if(item&&!isLocked(item)&&!typing&&(k==='delete'||k==='backspace')&&(item.type==='building'||item.type==='prop')){
         deleteButton.click();e.preventDefault();return;
       }
       return;
@@ -1109,9 +1134,10 @@ export async function renderBlockWorld(root, options={}){
   function onEditorPointerDown(e){
     if(!editMode)return;
     const target=e.target.closest('[data-edit-key]');if(!target)return;
+    const item=allEditable().find(x=>x.key===target.dataset.editKey);
+    if(!item||isLocked(item))return;
     e.preventDefault();e.stopPropagation();
     select(target.dataset.editKey);
-    const item=currentEditable();if(!item)return;
     const resize=e.target.closest('[data-resize]')?.dataset.resize||'';
     drag={
       id:e.pointerId,key:selectedKey,mode:resize?'resize':'move',resize,
@@ -1203,6 +1229,12 @@ export async function renderBlockWorld(root, options={}){
   revertDraftButton?.addEventListener('click',revertServerDraft);
   historyLoadButton?.addEventListener('click',restoreHistoryToDraft);
   focusButton?.addEventListener('click',focusSelected);
+  lockButton?.addEventListener('click',()=>{
+    const item=currentEditable();if(!item)return;
+    const before=snapshot();
+    item.o.locked=!item.o.locked;
+    commit(before);renderEditorObjects();syncInspector();
+  });
   editorScope.querySelectorAll('[data-bw-nudge]').forEach(button=>button.addEventListener('click',()=>{
     const dir=button.dataset.bwNudge;
     if(dir==='up')nudgeSelected(0,-1);
@@ -1211,7 +1243,18 @@ export async function renderBlockWorld(root, options={}){
     if(dir==='right')nudgeSelected(1,0);
   }));
   resetButton.addEventListener('click',()=>{const before=snapshot();working=JSON.parse(JSON.stringify(BLOCK1));commit(before);select('');renderEditorObjects();});
-  addPropButton.addEventListener('click',()=>{const before=snapshot();working.props.push({kind:propKind.value,x:snap(state.x+70),y:snap(state.y)});commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);});
+  let propSerial=0;
+  addPropButton.addEventListener('click',()=>{
+    const before=snapshot();
+    const kind=String(propKind.value||'prop').trim()||'prop';
+    const sameKind=(working.props||[]).filter(p=>p.kind===kind).length;
+    const step=Math.max(10,Number(snapSelect.value)||10);
+    const column=sameKind%6,row=Math.floor(sameKind/6);
+    const slug=kind.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'prop';
+    const id=`prop-${slug}-${Date.now().toString(36)}-${(++propSerial).toString(36)}`;
+    working.props.push({id,kind,x:snap(state.x+70+column*step*2),y:snap(state.y+row*step*2),active:true});
+    commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);
+  });
   editorScope.querySelectorAll('[data-bw-add-object]').forEach(button=>button.addEventListener('click',()=>{
     const kind=button.dataset.bwAddObject;
     const before=snapshot();
@@ -1242,8 +1285,8 @@ export async function renderBlockWorld(root, options={}){
       if(nearest){nearest.b.doorX=snap(state.x);nearest.b.doorY=snap(state.y);commit(before);renderEditorObjects();select(`building:${nearest.i}`);}
     }
   }));
-  duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item)return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}});
-  deleteButton.addEventListener('click',()=>{const item=currentEditable();if(!item||item.type==='alley')return;const before=snapshot();if(item.type==='building')working.buildings.splice(item.i,1);else working.props.splice(item.i,1);commit(before);select('');renderEditorObjects();});
+  duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item))return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){const slug=String(copy.kind||'prop').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'prop';copy.id=`prop-${slug}-${Date.now().toString(36)}-${(++propSerial).toString(36)}`;delete copy.locked;working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}});
+  deleteButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item)||item.type==='alley')return;const before=snapshot();if(item.type==='building')working.buildings.splice(item.i,1);else working.props.splice(item.i,1);commit(before);select('');renderEditorObjects();});
   scene.addEventListener('pointerdown',onEditorPointerDown,true);
   scene.addEventListener('pointermove',onEditorPointerMove,true);
   scene.addEventListener('pointerup',onEditorPointerUp,true);

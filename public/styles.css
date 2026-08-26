@@ -2858,3 +2858,115 @@ body.dev-block-editor-page{
   .dev-block-editor-page .bw-studio-viewport-tools{right:7px!important;bottom:7px!important;width:32px!important;padding:3px!important}
   .dev-block-editor-page .bw-studio-viewport-tools button{height:27px!important;min-height:27px!important;font-size:12px!important}
 }
+
+
+/* =====================================================================
+   Hybrid H1.15 — LOCKED OBJECTS + TOUCH-SCROLLABLE EDITOR POPOVERS
+   The Block World canvas still owns direct manipulation, but developer
+   popovers must remain normal Safari scroll containers. Lock metadata is
+   persisted in the authored block JSON and only affects edit operations.
+   ===================================================================== */
+
+/* The generic Block World shell disables browser gestures for gameplay.
+   On the private editor page, restore normal gesture negotiation at the
+   shell level, then explicitly keep only the actual world viewport locked. */
+.dev-block-editor-page .blockworld-shell.bw-editor-page{
+  touch-action:auto!important;
+}
+.dev-block-editor-page .blockworld-viewport,
+.dev-block-editor-page .blockworld-scene{
+  touch-action:none!important;
+}
+
+/* Side/Tools popovers are bounded flex columns with independently scrolling
+   bodies. This avoids the old percentage-height + max-height combination
+   that Safari could display but would not reliably pan. */
+.dev-block-editor-page .bw-studio-panel[data-collapsed="false"]{
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  min-height:0!important;
+}
+.dev-block-editor-page .bw-studio-panel-head{
+  flex:0 0 34px!important;
+  position:relative!important;
+  z-index:2!important;
+}
+.dev-block-editor-page .bw-studio-panel-body{
+  flex:1 1 auto!important;
+  height:auto!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-x pan-y!important;
+  scrollbar-width:thin!important;
+}
+.dev-block-editor-page .bw-studio-left,
+.dev-block-editor-page .bw-studio-right{
+  max-height:min(76dvh,calc(100dvh - var(--be-header) - 28px))!important;
+}
+.dev-block-editor-page .bw-studio-bottom{
+  max-height:min(52dvh,230px)!important;
+}
+
+/* Transform is a scroll surface itself rather than a clipped one-row panel. */
+.dev-block-editor-page .bw-studio-transform[data-collapsed="false"]{
+  display:grid!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-x pan-y!important;
+  max-height:min(62dvh,220px)!important;
+  min-width:0!important;
+}
+.dev-block-editor-page .bw-studio-bottom-body{
+  width:100%!important;
+  min-width:0!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-x pan-y!important;
+}
+
+/* Locked authored objects stay visible, but direct scene manipulation ignores
+   them. The object dropdown remains the deliberate path to select/unlock. */
+.bw-edit-mode .bw-edit-locked{
+  cursor:not-allowed!important;
+}
+.bw-edit-mode .bw-editor-guide.bw-edit-locked{
+  border-style:dashed!important;
+  opacity:.62!important;
+}
+.bw-edit-mode .bw-editor-guide.bw-edit-locked::after{
+  content:"LOCKED";
+  position:absolute;
+  right:4px;top:4px;
+  padding:2px 4px;
+  border-radius:4px;
+  background:#07161ddd;
+  border:1px solid #8bb3bd88;
+  color:#b8d5dc;
+  font:900 7px/1 system-ui,sans-serif;
+  letter-spacing:.08em;
+  pointer-events:none;
+}
+#bw-editor-lock.active{
+  border-color:#63eab3!important;
+  color:#7bf2c2!important;
+  background:#0a2a22!important;
+}
+
+@media (max-width:760px), (max-height:470px){
+  .dev-block-editor-page .bw-studio-left,
+  .dev-block-editor-page .bw-studio-right{
+    max-height:calc(100dvh - var(--be-header) - 18px)!important;
+  }
+  .dev-block-editor-page .bw-studio-bottom{
+    max-height:min(58dvh,190px)!important;
+  }
+  .dev-block-editor-page .bw-studio-transform[data-collapsed="false"]{
+    max-height:min(62dvh,190px)!important;
+  }
+}

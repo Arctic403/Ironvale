@@ -141,6 +141,7 @@ export function BlockEditor() {
               <div className="bw-studio-icon-tools">
                 <button className="active" type="button">SELECT</button><button type="button">MOVE</button>
                 <button type="button" disabled>ROTATE</button><button type="button">SCALE</button>
+                <button type="button" id="bw-editor-lock">LOCK SELECTED</button>
                 <button type="button" id="bw-editor-duplicate">DUPLICATE</button><button type="button" id="bw-editor-local-export">EXPORT</button>
               </div>
             </div>
