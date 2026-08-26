@@ -902,3 +902,27 @@ body.bw-fullscreen-mode .blockworld-shell{
 .bw-asset-import{position:relative;overflow:hidden;display:grid!important;place-items:center;min-height:38px;padding:8px;border:1px dashed #ffffff40;border-radius:7px;color:#fff!important;background:#18262c;cursor:pointer}
 .bw-asset-import input{position:absolute;inset:0;opacity:0;cursor:pointer}
 #bw-asset-status{font-size:9px;line-height:1.35;color:#9fb0b7;overflow-wrap:anywhere}
+
+
+/* Phase 11.9 — Asset Lab is the sole storefront renderer.
+   Building DOM boxes are gameplay geometry only; legacy procedural facade children are gone. */
+.bw-building-geometry {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+.bw-building-geometry::before,
+.bw-building-geometry::after { content: none !important; display: none !important; }
+.bw-building-art {
+  position: absolute;
+  display: block;
+  max-width: none;
+  max-height: none;
+  object-fit: unset;
+  pointer-events: none;
+  z-index: 2;
+}
+.bw-building:not(.has-building-art) { background: transparent !important; box-shadow: none !important; }
+.bw-building:not(.has-building-art)::before,
+.bw-building:not(.has-building-art)::after { content: none !important; }

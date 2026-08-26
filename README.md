@@ -400,3 +400,14 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Imported packs are persisted in the browser asset library and restored on reload, matching the Asset Lab workflow.
 - Runtime building placement stays separate from the Asset Lab metadata so collision and door geometry remain untouched.
 - The previous Corner Mart-only baked source blob was removed; the same importer path now works for every storefront asset pack.
+
+
+## Phase 11.9 — Asset Lab-native storefront runtime
+
+- Asset Lab is now the sole visual source for Commerce Street storefront buildings.
+- Removed the legacy procedural storefront markup (roof/cornice/windows/awnings/signs/facade decoration).
+- RiftCity imports `riftcity-asset-pack` objects intact and renders their embedded image source directly.
+- PNG, JPEG, WebP and SVG data-image sources are accepted through the Asset Lab data-URL pipeline.
+- Asset Lab-authored source dimensions, X/Y, scale, rotation and opacity drive rendering; the duplicate RiftCity art-scale/X/Y/fit controls were removed.
+- Building rectangles remain only as invisible gameplay geometry for collision, door interaction and routing.
+- Buildings without an assigned Asset Lab asset no longer fall back to the old generated storefront.

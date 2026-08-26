@@ -76,13 +76,7 @@ export async function renderBlockWorld(root){
             <label class="bw-asset-import">Import RiftAssets JSON<input id="bw-asset-file" type="file" accept="application/json,.json"></label>
             <div id="bw-asset-status">Persistent RiftCity art registry ready.</div>
             <label>Asset<select id="bw-editor-asset"><option value="">No asset</option></select></label>
-            <div class="bw-editor-grid">
-              <label>Art scale<input id="bw-asset-scale" type="number" min="0.05" max="5" step="0.05" value="1"></label>
-              <label>Art Y<input id="bw-asset-y" type="number" step="5" value="0"></label>
-              <label>Art X<input id="bw-asset-x" type="number" step="5" value="0"></label>
-              <label>Fit<select id="bw-asset-fit"><option value="contain">Contain</option><option value="cover">Cover</option></select></label>
-            </div>
-            <div class="bw-editor-actions"><button type="button" id="bw-asset-apply">APPLY TO BUILDING</button><button type="button" id="bw-asset-clear">CLEAR ART</button></div>
+            <div class="bw-editor-actions"><button type="button" id="bw-asset-apply">ASSIGN ASSET</button><button type="button" id="bw-asset-clear">CLEAR ART</button></div>
           </div>
           <button type="button" class="primary" id="bw-editor-export">EXPORT WORLD JSON</button>
           <button type="button" id="bw-editor-reset">RESET BLOCK</button>
@@ -119,8 +113,7 @@ export async function renderBlockWorld(root){
   const exportButton=root.querySelector('#bw-editor-export'),resetButton=root.querySelector('#bw-editor-reset');
   const addPropButton=root.querySelector('#bw-editor-add-prop'),propKind=root.querySelector('#bw-editor-prop-kind');
   const assetFile=root.querySelector('#bw-asset-file'),assetSelect=root.querySelector('#bw-editor-asset');
-  const assetStatus=root.querySelector('#bw-asset-status'),assetScale=root.querySelector('#bw-asset-scale');
-  const assetX=root.querySelector('#bw-asset-x'),assetY=root.querySelector('#bw-asset-y'),assetFit=root.querySelector('#bw-asset-fit');
+  const assetStatus=root.querySelector('#bw-asset-status');
   const assetApply=root.querySelector('#bw-asset-apply'),assetClear=root.querySelector('#bw-asset-clear');
 
   // Asset Lab-compatible runtime library. Keep every imported asset object intact:
@@ -218,8 +211,7 @@ export async function renderBlockWorld(root){
   function syncAssetInspector(){
     const item=currentEditable(); const b=item?.type==='building'?item.o:null;
     assetSelect.disabled=!b;assetApply.disabled=!b;assetClear.disabled=!b;
-    assetSelect.value=b?.asset?.assetId&&importedAssets.has(b.asset.assetId)?b.asset.assetId:(b?.asset?.id&&importedAssets.has(b.asset.id)?b.asset.id:'');
-    assetScale.value=b?.asset?.scale??1;assetX.value=b?.asset?.x??0;assetY.value=b?.asset?.y??0;assetFit.value=b?.asset?.fit||'contain';
+    assetSelect.value=b?.assetId&&importedAssets.has(b.assetId)?b.assetId:'';
   }
   async function importAssetPack(file){
     if(!file)return;
@@ -248,7 +240,7 @@ export async function renderBlockWorld(root){
         const target=working.buildings.find(b=>b.id===hinted)
           ||working.buildings.find(b=>String(b.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===hinted);
         if(target){
-          target.asset={assetId:imported.assetId,scale:1,x:0,y:0,fit:'contain'};
+          target.assetId=imported.assetId;
           selectedKey=`building:${working.buildings.indexOf(target)}`;
           matched++;
         }
@@ -265,9 +257,12 @@ export async function renderBlockWorld(root){
   function applyBuildingAsset(){
     const item=currentEditable();if(item?.type!=='building')return;
     const id=assetSelect.value;if(!id||!importedAssets.has(id)){assetStatus.textContent='Choose an imported asset first.';return;}
-    const before=snapshot();item.o.asset={assetId:id,scale:Math.max(.05,Number(assetScale.value)||1),x:Number(assetX.value)||0,y:Number(assetY.value)||0,fit:assetFit.value==='cover'?'cover':'contain'};commit(before);renderEditorObjects();syncAssetInspector();
+    const before=snapshot();item.o.assetId=id;commit(before);renderEditorObjects();syncAssetInspector();
   }
-  function clearBuildingAsset(){const item=currentEditable();if(item?.type!=='building')return;const before=snapshot();delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();}
+  function clearBuildingAsset(){
+    const item=currentEditable();if(item?.type!=='building')return;
+    const before=snapshot();delete item.o.assetId;delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();
+  }
   function syncInspector(){
     const item=currentEditable(); if(!item){inputX.value=inputY.value=inputW.value=inputH.value='';return;}
     const o=item.o; inputX.value=Math.round(o.x||0);inputY.value=Math.round(o.y||0);
@@ -289,15 +284,18 @@ export async function renderBlockWorld(root){
       if(!marker){marker=document.createElement('span');marker.className='bw-door-marker';el.appendChild(marker);}
       marker.style.left=`${(b.doorX??b.x+b.w/2)-b.x}px`;marker.title='Interaction door';
       let art=el.querySelector('.bw-building-art');
-      const assetKey=b.asset?.assetId||b.asset?.id;
+      const assetKey=b.assetId||b.asset?.assetId||b.asset?.id;
       const imported=assetKey?importedAssets.get(assetKey):null;
       if(imported){
         if(!art){art=document.createElement('img');art.className='bw-building-art';art.draggable=false;el.prepend(art);}
-        art.src=imported.src;art.alt=b.name;art.style.objectFit=b.asset.fit||'contain';
+        art.src=imported.src;art.alt=b.name;
+        art.style.width=`${imported.sourceWidth||b.w}px`;
+        art.style.height=`${imported.sourceHeight||b.h}px`;
+        art.style.left=`${Number(imported.x)||0}px`;
+        art.style.top=`${Number(imported.y)||0}px`;
         art.style.opacity=String(Math.max(0,Math.min(1,Number(imported.opacity??1))));
-        const runtimeScale=Number(b.asset.scale)||1;
-        const runtimeX=Number(b.asset.x)||0,runtimeY=Number(b.asset.y)||0;
-        art.style.transform=`translate(${runtimeX}px,${runtimeY}px) scale(${runtimeScale}) rotate(${Number(imported.rotation)||0}deg)`;
+        art.style.transformOrigin='50% 100%';
+        art.style.transform=`translate(-50%,-100%) scale(${Number(imported.scale??1)}) rotate(${Number(imported.rotation)||0}deg)`;
         art.dataset.assetId=imported.assetId;
         art.dataset.assetInternalId=imported.id;
         el.classList.add('has-building-art');
@@ -333,34 +331,13 @@ export async function renderBlockWorld(root){
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${working.id}-edit.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   }
 
+  // Buildings are gameplay geometry only. Visible storefront art comes exclusively
+  // from Asset Lab packs; no legacy procedural facade is generated.
   for(const b of BLOCK1.buildings){
     const el=document.createElement('div');
-    el.className=`bw-building tone-${b.tone} style-${b.style||b.tone}`; el.dataset.buildingId=b.id;
+    el.className='bw-building bw-building-geometry';
+    el.dataset.buildingId=b.id;
     el.style.cssText=`left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px`;
-    const upperCount=b.style==='apartments'?10:(b.style==='realty'?6:5);
-    const sideSign=b.style==='pharmacy'?'✚':b.style==='pawn'?'$':b.style==='noodle'?'NOODLES':'';
-    el.innerHTML=`
-      <div class="bw-roof">
-        <span class="bw-roof-unit"></span>
-        <span class="bw-roof-pipe"></span>
-        <span class="bw-roof-vent"></span>
-      </div>
-      <div class="bw-cornice"></div>
-      <div class="bw-upper">${'<i></i>'.repeat(upperCount)}</div>
-      <div class="bw-balcony"><i></i><i></i><i></i></div>
-      <div class="bw-storefront">
-        <b>${b.sign}</b><em>${b.detail||''}</em>
-        <span class="bw-awning"></span>
-        <span class="bw-door"><i></i></span>
-        <span class="bw-window"></span>
-        <span class="bw-window-display"></span>
-        <span class="bw-security-grille"></span>
-        <span class="bw-menu-board"></span>
-        <span class="bw-neon-open">OPEN</span>
-        <span class="bw-address"></span>
-      </div>
-      <span class="bw-side-sign">${sideSign}</span>
-      <span class="bw-fire-escape-small"><i></i><i></i><i></i></span>`;
     buildings.appendChild(el);
   }
   const alley=document.createElement('div');
