@@ -636,9 +636,13 @@ export async function renderBlockWorld(root){
   function keyup(e){keys.delete(e.key.toLowerCase());}
   function joy(e){
     const r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-    let x=e.clientX-cx,y=e.clientY-cy; const m=Math.hypot(x,y),lim=r.width*.34;
-    if(m>lim){x=x/m*lim;y=y/m*lim;}
-    joyX=x/lim;joyY=y/lim;knob.style.transform=`translate(${x}px,${y}px)`;
+    let screenX=e.clientX-cx,screenY=e.clientY-cy;
+    const m=Math.hypot(screenX,screenY),lim=r.width*.34;
+    if(m>lim){screenX=screenX/m*lim;screenY=screenY/m*lim;}
+    const world=pointerVectorToWorld(screenX,screenY);
+    joyX=world.x/lim;joyY=world.y/lim;
+    // The knob follows the finger in screen space; only movement math is remapped.
+    knob.style.transform=`translate(${screenX}px,${screenY}px)`;
   }
   function down(e){if(editMode)return;e.preventDefault();e.stopPropagation();pointerId=e.pointerId;stick.setPointerCapture?.(pointerId);joy(e);}
   function move(e){if(e.pointerId===pointerId){e.preventDefault();joy(e);}}
@@ -666,8 +670,10 @@ export async function renderBlockWorld(root){
     if(!drag||e.pointerId!==drag.id)return;
     e.preventDefault();e.stopPropagation();
     const item=allEditable().find(x=>x.key===drag.key);if(!item)return;
-    const scale=scene.getBoundingClientRect().width/(working.width||BLOCK1.width)||1;
-    const dx=(e.clientX-drag.startX)/scale,dy=(e.clientY-drag.startY)/scale;
+    const scale=pointerScaleToWorld();
+    const screenDx=e.clientX-drag.startX,screenDy=e.clientY-drag.startY;
+    const worldDelta=pointerVectorToWorld(screenDx,screenDy);
+    const dx=worldDelta.x/scale,dy=worldDelta.y/scale;
     if(drag.mode==='resize'){
       const edge=drag.resize,min=30;
       let x=drag.ox,y=drag.oy,w=drag.ow,h=drag.oh;
@@ -739,6 +745,22 @@ export async function renderBlockWorld(root){
   function isiOS(){
     return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
       (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  }
+
+  function usesRotatedIOSFullscreen(){
+    return fullscreenMode && isiOS() && window.matchMedia?.('(orientation: portrait)').matches;
+  }
+
+  // Convert a screen-space pointer vector back into the unrotated game/world axes.
+  // The iPhone portrait fullscreen fallback rotates #game-root 90deg clockwise in CSS.
+  function pointerVectorToWorld(dx,dy){
+    return usesRotatedIOSFullscreen() ? {x:dy,y:-dx} : {x:dx,y:dy};
+  }
+
+  function pointerScaleToWorld(){
+    const rect=scene.getBoundingClientRect();
+    const worldWidth=working.width||BLOCK1.width||1;
+    return Math.max(0.0001,(usesRotatedIOSFullscreen()?rect.height:rect.width)/worldWidth);
   }
 
   function updateShellSize(){

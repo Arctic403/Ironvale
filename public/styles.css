@@ -1514,3 +1514,31 @@ body.bw-fullscreen-mode .bw-editor-more{display:none!important}
   .bw-editor-transform-grid{min-width:390px!important;flex-basis:390px!important}
   .bw-editor-quickbar{min-width:220px!important;flex-basis:220px!important}
 }
+
+
+/* Hybrid H1.6 — iPhone editor grab targets.
+   Keep all eight handles easy to acquire with a thumb in portrait and CSS-rotated fullscreen. */
+.bw-resize-handle{
+  width:64px!important;
+  height:64px!important;
+  min-width:64px!important;
+  min-height:64px!important;
+}
+.bw-resize-handle::after{
+  width:24px!important;
+  height:24px!important;
+  border-width:4px!important;
+}
+@media (pointer:coarse){
+  .bw-resize-handle{
+    width:76px!important;
+    height:76px!important;
+    min-width:76px!important;
+    min-height:76px!important;
+  }
+  .bw-resize-handle::after{
+    width:28px!important;
+    height:28px!important;
+    border-width:4px!important;
+  }
+}

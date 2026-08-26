@@ -547,3 +547,12 @@ The Block Editor is now a real development authoring tool rather than a browser-
 - Block layout JSON is validated and size-capped server-side; images/assets remain outside D1.
 - The compact mobile editor row scrolls horizontally instead of clipping controls.
 - Resize gizmos have larger touch targets on coarse-pointer mobile devices.
+
+
+## Hybrid H1.6 — iPhone fullscreen input-axis repair
+
+- Fixed the CSS-rotated iPhone fullscreen fallback so touch input is converted from screen-space back into the unrotated game-world axes.
+- Joystick movement now follows the direction shown on screen while the joystick knob still follows the finger directly.
+- Block Editor move and resize drags use the same coordinate conversion, including the correct scene scale while the game root is rotated.
+- Native landscape/Android fullscreen and normal non-fullscreen controls keep their existing unrotated input path.
+- Mobile resize gizmos now use substantially larger coarse-pointer hit targets and larger visible handles for easier iPhone editing.
