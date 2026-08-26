@@ -55,7 +55,7 @@ export async function renderBlockWorld(root){
       <aside class="bw-editor" id="bw-editor" aria-hidden="true">
         <header><strong>BLOCK EDITOR</strong><button id="bw-editor-close" type="button">×</button></header>
         <div class="bw-editor-tabs">
-          <button data-tool="select" class="active">SELECT</button><button data-tool="add">ADD PROP</button>
+          <button type="button" data-tool="select" class="active">SELECT</button><button type="button" data-tool="add">ADD PROP</button>
         </div>
         <div class="bw-editor-body">
           <label>Object<select id="bw-editor-object"></select></label>
@@ -66,10 +66,10 @@ export async function renderBlockWorld(root){
             <label>H<input id="bw-editor-h" type="number" step="5"></label>
           </div>
           <label>Snap<select id="bw-editor-snap"><option value="1">OFF</option><option value="5">5 px</option><option value="10" selected>10 px</option><option value="25">25 px</option></select></label>
-          <div class="bw-editor-actions"><button id="bw-editor-duplicate">DUPLICATE</button><button id="bw-editor-delete">DELETE</button></div>
+          <div class="bw-editor-actions"><button type="button" id="bw-editor-duplicate">DUPLICATE</button><button type="button" id="bw-editor-delete">DELETE</button></div>
           <label>Add prop<select id="bw-editor-prop-kind"><option>tree</option><option>lamp</option><option>bench</option><option>hydrant</option><option>box</option><option>news</option><option>car</option><option>van</option></select></label>
-          <button id="bw-editor-add-prop">ADD AT PLAYER</button>
-          <div class="bw-editor-actions"><button id="bw-editor-undo">UNDO</button><button id="bw-editor-redo">REDO</button></div>
+          <button type="button" id="bw-editor-add-prop">ADD AT PLAYER</button>
+          <div class="bw-editor-actions"><button type="button" id="bw-editor-undo">UNDO</button><button type="button" id="bw-editor-redo">REDO</button></div>
           <div class="bw-asset-panel">
             <strong>BUILDING ART ASSETS</strong>
             <label class="bw-asset-import">Import RiftAssets JSON<input id="bw-asset-file" type="file" accept="application/json,.json"></label>
@@ -81,17 +81,17 @@ export async function renderBlockWorld(root){
               <label>Art X<input id="bw-asset-x" type="number" step="5" value="0"></label>
               <label>Fit<select id="bw-asset-fit"><option value="contain">Contain</option><option value="cover">Cover</option></select></label>
             </div>
-            <div class="bw-editor-actions"><button id="bw-asset-apply">APPLY TO BUILDING</button><button id="bw-asset-clear">CLEAR ART</button></div>
+            <div class="bw-editor-actions"><button type="button" id="bw-asset-apply">APPLY TO BUILDING</button><button type="button" id="bw-asset-clear">CLEAR ART</button></div>
           </div>
-          <button class="primary" id="bw-editor-export">EXPORT WORLD JSON</button>
-          <button id="bw-editor-reset">RESET BLOCK</button>
+          <button type="button" class="primary" id="bw-editor-export">EXPORT WORLD JSON</button>
+          <button type="button" id="bw-editor-reset">RESET BLOCK</button>
           <small>Drag objects directly in the scene. Buildings also expose door markers. Export and send the JSON with your newest workspace.</small>
         </div>
       </aside>
       <div class="bw-controls">
         <div class="bw-stick" id="bw-stick"><div class="bw-knob" id="bw-knob"></div></div>
-        <button class="bw-run" id="bw-run">RUN</button>
-        <button class="bw-interact" id="bw-interact" disabled>ENTER</button>
+        <button type="button" class="bw-run" id="bw-run">RUN</button>
+        <button type="button" class="bw-interact" id="bw-interact" disabled>ENTER</button>
       </div>
     </section>`;
 
@@ -439,7 +439,14 @@ export async function renderBlockWorld(root){
   function onEditorPointerUp(e){
     if(!drag||e.pointerId!==drag.id)return;commit(drag.before);drag=null;
   }
-  assetFile.addEventListener('change',()=>importAssetPack(assetFile.files?.[0]));
+  assetFile.addEventListener('click',e=>{e.stopPropagation();});
+  assetFile.addEventListener('change',async e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const file=e.currentTarget.files?.[0];
+    assetStatus.textContent=file?`Reading ${file.name}…`:'No file selected.';
+    if(file) await importAssetPack(file);
+  });
   assetApply.addEventListener('click',applyBuildingAsset);assetClear.addEventListener('click',clearBuildingAsset);
   assetSelect.addEventListener('change',()=>{const item=currentEditable();if(item?.type==='building'&&item.o.asset?.id===assetSelect.value)syncAssetInspector();});
   editToggle.addEventListener('click',()=>setEditMode(!editMode));
@@ -456,6 +463,11 @@ export async function renderBlockWorld(root){
   scene.addEventListener('pointermove',onEditorPointerMove,true);
   scene.addEventListener('pointerup',onEditorPointerUp,true);
   scene.addEventListener('pointercancel',onEditorPointerUp,true);
+  editor.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();},true);
+  editor.addEventListener('click',e=>{
+    const button=e.target.closest('button');
+    if(button){button.type='button';}
+  },true);
   renderEditorObjects();
 
 
