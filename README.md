@@ -433,3 +433,11 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Keyboard editing supports `E` to toggle edit mode, arrow-key nudging, Shift for larger nudges, Delete/Backspace for removable objects, Ctrl/Cmd+Z undo and Ctrl/Cmd+Y redo.
 - Editor targets now include buildings, props, player spawn, west/east block exits, the walkable area and the panoramic scene plate. Legacy Asset Lab controls remain available in a collapsed compatibility section.
 - Block Editor JSON schema is now version 2.
+
+
+## Phase 12.2 — mobile camera/control repair
+
+- Restored Commerce Street's playable world to 3600 × 1440 units; the 3600 × 1800 panoramic plate is visual-only.
+- Mobile and fullscreen camera fitting now uses gameplay dimensions rather than the panorama bitmap height.
+- Touch controls are explicitly layered above scene/editor guides in play mode and use pointer capture/preventDefault for Safari reliability.
+- The Block Editor remains minimizable and continues to disable gameplay controls only while edit mode is active.

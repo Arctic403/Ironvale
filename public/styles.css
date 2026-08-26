@@ -1021,3 +1021,28 @@ body.bw-fullscreen-mode .blockworld-shell{
 @media (min-width:1000px){
   .bw-editor{width:390px!important}
 }
+
+
+/* Phase 12.2 — restore gameplay viewport scale + reliable mobile controls.
+   The 2:1 panorama is visual-only; it must not redefine the 1440-unit game world. */
+.blockworld-scene{height:1440px!important;min-height:0!important}
+.bw-scene-plate{
+  width:3600px!important;height:1800px!important;
+  object-fit:fill!important;pointer-events:none!important;
+}
+.bw-controls{z-index:90!important;pointer-events:none!important}
+.bw-stick,.bw-run,.bw-interact{
+  z-index:91!important;pointer-events:auto!important;
+  touch-action:none!important;-webkit-user-select:none!important;user-select:none!important;
+}
+.bw-dev-buttons,.bw-block-label{z-index:92!important}
+.bw-editor{z-index:110!important}
+.bw-editor-guide{z-index:85!important}
+.blockworld-viewport{touch-action:none!important}
+@media(max-width:700px){
+  .blockworld-scene{height:1440px!important;min-height:0!important}
+}
+body.bw-fullscreen-mode .bw-controls{z-index:10001!important}
+body.bw-fullscreen-mode .bw-dev-buttons,
+body.bw-fullscreen-mode .bw-block-label{z-index:10002!important}
+body.bw-fullscreen-mode .bw-editor{z-index:10010!important}

@@ -498,10 +498,11 @@ export async function renderBlockWorld(root){
     player.style.transform=`translate(-50%,-100%) scale(${playerDepth})`;
     player.style.zIndex=String(30+Math.round(state.y));
 
-    // Scale Block 01 to the real viewport height so portrait mode never crops
-    // the buildings/road/controls. The camera then pans through world space.
+    // Gameplay world height is independent from the 2:1 scene-plate bitmap.
+    // Fit the playable 1440-unit block to the available viewport; the plate
+    // may extend below it visually without changing movement/camera scale.
     const authoredHeight=working.height||BLOCK1.height;
-    const fitScale=Math.max(.26,Math.min(1,viewport.clientHeight/authoredHeight));
+    const fitScale=Math.max(.20,Math.min(1,viewport.clientHeight/authoredHeight));
     const visibleWorldWidth=viewport.clientWidth/fitScale;
     const cameraX=Math.max(
       0,
@@ -544,8 +545,8 @@ export async function renderBlockWorld(root){
     if(m>lim){x=x/m*lim;y=y/m*lim;}
     joyX=x/lim;joyY=y/lim;knob.style.transform=`translate(${x}px,${y}px)`;
   }
-  function down(e){if(editMode)return;pointerId=e.pointerId;stick.setPointerCapture(pointerId);joy(e);}
-  function move(e){if(e.pointerId===pointerId)joy(e);}
+  function down(e){if(editMode)return;e.preventDefault();e.stopPropagation();pointerId=e.pointerId;stick.setPointerCapture?.(pointerId);joy(e);}
+  function move(e){if(e.pointerId===pointerId){e.preventDefault();joy(e);}}
   function up(e){if(e.pointerId!==pointerId)return;pointerId=null;joyX=joyY=0;knob.style.transform='translate(0,0)';}
 
 
@@ -693,8 +694,8 @@ export async function renderBlockWorld(root){
   stick.addEventListener('pointermove',move);
   stick.addEventListener('pointerup',up);
   stick.addEventListener('pointercancel',up);
-  interact.addEventListener('click',enter);
-  run.addEventListener('pointerdown',()=>state.running=true);
+  interact.addEventListener('pointerup',e=>{if(!editMode){e.preventDefault();enter();}});
+  run.addEventListener('pointerdown',e=>{if(!editMode){e.preventDefault();e.stopPropagation();state.running=true;run.setPointerCapture?.(e.pointerId);}});
   run.addEventListener('pointerup',()=>state.running=false);
   run.addEventListener('pointercancel',()=>state.running=false);
 
