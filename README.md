@@ -516,3 +516,19 @@ while real-time city/gameplay code stays direct JavaScript.
 - Landscape/fullscreen uses an extra-short toolbar so the playable scene stays visible.
 - Resize gizmos and direct dragging remain the primary touch/mouse editing workflow.
 - Existing editor DOM IDs and the plain-JavaScript world manipulation runtime are preserved.
+
+
+## Hybrid H1.4 — mobile direct-manipulation editor + restored Play Mode
+
+This pass follows current iPhone/game-control guidance: keep secondary menus at the top, minimize
+controls covering game content, use direct touch manipulation for scene objects, and preserve
+large enough hit regions for fingers while allowing pointer/keyboard precision.
+
+- `EDIT BLOCK` now enters edit mode and the top control becomes `PLAY MODE`.
+- `PLAY MODE` exits editing completely: inspector, boundaries and gizmos are removed and
+  joystick/RUN/ENTER controls are restored.
+- The editor minimize button only hides/reopens the inspector while edit mode remains active.
+- Landscape/fullscreen uses a single compact toolbar row around 90px tall instead of a large panel.
+- Portrait uses a shallow precision inspector; secondary tools are hidden/collapsed.
+- Resize gizmos keep a 44px touch hit region but use a small visible dot so geometry stays readable.
+- Direct scene dragging/resizing remains plain JavaScript; React owns only the inspector shell.

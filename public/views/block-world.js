@@ -345,32 +345,31 @@ export async function renderBlockWorld(root){
     if(editMode){
       editorCollapsed=false;
       editor.classList.add('show');
-      editor.classList.remove('minimized');
       editor.setAttribute('aria-hidden','false');
-      editToggle.textContent='HIDE EDITOR';
+      editToggle.textContent='PLAY MODE';
+      editToggle.setAttribute('aria-label','Return to play mode');
       editorMinimize.textContent='—';
-      editorMinimize.setAttribute('aria-label','Minimize editor');
       populateObjectSelect();syncInspector();renderEditorObjects();
     }else{
       editorCollapsed=false;
       editor.classList.remove('show','minimized');
       editor.setAttribute('aria-hidden','true');
       editToggle.textContent='EDIT BLOCK';
-      select('');renderEditorObjects();
+      editToggle.setAttribute('aria-label','Enter block edit mode');
+      drag=null;select('');renderEditorObjects();
+      joyX=0;joyY=0;state.running=false;
     }
   }
   function toggleEditorMinimized(){
     if(!editMode)return;
     editorCollapsed=!editorCollapsed;
     editor.classList.toggle('show',!editorCollapsed);
-    editor.classList.remove('minimized');
     editor.setAttribute('aria-hidden',String(editorCollapsed));
-    editToggle.textContent=editorCollapsed?'OPEN EDITOR':'HIDE EDITOR';
     editorMinimize.textContent='—';
   }
   function toggleTopEditor(){
-    if(!editMode){setEditMode(true);return;}
-    toggleEditorMinimized();
+    if(editMode)setEditMode(false);
+    else setEditMode(true);
   }
   function applyInspector(){
     const item=currentEditable();if(!item)return;const before=snapshot(),o=item.o;

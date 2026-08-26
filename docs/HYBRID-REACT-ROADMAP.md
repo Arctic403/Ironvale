@@ -174,3 +174,13 @@ screens to React until the H1 exit criteria pass on mobile.
 ## H1.2 mobile editor note
 
 The editor UI is now deliberately compact rather than becoming a full-screen form on phones. Direct manipulation is the primary workflow: select geometry, drag its body to move it, or use eight large edge/corner gizmos to resize it. React still owns only the inspector shell; pointer hit-testing, snapping, resize math, geometry updates and undo snapshots remain in the plain-JavaScript Block World runtime.
+
+
+## H1.4 mobile interaction decision
+
+Research before this pass confirmed the intended direction: on iPhone, direct interaction with
+game/world objects should replace unnecessary overlay controls, secondary menus belong away from
+the primary play area, and frequent touch targets should remain comfortably tappable. H1.4
+therefore treats gizmos/dragging as the primary editor interaction and the React inspector as a
+small precision toolbar. It also restores an explicit Play/Edit mode boundary so editor overlays
+cannot remain active during normal gameplay.
