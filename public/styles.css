@@ -1542,3 +1542,21 @@ body.bw-fullscreen-mode .bw-editor-more{display:none!important}
     border-width:4px!important;
   }
 }
+
+
+/* Hybrid H1.7 — separate mode and inspector visibility controls */
+.bw-editor-panel-toggle{
+  border:1px solid rgba(122,232,255,.42);
+  background:rgba(7,20,25,.92);
+  color:#d8fbff;
+  min-height:34px;
+  padding:6px 10px;
+  border-radius:8px;
+  font:800 10px/1 system-ui,sans-serif;
+  letter-spacing:.04em;
+  touch-action:manipulation;
+}
+.bw-editor-panel-toggle[hidden]{display:none!important}
+@media (pointer:coarse){
+  .bw-editor-panel-toggle{min-height:44px;padding:8px 13px}
+}

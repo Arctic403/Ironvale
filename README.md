@@ -556,3 +556,12 @@ The Block Editor is now a real development authoring tool rather than a browser-
 - Block Editor move and resize drags use the same coordinate conversion, including the correct scene scale while the game root is rotated.
 - Native landscape/Android fullscreen and normal non-fullscreen controls keep their existing unrotated input path.
 - Mobile resize gizmos now use substantially larger coarse-pointer hit targets and larger visible handles for easier iPhone editing.
+
+
+## Hybrid H1.7 — editor state/publish repair
+
+- `EDIT / PLAY` is now one shared mode toggle and does only mode switching.
+- `SHOW PANEL / HIDE PANEL` is a separate control available while editing; hiding the inspector does not leave Edit Mode.
+- The inspector minimize and close controls hide the panel instead of changing Play/Edit mode.
+- `PUBLISH` saves the draft, publishes it server-side, then reads the public block endpoint back and adopts that verified live layout as the local published state.
+- Exiting Edit Mode rebuilds gameplay geometry from that verified published state, preventing a successful publish from visually snapping back to the pre-publish layout.

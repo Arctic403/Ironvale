@@ -56,7 +56,8 @@ export async function renderBlockWorld(root){
       </div>
       <div class="bw-block-label"><small>DOWNTOWN / BLOCK 01</small><strong>Commerce Street</strong></div>
       <div class="bw-dev-buttons">
-        <button class="bw-edit-toggle" id="bw-edit-toggle" type="button">EDIT BLOCK</button>
+        <button class="bw-edit-toggle" id="bw-edit-toggle" type="button">EDIT</button>
+        <button class="bw-editor-panel-toggle" id="bw-editor-panel-toggle" type="button" hidden>HIDE PANEL</button>
         <button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button>
       </div>
       <div id="bw-react-editor-root" class="bw-react-editor-host"></div>
@@ -81,6 +82,7 @@ export async function renderBlockWorld(root){
   const shell=root.querySelector('.blockworld-shell');
   const stick=root.querySelector('#bw-stick');
   const editToggle=root.querySelector('#bw-edit-toggle');
+  const editorPanelToggle=root.querySelector('#bw-editor-panel-toggle');
   const editor=root.querySelector('#bw-editor');
   const editorClose=root.querySelector('#bw-editor-close');
   const editorMinimize=root.querySelector('#bw-editor-minimize');
@@ -221,6 +223,13 @@ export async function renderBlockWorld(root){
     return true;
   }
 
+  function rebuildPublishedScene(){
+    // renderEditorObjects is also the canonical geometry/art renderer. Calling it after
+    // publishedWorking changes prevents Play Mode from retaining stale authored DOM.
+    working=cloneBlock(publishedWorking);
+    renderEditorObjects();
+  }
+
   async function publishDraft(){
     const saved=await saveDraftToServer({force:true});
     if(!saved)return;
@@ -230,8 +239,20 @@ export async function renderBlockWorld(root){
       setServerStatus(`PUBLISH · ${result.error||'failed'}`,'error');
       return;
     }
-    publishedRevision=Number(result.publishedRevision||publishedRevision+1);
-    publishedWorking=cloneBlock(result.block||working);
+
+    // Do not trust only the draft response: read the public endpoint back so the client
+    // uses the exact layout ordinary Play Mode/other players will receive.
+    const live=await api(`/api/world/blocks/${encodeURIComponent(working.id)}`);
+    if(!live.ok||!live.block){
+      setServerStatus(`PUBLISH · live verify failed`,'error');
+      return;
+    }
+    publishedRevision=Number(live.revision||result.publishedRevision||publishedRevision+1);
+    publishedWorking=cloneBlock(live.block);
+    working=cloneBlock(publishedWorking);
+    draftDirty=false;
+    renderEditorObjects();
+    syncInspector();
     setServerStatus(`LIVE · r${publishedRevision}`,'published');
   }
 
@@ -436,40 +457,47 @@ export async function renderBlockWorld(root){
     }
     populateObjectSelect(); if(selectedKey)select(selectedKey);
   }
+  function syncEditorPanelUI(){
+    const visible=editMode&&!editorCollapsed;
+    editor.classList.toggle('show',visible);
+    editor.setAttribute('aria-hidden',String(!visible));
+    editorPanelToggle.hidden=!editMode;
+    editorPanelToggle.textContent=visible?'HIDE PANEL':'SHOW PANEL';
+    editorPanelToggle.setAttribute('aria-pressed',String(visible));
+  }
+
   async function setEditMode(on){
     editMode=!!on;
     shell.classList.toggle('bw-edit-mode',editMode);
     if(editMode){
+      // Mode and panel visibility are intentionally separate. Enter Edit with the
+      // panel visible, then the dedicated panel button may hide/show it freely.
       editorCollapsed=false;
-      editor.classList.add('show');
-      editor.setAttribute('aria-hidden','false');
-      editToggle.textContent='PLAY MODE';
-      editToggle.setAttribute('aria-label','Return to play mode');
-      editorMinimize.textContent='—';
+      editToggle.textContent='PLAY';
+      editToggle.setAttribute('aria-label','Switch to play mode');
       await loadDraftForEditor();
       populateObjectSelect();syncInspector();renderEditorObjects();
+      syncEditorPanelUI();
     }else{
       clearTimeout(draftTimer);
       if(draftDirty)await saveDraftToServer();
-      editorCollapsed=false;
-      editor.classList.remove('show','minimized');
-      editor.setAttribute('aria-hidden','true');
-      editToggle.textContent='EDIT BLOCK';
-      editToggle.setAttribute('aria-label','Enter block edit mode');
+      editorCollapsed=true;
+      editToggle.textContent='EDIT';
+      editToggle.setAttribute('aria-label','Switch to edit mode');
       drag=null;
       working=cloneBlock(publishedWorking);
-      select('');renderEditorObjects();
+      select('');
+      rebuildPublishedScene();
       joyX=0;joyY=0;state.running=false;
       setServerStatus(`LIVE · r${publishedRevision}`,'published');
+      syncEditorPanelUI();
     }
   }
 
-  function toggleEditorMinimized(){
+  function toggleEditorPanel(){
     if(!editMode)return;
     editorCollapsed=!editorCollapsed;
-    editor.classList.toggle('show',!editorCollapsed);
-    editor.setAttribute('aria-hidden',String(editorCollapsed));
-    editorMinimize.textContent='—';
+    syncEditorPanelUI();
   }
 
   async function toggleTopEditor(){
@@ -716,8 +744,9 @@ export async function renderBlockWorld(root){
   assetApply.addEventListener('click',applyBuildingAsset);assetClear.addEventListener('click',clearBuildingAsset);
   assetSelect.addEventListener('change',()=>{const item=currentEditable();if(item?.type==='building'&&item.o.asset?.id===assetSelect.value)syncAssetInspector();});
   editToggle.addEventListener('click',toggleTopEditor);
-  editorClose.addEventListener('click',()=>setEditMode(false));
-  editorMinimize.addEventListener('click',toggleEditorMinimized);
+  editorPanelToggle.addEventListener('click',toggleEditorPanel);
+  editorClose.addEventListener('click',toggleEditorPanel);
+  editorMinimize.addEventListener('click',toggleEditorPanel);
   objectSelect.addEventListener('change',()=>select(objectSelect.value));
   [inputX,inputY,inputW,inputH].forEach(el=>el.addEventListener('change',applyInspector));
   undoButton.addEventListener('click',undo);redoButton.addEventListener('click',redo);
