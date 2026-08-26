@@ -1445,6 +1445,22 @@ function validateBlockLayout(block, expectedId) {
   if (!block.spawn || !Number.isFinite(Number(block.spawn.x)) || !Number.isFinite(Number(block.spawn.y))) return 'Invalid spawn';
   if (!block.walkable || !Number.isFinite(Number(block.walkable.x)) || !Number.isFinite(Number(block.walkable.y))) return 'Invalid walkable area';
 
+  if (block.obstacles != null) {
+    if (!Array.isArray(block.obstacles) || block.obstacles.length > 250) return 'Invalid obstacles array';
+    for (const obstacle of block.obstacles) {
+      if (!obstacle || !Number.isFinite(Number(obstacle.x)) || !Number.isFinite(Number(obstacle.y))
+        || !Number.isFinite(Number(obstacle.width ?? obstacle.w)) || !Number.isFinite(Number(obstacle.height ?? obstacle.h))) {
+        return 'Invalid obstacle geometry';
+      }
+    }
+  }
+  if (block.exit != null) {
+    if (!block.exit || !Number.isFinite(Number(block.exit.x)) || !Number.isFinite(Number(block.exit.y))
+      || !Number.isFinite(Number(block.exit.width ?? block.exit.w)) || !Number.isFinite(Number(block.exit.height ?? block.exit.h))) {
+      return 'Invalid room exit geometry';
+    }
+  }
+
   const jsonText = JSON.stringify(block);
   if (new TextEncoder().encode(jsonText).byteLength > BLOCK_LAYOUT_MAX_BYTES) {
     return 'Block layout is too large. Keep image/assets outside the layout JSON.';

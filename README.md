@@ -766,3 +766,91 @@ The normal D1 schema migration also creates `approved_assets`. The Worker keeps 
 - If neither image reports completion, scene entry still resolves instead of hanging forever; the existing dedicated alley diagnostic background remains available.
 - Successful preload results record the actual loaded source for diagnostics.
 - The transition timeout is generic in `SceneManager`, so future rooms/interiors cannot deadlock the game on a missing image either.
+
+
+## Hybrid H1.24 — non-blocking Commerce Alley transition
+
+- Room ownership no longer waits for scene artwork. `SceneManager.enter()` commits the sub-area immediately and probes image assets only in the background.
+- Removed the eager Commerce Alley warm-preload so an old pending image Promise cannot be cached before the player presses ENTER.
+- H1.23's bounded WebP/SVG probes remain, but timed-out probe Promises are removed from the preload cache instead of being reused indefinitely.
+- The mounted alley image has its own Safari watchdog. If `commerce-alley.webp` emits neither `load` nor `error`, it is replaced by `commerce-alley-fallback.svg` without blocking gameplay.
+- `enterSubarea()` now clears `LOADING ALLEY…` in `finally` for success, cancellation and failure. `requestAnimationFrame()` is no longer responsible for ending the transition.
+- Added a three-second overlay fail-safe so a future lifecycle regression cannot permanently cover the game.
+- Existing H1.22 scene-ownership assertions and exact Commerce Street rollback remain intact.
+
+
+## Hybrid H1.25 — full Commerce Alley audit + deterministic room reset
+
+A full current-snapshot audit was performed before this patch.
+
+Audit findings:
+- All 71 JavaScript files pass syntax validation.
+- The Commerce Alley entrance target, dimensions, spawn, walkable bounds, exit and collision data are internally consistent.
+- The only unresolved source-controlled `/assets/*` reference in the workspace was `/assets/blocks/commerce-alley.webp`.
+- The patch pipeline/workspace is text-oriented, while the alley art was binary WebP, so the runtime had been repeatedly trying to enter a room whose preferred static asset was not actually present in the workspace.
+- Five generations of sub-area CSS (H1.16, H1.17, H1.19, H1.20 and H1.22) were stacked together with overlapping scene rules.
+- H1.24 fixed ENTER cleanup, but EXIT still depended on nested `requestAnimationFrame()` callbacks to release its transition overlay.
+- Transition failures were console-only, which is not useful when testing from iPhone.
+
+H1.25 repairs:
+- The exact 1672 × 941 Commerce Alley WebP is embedded inside the already-existing `public/assets/blocks/commerce-alley-fallback.svg` path. This keeps the real art inside the text patch/workspace path without creating a new filename that the Editor's fuzzy-path correction can mistake for `commerce-alley.webp`.
+- Commerce Alley now uses that existing source-controlled SVG path as its scene plate, removing the missing-WebP dependency in Local Test.
+- `SceneManager.enter()` is synchronous scene-state ownership. It no longer starts or waits on artwork at all.
+- ENTER and EXIT both use bounded visual beats and `finally` cleanup; neither image events nor `requestAnimationFrame()` can own the gameplay transition lifecycle.
+- All historical H1.16–H1.22 sub-area CSS at the end of `styles.css` is replaced by one authoritative room-scene block.
+- Failed room ownership now produces a temporary on-screen `ALLEY ERROR` message instead of silently snapping back.
+- Existing exact Commerce Street return-position behavior remains intact.
+
+
+### H1.25.1 — Editor fuzzy-path conflict compatibility
+
+The first H1.25 patch intentionally created `public/assets/blocks/commerce-alley.svg`, but the Editor correctly surfaced its close-name fuzzy-path safety prompt against the existing `commerce-alley.webp` workspace path. Applying only the other five operations would leave the new scene reference unresolved.
+
+H1.25.1 avoids partial-apply risk entirely:
+- no new alley filename is created;
+- the exact alley artwork is written into the existing `commerce-alley-fallback.svg`;
+- every patch operation is now a modification of an existing workspace file.
+
+
+## Hybrid H1.25.2 — joystick symbol runtime repair
+
+A full current-snapshot audit was run before this patch.
+
+Audit results:
+- all 71 JavaScript files pass syntax validation;
+- the JavaScript-only policy passes;
+- all static `/assets/*` references resolve;
+- the H1.25 room CSS is now a single authoritative sub-area ruleset;
+- Commerce Alley target, room geometry and source-controlled scene art are present;
+- the visible Safari error was traced to one concrete runtime symbol bug: `#bw-knob` existed in the Block World DOM, but the runtime never queried it into a `knob` variable before using `knob.style.transform` during ENTER, rollback, EXIT and joystick movement.
+
+Repair:
+- bind `#bw-knob` explicitly beside `#bw-stick`;
+- route all joystick visual movement/reset through `setJoystickKnob()`;
+- make the knob visual optional so a missing visual element can never abort a gameplay scene transition.
+
+## Hybrid H1.26 — scene-aware Commerce Alley Block Editor
+
+A full audit of snapshot `e21f1cb976ee28aaddb762f73e250565ca75bbb813250e72eaef7497b7c5b824` was completed before this patch.
+
+Audit findings:
+- all 71 JavaScript files pass syntax validation and the JavaScript-only policy passes;
+- all static `/assets/*` references resolve;
+- H1.25.2 is present and Commerce Alley now enters successfully;
+- the existing Block Editor is street-only by design: `setEditMode(true)` forcibly leaves an active sub-area;
+- all editable-object enumeration and guide rendering are bound to Commerce Street's `working.buildings`, `working.props`, `working.alley` and `blockworld-scene`;
+- direct manipulation pointer events are registered only on the street scene;
+- D1's existing generic `/api/admin/blocks/:id/*` draft/publish/history routes can persist a room layout as long as it carries the normal `id`, `width`, `height`, `buildings`, `props`, `spawn` and `walkable` fields;
+- Local Frontend Test may reject authoritative mutations, so room editing needs a per-scene in-memory draft rather than depending on D1 to switch scenes safely.
+
+H1.26 changes:
+- Commerce Alley becomes a first-class Block Editor scene instead of being forced back to Commerce Street when Edit Mode is entered.
+- The editor can be opened inside the alley after entering it in Play Mode, or directly from Add Object with **Edit Commerce Alley**.
+- **Back to Street** switches authoring context without leaving the private editor.
+- Alley editing exposes the scene plate, player spawn, walkable zone, street exit, all collision/obstacle boxes and authored props through the existing object selector, X/Y/W/H controls, drag, resize gizmos, nudge, lock, undo/redo and focus workflow.
+- Added **Collision Box** creation for room collision authoring; room collisions can also be duplicated and deleted.
+- Street-only Add Object controls are hidden while authoring a room; room-only controls are hidden on Commerce Street.
+- Published Commerce Alley data is loaded through the same public block-layout endpoint as Commerce Street and used by normal gameplay when available, with `public/subareas.js` remaining the authored fallback.
+- Alley drafts/publish/history/revert now use `alley-commerce-01` as their own D1 document and do not overwrite `downtown-commercial-01`.
+- Server validation now checks optional room obstacle and exit geometry before a room draft can be stored or published.
+- Local Frontend Test keeps independent in-memory street/alley drafts when server mutations are unavailable, so switching editor scenes does not discard current authoring work.

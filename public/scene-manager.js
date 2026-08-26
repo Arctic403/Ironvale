@@ -41,20 +41,29 @@ export class SceneManager {
     })();
 
     this.preloads.set(cacheKey,pending);
+    pending.finally(()=>{
+      queueMicrotask(()=>{
+        if(this.preloads.get(cacheKey)===pending) this.preloads.delete(cacheKey);
+      });
+    });
     return pending;
   }
 
-  async enter(id,returnState=null){
-    const seq=++this.sequence;
-    const loaded=await this.preload(id);
-    if(seq!==this.sequence) return {cancelled:true};
+  enter(id,returnState=null){
+    ++this.sequence;
+    const scene=this.resolve(id);
+    if(!scene) throw new Error(`Unknown scene: ${id}`);
+
     if(this.active){
       this.stack.push({scene:this.active.scene,returnState:this.active.returnState});
     }
+
+    // Scene state is synchronous. Artwork loading is presentation-only and is
+    // owned by the mounted room image in Block World, never by scene ownership.
     this.active={
-      scene:loaded.scene,
-      assetError:!!loaded.assetError,
-      loadedSrc:String(loaded.loadedSrc||''),
+      scene,
+      assetError:false,
+      loadedSrc:'',
       returnState:returnState?structuredCloneSafe(returnState):null
     };
     return {cancelled:false,...this.active};

@@ -33,7 +33,7 @@ export function BlockEditor() {
           <button className="bw-studio-menu-button" type="button" data-panel-toggle="palette" aria-label="Open Add Object menu">＋</button>
           <div className="bw-editor-title">
             <strong>BLOCK EDITOR</strong>
-            <small>DOWNTOWN / BLOCK 01&nbsp;&nbsp;•&nbsp;&nbsp;Commerce Street</small>
+            <small id="bw-editor-context">DOWNTOWN / BLOCK 01&nbsp;&nbsp;•&nbsp;&nbsp;Commerce Street</small>
           </div>
           <div className="bw-studio-status">
             <small id="bw-editor-server-status" className="bw-editor-server-status">SERVER · loading…</small>
@@ -76,9 +76,12 @@ export function BlockEditor() {
           <PanelHeader title="ADD OBJECT" panel="palette" />
           <div className="bw-studio-panel-body">
             <div className="bw-editor-create-grid">
-              <button type="button" data-bw-add-object="alley"><b>▣</b><span>Alley Entrance</span></button>
-              <button type="button" data-bw-add-object="door"><b>▤</b><span>Door / Entrance</span></button>
-              <button type="button" data-bw-add-object="exit"><b>⇥</b><span>Block Exit</span></button>
+              <button type="button" data-bw-open-subarea="alley-commerce-01" data-bw-street-only="true"><b>↳</b><span>Edit Commerce Alley</span></button>
+              <button type="button" id="bw-editor-parent-scene" data-bw-room-only="true"><b>←</b><span>Back to Street</span></button>
+              <button type="button" data-bw-add-object="alley" data-bw-street-only="true"><b>▣</b><span>Alley Entrance</span></button>
+              <button type="button" data-bw-add-object="door" data-bw-street-only="true"><b>▤</b><span>Door / Entrance</span></button>
+              <button type="button" data-bw-add-object="obstacle" data-bw-room-only="true"><b>▰</b><span>Collision Box</span></button>
+              <button type="button" data-bw-add-object="exit"><b>⇥</b><span>Exit Zone</span></button>
               <button type="button" data-bw-add-object="spawn"><b>♙</b><span>Spawn Point</span></button>
               <button type="button" data-bw-add-object="walkable"><b>▧</b><span>Walkable Zone</span></button>
             </div>

@@ -19,10 +19,12 @@ export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
 export async function renderBlockWorld(root, options={}){
   const editorWorkspace=!!options.editorWorkspace;
   destroyBlockWorld();
-  const [worldData,playerData,publishedBlockData]=await Promise.all([
+  const PRIMARY_SUBAREA_ID='alley-commerce-01';
+  const [worldData,playerData,publishedBlockData,publishedAlleyData]=await Promise.all([
     api('/api/world'),
     api('/api/player'),
-    api(`/api/world/blocks/${encodeURIComponent(BLOCK1.id)}`)
+    api(`/api/world/blocks/${encodeURIComponent(BLOCK1.id)}`),
+    api(`/api/world/blocks/${encodeURIComponent(PRIMARY_SUBAREA_ID)}`)
   ]);
   const locations=worldData.locations||[];
   const validLocationIds=new Set(locations.map(x=>x.id));
@@ -141,24 +143,25 @@ export async function renderBlockWorld(root, options={}){
   const fullscreenButton=root.querySelector('#bw-fullscreen')||editorQuery('#bw-fullscreen');
   const shell=root.querySelector('.blockworld-shell');
   const stick=root.querySelector('#bw-stick');
+  const knob=root.querySelector('#bw-knob');
 
-  // Scene art is preloaded before the runtime swaps away from Commerce Street.
-  // If the preferred binary plate is unavailable in a local/browser workspace,
-  // swap to the source-controlled SVG fallback. Commerce Street is never reused
-  // as substitute artwork.
+  // Room art is presentation-only. The primary alley scene is source-controlled
+  // as text, and this error fallback never participates in gameplay ownership.
   subareaPlate?.addEventListener('load',()=>{
     shell.classList.remove('bw-subarea-asset-error');
   });
   subareaPlate?.addEventListener('error',()=>{
     const fallback=String(subareaPlate.dataset.fallbackSrc||'');
-    const attemptedFallback=subareaPlate.dataset.fallbackAttempted==='1';
-    if(fallback&&!attemptedFallback&&subareaPlate.src!==new URL(fallback,location.href).href){
+    const fallbackHref=fallback?new URL(fallback,location.href).href:'';
+    const attempted=subareaPlate.dataset.fallbackAttempted==='1';
+    if(fallback&&!attempted&&subareaPlate.src!==fallbackHref){
       subareaPlate.dataset.fallbackAttempted='1';
       subareaPlate.src=fallback;
       return;
     }
     shell.classList.add('bw-subarea-asset-error');
   });
+
   const editToggle=editorQuery('#bw-edit-toggle');
   const editorPanelToggle=editorQuery('#bw-editor-panel-toggle');
   const editor=editorQuery('#bw-editor');
@@ -194,6 +197,9 @@ export async function renderBlockWorld(root, options={}){
   const statusExits=editorQuery('#bw-status-exits'),statusProps=editorQuery('#bw-status-props');
   const historySelect=editorQuery('#bw-editor-history'),historyLoadButton=editorQuery('#bw-editor-load-history');
   const focusButton=editorQuery('#bw-editor-focus'),resetLayoutButton=editorQuery('#bw-editor-reset-layout');
+  const editorContextLabel=editorQuery('#bw-editor-context');
+  const editorParentSceneButton=editorQuery('#bw-editor-parent-scene');
+  const editorSubareaButtons=[...editorScope.querySelectorAll('[data-bw-open-subarea]')];
 
   const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v3';
   function setupStudioPanels(){
@@ -523,21 +529,87 @@ export async function renderBlockWorld(root, options={}){
     }
   }
 
-  // Published server layout is authoritative in Play Mode. BLOCK1 remains the source fallback.
+  // Published server layout is authoritative in Play Mode. Source layouts remain
+  // deterministic fallbacks for both the street and editable room scenes.
   const cloneBlock=value=>JSON.parse(JSON.stringify(value));
+  const normalizeSubareaLayout=(value,id=PRIMARY_SUBAREA_ID)=>{
+    const authored=getSubarea(id);
+    if(!authored)return null;
+    const raw=cloneBlock(value||authored);
+    const base=cloneBlock(authored);
+    const next={...base,...raw};
+    next.id=String(raw.id||base.id);
+    next.kind='subarea';
+    next.parentBlock=String(raw.parentBlock||base.parentBlock||BLOCK1.id);
+    next.width=Number(raw.width)||base.width;
+    next.height=Number(raw.height)||base.height;
+    next.scenePlate={...base.scenePlate,...(raw.scenePlate||{})};
+    next.spawn={...base.spawn,...(raw.spawn||{})};
+    next.walkable={...base.walkable,...(raw.walkable||{})};
+    next.exit={...base.exit,...(raw.exit||{})};
+    next.camera={...base.camera,...(raw.camera||{})};
+    next.buildings=Array.isArray(raw.buildings)?raw.buildings:[];
+    next.props=Array.isArray(raw.props)?raw.props:[];
+    next.obstacles=Array.isArray(raw.obstacles)?raw.obstacles:cloneBlock(base.obstacles||[]);
+    next.interactions=Array.isArray(raw.interactions)?raw.interactions:cloneBlock(base.interactions||[]);
+    return next;
+  };
+
   let publishedWorking=cloneBlock(publishedBlockData?.block||BLOCK1);
+  const publishedSubareas=new Map();
+  const publishedAlley=normalizeSubareaLayout(publishedAlleyData?.block,PRIMARY_SUBAREA_ID);
+  if(publishedAlley)publishedSubareas.set(PRIMARY_SUBAREA_ID,publishedAlley);
+  const resolveSubarea=id=>publishedSubareas.get(String(id||''))||getSubarea(id);
+
   let editMode=false, editorCollapsed=false, selectedKey='', drag=null;
   let working=cloneBlock(publishedWorking);
-  const sceneManager=new SceneManager(getSubarea);
+  let editorSceneId=BLOCK1.id;
+  let editorStreetReturn=null;
+  const sceneManager=new SceneManager(resolveSubarea);
   let activeSubarea=null;
   let sceneTransitionBusy=false;
+  let sceneFailureTimer=0;
   let undoStack=[],redoStack=[];
+  const localEditorDrafts=new Map();
   let draftDirty=false,draftSaving=false,draftTimer=null,draftInterval=null;
   let draftRevision=0,publishedRevision=Number(publishedBlockData?.revision||0);
 
-  // Warm the first room asset early so ENTER normally becomes an instant
-  // scene swap after the short fade, while still allowing a safe fallback.
-  sceneManager.preload('alley-commerce-01').catch(()=>{});
+  const editingSubarea=()=>editorSceneId!==BLOCK1.id;
+  const editorDocumentId=()=>editorSceneId||BLOCK1.id;
+  const authoredEditorDocument=()=>editingSubarea()
+    ? normalizeSubareaLayout(getSubarea(editorSceneId),editorSceneId)
+    : cloneBlock(BLOCK1);
+  const publishedEditorDocument=()=>editingSubarea()
+    ? cloneBlock(publishedSubareas.get(editorSceneId)||normalizeSubareaLayout(getSubarea(editorSceneId),editorSceneId))
+    : cloneBlock(publishedWorking);
+
+  function setWorkingEditorDocument(value){
+    working=editingSubarea()
+      ? normalizeSubareaLayout(value||authoredEditorDocument(),editorSceneId)
+      : cloneBlock(value||publishedWorking||BLOCK1);
+    if(editingSubarea()){
+      activeSubarea=working;
+      if(sceneManager.active)sceneManager.active.scene=activeSubarea;
+      else sceneManager.enter(editorSceneId,editorStreetReturn);
+      applyAreaVisuals();
+      updatePlayer();
+      applyCamera();
+    }
+  }
+
+  function syncEditorSceneContext(){
+    const room=editingSubarea();
+    shell.classList.toggle('bw-editor-room-context',room);
+    if(editorContextLabel){
+      editorContextLabel.textContent=room
+        ? `${working.kicker||'DOWNTOWN / BLOCK 01'}  •  ${working.name||'Commerce Alley'}`
+        : 'DOWNTOWN / BLOCK 01  •  Commerce Street';
+    }
+    if(editorParentSceneButton)editorParentSceneButton.hidden=!room;
+  }
+
+  // Room artwork is intentionally not allowed to gate gameplay scene entry.
+  // The active room <img> loads independently after scene ownership switches.
 
   function setServerStatus(text,state=''){
     if(!serverStatus)return;
@@ -548,6 +620,7 @@ export async function renderBlockWorld(root, options={}){
   function markDraftDirty(){
     if(!editMode)return;
     draftDirty=true;
+    localEditorDrafts.set(editorDocumentId(),cloneBlock(working));
     setServerStatus('DRAFT · unsaved','dirty');
     clearTimeout(draftTimer);
     draftTimer=setTimeout(()=>saveDraftToServer(),1200);
@@ -569,23 +642,35 @@ export async function renderBlockWorld(root, options={}){
     }
     draftRevision=Number(result.draftRevision||draftRevision);
     draftDirty=false;
+    localEditorDrafts.delete(editorDocumentId());
     setServerStatus(`DRAFT · saved r${draftRevision}`,'saved');
     return true;
   }
 
   async function loadDraftForEditor(){
-    setServerStatus('SERVER · loading draft…','saving');
-    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/editor`);
+    const id=editorDocumentId();
+    const authored=authoredEditorDocument();
+    const publishedFallback=publishedEditorDocument();
+    setServerStatus(`SERVER · loading ${editingSubarea()?'room':'block'} draft…`,'saving');
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(id)}/editor`);
+    const localDraft=localEditorDrafts.get(id);
     if(!result.ok){
-      setServerStatus(result.status===403?'SERVER · admin role required':`SERVER · ${result.error||'unavailable'}`,'error');
+      // Local Frontend Test intentionally blocks authoritative mutations. Keep a
+      // per-scene in-memory draft so street ↔ alley authoring still works safely.
+      setWorkingEditorDocument(localDraft||publishedFallback||authored);
+      draftRevision=0;
+      undoStack=[];redoStack=[];draftDirty=!!localDraft;
+      renderEditorObjects();syncInspector();syncEditorSceneContext();
+      setServerStatus(localDraft?'LOCAL · unsaved scene draft':(result.status===403?'SERVER · admin role required':`LOCAL · ${result.error||'fallback scene'}`),localDraft?'dirty':'error');
       return false;
     }
     draftRevision=Number(result.draftRevision||0);
-    publishedRevision=Number(result.publishedRevision||publishedRevision);
-    working=cloneBlock(result.draft||result.published||publishedWorking||BLOCK1);
-    undoStack=[];redoStack=[];draftDirty=false;
-    renderEditorObjects();syncInspector();
-    setServerStatus(`DRAFT · r${draftRevision} · LIVE r${publishedRevision}`,'saved');
+    publishedRevision=Number(result.publishedRevision||0);
+    const next=localDraft||result.draft||result.published||publishedFallback||authored;
+    setWorkingEditorDocument(next);
+    undoStack=[];redoStack=[];draftDirty=!!localDraft;
+    renderEditorObjects();syncInspector();syncEditorSceneContext();
+    setServerStatus(localDraft?'LOCAL · unsaved scene draft':`DRAFT · r${draftRevision} · LIVE r${publishedRevision}`,localDraft?'dirty':'saved');
     return true;
   }
 
@@ -603,11 +688,8 @@ export async function renderBlockWorld(root, options={}){
       buildings.insertBefore(el,alley);
     }
 
-    // Rebuild the authored prop layer from the authoritative layout.
     props.querySelectorAll('.bw-prop-authored').forEach(el=>el.remove());
 
-    // Clamp the player to the newly authoritative walkable area rather than silently
-    // restoring the authored spawn every time Publish is pressed.
     if(!preservePlayer&&working.spawn){
       state.x=Number(working.spawn.x)||state.x;
       state.y=Number(working.spawn.y)||state.y;
@@ -631,8 +713,6 @@ export async function renderBlockWorld(root, options={}){
     if(!saved)return;
     setServerStatus('PUBLISHING…','saving');
 
-    // The publish transaction already returns the exact validated JSON committed to D1.
-    // Adopt that response directly: no second GET/read-after-write race is required.
     const result=await api(`/api/admin/blocks/${encodeURIComponent(working.id)}/publish`,{method:'POST'});
     if(!result.ok||!result.block){
       setServerStatus(`PUBLISH · ${result.error||'failed'}`,'error');
@@ -640,31 +720,45 @@ export async function renderBlockWorld(root, options={}){
     }
 
     publishedRevision=Number(result.publishedRevision||publishedRevision+1);
-    publishedWorking=cloneBlock(result.block);
     draftRevision=Math.max(draftRevision,publishedRevision);
     draftDirty=false;
-    hydrateBlock(publishedWorking,{preservePlayer:true});
+
+    if(editingSubarea()){
+      const publishedRoom=normalizeSubareaLayout(result.block,editorSceneId);
+      publishedSubareas.set(editorSceneId,cloneBlock(publishedRoom));
+      setWorkingEditorDocument(publishedRoom);
+      renderEditorObjects();
+      updatePlayer();
+      applyCamera();
+    }else{
+      publishedWorking=cloneBlock(result.block);
+      hydrateBlock(publishedWorking,{preservePlayer:true});
+    }
+
     syncInspector();
     await loadVersionHistory();
     setServerStatus(`LIVE · r${publishedRevision}`,'published');
   }
 
   async function revertServerDraft(){
+    const id=editorDocumentId();
     setServerStatus('DRAFT · reverting…','saving');
-    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/revert-draft`,{method:'POST'});
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(id)}/revert-draft`,{method:'POST'});
     if(!result.ok){
       setServerStatus(`REVERT · ${result.error||'failed'}`,'error');
       return;
     }
-    working=cloneBlock(result.block||publishedWorking||BLOCK1);
+    localEditorDrafts.delete(id);
+    setWorkingEditorDocument(result.block||publishedEditorDocument()||authoredEditorDocument());
     draftDirty=false;undoStack=[];redoStack=[];
-    renderEditorObjects();syncInspector();
+    renderEditorObjects();syncInspector();syncEditorSceneContext();
     setServerStatus(`DRAFT · reverted to ${result.revertedTo}`,'saved');
   }
 
   async function loadVersionHistory(){
     if(!historySelect)return;
-    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/history`);
+    const id=editorDocumentId();
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(id)}/history`);
     if(!result.ok){
       historySelect.innerHTML='<option value="">History unavailable</option>';
       return;
@@ -679,8 +773,9 @@ export async function renderBlockWorld(root, options={}){
   async function restoreHistoryToDraft(){
     const revision=Number(historySelect?.value||0);
     if(!revision)return;
+    const id=editorDocumentId();
     setServerStatus(`RESTORE · r${revision}…`,'saving');
-    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/restore-revision`,{
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(id)}/restore-revision`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({revision})
@@ -689,10 +784,11 @@ export async function renderBlockWorld(root, options={}){
       setServerStatus(`RESTORE · ${result.error||'failed'}`,'error');
       return;
     }
-    working=cloneBlock(result.block);
+    localEditorDrafts.delete(id);
+    setWorkingEditorDocument(result.block);
     draftRevision=Number(result.draftRevision||draftRevision);
     draftDirty=false;undoStack=[];redoStack=[];selectedKey='';
-    renderEditorObjects();populateObjectSelect();syncInspector();
+    renderEditorObjects();populateObjectSelect();syncInspector();syncEditorSceneContext();
     setServerStatus(`DRAFT · restored from live r${revision}`,'saved');
   }
 
@@ -700,15 +796,26 @@ export async function renderBlockWorld(root, options={}){
   draftInterval=setInterval(()=>{ if(editMode&&draftDirty)saveDraftToServer(); },5000);
 
   function allEditable(){
+    if(editingSubarea()){
+      const items=[
+        ...(working.obstacles||[]).map((o,i)=>({key:`obstacle:${i}`,type:'obstacle',i,o,label:o.label||o.id||`Collision ${i+1}`})),
+        ...(working.props||[]).map((o,i)=>({key:`prop:${i}`,type:'prop',i,o,label:o.label||o.kind||`Prop ${i+1}`})),
+        {key:'spawn:0',type:'spawn',i:0,o:working.spawn,label:'Player spawn'},
+        {key:'walkable:0',type:'walkable',i:0,o:working.walkable,label:'Walkable area'},
+        {key:'scene:0',type:'scene',i:0,o:working.scenePlate,label:'Scene plate'}
+      ];
+      if(working.exit)items.splice(2,0,{key:'room-exit:0',type:'room-exit',i:0,o:working.exit,label:working.exit.label||'Street exit'});
+      return items.filter(item=>item.o);
+    }
     return [
-      ...working.buildings.map((o,i)=>({key:`building:${i}`,type:'building',i,o,label:o.name})),
-      ...working.props.map((o,i)=>({key:`prop:${i}`,type:'prop',i,o,label:`${o.kind} ${i+1}`})),
+      ...(working.buildings||[]).map((o,i)=>({key:`building:${i}`,type:'building',i,o,label:o.name})),
+      ...(working.props||[]).map((o,i)=>({key:`prop:${i}`,type:'prop',i,o,label:`${o.kind} ${i+1}`})),
       ...((working.exits||[]).map((o,i)=>({key:`exit:${i}`,type:'exit',i,o,label:`${o.id.toUpperCase()} block exit`}))),
       {key:'spawn:0',type:'spawn',i:0,o:working.spawn,label:'Player spawn'},
       {key:'walkable:0',type:'walkable',i:0,o:working.walkable||(working.walkable={x:0,y:990,width:working.width,height:working.height-990}),label:'Walkable area'},
       {key:'scene:0',type:'scene',i:0,o:working.scenePlate||(working.scenePlate={src:'/assets/blocks/commerce-street.svg',x:0,y:0,width:working.width,height:working.height,scale:1}),label:'Scene plate'},
       {key:'alley:0',type:'alley',i:0,o:working.alley,label:'Alley'}
-    ];
+    ].filter(item=>item.o);
   }
   function currentEditable(){return allEditable().find(x=>x.key===selectedKey)||null;}
   function isLocked(item){return !!item?.o?.locked;}
@@ -859,6 +966,8 @@ export async function renderBlockWorld(root, options={}){
     const o=item.o||{};
     if(item.type==='building')return o.name||o.id||item.label||'Building';
     if(item.type==='exit')return o.label||o.id||'Block Exit';
+    if(item.type==='room-exit')return o.label||o.id||'Room Exit';
+    if(item.type==='obstacle')return o.label||o.id||'Collision';
     if(item.type==='prop')return o.label||o.kind||'Prop';
     return o.label||item.label||item.type;
   }
@@ -867,12 +976,13 @@ export async function renderBlockWorld(root, options={}){
     const o=item.o||{};
     if(item.type==='building')return o.locationId||'';
     if(item.type==='exit')return o.targetBlock||'';
+    if(item.type==='room-exit')return o.target||o.targetBlock||working.parentBlock||BLOCK1.id;
     return o.target||o.targetBlock||'';
   }
   function syncStudioStatus(){
     statusObjects && (statusObjects.textContent=String(allEditable().length));
-    statusEntrances && (statusEntrances.textContent=String((working.buildings||[]).length+(working.alley?1:0)));
-    statusExits && (statusExits.textContent=String((working.exits||[]).length));
+    statusEntrances && (statusEntrances.textContent=String(editingSubarea()?0:(working.buildings||[]).length+(working.alley?1:0)));
+    statusExits && (statusExits.textContent=String(editingSubarea()?(working.exit?1:0):(working.exits||[]).length));
     statusProps && (statusProps.textContent=String((working.props||[]).length));
   }
   function syncInspector(){
@@ -927,23 +1037,93 @@ export async function renderBlockWorld(root, options={}){
     if(assetSelect)assetSelect.disabled=locked||item.type!=='building';
     if(assetApply)assetApply.disabled=locked||item.type!=='building';
     if(assetClear)assetClear.disabled=locked||item.type!=='building';
-    if(duplicateButton)duplicateButton.disabled=locked||!['building','prop'].includes(item.type);
-    if(deleteButton)deleteButton.disabled=locked||item.type==='alley'||!['building','prop'].includes(item.type);
+    if(duplicateButton)duplicateButton.disabled=locked||!['building','prop','obstacle'].includes(item.type);
+    if(deleteButton)deleteButton.disabled=locked||item.type==='alley'||!['building','prop','obstacle'].includes(item.type);
     editorScope.querySelectorAll('[data-bw-nudge]').forEach(button=>{button.disabled=locked;});
     syncStudioStatus();
   }
+  function editorSurfaceElement(){return editingSubarea()?subareaWorld:scene;}
   function select(key){
     selectedKey=key||'';populateObjectSelect();syncInspector();
     const selected=currentEditable();if(editorSelection)editorSelection.textContent=selected?`${selected.type.toUpperCase()} · ${selected.label}`:'Tap an object in the scene';
     scene.querySelectorAll('.bw-edit-selected').forEach(x=>x.classList.remove('bw-edit-selected'));
-    if(key)scene.querySelector(`[data-edit-key="${key}"]`)?.classList.add('bw-edit-selected');
+    subareaWorld.querySelectorAll('.bw-edit-selected').forEach(x=>x.classList.remove('bw-edit-selected'));
+    if(key)editorSurfaceElement().querySelector(`[data-edit-key="${key}"]`)?.classList.add('bw-edit-selected');
     // Selecting/dragging never forces a minimized inspector back open.
     if(editMode&&!editorCollapsed){
       editor.classList.add('show');
       editor.setAttribute('aria-hidden','false');
     }
   }
+  function renderRoomEditorObjects(){
+    working=normalizeSubareaLayout(working,editorSceneId);
+    activeSubarea=working;
+    if(sceneManager.active)sceneManager.active.scene=activeSubarea;
+    else sceneManager.enter(editorSceneId,editorStreetReturn);
+    applyAreaVisuals();
+
+    subareaWorld.querySelectorAll('.bw-editor-guide,.bw-resize-gizmos').forEach(x=>x.remove());
+
+    const addGuide=(key,o,kind,label,point=false)=>{
+      if(!o)return null;
+      const g=document.createElement('div');
+      g.className=`bw-editor-guide bw-guide-${kind}`;
+      g.dataset.editKey=key;
+      g.classList.toggle('bw-edit-locked',!!o.locked);
+      g.dataset.editLocked=o.locked?'true':'false';
+      g.style.left=`${Number(o.x)||0}px`;
+      g.style.top=`${Number(o.y)||0}px`;
+      if(point){
+        g.classList.add('bw-guide-point');
+      }else{
+        g.style.width=`${Number(o.w??o.width)||40}px`;
+        g.style.height=`${Number(o.h??o.height)||40}px`;
+      }
+      g.style.zIndex=String(5000+Number(o.zIndex||0));
+      if(Number(o.rotation||0)){
+        g.style.transform=`rotate(${Number(o.rotation)||0}deg)`;
+        g.style.transformOrigin='50% 50%';
+      }
+      g.innerHTML=`<span>${escapeText(label)}</span>`;
+      subareaWorld.appendChild(g);
+      return g;
+    };
+
+    (working.obstacles||[]).forEach((o,i)=>addGuide(`obstacle:${i}`,o,'obstacle',o.label||o.id||`COLLISION ${i+1}`));
+    (working.props||[]).forEach((o,i)=>addGuide(`prop:${i}`,o,'prop',o.label||o.kind||`PROP ${i+1}`,true));
+    addGuide('room-exit:0',working.exit,'room-exit',working.exit?.label||'STREET EXIT');
+    addGuide('spawn:0',working.spawn,'spawn','SPAWN',true);
+    addGuide('walkable:0',working.walkable,'walkable','WALKABLE');
+    addGuide('scene:0',working.scenePlate,'scene','SCENE');
+
+    const gizmoItem=currentEditable();
+    if(editMode&&gizmoItem&&!isLocked(gizmoItem)&&!['prop','spawn'].includes(gizmoItem.type)){
+      const target=subareaWorld.querySelector(`[data-edit-key="${selectedKey}"]`);
+      if(target){
+        const gizmos=document.createElement('div');
+        gizmos.className='bw-resize-gizmos';
+        gizmos.dataset.editKey=selectedKey;
+        for(const edge of ['n','e','s','w','nw','ne','se','sw']){
+          const h=document.createElement('button');
+          h.type='button';
+          h.className=`bw-resize-handle bw-resize-${edge}`;
+          h.dataset.editKey=selectedKey;
+          h.dataset.resize=edge;
+          h.setAttribute('aria-label',`Resize ${edge}`);
+          gizmos.appendChild(h);
+        }
+        target.appendChild(gizmos);
+      }
+    }
+
+    renderSubareaDebug();
+    populateObjectSelect();
+    if(selectedKey)select(selectedKey);
+    syncEditorSceneContext();
+  }
+
   function renderEditorObjects(){
+    if(editingSubarea()){renderRoomEditorObjects();return;}
     // Keep authored markup but reposition it from working data.
     working.buildings.forEach((b,i)=>{
       const el=buildings.querySelector(`[data-building-id="${b.id}"]`);
@@ -1048,32 +1228,107 @@ export async function renderBlockWorld(root, options={}){
   }
 
   async function setEditMode(on){
-    if(on&&activeSubarea)leaveSubarea();
+    if(on){
+      editorSceneId=activeSubarea?.id||BLOCK1.id;
+      if(activeSubarea){
+        editorStreetReturn=sceneManager.active?.returnState||editorStreetReturn||null;
+      }
+    }
+
     editMode=!!on;
     shell.classList.toggle('bw-edit-mode',editMode);
     if(editMode){
-      // Mode and panel visibility are intentionally separate. Enter Edit with the
-      // panel visible, then the dedicated panel button may hide/show it freely.
       editorCollapsed=false;
       editToggle.textContent='PLAY';
       editToggle.setAttribute('aria-label','Switch to play mode');
       await loadDraftForEditor();
       await loadVersionHistory();
-      populateObjectSelect();syncInspector();renderEditorObjects();
+      populateObjectSelect();syncInspector();renderEditorObjects();syncEditorSceneContext();
       syncEditorPanelUI();
     }else{
       clearTimeout(draftTimer);
       if(draftDirty)await saveDraftToServer();
+      const wasRoom=editingSubarea();
+      const roomId=editorSceneId;
+
       editorCollapsed=true;
       editToggle.textContent='EDIT';
       editToggle.setAttribute('aria-label','Switch to edit mode');
       drag=null;
       select('');
-      rebuildPublishedScene();
+
+      if(wasRoom){
+        // Play Mode stays inside the room. Draft-only changes disappear; the
+        // verified published room becomes authoritative just like the street.
+        const live=cloneBlock(publishedSubareas.get(roomId)||normalizeSubareaLayout(getSubarea(roomId),roomId));
+        working=cloneBlock(publishedWorking);
+        activeSubarea=live;
+        if(sceneManager.active)sceneManager.active.scene=activeSubarea;
+        else sceneManager.enter(roomId,editorStreetReturn);
+        applyAreaVisuals();
+        state.x=Math.max(activeSubarea.walkable.x,Math.min(activeSubarea.walkable.x+activeSubarea.walkable.width,state.x));
+        state.y=Math.max(activeSubarea.walkable.y,Math.min(activeSubarea.walkable.y+activeSubarea.walkable.height,state.y));
+        updatePlayer();
+        applyCamera();
+      }else{
+        rebuildPublishedScene();
+      }
+
       joyX=0;joyY=0;state.running=false;
+      editorSceneId=activeSubarea?.id||BLOCK1.id;
+      syncEditorSceneContext();
       setServerStatus(`LIVE · r${publishedRevision}`,'published');
       syncEditorPanelUI();
     }
+  }
+
+  async function switchEditorScene(targetId){
+    if(!editMode)return false;
+    const target=String(targetId||'');
+    if(target===editorSceneId)return true;
+
+    clearTimeout(draftTimer);
+    if(draftDirty)await saveDraftToServer({force:true});
+    selectedKey='';undoStack=[];redoStack=[];draftDirty=false;
+
+    if(target===BLOCK1.id){
+      const back=sceneManager.active?.returnState||editorStreetReturn||publishedWorking.spawn;
+      sceneManager.reset();
+      activeSubarea=null;
+      editorSceneId=BLOCK1.id;
+      working=cloneBlock(publishedWorking);
+      state.x=Number(back?.x)||working.spawn.x;
+      state.y=Number(back?.y)||working.spawn.y;
+      applyAreaVisuals();
+      updatePlayer();
+      applyCamera();
+      await loadDraftForEditor();
+      await loadVersionHistory();
+      renderEditorObjects();syncInspector();syncEditorSceneContext();
+      return true;
+    }
+
+    const authored=getSubarea(target);
+    if(!authored){
+      setServerStatus(`ROOM · unknown ${target}`,'error');
+      return false;
+    }
+
+    if(!activeSubarea)editorStreetReturn={x:state.x,y:state.y};
+    const live=cloneBlock(publishedSubareas.get(target)||normalizeSubareaLayout(authored,target));
+    editorSceneId=target;
+    sceneManager.reset();
+    sceneManager.enter(target,editorStreetReturn);
+    activeSubarea=live;
+    state.x=Number(live.spawn?.x)||state.x;
+    state.y=Number(live.spawn?.y)||state.y;
+    applyAreaVisuals();
+    updatePlayer();
+    applyCamera();
+    await loadDraftForEditor();
+    await loadVersionHistory();
+    renderEditorObjects();syncInspector();syncEditorSceneContext();
+    return true;
   }
 
   function toggleEditorPanel(){
@@ -1175,6 +1430,11 @@ export async function renderBlockWorld(root, options={}){
   const state={x:working.spawn.x,y:working.spawn.y,vx:0,vy:0,running:false,near:null,last:performance.now()};
   const keys=new Set();
   let raf=0, pointerId=null, joyX=0,joyY=0;
+
+  function setJoystickKnob(x=0,y=0){
+    if(!knob)return;
+    knob.style.transform=`translate(${Number(x)||0}px,${Number(y)||0}px)`;
+  }
 
   function currentArea(){
     if(activeSubarea)return activeSubarea;
@@ -1284,35 +1544,55 @@ export async function renderBlockWorld(root, options={}){
     return activeSubarea ? subareaStage : scene;
   }
 
-  function setSceneTransition(active,label='LOADING AREA…'){
+  function setSceneTransition(active,label='ENTERING AREA…'){
     sceneTransitionBusy=!!active;
     if(sceneTransitionLabel)sceneTransitionLabel.textContent=label;
     if(sceneTransition){
+      sceneTransition.classList.remove('error');
       sceneTransition.classList.toggle('show',!!active);
       sceneTransition.setAttribute('aria-hidden',active?'false':'true');
     }
     if(interact)interact.disabled=!!active||!state.near;
   }
 
+  function visualBeat(maxMs=70){
+    return Promise.race([
+      new Promise(resolve=>requestAnimationFrame(()=>resolve())),
+      new Promise(resolve=>setTimeout(resolve,maxMs))
+    ]);
+  }
+
+  function showSceneFailure(message){
+    console.error('RiftCity scene transition failed:',message);
+    if(!sceneTransition||!sceneTransitionLabel)return;
+    clearTimeout(sceneFailureTimer);
+    sceneTransitionLabel.textContent=`ALLEY ERROR · ${String(message||'UNKNOWN').slice(0,72)}`;
+    sceneTransition.classList.add('show','error');
+    sceneTransition.setAttribute('aria-hidden','false');
+    sceneFailureTimer=setTimeout(()=>{
+      sceneTransition.classList.remove('show','error');
+      sceneTransition.setAttribute('aria-hidden','true');
+    },2200);
+  }
+
   function applyAreaVisuals(){
     if(activeSubarea){
       shell.classList.add('bw-subarea-active','bw-subarea-alley');
-      shell.classList.toggle('bw-subarea-asset-error',!!sceneManager.active?.assetError);
+      shell.classList.remove('bw-subarea-asset-error');
       shell.dataset.activeArea=activeSubarea.id;
+      shell.dataset.sceneState='room';
       shell.style.setProperty('--bw-subarea-width',`${activeSubarea.width}px`);
       shell.style.setProperty('--bw-subarea-height',`${activeSubarea.height}px`);
 
-      // Atomic scene swap: Commerce Street is removed from the render path
-      // before the alley becomes visible. The alley owns a viewport clip plus
-      // its own world stage; no Commerce Street transform can leak across.
+      // Hard ownership swap. The street is not resized or reused as an interior.
       scene.style.display='none';
+      scene.style.visibility='hidden';
       scene.setAttribute('aria-hidden','true');
       scene.style.transform='none';
 
       subareaScene.style.display='block';
+      subareaScene.style.visibility='visible';
       subareaScene.setAttribute('aria-hidden','false');
-      subareaScene.style.width='100%';
-      subareaScene.style.height='100%';
 
       subareaStage.style.width=`${activeSubarea.width}px`;
       subareaStage.style.height=`${activeSubarea.height}px`;
@@ -1323,8 +1603,8 @@ export async function renderBlockWorld(root, options={}){
 
       if(subareaPlate){
         const plate=activeSubarea.scenePlate||{};
-        const nextSrc=plate.src||'';
-        const fallbackSrc=plate.fallbackSrc||'';
+        const nextSrc=String(plate.src||'');
+        const fallbackSrc=String(plate.fallbackSrc||'');
         subareaPlate.dataset.fallbackSrc=fallbackSrc;
         subareaPlate.dataset.fallbackAttempted='0';
         if(subareaPlate.dataset.src!==nextSrc){
@@ -1348,13 +1628,17 @@ export async function renderBlockWorld(root, options={}){
 
     shell.classList.remove('bw-subarea-active','bw-subarea-alley','bw-subarea-asset-error');
     delete shell.dataset.activeArea;
+    shell.dataset.sceneState='street';
     shell.style.removeProperty('--bw-subarea-width');
     shell.style.removeProperty('--bw-subarea-height');
 
     subareaScene.style.display='none';
+    subareaScene.style.visibility='hidden';
     subareaScene.setAttribute('aria-hidden','true');
     subareaStage.style.transform='none';
+
     scene.style.display='block';
+    scene.style.visibility='visible';
     scene.setAttribute('aria-hidden','false');
     scene.style.width=`${working.width||BLOCK1.width}px`;
     scene.style.height=`${working.height||BLOCK1.height}px`;
@@ -1377,15 +1661,16 @@ export async function renderBlockWorld(root, options={}){
 
   function assertSceneOwnership(){
     if(!activeSubarea)return true;
-    const streetHidden=scene.style.display==='none'
-      && getComputedStyle(scene).display==='none';
-    const alleyVisible=getComputedStyle(subareaScene).display!=='none'
-      && getComputedStyle(subareaScene).visibility!=='hidden';
-    const playerOwned=player.parentElement===subareaWorld;
-    const promptOwned=prompt.parentElement===subareaWorld;
-    if(streetHidden&&alleyVisible&&playerOwned&&promptOwned)return true;
+    const checks={
+      streetHidden:scene.style.display==='none'&&getComputedStyle(scene).display==='none',
+      alleyVisible:getComputedStyle(subareaScene).display!=='none'&&getComputedStyle(subareaScene).visibility!=='hidden',
+      playerOwned:player.parentElement===subareaWorld,
+      promptOwned:prompt.parentElement===subareaWorld,
+      shellActive:shell.classList.contains('bw-subarea-active')
+    };
+    if(Object.values(checks).every(Boolean))return true;
     throw new Error(
-      `Sub-area ownership failed: streetHidden=${streetHidden}, alleyVisible=${alleyVisible}, playerOwned=${playerOwned}, promptOwned=${promptOwned}`
+      Object.entries(checks).filter(([,ok])=>!ok).map(([key])=>key).join(', ')||'ownership'
     );
   }
 
@@ -1480,60 +1765,42 @@ export async function renderBlockWorld(root, options={}){
   async function enterSubarea(targetId){
     if(sceneTransitionBusy)return false;
     const next=getSubarea(targetId);
-    if(!next)return false;
+    if(!next){
+      showSceneFailure(`UNKNOWN AREA ${targetId}`);
+      return false;
+    }
 
     const streetReturn={x:state.x,y:state.y};
-    setSceneTransition(true,'LOADING ALLEY…');
+    let failure='';
+    setSceneTransition(true,'ENTERING ALLEY…');
     state.near=null;
     prompt.classList.remove('show');
     interact.disabled=true;
 
     try{
-      const result=await sceneManager.enter(targetId,streetReturn);
-      if(!result||result.cancelled)return false;
+      // Give Safari one opportunity to paint the transition, but never wait on
+      // artwork/network state. visualBeat has its own timer fallback.
+      await visualBeat();
 
+      const result=sceneManager.enter(targetId,streetReturn);
       activeSubarea=result.scene;
       state.x=Number(activeSubarea.spawn?.x)||220;
       state.y=Number(activeSubarea.spawn?.y)||800;
       state.running=false;
       joyX=joyY=0;
       keys.clear();
-      knob.style.transform='translate(0,0)';
+      setJoystickKnob();
 
-      // Ownership changes before camera/player updates. If the DOM cannot be
-      // switched cleanly, fail the whole transaction instead of keeping alley
-      // coordinates inside Commerce Street.
       applyAreaVisuals();
       assertSceneOwnership();
       updatePlayer();
       applyCamera();
-      updatePrompt();
 
-      requestAnimationFrame(()=>{
-        try{
-          assertSceneOwnership();
-          applyCamera();
-          requestAnimationFrame(()=>setSceneTransition(false));
-        }catch(error){
-          console.error('Sub-area ownership failed after frame commit',error);
-          sceneManager.reset();
-          activeSubarea=null;
-          state.x=streetReturn.x;
-          state.y=streetReturn.y;
-          applyAreaVisuals();
-          updatePlayer();
-          applyCamera();
-          updatePrompt();
-          setSceneTransition(false);
-        }
-      });
+      shell.dataset.sceneState='alley-ready';
+      await visualBeat(50);
       return true;
     }catch(error){
-      console.error('Could not enter sub-area',error);
-
-      // Roll back ALL transition state. H1.20 used to clear activeSubarea but
-      // leave the alley spawn coordinates behind, which is what made the player
-      // appear at the far-left edge of Commerce Street when a scene swap failed.
+      failure=error?.message||String(error);
       sceneManager.reset();
       activeSubarea=null;
       state.x=streetReturn.x;
@@ -1542,44 +1809,55 @@ export async function renderBlockWorld(root, options={}){
       state.running=false;
       joyX=joyY=0;
       keys.clear();
-      knob.style.transform='translate(0,0)';
+      setJoystickKnob();
       applyAreaVisuals();
       updatePlayer();
       applyCamera();
-      updatePrompt();
-      setSceneTransition(false);
       return false;
+    }finally{
+      setSceneTransition(false);
+      updatePrompt();
+      if(failure)showSceneFailure(failure);
     }
   }
 
-  function leaveSubarea(){
+  async function leaveSubarea(){
     if(sceneTransitionBusy||!activeSubarea)return false;
+    let failure='';
     setSceneTransition(true,'RETURNING TO STREET…');
-    const result=sceneManager.leave();
-    activeSubarea=sceneManager.active?.scene||null;
 
-    // Commerce Alley currently returns directly to Commerce Street. The stack
-    // shape is already scene-manager compatible for future nested interiors.
-    const fallback=working.alley&&Number(working.alley.width)>0
-      ? {x:Number(working.alley.x)+Number(working.alley.width)/2,y:Number(working.alley.y)+Number(working.alley.height)+35}
-      : working.spawn;
-    const back=result?.returnState||fallback||working.spawn;
-    state.x=Number(back?.x)||working.spawn.x;
-    state.y=Number(back?.y)||working.spawn.y;
-    state.near=null;
-    state.running=false;
-    joyX=joyY=0;
-    keys.clear();
-    knob.style.transform='translate(0,0)';
-    applyAreaVisuals();
-    updatePlayer();
-    applyCamera();
-    updatePrompt();
-    requestAnimationFrame(()=>{
+    try{
+      await visualBeat();
+      const result=sceneManager.leave();
+      activeSubarea=sceneManager.active?.scene||null;
+
+      const fallback=working.alley&&Number(working.alley.width)>0
+        ? {x:Number(working.alley.x)+Number(working.alley.width)/2,y:Number(working.alley.y)+Number(working.alley.height)+35}
+        : working.spawn;
+      const back=result?.returnState||fallback||working.spawn;
+
+      state.x=Number(back?.x)||working.spawn.x;
+      state.y=Number(back?.y)||working.spawn.y;
+      state.near=null;
+      state.running=false;
+      joyX=joyY=0;
+      keys.clear();
+      setJoystickKnob();
+
+      applyAreaVisuals();
+      updatePlayer();
       applyCamera();
-      requestAnimationFrame(()=>setSceneTransition(false));
-    });
-    return true;
+      editorStreetReturn=null;
+      await visualBeat(50);
+      return true;
+    }catch(error){
+      failure=error?.message||String(error);
+      return false;
+    }finally{
+      setSceneTransition(false);
+      updatePrompt();
+      if(failure)showSceneFailure(failure);
+    }
   }
 
   function updatePrompt(){
@@ -1667,7 +1945,7 @@ export async function renderBlockWorld(root, options={}){
         if(item.type==='building'){item.o.doorX+=k==='arrowleft'?-step:k==='arrowright'?step:0;item.o.doorY=item.o.y+item.o.h;}
         commit(before);renderEditorObjects();syncInspector();e.preventDefault();return;
       }
-      if(item&&!isLocked(item)&&!typing&&(k==='delete'||k==='backspace')&&(item.type==='building'||item.type==='prop')){
+      if(item&&!isLocked(item)&&!typing&&(k==='delete'||k==='backspace')&&['building','prop','obstacle'].includes(item.type)){
         deleteButton.click();e.preventDefault();return;
       }
       return;
@@ -1684,11 +1962,11 @@ export async function renderBlockWorld(root, options={}){
     const world=pointerVectorToWorld(screenX,screenY);
     joyX=world.x/lim;joyY=world.y/lim;
     // The knob follows the finger in screen space; only movement math is remapped.
-    knob.style.transform=`translate(${screenX}px,${screenY}px)`;
+    setJoystickKnob(screenX,screenY);
   }
   function down(e){if(editMode)return;e.preventDefault();e.stopPropagation();pointerId=e.pointerId;stick.setPointerCapture?.(pointerId);joy(e);}
   function move(e){if(e.pointerId===pointerId){e.preventDefault();joy(e);}}
-  function up(e){if(e.pointerId!==pointerId)return;pointerId=null;joyX=joyY=0;knob.style.transform='translate(0,0)';}
+  function up(e){if(e.pointerId!==pointerId)return;pointerId=null;joyX=joyY=0;setJoystickKnob();}
 
 
   function onEditorPointerDown(e){
@@ -1707,7 +1985,7 @@ export async function renderBlockWorld(root, options={}){
       doorX:item.type==='building'?(Number(item.o.doorX)||0):null,
       before:snapshot()
     };
-    scene.setPointerCapture?.(e.pointerId);
+    editorSurfaceElement().setPointerCapture?.(e.pointerId);
   }
   function onEditorPointerMove(e){
     if(!drag||e.pointerId!==drag.id)return;
@@ -1745,7 +2023,7 @@ export async function renderBlockWorld(root, options={}){
   function onEditorPointerUp(e){
     if(!drag||e.pointerId!==drag.id)return;
     e.preventDefault();e.stopPropagation();commit(drag.before);
-    try{scene.releasePointerCapture?.(e.pointerId);}catch(_){}
+    try{editorSurfaceElement().releasePointerCapture?.(e.pointerId);}catch(_){}
     drag=null;
   }
   assetFile.addEventListener('click',e=>{e.stopPropagation();});
@@ -1802,7 +2080,9 @@ export async function renderBlockWorld(root, options={}){
     if(dir==='left')nudgeSelected(-1,0);
     if(dir==='right')nudgeSelected(1,0);
   }));
-  resetButton.addEventListener('click',()=>{const before=snapshot();working=JSON.parse(JSON.stringify(BLOCK1));commit(before);select('');renderEditorObjects();});
+  editorSubareaButtons.forEach(button=>button.addEventListener('click',()=>switchEditorScene(button.dataset.bwOpenSubarea)));
+  editorParentSceneButton?.addEventListener('click',()=>switchEditorScene(BLOCK1.id));
+  resetButton.addEventListener('click',()=>{const before=snapshot();setWorkingEditorDocument(authoredEditorDocument());commit(before);select('');renderEditorObjects();syncEditorSceneContext();});
   let propSerial=0;
   addPropButton.addEventListener('click',()=>{
     const before=snapshot();
@@ -1819,6 +2099,7 @@ export async function renderBlockWorld(root, options={}){
     const kind=button.dataset.bwAddObject;
     const before=snapshot();
     if(kind==='alley'){
+      if(editingSubarea())return;
       const width=Math.max(20,Number(working.alley?.width)||200);
       const height=Math.max(20,Number(working.alley?.height)||140);
       const x=snap(Math.max(0,Math.min((working.width||BLOCK1.width)-width,state.x-width/2)));
@@ -1832,7 +2113,17 @@ export async function renderBlockWorld(root, options={}){
       };
       commit(before);renderEditorObjects();select('alley:0');return;
     }
+    if(kind==='obstacle'&&editingSubarea()){
+      working.obstacles=working.obstacles||[];
+      const id=`collision-${Date.now().toString(36)}`;
+      working.obstacles.push({id,x:snap(Math.max(0,state.x-80)),y:snap(Math.max(0,state.y-60)),width:160,height:120,active:true});
+      commit(before);renderEditorObjects();select(`obstacle:${working.obstacles.length-1}`);return;
+    }
     if(kind==='exit'){
+      if(editingSubarea()){
+        working.exit={...(working.exit||{}),id:working.exit?.id||'street-exit',x:snap(Math.max(0,state.x-80)),y:snap(Math.max(0,state.y-100)),width:160,height:220,label:working.exit?.label||'Commerce Street'};
+        commit(before);renderEditorObjects();select('room-exit:0');return;
+      }
       working.exits=working.exits||[];
       const id=`exit-${Date.now().toString(36)}`;
       working.exits.push({id,x:snap(state.x),y:snap(state.y),width:120,height:220,targetBlock:''});
@@ -1847,16 +2138,19 @@ export async function renderBlockWorld(root, options={}){
       commit(before);renderEditorObjects();select('walkable:0');return;
     }
     if(kind==='door'){
+      if(editingSubarea())return;
       const nearest=(working.buildings||[]).map((b,i)=>({b,i,d:Math.hypot((b.doorX??b.x)-state.x,(b.doorY??b.y)-state.y)})).sort((a,b)=>a.d-b.d)[0];
       if(nearest){nearest.b.doorX=snap(state.x);nearest.b.doorY=snap(state.y);commit(before);renderEditorObjects();select(`building:${nearest.i}`);}
     }
   }));
-  duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item))return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){const slug=String(copy.kind||'prop').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'prop';copy.id=`prop-${slug}-${Date.now().toString(36)}-${(++propSerial).toString(36)}`;delete copy.locked;working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}});
-  deleteButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item)||item.type==='alley')return;const before=snapshot();if(item.type==='building')working.buildings.splice(item.i,1);else working.props.splice(item.i,1);commit(before);select('');renderEditorObjects();});
-  scene.addEventListener('pointerdown',onEditorPointerDown,true);
-  scene.addEventListener('pointermove',onEditorPointerMove,true);
-  scene.addEventListener('pointerup',onEditorPointerUp,true);
-  scene.addEventListener('pointercancel',onEditorPointerUp,true);
+  duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item))return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){const slug=String(copy.kind||'prop').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'prop';copy.id=`prop-${slug}-${Date.now().toString(36)}-${(++propSerial).toString(36)}`;delete copy.locked;working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}else if(item.type==='obstacle'){copy.id=`${copy.id||'collision'}-copy-${Date.now().toString(36)}`;delete copy.locked;working.obstacles.push(copy);commit(before);renderEditorObjects();select(`obstacle:${working.obstacles.length-1}`);}});
+  deleteButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item)||item.type==='alley')return;const before=snapshot();if(item.type==='building')working.buildings.splice(item.i,1);else if(item.type==='prop')working.props.splice(item.i,1);else if(item.type==='obstacle')working.obstacles.splice(item.i,1);else return;commit(before);select('');renderEditorObjects();});
+  for(const surface of [scene,subareaWorld]){
+    surface.addEventListener('pointerdown',onEditorPointerDown,true);
+    surface.addEventListener('pointermove',onEditorPointerMove,true);
+    surface.addEventListener('pointerup',onEditorPointerUp,true);
+    surface.addEventListener('pointercancel',onEditorPointerUp,true);
+  }
   editor.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();},true);
   editor.addEventListener('click',e=>{
     const button=e.target.closest('button');
@@ -2012,10 +2306,12 @@ export async function renderBlockWorld(root, options={}){
     document.body.classList.remove('bw-fullscreen-mode');
     shell.classList.remove('bw-fullscreen-active');
     try{screen.orientation?.unlock?.();}catch(_){}
-    scene.removeEventListener('pointerdown',onEditorPointerDown,true);
-    scene.removeEventListener('pointermove',onEditorPointerMove,true);
-    scene.removeEventListener('pointerup',onEditorPointerUp,true);
-    scene.removeEventListener('pointercancel',onEditorPointerUp,true);
+    for(const surface of [scene,subareaWorld]){
+      surface.removeEventListener('pointerdown',onEditorPointerDown,true);
+      surface.removeEventListener('pointermove',onEditorPointerMove,true);
+      surface.removeEventListener('pointerup',onEditorPointerUp,true);
+      surface.removeEventListener('pointercancel',onEditorPointerUp,true);
+    }
     for(const url of assetObjectUrls)try{URL.revokeObjectURL(url);}catch(_){}
     assetObjectUrls.clear();
   };
