@@ -739,3 +739,11 @@ The normal D1 schema migration also creates `approved_assets`. The Worker keeps 
 - If the alley image fails to preload, the dedicated alley scene still opens with a dark diagnostic fallback; the Commerce Street panorama is never substituted.
 - The new `public/scene-manager.js` is intentionally generic so future shop, apartment, warehouse, garage and other interior scenes can reuse the same enter/leave/preload path.
 - Existing server-authoritative gameplay, Block Editor draft/publish behavior, and H1.18 D1/R2 asset verification are unchanged.
+
+
+## Hybrid H1.21 — Downtown D1 layout synced to source fallback
+
+- Synced the exported `riftcity-block-edit` v2 layout for `downtown-commercial-01` into `public/block1.js`.
+- The repo fallback now matches the authored Commerce Street D1 geometry for world size, scene plate, spawn, walkable region, road/sidewalk, all six building rectangles and door positions, the authored tree prop, alley bounds and west/east exits.
+- Preserved the repo-only Commerce Alley `target` / `label` routing metadata so the existing `alley-commerce-01` sub-area transition continues to work even though those fields were not present in the exported edit JSON.
+- This changes only the source fallback. Runtime D1 publish/hydration behavior and server-authoritative gameplay remain unchanged.
