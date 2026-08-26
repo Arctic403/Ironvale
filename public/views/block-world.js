@@ -2,6 +2,7 @@ import { api } from '../ui/api.js';
 import { go } from '../ui/router.js';
 import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
 import { BLOCK_ASSETS } from '../block-assets.js';
+import { getSubarea } from '../subareas.js';
 
 let cleanup=null;
 export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
@@ -21,7 +22,7 @@ export async function renderBlockWorld(root, options={}){
     <section class="blockworld-shell${editorWorkspace?' bw-editor-page':''}">
       <div class="blockworld-viewport" id="blockworld-viewport">
         <div class="blockworld-scene" id="blockworld-scene">
-          <img class="bw-scene-plate" src="/assets/blocks/commerce-street.svg" alt="" draggable="false" decoding="async" fetchpriority="high">
+          <img class="bw-scene-plate" id="bw-scene-plate" src="/assets/blocks/commerce-street.svg" alt="" draggable="false" decoding="async" fetchpriority="high">
           <div class="bw-sky"></div>
           <div class="bw-backdrop">
             <div class="bw-haze"></div>
@@ -48,13 +49,14 @@ export async function renderBlockWorld(root, options={}){
           <div class="bw-sidewalk bw-sidewalk-south"></div>
           <div class="bw-buildings"></div>
           <div class="bw-props"></div>
+          <div class="bw-subarea-debug" id="bw-subarea-debug" aria-hidden="true"></div>
           <div class="bw-player" id="bw-player"><i></i></div>
           <div class="bw-prompt" id="bw-prompt"></div>
           <div class="bw-exit bw-exit-west">← NEXT BLOCK</div>
           <div class="bw-exit bw-exit-east">NEXT BLOCK →</div>
         </div>
       </div>
-      <div class="bw-block-label"><small>DOWNTOWN / BLOCK 01</small><strong>Commerce Street</strong></div>
+      <div class="bw-block-label"><small id="bw-area-kicker">DOWNTOWN / BLOCK 01</small><strong id="bw-area-name">Commerce Street</strong></div>
       ${editorWorkspace
         ? '<div id="bw-react-editor-root" class="bw-react-editor-host"></div>'
         : '<div class="bw-dev-buttons bw-player-only-buttons"><button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button></div>'}
@@ -103,8 +105,12 @@ export async function renderBlockWorld(root, options={}){
   const scene=root.querySelector('#blockworld-scene');
   const buildings=scene.querySelector('.bw-buildings');
   const props=scene.querySelector('.bw-props');
+  const scenePlate=scene.querySelector('#bw-scene-plate');
+  const subareaDebug=scene.querySelector('#bw-subarea-debug');
   const player=scene.querySelector('#bw-player');
   const prompt=scene.querySelector('#bw-prompt');
+  const areaKicker=root.querySelector('#bw-area-kicker');
+  const areaName=root.querySelector('#bw-area-name');
   const interact=root.querySelector('#bw-interact');
   const run=root.querySelector('#bw-run');
   const fullscreenButton=root.querySelector('#bw-fullscreen')||editorQuery('#bw-fullscreen');
@@ -418,6 +424,8 @@ export async function renderBlockWorld(root, options={}){
   let publishedWorking=cloneBlock(publishedBlockData?.block||BLOCK1);
   let editMode=false, editorCollapsed=false, selectedKey='', drag=null;
   let working=cloneBlock(publishedWorking);
+  let activeSubarea=null;
+  let streetReturnPoint=null;
   let undoStack=[],redoStack=[];
   let draftDirty=false,draftSaving=false,draftTimer=null,draftInterval=null;
   let draftRevision=0,publishedRevision=Number(publishedBlockData?.revision||0);
@@ -854,11 +862,11 @@ export async function renderBlockWorld(root, options={}){
         target.appendChild(gizmos);
       }
     }
-    const plate=root.querySelector('#bw-scene-plate');
-    if(plate&&working.scenePlate){
-      plate.style.left=`${working.scenePlate.x||0}px`;plate.style.top=`${working.scenePlate.y||0}px`;
-      plate.style.width=`${working.scenePlate.width||working.width}px`;plate.style.height=`${working.scenePlate.height||working.height}px`;
-      plate.style.transform=`scale(${Number(working.scenePlate.scale)||1})`;plate.style.transformOrigin='0 0';
+    if(scenePlate&&working.scenePlate&&!activeSubarea){
+      scenePlate.src=working.scenePlate.src||'/assets/blocks/commerce-street.svg';
+      scenePlate.style.left=`${working.scenePlate.x||0}px`;scenePlate.style.top=`${working.scenePlate.y||0}px`;
+      scenePlate.style.width=`${working.scenePlate.width||working.width}px`;scenePlate.style.height=`${working.scenePlate.height||working.height}px`;
+      scenePlate.style.transform=`scale(${Number(working.scenePlate.scale)||1})`;scenePlate.style.transformOrigin='0 0';
     }
     populateObjectSelect(); if(selectedKey)select(selectedKey);
   }
@@ -873,6 +881,7 @@ export async function renderBlockWorld(root, options={}){
   }
 
   async function setEditMode(on){
+    if(on&&activeSubarea)leaveSubarea();
     editMode=!!on;
     shell.classList.toggle('bw-edit-mode',editMode);
     if(editMode){
@@ -1000,41 +1009,219 @@ export async function renderBlockWorld(root, options={}){
   const keys=new Set();
   let raf=0, pointerId=null, joyX=0,joyY=0;
 
-  function nearestBuilding(){
+  function currentArea(){
+    if(activeSubarea)return activeSubarea;
+    return {
+      id:working.id,
+      name:working.name||'Commerce Street',
+      width:working.width||BLOCK1.width,
+      height:working.height||BLOCK1.height,
+      walkable:working.walkable||{x:0,y:990,width:working.width||BLOCK1.width,height:(working.height||BLOCK1.height)-990},
+      obstacles:working.buildings||[]
+    };
+  }
+
+  function distanceToRect(x,y,rect){
+    const left=Number(rect.x)||0,top=Number(rect.y)||0;
+    const width=Number(rect.width??rect.w)||0,height=Number(rect.height??rect.h)||0;
+    const right=left+width,bottom=top+height;
+    const dx=x<left?left-x:x>right?x-right:0;
+    const dy=y<top?top-y:y>bottom?y-bottom:0;
+    return Math.hypot(dx,dy);
+  }
+
+  function nearestStreetInteraction(){
     let best=null,dist=Infinity;
-    for(const b of working.buildings){
+    for(const b of working.buildings||[]){
       const doorX=b.doorX??(b.x+b.w*.5);
       const doorY=b.doorY??510;
       const d=Math.hypot(state.x-doorX,state.y-doorY);
-      if(d<dist){dist=d;best=b;}
+      if(d<dist){
+        dist=d;
+        best={kind:'location',name:b.name||'Building',locationId:b.locationId,distance:d};
+      }
     }
-    // Interaction only activates when the character is actually at the door.
-    return dist<92?best:null;
+
+    const alley=working.alley;
+    if(alley&&alley.active!==false&&(Number(alley.width)||0)>0&&(Number(alley.height)||0)>0){
+      const d=distanceToRect(state.x,state.y,alley);
+      if(d<dist){
+        dist=d;
+        best={
+          kind:'subarea',
+          name:alley.label||'Commerce Alley',
+          target:alley.target||'alley-commerce-01',
+          distance:d
+        };
+      }
+    }
+
+    return best&&dist<100?best:null;
   }
 
-  function collidesWithFacade(x,y){
-    const radius=18;
-    return working.buildings.some(b=>
-      x>b.x-radius && x<b.x+b.w+radius &&
-      y>b.y-radius && y<b.y+b.h+radius
-    );
+  function nearestSubareaInteraction(){
+    if(!activeSubarea)return null;
+    const exit=activeSubarea.exit;
+    if(exit&&distanceToRect(state.x,state.y,exit)<105){
+      return {kind:'subarea-exit',name:exit.label||'Commerce Street',distance:0};
+    }
+    return null;
   }
+
+  function collidesAt(x,y){
+    const radius=18;
+    const obstacles=activeSubarea?(activeSubarea.obstacles||[]):(working.buildings||[]);
+    return obstacles.some(o=>{
+      const left=Number(o.x)||0,top=Number(o.y)||0;
+      const width=Number(o.width??o.w)||0,height=Number(o.height??o.h)||0;
+      return x>left-radius&&x<left+width+radius&&y>top-radius&&y<top+height+radius;
+    });
+  }
+
+  function renderSubareaDebug(){
+    if(!subareaDebug)return;
+    subareaDebug.innerHTML='';
+    if(!activeSubarea)return;
+    for(const obstacle of activeSubarea.obstacles||[]){
+      const el=document.createElement('div');
+      el.className='bw-subarea-collider';
+      el.style.left=`${obstacle.x}px`;
+      el.style.top=`${obstacle.y}px`;
+      el.style.width=`${obstacle.width}px`;
+      el.style.height=`${obstacle.height}px`;
+      subareaDebug.appendChild(el);
+    }
+    if(activeSubarea.walkable){
+      const walk=document.createElement('div');
+      walk.className='bw-subarea-walkable';
+      walk.style.left=`${activeSubarea.walkable.x}px`;
+      walk.style.top=`${activeSubarea.walkable.y}px`;
+      walk.style.width=`${activeSubarea.walkable.width}px`;
+      walk.style.height=`${activeSubarea.walkable.height}px`;
+      subareaDebug.appendChild(walk);
+    }
+    if(activeSubarea.exit){
+      const exit=document.createElement('div');
+      exit.className='bw-subarea-exit-guide';
+      exit.style.left=`${activeSubarea.exit.x}px`;
+      exit.style.top=`${activeSubarea.exit.y}px`;
+      exit.style.width=`${activeSubarea.exit.width}px`;
+      exit.style.height=`${activeSubarea.exit.height}px`;
+      subareaDebug.appendChild(exit);
+    }
+  }
+
+  function applyAreaVisuals(){
+    if(activeSubarea){
+      shell.classList.add('bw-subarea-active','bw-subarea-alley');
+      shell.style.setProperty('--bw-subarea-width',`${activeSubarea.width}px`);
+      shell.style.setProperty('--bw-subarea-height',`${activeSubarea.height}px`);
+      if(scenePlate){
+        scenePlate.src=activeSubarea.scenePlate?.src||'';
+        scenePlate.style.left=`${activeSubarea.scenePlate?.x||0}px`;
+        scenePlate.style.top=`${activeSubarea.scenePlate?.y||0}px`;
+        scenePlate.style.transform=`scale(${Number(activeSubarea.scenePlate?.scale)||1})`;
+        scenePlate.style.transformOrigin='0 0';
+      }
+      if(areaKicker)areaKicker.textContent='DOWNTOWN / COMMERCE STREET';
+      if(areaName)areaName.textContent=activeSubarea.name||'Alley';
+      renderSubareaDebug();
+      return;
+    }
+
+    shell.classList.remove('bw-subarea-active','bw-subarea-alley');
+    shell.style.removeProperty('--bw-subarea-width');
+    shell.style.removeProperty('--bw-subarea-height');
+    if(scenePlate){
+      scenePlate.src=working.scenePlate?.src||'/assets/blocks/commerce-street.svg';
+      scenePlate.style.left=`${working.scenePlate?.x||0}px`;
+      scenePlate.style.top=`${working.scenePlate?.y||0}px`;
+      scenePlate.style.transform=`scale(${Number(working.scenePlate?.scale)||1})`;
+      scenePlate.style.transformOrigin='0 0';
+    }
+    if(areaKicker)areaKicker.textContent='DOWNTOWN / BLOCK 01';
+    if(areaName)areaName.textContent='Commerce Street';
+    renderSubareaDebug();
+  }
+
+  function updatePlayer(){
+    const area=currentArea();
+    const walk=area.walkable;
+    player.style.left=`${state.x}px`;
+    player.style.top=`${state.y}px`;
+    const depthRange=Math.max(1,walk.height-63);
+    const playerDepth=.82+((state.y-(walk.y+18))/depthRange)*.20;
+    player.style.transform=`translate(-50%,-100%) scale(${Math.max(.78,Math.min(1.05,playerDepth))})`;
+    player.style.zIndex=String(30+Math.round(state.y));
+  }
+
+  function enterSubarea(targetId){
+    const next=getSubarea(targetId);
+    if(!next)return false;
+    streetReturnPoint={x:state.x,y:state.y};
+    activeSubarea=next;
+    state.x=Number(next.spawn?.x)||220;
+    state.y=Number(next.spawn?.y)||800;
+    state.near=null;
+    state.running=false;
+    joyX=joyY=0;
+    keys.clear();
+    knob.style.transform='translate(0,0)';
+    applyAreaVisuals();
+    updatePlayer();
+    return true;
+  }
+
+  function leaveSubarea(){
+    if(!activeSubarea)return false;
+    activeSubarea=null;
+    const fallback=working.alley&&Number(working.alley.width)>0
+      ? {x:Number(working.alley.x)+Number(working.alley.width)/2,y:Number(working.alley.y)+Number(working.alley.height)+35}
+      : working.spawn;
+    const back=streetReturnPoint||fallback||working.spawn;
+    streetReturnPoint=null;
+    state.x=Number(back?.x)||working.spawn.x;
+    state.y=Number(back?.y)||working.spawn.y;
+    state.near=null;
+    state.running=false;
+    joyX=joyY=0;
+    keys.clear();
+    knob.style.transform='translate(0,0)';
+    applyAreaVisuals();
+    updatePlayer();
+    return true;
+  }
+
   function updatePrompt(){
-    state.near=nearestBuilding();
+    state.near=activeSubarea?nearestSubareaInteraction():nearestStreetInteraction();
     if(state.near){
-      prompt.textContent=`${state.near.name} · Enter`;
+      const action=state.near.kind==='subarea-exit'?'Exit':'Enter';
+      prompt.textContent=`${state.near.name} · ${action}`;
       prompt.classList.add('show');
       interact.disabled=false;
-      interact.textContent='ENTER';
+      interact.textContent=action.toUpperCase();
     }else{
       prompt.classList.remove('show');
       interact.disabled=true;
+      interact.textContent='ENTER';
     }
   }
+
   function enter(){
     if(!state.near)return;
-    if(validLocationIds.has(state.near.locationId)) go(`city/${state.near.locationId}`);
+    if(state.near.kind==='subarea'){
+      enterSubarea(state.near.target);
+      return;
+    }
+    if(state.near.kind==='subarea-exit'){
+      leaveSubarea();
+      return;
+    }
+    if(state.near.kind==='location'&&validLocationIds.has(state.near.locationId)){
+      go(`city/${state.near.locationId}`);
+    }
   }
+
   function tick(now){
     const dt=Math.min(.035,(now-state.last)/1000||0); state.last=now;
     let dx=joyX,dy=joyY;
@@ -1044,27 +1231,21 @@ export async function renderBlockWorld(root, options={}){
     if(keys.has('s')||keys.has('arrowdown'))dy+=1;
     const len=Math.hypot(dx,dy)||1; if(Math.hypot(dx,dy)>1){dx/=len;dy/=len;}
     const speed=(state.running||keys.has('shift'))?390:235;
+    const area=currentArea();
+    const walk=area.walkable;
     let nx=state.x+dx*speed*dt, ny=state.y+dy*speed*dt;
-    nx=Math.max(45,Math.min((working.width||BLOCK1.width)-45,nx));
-    // The whole foreground street plane is walkable. Players can now walk
-    // north across the road and right up to the storefront threshold.
-    const walk=working.walkable||{x:0,y:990,width:working.width,height:working.height-990};
+    nx=Math.max(45,Math.min(area.width-45,nx));
     ny=Math.max(walk.y+18,Math.min(walk.y+walk.height-45,ny));
     nx=Math.max(walk.x+18,Math.min(walk.x+walk.width-45,nx));
 
-    // Resolve axes separately so facades feel solid without sticky corners.
-    if(!collidesWithFacade(nx,state.y))state.x=nx;
-    if(!collidesWithFacade(state.x,ny))state.y=ny;
-    player.style.left=`${state.x}px`; player.style.top=`${state.y}px`;
-    const depthRange=Math.max(1,walk.height-63);const playerDepth=.82+((state.y-(walk.y+18))/depthRange)*.20;
-    player.style.transform=`translate(-50%,-100%) scale(${playerDepth})`;
-    player.style.zIndex=String(30+Math.round(state.y));
+    // Resolve axes separately so storefronts and sub-area props feel solid
+    // without producing sticky diagonal corners.
+    if(!collidesAt(nx,state.y))state.x=nx;
+    if(!collidesAt(state.x,ny))state.y=ny;
+    updatePlayer();
 
-    // Gameplay world height is independent from the 2:1 scene-plate bitmap.
-    // Fit the playable 1440-unit block to the available viewport; the plate
-    // may extend below it visually without changing movement/camera scale.
-    const authoredHeight=working.height||BLOCK1.height;
-    const authoredWidth=working.width||BLOCK1.width;
+    const authoredHeight=area.height;
+    const authoredWidth=area.width;
     const editorBaseFit=Math.min(
       1,
       Math.max(.06,viewport.clientHeight/Math.max(1,authoredHeight)),
@@ -1079,12 +1260,13 @@ export async function renderBlockWorld(root, options={}){
     const visibleWorldWidth=viewport.clientWidth/fitScale;
     const cameraX=Math.max(
       0,
-      Math.min(Math.max(0,(working.width||BLOCK1.width)-visibleWorldWidth),state.x-visibleWorldWidth*.46)
+      Math.min(Math.max(0,area.width-visibleWorldWidth),state.x-visibleWorldWidth*.46)
     );
     scene.style.transform=`translate3d(${-cameraX*fitScale}px,0,0) scale(${fitScale})`;
     updatePrompt();
     raf=requestAnimationFrame(tick);
   }
+
   function keydown(e){
     const k=e.key.toLowerCase();
     const typing=/input|select|textarea/i.test(e.target?.tagName||'');
@@ -1263,7 +1445,13 @@ export async function renderBlockWorld(root, options={}){
       const height=Math.max(20,Number(working.alley?.height)||140);
       const x=snap(Math.max(0,Math.min((working.width||BLOCK1.width)-width,state.x-width/2)));
       const y=snap(Math.max(0,Math.min((working.height||BLOCK1.height)-height,state.y-height/2)));
-      working.alley={...(working.alley||{}),x,y,width,height,active:working.alley?.active!==false};
+      working.alley={
+        ...(working.alley||{}),
+        x,y,width,height,
+        target:working.alley?.target||'alley-commerce-01',
+        label:working.alley?.label||'Commerce Alley',
+        active:working.alley?.active!==false
+      };
       commit(before);renderEditorObjects();select('alley:0');return;
     }
     if(kind==='exit'){
@@ -1318,7 +1506,7 @@ export async function renderBlockWorld(root, options={}){
 
   function pointerScaleToWorld(){
     const rect=scene.getBoundingClientRect();
-    const worldWidth=working.width||BLOCK1.width||1;
+    const worldWidth=currentArea().width||working.width||BLOCK1.width||1;
     return Math.max(0.0001,(usesRotatedIOSFullscreen()?rect.height:rect.width)/worldWidth);
   }
 
@@ -1416,7 +1604,8 @@ export async function renderBlockWorld(root, options={}){
   run.addEventListener('pointerup',()=>state.running=false);
   run.addEventListener('pointercancel',()=>state.running=false);
 
-  player.style.left=`${state.x}px`;player.style.top=`${state.y}px`;
+  applyAreaVisuals();
+  updatePlayer();
   if(editorWorkspace)await setEditMode(true);
   raf=requestAnimationFrame(tick);
   cleanup=()=>{

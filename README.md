@@ -657,3 +657,15 @@ Research-driven state cleanup:
 - Locked objects remain visible and are marked `LOCKED` in the object selector so they are always recoverable.
 - Props are explicitly multi-instance. Repeated adds of the same type now create unique prop IDs and stagger their initial placement instead of stacking every new copy at exactly the same coordinates. Duplicated props also receive a fresh ID.
 - Fixed private Block Editor popover scrolling on iPhone/Safari: Properties, Add Object and Tools use bounded independent scroll bodies, Transform can pan/scroll instead of clipping, and gameplay `touch-action:none` is limited back to the actual world viewport rather than blocking menu scrolling.
+
+
+## Hybrid H1.16 — Commerce Alley sub-area foundation
+
+- Commerce Street's authored Alley Entrance now targets `alley-commerce-01`.
+- Added a reusable 2.5D sub-area registry so alleys can be followed later by shop, apartment, warehouse and other interiors without creating a second 3D runtime.
+- Walking into the authored alley entrance range now exposes **ENTER** and swaps the Block World into the Commerce Alley scene without routing away from the 2.5D runtime.
+- The alley uses its own scene plate, logical world size, spawn point, walkable bounds and collision obstacles.
+- Alley scene art remains presentation-only; gameplay geometry is separate from the image.
+- The alley exit returns the player to the exact Commerce Street position they entered from.
+- Editor Play Mode can test the transition; entering Edit Mode while inside a sub-area returns to Commerce Street before editing.
+- Scavenging is intentionally not wired in this pass. The alley config contains an empty interaction registry ready for the existing server-authoritative scavenging crime in the next pass.

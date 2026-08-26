@@ -21,7 +21,7 @@ export const BLOCK1 = Object.freeze({
     {id:'apartment-rentals',name:'Apartment Rentals',locationId:'keystone-realty',x:2960,y:480,w:440,h:530,tone:'apartment',sign:'APARTMENT RENTALS',doorX:3215,doorY:1010,style:'apartments',detail:'RENTALS'}
   ],
   props:[],
-  alley:{x:0,y:0,width:0,height:0,details:[]},
+  alley:{x:570,y:980,width:200,height:120,target:'alley-commerce-01',label:'Commerce Alley',active:true,details:[]},
   exits:[
     {id:'west',x:0,y:1010,w:110,h:430,label:'West Downtown — future block'},
     {id:'east',x:3490,y:1010,w:110,h:430,label:'East Downtown — future block'}

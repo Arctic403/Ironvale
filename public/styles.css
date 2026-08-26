@@ -2970,3 +2970,67 @@ body.dev-block-editor-page{
     max-height:min(62dvh,190px)!important;
   }
 }
+
+
+/* H1.16 — reusable 2.5D sub-areas (Commerce Alley first).
+   The art remains one scene plate. Movement/collision/exit geometry is authored
+   separately so future shops, apartments and other interiors can reuse the same path. */
+.blockworld-shell.bw-subarea-active .blockworld-scene{
+  width:var(--bw-subarea-width)!important;
+  height:var(--bw-subarea-height)!important;
+  min-height:0!important;
+}
+.blockworld-shell.bw-subarea-active .bw-scene-plate{
+  display:block!important;
+  width:var(--bw-subarea-width)!important;
+  height:var(--bw-subarea-height)!important;
+  object-fit:fill!important;
+  pointer-events:none!important;
+}
+.blockworld-shell.bw-subarea-active .bw-buildings,
+.blockworld-shell.bw-subarea-active .bw-props,
+.blockworld-shell.bw-subarea-active .bw-exit{
+  display:none!important;
+}
+.blockworld-shell.bw-subarea-active .bw-block-label{
+  background:#091216d9!important;
+  border:1px solid #ffffff22;
+  backdrop-filter:blur(7px);
+}
+.bw-subarea-debug{
+  position:absolute;
+  inset:0;
+  z-index:82;
+  pointer-events:none;
+}
+.bw-subarea-collider,
+.bw-subarea-walkable,
+.bw-subarea-exit-guide{
+  position:absolute;
+  display:none;
+  box-sizing:border-box;
+}
+.bw-view-colliders.bw-subarea-active .bw-subarea-collider{
+  display:block;
+  background:#ff5f571b;
+  outline:3px dashed #ff6b63cc;
+}
+.bw-view-zones.bw-subarea-active .bw-subarea-walkable{
+  display:block;
+  background:#5eff9d12;
+  outline:3px dashed #69f3a7c7;
+}
+.bw-view-zones.bw-subarea-active .bw-subarea-exit-guide{
+  display:block;
+  background:#65d9ff18;
+  outline:3px dashed #65d9ffcc;
+}
+.blockworld-shell.bw-subarea-alley .bw-player{
+  filter:drop-shadow(0 4px 4px #0008);
+}
+@media(max-width:700px){
+  .blockworld-shell.bw-subarea-active .blockworld-scene{
+    height:var(--bw-subarea-height)!important;
+    min-height:0!important;
+  }
+}
