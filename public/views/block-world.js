@@ -1,6 +1,7 @@
 import { api } from '../ui/api.js';
 import { go } from '../ui/router.js';
 import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
+import { BLOCK_ASSETS } from '../block-assets.js';
 
 let cleanup=null;
 export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
@@ -73,7 +74,7 @@ export async function renderBlockWorld(root){
           <div class="bw-asset-panel">
             <strong>BUILDING ART ASSETS</strong>
             <label class="bw-asset-import">Import RiftAssets JSON<input id="bw-asset-file" type="file" accept="application/json,.json"></label>
-            <div id="bw-asset-status">No art assets imported yet.</div>
+            <div id="bw-asset-status">Persistent RiftCity art registry ready.</div>
             <label>Asset<select id="bw-editor-asset"><option value="">No asset</option></select></label>
             <div class="bw-editor-grid">
               <label>Art scale<input id="bw-asset-scale" type="number" min="0.05" max="5" step="0.05" value="1"></label>
@@ -122,8 +123,20 @@ export async function renderBlockWorld(root){
   const assetX=root.querySelector('#bw-asset-x'),assetY=root.querySelector('#bw-asset-y'),assetFit=root.querySelector('#bw-asset-fit');
   const assetApply=root.querySelector('#bw-asset-apply'),assetClear=root.querySelector('#bw-asset-clear');
 
-  // Imported image data stays in the browser/editor session; block exports only keep the lightweight asset id + placement.
-  const importedAssets=new Map();
+  // Built-in source assets are permanent. Editor imports are also cached locally so
+  // they survive refreshes until they are deliberately integrated into source.
+  const ASSET_CACHE_KEY='riftcity:block-assets:v2';
+  const importedAssets=new Map(Object.entries(BLOCK_ASSETS).map(([id,a])=>[id,{...a,id}]));
+  try{
+    const cached=JSON.parse(localStorage.getItem(ASSET_CACHE_KEY)||'[]');
+    for(const a of Array.isArray(cached)?cached:[])if(a?.id&&String(a.src||'').startsWith('data:image/'))importedAssets.set(a.id,a);
+  }catch(_){}
+  function persistImportedAssets(){
+    try{
+      const cached=[...importedAssets.values()].filter(a=>!BLOCK_ASSETS[a.id]);
+      localStorage.setItem(ASSET_CACHE_KEY,JSON.stringify(cached));
+    }catch(err){console.warn('RiftCity asset cache could not be saved',err);}
+  }
 
   // Editable working copy; the imported authored block remains untouched.
   let editMode=false, selectedKey='', drag=null;
@@ -183,24 +196,38 @@ export async function renderBlockWorld(root){
 
       let added=0;
       for(const raw of list){
-        const id=String(raw.id||raw.assetId||raw.slug||raw.name||`asset-${added+1}`).trim();
+        const id=String(raw.assetId||raw.id||raw.slug||raw.name||`asset-${added+1}`).trim();
         let src=String(raw.src||raw.dataUrl||raw.image||raw.imageData||raw.data||'').trim();
         const mime=String(raw.mimeType||raw.mime||'image/png').trim()||'image/png';
         if(src && !src.startsWith('data:image/') && /^[A-Za-z0-9+/=\s]+$/.test(src)){
           src=`data:${mime};base64,${src.replace(/\s+/g,'')}`;
         }
         if(!id||!src.startsWith('data:image/'))continue;
-        importedAssets.set(id,{
+        const imported={
           id,
           name:raw.name||raw.label||id,
           src,
           sourceWidth:Number(raw.sourceWidth||raw.width||0),
           sourceHeight:Number(raw.sourceHeight||raw.height||0)
-        });
+        };
+        importedAssets.set(id,imported);
+
+        // Stable RiftAssets ids such as building.corner-mart.a auto-target the
+        // corresponding authored building without requiring a second manual step.
+        const hinted=String(raw.assetId||id).match(/^building\.([a-z0-9-]+)(?:\.|$)/i)?.[1];
+        const target=working.buildings.find(b=>b.id===hinted)
+          || working.buildings.find(b=>String(b.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===hinted);
+        if(target){
+          target.asset={id,scale:1,x:0,y:0,fit:'contain'};
+          selectedKey=`building:${working.buildings.indexOf(target)}`;
+        }
         added++;
       }
       if(!added)throw new Error('No embedded image data was found. Expected src/dataUrl/image containing a data:image URL or base64 image.');
-      populateAssetSelect();assetStatus.textContent=`${added} asset${added===1?'':'s'} imported · ${file.name}`;syncAssetInspector();renderEditorObjects();
+      persistImportedAssets();
+      populateAssetSelect();
+      assetStatus.textContent=`${added} asset${added===1?'':'s'} imported & saved · ${file.name}`;
+      syncAssetInspector();renderEditorObjects();syncInspector();
     }catch(err){assetStatus.textContent=`Import failed: ${err.message}`;}
     finally{assetFile.value='';}
   }

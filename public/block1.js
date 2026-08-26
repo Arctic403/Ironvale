@@ -12,7 +12,7 @@ export const BLOCK1 = Object.freeze({
     {x:0,y:1080,width:3600,height:150}
   ],
   buildings:[
-    {id:'corner-mart',name:'Corner Mart',locationId:'mall',x:260,y:180,w:430,h:330,tone:'shop',sign:'CORNER MART',doorX:475,doorY:510,style:'mart',detail:'24/7 • GROCERIES'},
+    {id:'corner-mart',name:'Corner Mart',locationId:'mall',x:260,y:180,w:430,h:330,tone:'shop',sign:'CORNER MART',doorX:475,doorY:510,style:'mart',detail:'24/7 • GROCERIES',asset:{id:'building.corner-mart.a',scale:1,x:0,y:0,fit:'contain'}},
     {id:'rift-pharmacy',name:'Rift Pharmacy',locationId:'hospital',x:780,y:160,w:430,h:350,tone:'pharmacy',sign:'RIFT PHARMACY',doorX:995,doorY:510,style:'pharmacy',detail:'PRESCRIPTIONS • CLINIC'},
     {id:'keystone',name:'Keystone Realty',locationId:'keystone-realty',x:1300,y:200,w:450,h:310,tone:'office',sign:'KEYSTONE REALTY',doorX:1525,doorY:510,style:'realty',detail:'LOFTS • COMMERCIAL'},
     {id:'noodle-house',name:'Noodle House',locationId:'nightclub',x:1860,y:170,w:430,h:340,tone:'food',sign:'NOODLE HOUSE',doorX:2075,doorY:510,style:'noodle',detail:'OPEN LATE'},

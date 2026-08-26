@@ -381,3 +381,13 @@ This remains deliberately mid-detail rather than photorealistic so Block 01 stay
 ## Phase 11.6 — RiftAssets building-art importer
 
 The temporary Block Editor can now import `riftcity-asset-pack` JSON files exported from RiftAssets. Imported transparent building art can be assigned to any selected Commerce Street building and previewed directly in the playable block. Per-building art scale, X/Y offset and contain/cover fit are editable without changing collision or interaction-door geometry. Imported image bytes stay in the current browser/editor session; exported block JSON stores only lightweight asset IDs and placement metadata, avoiding multi-megabyte image blobs in workspace patches.
+
+
+## Phase 11.7 — persistent RiftAssets city art
+
+- Authored building art can now live in `public/block-assets.js` and load automatically with the city.
+- Corner Mart's `building.corner-mart.a` art is integrated into the source registry and assigned in `public/block1.js`.
+- RiftAssets imports now prefer stable `assetId` values over temporary pack ids.
+- `building.<building-id>.*` assets auto-assign to the matching authored building on import.
+- Editor-imported assets are cached locally so a refresh no longer immediately loses them.
+- Source-integrated assets remain available after refresh and deployment without re-importing the JSON.
