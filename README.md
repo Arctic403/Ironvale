@@ -450,3 +450,14 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Tapping/selecting an editable scene object opens the inspector only when needed.
 - Minimize now fully hides the inspector instead of leaving a bottom bar over gameplay.
 - Selecting another object reopens the inspector, keeping touch and mouse/keyboard workflows intact.
+
+
+## Phase 12.4 — top-mounted mobile editor
+
+- `EDIT BLOCK` is a permanent compact top control.
+- Entering edit mode opens a wide inspector near the top of the game instead of a bottom sheet.
+- Minimize hides the inspector completely while keeping edit mode active, so buildings/zones/props can be dragged with the full scene unobstructed.
+- The top control becomes `OPEN EDITOR` while minimized and `HIDE EDITOR` while the inspector is open.
+- Selecting or dragging an object no longer forces a minimized inspector to reopen.
+- Portrait mobile uses a wide shallow top inspector; landscape/fullscreen mobile uses a shorter wide top inspector.
+- Touch, mouse/trackpad and keyboard editing remain supported. The inspector X exits edit mode completely.

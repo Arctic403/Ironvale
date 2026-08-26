@@ -311,14 +311,10 @@ export async function renderBlockWorld(root){
     const selected=currentEditable();if(editorSelection)editorSelection.textContent=selected?`${selected.type.toUpperCase()} · ${selected.label}`:'Tap an object in the scene';
     scene.querySelectorAll('.bw-edit-selected').forEach(x=>x.classList.remove('bw-edit-selected'));
     if(key)scene.querySelector(`[data-edit-key="${key}"]`)?.classList.add('bw-edit-selected');
-    // Keep the city unobstructed in edit mode. The inspector only opens when
-    // an object is actually selected, and minimizing hides it completely.
-    if(editMode&&key){
+    // Selecting/dragging never forces a minimized inspector back open.
+    if(editMode&&!editorCollapsed){
       editor.classList.add('show');
-      editor.classList.remove('minimized');
       editor.setAttribute('aria-hidden','false');
-      editorMinimize.textContent='—';
-      editorMinimize.setAttribute('aria-label','Hide editor');
     }
   }
   function renderEditorObjects(){
@@ -380,23 +376,35 @@ export async function renderBlockWorld(root){
   }
   function setEditMode(on){
     editMode=!!on;shell.classList.toggle('bw-edit-mode',editMode);
-    editToggle.textContent=editMode?'DONE':'EDIT BLOCK';
     if(editMode){
-      // Enter edit mode without throwing an inspector over the scene.
-      editor.classList.remove('show','minimized');
-      editor.setAttribute('aria-hidden','true');
+      editorCollapsed=false;
+      editor.classList.add('show');
+      editor.classList.remove('minimized');
+      editor.setAttribute('aria-hidden','false');
+      editToggle.textContent='HIDE EDITOR';
+      editorMinimize.textContent='—';
+      editorMinimize.setAttribute('aria-label','Minimize editor');
       populateObjectSelect();syncInspector();renderEditorObjects();
     }else{
+      editorCollapsed=false;
       editor.classList.remove('show','minimized');
-      editor.setAttribute('aria-hidden','true');select('');renderEditorObjects();
+      editor.setAttribute('aria-hidden','true');
+      editToggle.textContent='EDIT BLOCK';
+      select('');renderEditorObjects();
     }
   }
   function toggleEditorMinimized(){
     if(!editMode)return;
-    // On phones a collapsed bottom bar still blocks the scene, so minimize
-    // means fully hide. Selecting any object opens the inspector again.
-    editor.classList.remove('show','minimized');
-    editor.setAttribute('aria-hidden','true');
+    editorCollapsed=!editorCollapsed;
+    editor.classList.toggle('show',!editorCollapsed);
+    editor.classList.remove('minimized');
+    editor.setAttribute('aria-hidden',String(editorCollapsed));
+    editToggle.textContent=editorCollapsed?'OPEN EDITOR':'HIDE EDITOR';
+    editorMinimize.textContent='—';
+  }
+  function toggleTopEditor(){
+    if(!editMode){setEditMode(true);return;}
+    toggleEditorMinimized();
   }
   function applyInspector(){
     const item=currentEditable();if(!item)return;const before=snapshot(),o=item.o;
@@ -533,11 +541,11 @@ export async function renderBlockWorld(root){
   function keydown(e){
     const k=e.key.toLowerCase();
     const typing=/input|select|textarea/i.test(e.target?.tagName||'');
-    if(!typing&&k==='e'){setEditMode(!editMode);e.preventDefault();return;}
+    if(!typing&&k==='e'){toggleTopEditor();e.preventDefault();return;}
     if(editMode){
       if((e.ctrlKey||e.metaKey)&&k==='z'){e.shiftKey?redo():undo();e.preventDefault();return;}
       if((e.ctrlKey||e.metaKey)&&k==='y'){redo();e.preventDefault();return;}
-      if(k==='escape'){toggleEditorMinimized();e.preventDefault();return;}
+      if(k==='escape'){if(editorCollapsed)setEditMode(false);else toggleEditorMinimized();e.preventDefault();return;}
       const item=currentEditable();
       if(item&&!typing&&['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){
         const before=snapshot(),step=(Number(snapSelect.value)||1)*(e.shiftKey?5:1);
@@ -598,7 +606,7 @@ export async function renderBlockWorld(root){
   });
   assetApply.addEventListener('click',applyBuildingAsset);assetClear.addEventListener('click',clearBuildingAsset);
   assetSelect.addEventListener('change',()=>{const item=currentEditable();if(item?.type==='building'&&item.o.asset?.id===assetSelect.value)syncAssetInspector();});
-  editToggle.addEventListener('click',()=>setEditMode(!editMode));
+  editToggle.addEventListener('click',toggleTopEditor);
   editorClose.addEventListener('click',()=>setEditMode(false));
   editorMinimize.addEventListener('click',toggleEditorMinimized);
   objectSelect.addEventListener('change',()=>select(objectSelect.value));

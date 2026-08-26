@@ -1057,3 +1057,72 @@ body.bw-fullscreen-mode .bw-editor{z-index:10010!important}
   .bw-editor.show{left:6px!important;right:6px!important;bottom:max(6px,env(safe-area-inset-bottom))!important;max-height:min(52%,430px)!important}
   .bw-editor:not(.show){display:none!important}
 }
+
+
+/* Phase 12.4 — top-mounted mobile Block Editor.
+   Open = wide working inspector near the top. Minimized = no panel at all;
+   the permanent top EDITOR button remains available while scene dragging continues. */
+.bw-editor{
+  left:max(8px,env(safe-area-inset-left))!important;
+  right:max(8px,env(safe-area-inset-right))!important;
+  top:max(72px,calc(env(safe-area-inset-top) + 58px))!important;
+  bottom:auto!important;
+  width:auto!important;
+  max-height:min(58vh,520px)!important;
+  border-radius:16px!important;
+}
+.bw-editor.show{display:flex!important}
+.bw-editor:not(.show){display:none!important}
+.bw-dev-buttons{
+  position:absolute!important;
+  top:max(10px,env(safe-area-inset-top))!important;
+  right:max(10px,env(safe-area-inset-right))!important;
+  z-index:10020!important;
+  display:flex!important;
+  gap:7px!important;
+  align-items:center!important;
+}
+.bw-dev-buttons .bw-edit-toggle,
+.bw-dev-buttons .bw-fullscreen{
+  position:static!important;
+  min-height:38px!important;
+  padding:8px 10px!important;
+  font-size:9px!important;
+  white-space:nowrap!important;
+}
+.bw-edit-mode .bw-controls{opacity:.12!important;pointer-events:none!important}
+
+/* Portrait iPhone: editor spans the usable width but stays shallow enough
+   to leave scene visible below it. */
+@media (orientation:portrait) and (max-width:700px){
+  .bw-editor{
+    top:max(62px,calc(env(safe-area-inset-top) + 52px))!important;
+    max-height:50vh!important;
+  }
+  .bw-editor-body{max-height:calc(50vh - 96px)!important}
+  .bw-editor-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+/* Landscape/fullscreen mobile: use a wide, short top inspector instead of
+   a bottom sheet or tall side drawer. */
+@media (orientation:landscape) and (pointer:coarse){
+  .bw-editor{
+    left:max(8px,env(safe-area-inset-left))!important;
+    right:max(8px,env(safe-area-inset-right))!important;
+    top:max(54px,calc(env(safe-area-inset-top) + 48px))!important;
+    bottom:auto!important;
+    width:auto!important;
+    max-height:min(52vh,300px)!important;
+  }
+  .bw-editor-body{max-height:190px!important}
+  .bw-editor-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .bw-editor-quickbar{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+}
+
+/* iOS CSS-rotated fullscreen uses the same top-mounted editor model. */
+body.bw-fullscreen-mode .bw-dev-buttons{
+  z-index:10020!important;
+}
+body.bw-fullscreen-mode .bw-editor{
+  z-index:10019!important;
+}
