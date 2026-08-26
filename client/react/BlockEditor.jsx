@@ -25,6 +25,7 @@ export function BlockEditor() {
         <button id="bw-editor-close" className="bw-runtime-only-control" type="button" aria-hidden="true">×</button>
 
         <header className="bw-studio-topbar">
+          <button className="bw-studio-menu-button" type="button" data-panel-collapse="palette" aria-label="Toggle Add Object panel">☰</button>
           <div className="bw-editor-title">
             <strong>BLOCK EDITOR</strong>
             <small>DOWNTOWN / BLOCK 01&nbsp;&nbsp;•&nbsp;&nbsp;Commerce Street</small>

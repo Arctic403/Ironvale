@@ -232,3 +232,12 @@ Developer discoverability now belongs in the normal drawer, but only as a role-a
 server-gated authoring page. Recovery and precision tooling stays inside the private editor: nudge controls,
 focus selection, resettable local panel layout and D1-backed published revision history. Loading an old
 revision restores only the draft so it can be inspected before an explicit Publish.
+
+
+## H1.13 outer-chrome layout rule
+
+The private Block Editor is now laid out as a true editor workspace rather than an overlay: editor chrome
+owns grid tracks around the scene and the block viewport owns the center cell. Future editor features must
+go into those outer docks, the transform row, the bottom tray or a dedicated tool rail; they must not cover
+the normal editing viewport. Dock resizing must preserve a minimum center viewport, and mobile compaction
+must shrink/scroll controls inside their dock rather than pushing other panels across the scene.

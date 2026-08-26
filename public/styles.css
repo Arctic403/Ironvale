@@ -2037,3 +2037,491 @@ body.dev-block-editor-page{
   .bw-studio-nudge button{min-height:42px!important;font-size:15px}
   .bw-studio-nudge #bw-editor-focus{font-size:8px}
 }
+
+
+/* =====================================================================
+   Hybrid H1.13 — OUTER-CHROME EDITOR GRID
+   The game viewport is a real center grid cell. Editor controls occupy
+   dedicated rows/columns around it and never cover the scene in Edit Mode.
+   ===================================================================== */
+
+.dev-block-editor-page .blockworld-shell.bw-editor-page{
+  --be-left:238px;
+  --be-right:252px;
+  --be-bottom:140px;
+  --be-header:68px;
+  --be-transform:82px;
+  --be-left-effective:var(--be-left);
+  --be-right-effective:var(--be-right);
+  --be-bottom-effective:var(--be-bottom);
+  --be-transform-effective:var(--be-transform);
+  --be-rail:46px;
+  --be-gap:8px;
+  --be-pad:8px;
+
+  display:grid!important;
+  grid-template-columns:var(--be-left-effective) minmax(0,1fr) var(--be-rail) var(--be-right-effective)!important;
+  grid-template-rows:var(--be-header) var(--be-transform-effective) minmax(0,1fr) var(--be-bottom-effective)!important;
+  grid-template-areas:
+    "head head head head"
+    "transform transform transform transform"
+    "left scene rail right"
+    "bottom bottom bottom bottom"!important;
+  gap:var(--be-gap)!important;
+  box-sizing:border-box!important;
+  padding:
+    max(var(--be-pad),env(safe-area-inset-top))
+    max(var(--be-pad),env(safe-area-inset-right))
+    max(var(--be-pad),env(safe-area-inset-bottom))
+    max(var(--be-pad),env(safe-area-inset-left))!important;
+  background:#03090d!important;
+  overflow:hidden!important;
+}
+
+.dev-block-editor-page .blockworld-shell.bw-editor-page.bw-dock-left-collapsed{--be-left-effective:36px}
+.dev-block-editor-page .blockworld-shell.bw-editor-page.bw-dock-right-collapsed{--be-right-effective:36px}
+.dev-block-editor-page .blockworld-shell.bw-editor-page.bw-dock-bottom-collapsed{--be-bottom-effective:34px}
+.dev-block-editor-page .blockworld-shell.bw-editor-page.bw-dock-transform-collapsed{--be-transform-effective:34px}
+
+/* React wrappers disappear from layout; their actual children become grid items. */
+.dev-block-editor-page .bw-editor-page .bw-react-editor-host{
+  display:contents!important;
+  position:static!important;
+  inset:auto!important;
+  width:auto!important;
+  height:auto!important;
+  pointer-events:none!important;
+}
+.dev-block-editor-page .bw-editor-page .bw-editor-studio,
+.dev-block-editor-page .bw-editor-page .bw-editor-studio.show{
+  display:contents!important;
+  position:static!important;
+  inset:auto!important;
+  width:auto!important;
+  height:auto!important;
+  max-width:none!important;
+  max-height:none!important;
+  padding:0!important;
+  margin:0!important;
+  overflow:visible!important;
+  transform:none!important;
+}
+.dev-block-editor-page .bw-editor-page .bw-editor-studio[aria-hidden="true"]{display:none!important}
+
+/* Scene is physically in the center cell. No editor chrome sits above it. */
+.dev-block-editor-page .bw-editor-page .blockworld-viewport{
+  grid-area:scene!important;
+  position:relative!important;
+  inset:auto!important;
+  width:100%!important;
+  height:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  max-width:none!important;
+  max-height:none!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
+  overflow:hidden!important;
+  border:1px solid rgba(59,116,132,.58)!important;
+  border-radius:10px!important;
+  background:#081016!important;
+  z-index:10!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.018),0 8px 24px rgba(0,0,0,.24)!important;
+}
+
+/* Header is one dedicated outside row. */
+.dev-block-editor-page .bw-studio-topbar{
+  grid-area:head!important;
+  position:relative!important;
+  inset:auto!important;
+  width:auto!important;
+  height:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:10px!important;
+  box-sizing:border-box!important;
+  padding:7px clamp(320px,54vw,470px) 7px 8px!important;
+  margin:0!important;
+  border:1px solid rgba(71,143,160,.55)!important;
+  border-radius:11px!important;
+  background:linear-gradient(180deg,#07141a,#061117)!important;
+  box-shadow:none!important;
+  z-index:20!important;
+  overflow:hidden!important;
+}
+.dev-block-editor-page .bw-studio-menu-button{
+  flex:0 0 38px!important;
+  width:38px!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0!important;
+  border:1px solid rgba(73,128,141,.58)!important;
+  border-radius:8px!important;
+  background:#091a21!important;
+  color:#eef7f8!important;
+  font:900 20px/1 system-ui,sans-serif!important;
+}
+.dev-block-editor-page .bw-studio-topbar .bw-editor-title{
+  min-width:0!important;
+  max-width:330px!important;
+  overflow:hidden!important;
+}
+.dev-block-editor-page .bw-studio-topbar .bw-editor-title strong{
+  display:block!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.dev-block-editor-page .bw-studio-topbar .bw-editor-title small{
+  display:block!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.dev-block-editor-page .bw-studio-status{
+  position:static!important;
+  left:auto!important;
+  transform:none!important;
+  margin-left:auto!important;
+  min-width:140px!important;
+  max-width:220px!important;
+  align-items:center!important;
+  padding:5px 8px!important;
+  border:1px solid rgba(63,180,112,.35)!important;
+  border-radius:8px!important;
+  background:rgba(4,24,18,.64)!important;
+  overflow:hidden!important;
+}
+.dev-block-editor-page .bw-studio-status>*{
+  max-width:100%!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+
+/* Global actions occupy the same header row but their own reserved right side. */
+.dev-block-editor-page .bw-studio-global-actions{
+  grid-area:head!important;
+  position:relative!important;
+  top:auto!important;
+  right:auto!important;
+  left:auto!important;
+  bottom:auto!important;
+  justify-self:end!important;
+  align-self:center!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  max-width:min(470px,58vw)!important;
+  min-width:0!important;
+  padding-right:7px!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  scrollbar-width:none!important;
+  z-index:30!important;
+}
+.dev-block-editor-page .bw-studio-global-actions::-webkit-scrollbar{display:none!important}
+.dev-block-editor-page .bw-studio-global-actions>*{
+  flex:0 0 auto!important;
+  min-height:38px!important;
+  padding:7px 11px!important;
+  font-size:9px!important;
+}
+
+/* Precision transform bar is a second outside row. */
+.dev-block-editor-page .bw-studio-transform{
+  grid-area:transform!important;
+  position:relative!important;
+  inset:auto!important;
+  width:auto!important;
+  height:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  display:grid!important;
+  grid-template-columns:minmax(150px,1.45fr) minmax(130px,1.2fr) minmax(250px,2.3fr) minmax(62px,.62fr) minmax(62px,.62fr) minmax(72px,.72fr) minmax(76px,.76fr) 30px!important;
+  grid-template-rows:1fr!important;
+  align-items:end!important;
+  gap:6px!important;
+  padding:7px 8px!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  border:1px solid rgba(67,132,148,.52)!important;
+  border-radius:10px!important;
+  background:#07151b!important;
+  z-index:18!important;
+  scrollbar-width:thin!important;
+  touch-action:pan-x!important;
+}
+.dev-block-editor-page .bw-studio-transform[data-collapsed="true"]{
+  display:grid!important;
+  height:auto!important;
+  min-height:0!important;
+  padding:2px 5px!important;
+  overflow:hidden!important;
+}
+.dev-block-editor-page .bw-studio-transform[data-collapsed="true"]>*:not(.bw-transform-collapse){display:none!important}
+.dev-block-editor-page .bw-transform-collapse{grid-column:8!important;grid-row:1!important;align-self:center!important;width:28px!important;min-width:28px!important;height:28px!important}
+.dev-block-editor-page .bw-editor-studio .bw-editor-object-row{grid-column:1!important;grid-row:1!important;min-width:0!important;flex:none!important;width:auto!important}
+.dev-block-editor-page .bw-studio-idlabel{grid-column:2!important;grid-row:1!important;min-width:0!important;flex:none!important}
+.dev-block-editor-page .bw-editor-studio .bw-editor-transform-grid{
+  grid-column:3!important;
+  grid-row:1!important;
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(54px,1fr))!important;
+  gap:5px!important;
+  min-width:0!important;
+  width:auto!important;
+  flex:none!important;
+}
+.dev-block-editor-page .bw-editor-studio .bw-editor-transform-grid label{min-width:0!important;width:auto!important}
+.dev-block-editor-page .bw-editor-studio .bw-studio-small-field:nth-of-type(3){grid-column:4!important;grid-row:1!important}
+.dev-block-editor-page .bw-editor-studio .bw-studio-small-field:nth-of-type(4){grid-column:5!important;grid-row:1!important}
+.dev-block-editor-page .bw-editor-studio .bw-studio-small-field{min-width:0!important;flex:none!important}
+.dev-block-editor-page .bw-editor-studio .bw-editor-snap-compact{grid-column:6!important;grid-row:1!important;min-width:0!important;flex:none!important}
+.dev-block-editor-page .bw-editor-studio .bw-editor-quickbar{grid-column:7!important;grid-row:1!important;min-width:0!important;width:auto!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:4px!important}
+.dev-block-editor-page .bw-studio-transform label>span{white-space:nowrap!important}
+
+/* Side docks are separate columns, never overlays. */
+.dev-block-editor-page .bw-studio-panel{
+  position:relative!important;
+  inset:auto!important;
+  width:auto!important;
+  height:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  max-width:none!important;
+  max-height:none!important;
+  margin:0!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
+  overflow:hidden!important;
+  border:1px solid rgba(67,134,150,.55)!important;
+  border-radius:10px!important;
+  background:linear-gradient(180deg,#07161c,#061218)!important;
+  box-shadow:none!important;
+  z-index:16!important;
+}
+.dev-block-editor-page .bw-studio-left{grid-area:left!important}
+.dev-block-editor-page .bw-studio-right{grid-area:right!important}
+.dev-block-editor-page .bw-studio-bottom{grid-area:bottom!important}
+
+.dev-block-editor-page .bw-studio-panel-head{
+  height:34px!important;
+  min-height:34px!important;
+  padding:4px 8px!important;
+}
+.dev-block-editor-page .bw-studio-panel-head strong{font-size:9px!important}
+.dev-block-editor-page .bw-studio-panel-head button{width:28px!important;height:28px!important;min-height:28px!important}
+.dev-block-editor-page .bw-studio-panel-body{
+  height:calc(100% - 34px)!important;
+  min-height:0!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  padding:7px!important;
+}
+.dev-block-editor-page .bw-studio-left[data-collapsed="true"],
+.dev-block-editor-page .bw-studio-right[data-collapsed="true"],
+.dev-block-editor-page .bw-studio-bottom[data-collapsed="true"]{width:auto!important;height:auto!important}
+.dev-block-editor-page .bw-studio-panel[data-collapsed="true"] .bw-studio-panel-head{
+  height:100%!important;
+  min-height:0!important;
+  padding:2px!important;
+}
+.dev-block-editor-page .bw-studio-left[data-collapsed="true"] .bw-studio-panel-head,
+.dev-block-editor-page .bw-studio-right[data-collapsed="true"] .bw-studio-panel-head{
+  writing-mode:vertical-rl!important;
+}
+
+/* Dedicated rail between scene and Properties. */
+.dev-block-editor-page .bw-studio-viewport-tools{
+  grid-area:rail!important;
+  position:relative!important;
+  inset:auto!important;
+  top:auto!important;
+  right:auto!important;
+  left:auto!important;
+  bottom:auto!important;
+  transform:none!important;
+  align-self:center!important;
+  justify-self:stretch!important;
+  display:grid!important;
+  grid-template-columns:1fr!important;
+  gap:5px!important;
+  width:auto!important;
+  padding:4px!important;
+  box-sizing:border-box!important;
+  border:1px solid rgba(67,132,148,.52)!important;
+  border-radius:9px!important;
+  background:#07161c!important;
+  z-index:16!important;
+}
+.dev-block-editor-page .bw-studio-viewport-tools button{
+  width:100%!important;
+  height:38px!important;
+  min-height:38px!important;
+  padding:0!important;
+}
+
+/* Bottom dock spans the whole screen width beneath the scene. */
+.dev-block-editor-page .bw-studio-bottom-body{
+  display:grid!important;
+  grid-template-columns:minmax(250px,1.5fr) minmax(170px,1fr) minmax(170px,1fr) minmax(100px,.62fr)!important;
+  gap:8px!important;
+  min-width:710px!important;
+  width:max(100%,710px)!important;
+  overflow:visible!important;
+  align-items:start!important;
+}
+.dev-block-editor-page .bw-studio-bottom .bw-studio-panel-body{overflow-x:auto!important;overflow-y:hidden!important}
+.dev-block-editor-page .bw-studio-toolgroup{min-width:0!important;overflow:hidden!important}
+.dev-block-editor-page .bw-studio-icon-tools{overflow-x:auto!important;padding-bottom:2px!important}
+.dev-block-editor-page .bw-studio-icon-tools button{min-width:48px!important;min-height:36px!important}
+.dev-block-editor-page .bw-studio-nudge{width:150px!important;grid-template-columns:repeat(3,minmax(30px,1fr))!important}
+.dev-block-editor-page .bw-studio-nudge button{min-height:30px!important}
+.dev-block-editor-page .bw-studio-status-summary span{display:block!important}
+
+/* Touch-friendly resizers live on the border between scene and dock, not over the scene content. */
+.dev-block-editor-page .bw-panel-resizer{z-index:40!important}
+.dev-block-editor-page .bw-studio-left .bw-panel-resizer-x{right:-11px!important}
+.dev-block-editor-page .bw-studio-right .bw-panel-resizer-x{left:-11px!important}
+.dev-block-editor-page .bw-studio-bottom .bw-panel-resizer-y{top:-11px!important}
+
+/* HIDE PANEL / PLAY deliberately expands the scene. Normal Edit Mode never overlays chrome. */
+.dev-block-editor-page .blockworld-shell.bw-editor-page.bw-editor-chrome-hidden{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;
+  grid-template-areas:"scene"!important;
+  gap:0!important;
+  padding:0!important;
+}
+.dev-block-editor-page .bw-editor-page.bw-editor-chrome-hidden .blockworld-viewport{
+  grid-area:scene!important;
+  border:0!important;
+  border-radius:0!important;
+}
+.dev-block-editor-page .bw-editor-page.bw-editor-chrome-hidden .bw-studio-global-actions{
+  position:absolute!important;
+  top:max(7px,env(safe-area-inset-top))!important;
+  right:max(7px,env(safe-area-inset-right))!important;
+  max-width:calc(100% - 14px)!important;
+  z-index:1000!important;
+}
+
+/* Compact iPhone landscape: same outside-dock architecture, just tighter. */
+@media (max-width:760px), (max-height:470px){
+  .dev-block-editor-page .blockworld-shell.bw-editor-page{
+    --be-left:148px;
+    --be-right:158px;
+    --be-bottom:72px;
+    --be-header:44px;
+    --be-transform:50px;
+    --be-rail:34px;
+    --be-gap:4px;
+    --be-pad:4px;
+  }
+
+  .dev-block-editor-page .bw-studio-topbar{
+    gap:5px!important;
+    padding:4px 315px 4px 5px!important;
+    border-radius:8px!important;
+  }
+  .dev-block-editor-page .bw-studio-menu-button{
+    flex-basis:30px!important;width:30px!important;height:30px!important;min-height:30px!important;
+    border-radius:6px!important;font-size:16px!important;
+  }
+  .dev-block-editor-page .bw-studio-topbar .bw-editor-title{max-width:210px!important}
+  .dev-block-editor-page .bw-studio-topbar .bw-editor-title strong{font-size:13px!important}
+  .dev-block-editor-page .bw-studio-topbar .bw-editor-title small{font-size:6px!important}
+  .dev-block-editor-page .bw-studio-status{display:none!important}
+
+  .dev-block-editor-page .bw-studio-global-actions{
+    gap:3px!important;
+    max-width:315px!important;
+    padding-right:4px!important;
+  }
+  .dev-block-editor-page .bw-studio-global-actions>*{
+    min-height:30px!important;
+    padding:4px 6px!important;
+    border-radius:6px!important;
+    font-size:7px!important;
+  }
+
+  .dev-block-editor-page .bw-studio-transform{
+    grid-template-columns:130px 115px 230px 54px 54px 62px 68px 26px!important;
+    gap:4px!important;
+    padding:4px 5px!important;
+    border-radius:8px!important;
+  }
+  .dev-block-editor-page .bw-transform-collapse{width:24px!important;min-width:24px!important;height:24px!important}
+  .dev-block-editor-page .bw-studio-idlabel input,
+  .dev-block-editor-page .bw-studio-small-field input{height:29px!important;min-height:29px!important;padding:3px 5px!important;font-size:8px!important}
+  .dev-block-editor-page .bw-editor-transform-grid input,
+  .dev-block-editor-page .bw-editor-object-row select,
+  .dev-block-editor-page .bw-editor-snap-compact select{min-height:29px!important;height:29px!important;font-size:8px!important}
+  .dev-block-editor-page .bw-studio-transform label>span{font-size:6px!important}
+
+  .dev-block-editor-page .bw-studio-panel-head{height:28px!important;min-height:28px!important;padding:2px 5px!important}
+  .dev-block-editor-page .bw-studio-panel-head strong{font-size:7px!important}
+  .dev-block-editor-page .bw-studio-panel-head button{width:24px!important;height:24px!important;min-height:24px!important}
+  .dev-block-editor-page .bw-studio-panel-body{height:calc(100% - 28px)!important;padding:4px!important}
+  .dev-block-editor-page .bw-editor-create-grid{gap:3px!important}
+  .dev-block-editor-page .bw-editor-create-grid button{min-height:30px!important;padding:4px 6px!important;font-size:7px!important}
+  .dev-block-editor-page .bw-editor-add-prop{gap:3px!important;margin-top:5px!important}
+  .dev-block-editor-page .bw-editor-add-prop select,
+  .dev-block-editor-page .bw-editor-add-prop button{min-height:29px!important;font-size:7px!important}
+
+  .dev-block-editor-page .bw-studio-properties{gap:3px!important}
+  .dev-block-editor-page .bw-studio-properties>label{grid-template-columns:48px minmax(0,1fr)!important;gap:3px!important;font-size:6px!important}
+  .dev-block-editor-page .bw-studio-properties input{min-height:27px!important;padding:3px 4px!important;font-size:7px!important}
+  .dev-block-editor-page .bw-studio-toggle-row input{height:19px!important;min-height:19px!important;width:34px!important}
+  .dev-block-editor-page .bw-studio-properties .bw-editor-danger{min-height:29px!important;font-size:7px!important}
+
+  .dev-block-editor-page .bw-studio-viewport-tools{gap:3px!important;padding:3px!important;border-radius:7px!important}
+  .dev-block-editor-page .bw-studio-viewport-tools button{height:29px!important;min-height:29px!important;font-size:14px!important}
+
+  .dev-block-editor-page .bw-studio-bottom-body{
+    grid-template-columns:245px 170px 165px 90px!important;
+    min-width:690px!important;
+    width:690px!important;
+    gap:5px!important;
+  }
+  .dev-block-editor-page .bw-studio-toolgroup{gap:2px!important;padding-right:4px!important}
+  .dev-block-editor-page .bw-studio-toolgroup>small{font-size:6px!important}
+  .dev-block-editor-page .bw-studio-icon-tools{gap:3px!important}
+  .dev-block-editor-page .bw-studio-icon-tools button{min-width:38px!important;min-height:29px!important;padding:3px 4px!important;font-size:6px!important}
+  .dev-block-editor-page .bw-studio-nudge{
+    display:flex!important;
+    width:auto!important;
+    gap:3px!important;
+  }
+  .dev-block-editor-page .bw-studio-nudge span{display:none!important}
+  .dev-block-editor-page .bw-studio-nudge button{width:28px!important;min-width:28px!important;min-height:28px!important;padding:2px!important;font-size:10px!important}
+  .dev-block-editor-page .bw-studio-nudge #bw-editor-focus{width:42px!important;font-size:6px!important}
+  .dev-block-editor-page .bw-studio-settings-actions{display:flex!important;gap:3px!important}
+  .dev-block-editor-page .bw-studio-settings-actions button{min-height:27px!important;padding:3px 5px!important;font-size:6px!important}
+  .dev-block-editor-page .bw-studio-status-summary{display:flex!important;gap:1px!important}
+  .dev-block-editor-page .bw-studio-status-summary span{font-size:6px!important}
+}
+
+/* Extremely short landscape (small iPhones / browser bars visible). */
+@media (max-height:390px){
+  .dev-block-editor-page .blockworld-shell.bw-editor-page{
+    --be-bottom:64px;
+    --be-header:40px;
+    --be-transform:46px;
+  }
+  .dev-block-editor-page .bw-studio-topbar{padding-top:3px!important;padding-bottom:3px!important}
+  .dev-block-editor-page .bw-studio-bottom-body{transform:scale(.94);transform-origin:0 0}
+}
+
+/* Fullscreen still uses the exact same grid; only the outer browser viewport changes. */
+.dev-block-editor-page .bw-fullscreen-active{
+  display:grid!important;
+  width:100dvw!important;
+  height:100dvh!important;
+}

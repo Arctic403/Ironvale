@@ -625,3 +625,17 @@ Research-driven state cleanup:
 - Added published **Version History** to the private editor.
 - A historical published revision can be loaded back into the current D1 draft without publishing automatically.
 - History restores are server-validated, developer/admin-gated and written to the audit trail.
+
+
+## Hybrid H1.13 — outer-chrome Block Editor layout
+
+- The private Block Editor now uses a real CSS grid instead of absolute/floating editor panels.
+- The Commerce Street viewport is physically the center grid cell; normal Edit Mode has zero editor panels layered over the scene.
+- The top project/action header and precision transform strip occupy dedicated rows above the scene.
+- Add Object is a dedicated left column, viewport zoom controls use a narrow dedicated rail, Properties is a dedicated right column, and Tools/View/Precision/Status spans the bottom row.
+- Resizing the left/right/bottom docks now changes the grid tracks instead of moving floating panels over the city.
+- Panel sizing is clamped so the center scene keeps a usable minimum width; saved old oversized dock values can no longer crush the viewport.
+- Collapsing a dock shrinks its grid track. HIDE PANEL / Play Mode deliberately expands the scene to the whole developer page.
+- The editor camera now fits the authored block to the actual center viewport by default, with zoom still available afterward.
+- Compact iPhone landscape keeps the same outside-chrome architecture with smaller controls and scrollable panel contents.
+- Fullscreen remains the same grid layout and the fullscreen action reads WINDOW while active so it is not confused with the red page EXIT action.

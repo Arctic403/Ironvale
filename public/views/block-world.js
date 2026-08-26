@@ -145,32 +145,103 @@ export async function renderBlockWorld(root, options={}){
   const historySelect=editorQuery('#bw-editor-history'),historyLoadButton=editorQuery('#bw-editor-load-history');
   const focusButton=editorQuery('#bw-editor-focus'),resetLayoutButton=editorQuery('#bw-editor-reset-layout');
 
-  const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v1';
+  const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v2';
   function setupStudioPanels(){
     if(!editorWorkspace||!editor)return ()=>{};
+    const layoutTarget=shell;
     let saved={};
     try{saved=JSON.parse(localStorage.getItem(STUDIO_LAYOUT_KEY)||'{}')||{};}catch(_){}
     const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
-
-    if(Number(saved.left))editor.style.setProperty('--be-left',`${clamp(saved.left,150,420)}px`);
-    if(Number(saved.right))editor.style.setProperty('--be-right',`${clamp(saved.right,150,420)}px`);
-    if(Number(saved.bottom))editor.style.setProperty('--be-bottom',`${clamp(saved.bottom,70,260)}px`);
-    if(Number(saved.top))editor.style.setProperty('--be-transform',`${clamp(saved.top,44,150)}px`);
-
     const panels=[...editor.querySelectorAll('[data-editor-panel]')];
-    const collapsed=saved.collapsed||{};
-    panels.forEach(panel=>{
-      const name=panel.dataset.editorPanel;
-      panel.dataset.collapsed=collapsed[name]?'true':'false';
-    });
+    const panelByName=name=>editor.querySelector(`[data-editor-panel="${name}"]`);
+    const isCollapsed=name=>panelByName(name)?.dataset.collapsed==='true';
+
+    const cssNumber=(name,fallback)=>{
+      const value=parseFloat(getComputedStyle(layoutTarget).getPropertyValue(name));
+      return Number.isFinite(value)?value:fallback;
+    };
+    const compact=()=>Math.min(window.innerWidth||9999,window.innerHeight||9999)<520 || (window.innerHeight||9999)<470;
+    const defaults=()=>compact()
+      ? {left:148,right:158,bottom:72,top:50}
+      : {left:238,right:252,bottom:140,top:82};
+
+    const applySaved=()=>{
+      const d=defaults();
+      if(Number(saved.left))layoutTarget.style.setProperty('--be-left',`${clamp(saved.left,112,360)}px`);
+      if(Number(saved.right))layoutTarget.style.setProperty('--be-right',`${clamp(saved.right,112,360)}px`);
+      if(Number(saved.bottom))layoutTarget.style.setProperty('--be-bottom',`${clamp(saved.bottom,58,230)}px`);
+      if(Number(saved.top))layoutTarget.style.setProperty('--be-transform',`${clamp(saved.top,42,120)}px`);
+      const collapsed=saved.collapsed||{};
+      panels.forEach(panel=>{
+        const name=panel.dataset.editorPanel;
+        panel.dataset.collapsed=collapsed[name]?'true':'false';
+      });
+      if(!Number(saved.left))layoutTarget.style.removeProperty('--be-left');
+      if(!Number(saved.right))layoutTarget.style.removeProperty('--be-right');
+      if(!Number(saved.bottom))layoutTarget.style.removeProperty('--be-bottom');
+      if(!Number(saved.top))layoutTarget.style.removeProperty('--be-transform');
+    };
+
+    const syncDockState=()=>{
+      layoutTarget.classList.toggle('bw-dock-left-collapsed',isCollapsed('palette'));
+      layoutTarget.classList.toggle('bw-dock-right-collapsed',isCollapsed('properties'));
+      layoutTarget.classList.toggle('bw-dock-bottom-collapsed',isCollapsed('tools'));
+      layoutTarget.classList.toggle('bw-dock-transform-collapsed',isCollapsed('transform'));
+    };
+
+    const constrainLayout=(preferred='')=>{
+      const d=defaults();
+      const rect=layoutTarget.getBoundingClientRect();
+      const width=Math.max(320,rect.width||window.innerWidth||667);
+      const height=Math.max(260,rect.height||window.innerHeight||375);
+      const minSide=compact()?112:150;
+      const rail=compact()?34:46;
+      const gap=compact()?4:8;
+      const minScene=Math.max(compact()?220:340,Math.min(compact()?300:520,width*.42));
+      const sideBudget=Math.max(minSide*2,width-minScene-rail-gap*5-20);
+
+      let left=cssNumber('--be-left',d.left);
+      let right=cssNumber('--be-right',d.right);
+      left=clamp(left,minSide,Math.min(360,width*.34));
+      right=clamp(right,minSide,Math.min(360,width*.34));
+
+      const leftEff=isCollapsed('palette')?34:left;
+      const rightEff=isCollapsed('properties')?34:right;
+      if(leftEff+rightEff>sideBudget){
+        if(preferred==='left'&&!isCollapsed('palette')){
+          left=Math.max(minSide,sideBudget-rightEff);
+        }else if(preferred==='right'&&!isCollapsed('properties')){
+          right=Math.max(minSide,sideBudget-leftEff);
+        }else if(!isCollapsed('palette')&&!isCollapsed('properties')){
+          const ratio=sideBudget/Math.max(1,left+right);
+          left=Math.max(minSide,left*ratio);
+          right=Math.max(minSide,right*ratio);
+        }
+      }
+
+      const header=compact()?44:68;
+      const transform=isCollapsed('transform')?32:cssNumber('--be-transform',d.top);
+      const minSceneHeight=compact()?110:180;
+      const maxBottom=Math.max(58,height-header-transform-minSceneHeight-gap*4-16);
+      let bottom=cssNumber('--be-bottom',d.bottom);
+      bottom=clamp(bottom,58,Math.min(230,maxBottom));
+
+      layoutTarget.style.setProperty('--be-left',`${Math.round(left)}px`);
+      layoutTarget.style.setProperty('--be-right',`${Math.round(right)}px`);
+      layoutTarget.style.setProperty('--be-bottom',`${Math.round(bottom)}px`);
+    };
+
+    applySaved();
+    syncDockState();
+    requestAnimationFrame(()=>constrainLayout());
 
     const persist=()=>{
-      const style=getComputedStyle(editor);
+      const d=defaults();
       const payload={
-        left:parseFloat(style.getPropertyValue('--be-left'))||220,
-        right:parseFloat(style.getPropertyValue('--be-right'))||220,
-        bottom:parseFloat(style.getPropertyValue('--be-bottom'))||110,
-        top:parseFloat(style.getPropertyValue('--be-transform'))||72,
+        left:cssNumber('--be-left',d.left),
+        right:cssNumber('--be-right',d.right),
+        bottom:cssNumber('--be-bottom',d.bottom),
+        top:cssNumber('--be-transform',d.top),
         collapsed:Object.fromEntries(panels.map(p=>[p.dataset.editorPanel,p.dataset.collapsed==='true']))
       };
       try{localStorage.setItem(STUDIO_LAYOUT_KEY,JSON.stringify(payload));}catch(_){}
@@ -181,9 +252,11 @@ export async function renderBlockWorld(root, options={}){
       const handler=e=>{
         e.preventDefault();e.stopPropagation();
         const name=button.dataset.panelCollapse;
-        const panel=editor.querySelector(`[data-editor-panel="${name}"]`);
+        const panel=panelByName(name);
         if(!panel)return;
         panel.dataset.collapsed=panel.dataset.collapsed==='true'?'false':'true';
+        syncDockState();
+        constrainLayout();
         persist();
       };
       button.addEventListener('click',handler);
@@ -196,12 +269,12 @@ export async function renderBlockWorld(root, options={}){
       if(!handle)return;
       e.preventDefault();e.stopPropagation();
       const name=handle.dataset.panelResizer;
-      const style=getComputedStyle(editor);
+      const d=defaults();
       resize={
         id:e.pointerId,name,startX:e.clientX,startY:e.clientY,
-        left:parseFloat(style.getPropertyValue('--be-left'))||220,
-        right:parseFloat(style.getPropertyValue('--be-right'))||220,
-        bottom:parseFloat(style.getPropertyValue('--be-bottom'))||110
+        left:cssNumber('--be-left',d.left),
+        right:cssNumber('--be-right',d.right),
+        bottom:cssNumber('--be-bottom',d.bottom)
       };
       handle.setPointerCapture?.(e.pointerId);
     };
@@ -210,13 +283,22 @@ export async function renderBlockWorld(root, options={}){
       e.preventDefault();
       const rawX=e.clientX-resize.startX,rawY=e.clientY-resize.startY;
       const delta=typeof pointerVectorToWorld==='function'?pointerVectorToWorld(rawX,rawY):{x:rawX,y:rawY};
-      if(resize.name==='palette')editor.style.setProperty('--be-left',`${clamp(resize.left+delta.x,150,420)}px`);
-      if(resize.name==='properties')editor.style.setProperty('--be-right',`${clamp(resize.right-delta.x,150,420)}px`);
-      if(resize.name==='tools')editor.style.setProperty('--be-bottom',`${clamp(resize.bottom-delta.y,70,260)}px`);
+      if(resize.name==='palette'){
+        layoutTarget.style.setProperty('--be-left',`${resize.left+delta.x}px`);
+        constrainLayout('left');
+      }
+      if(resize.name==='properties'){
+        layoutTarget.style.setProperty('--be-right',`${resize.right-delta.x}px`);
+        constrainLayout('right');
+      }
+      if(resize.name==='tools'){
+        layoutTarget.style.setProperty('--be-bottom',`${resize.bottom-delta.y}px`);
+        constrainLayout('bottom');
+      }
     };
     const up=e=>{
       if(!resize||e.pointerId!==resize.id)return;
-      resize=null;persist();
+      resize=null;constrainLayout();persist();
     };
     editor.addEventListener('pointerdown',down,true);
     editor.addEventListener('pointermove',move,true);
@@ -225,10 +307,16 @@ export async function renderBlockWorld(root, options={}){
 
     const resetLayout=()=>{
       try{localStorage.removeItem(STUDIO_LAYOUT_KEY);}catch(_){}
-      ['--be-left','--be-right','--be-bottom','--be-transform'].forEach(name=>editor.style.removeProperty(name));
+      ['--be-left','--be-right','--be-bottom','--be-transform'].forEach(name=>layoutTarget.style.removeProperty(name));
       panels.forEach(panel=>panel.dataset.collapsed='false');
+      syncDockState();
+      requestAnimationFrame(()=>constrainLayout());
     };
     resetLayoutButton?.addEventListener('click',resetLayout);
+
+    const onStudioResize=()=>constrainLayout();
+    window.addEventListener('resize',onStudioResize);
+    window.visualViewport?.addEventListener('resize',onStudioResize);
 
     return ()=>{
       collapseHandlers.forEach(fn=>fn());
@@ -237,6 +325,9 @@ export async function renderBlockWorld(root, options={}){
       editor.removeEventListener('pointermove',move,true);
       editor.removeEventListener('pointerup',up,true);
       editor.removeEventListener('pointercancel',up,true);
+      window.removeEventListener('resize',onStudioResize);
+      window.visualViewport?.removeEventListener('resize',onStudioResize);
+      ['bw-dock-left-collapsed','bw-dock-right-collapsed','bw-dock-bottom-collapsed','bw-dock-transform-collapsed'].forEach(name=>layoutTarget.classList.remove(name));
     };
   }
   const destroyStudioPanels=setupStudioPanels();
@@ -735,6 +826,7 @@ export async function renderBlockWorld(root, options={}){
     editorPanelToggle.hidden=!editMode;
     editorPanelToggle.textContent=visible?'HIDE PANEL':'SHOW PANEL';
     editorPanelToggle.setAttribute('aria-pressed',String(visible));
+    if(editorWorkspace)shell.classList.toggle('bw-editor-chrome-hidden',!visible);
   }
 
   async function setEditMode(on){
@@ -916,8 +1008,18 @@ export async function renderBlockWorld(root, options={}){
     // Fit the playable 1440-unit block to the available viewport; the plate
     // may extend below it visually without changing movement/camera scale.
     const authoredHeight=working.height||BLOCK1.height;
-    const baseFitScale=Math.max(.20,Math.min(1,viewport.clientHeight/authoredHeight));
-    const fitScale=editorWorkspace?Math.max(.20,Math.min(1.8,baseFitScale*editorZoom)):baseFitScale;
+    const authoredWidth=working.width||BLOCK1.width;
+    const editorBaseFit=Math.min(
+      1,
+      Math.max(.06,viewport.clientHeight/Math.max(1,authoredHeight)),
+      Math.max(.06,viewport.clientWidth/Math.max(1,authoredWidth))
+    );
+    const baseFitScale=editorWorkspace
+      ? editorBaseFit
+      : Math.max(.20,Math.min(1,viewport.clientHeight/authoredHeight));
+    const fitScale=editorWorkspace
+      ? Math.max(.06,Math.min(1.8,baseFitScale*editorZoom))
+      : baseFitScale;
     const visibleWorldWidth=viewport.clientWidth/fitScale;
     const cameraX=Math.max(
       0,
@@ -1164,7 +1266,7 @@ export async function renderBlockWorld(root, options={}){
     fullscreenMode=true;
     document.body.classList.add('bw-fullscreen-mode');
     shell.classList.add('bw-fullscreen-active');
-    fullscreenButton.textContent='EXIT';
+    fullscreenButton.textContent='WINDOW';
 
     if(!isiOS()){
       // Samsung / Android: use real browser fullscreen and request landscape.
@@ -1191,7 +1293,7 @@ export async function renderBlockWorld(root, options={}){
   async function exitFullscreen(){
     fullscreenMode=false;
     document.body.classList.remove('bw-fullscreen-mode');
-    shell.classList.remove('bw-fullscreen-active');
+    shell.classList.remove('bw-fullscreen-active','bw-editor-chrome-hidden');
     fullscreenButton.textContent='FULLSCREEN';
     try{screen.orientation?.unlock?.();}catch(_){}
     try{
