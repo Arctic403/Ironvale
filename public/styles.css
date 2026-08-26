@@ -1126,3 +1126,7 @@ body.bw-fullscreen-mode .bw-dev-buttons{
 body.bw-fullscreen-mode .bw-editor{
   z-index:10019!important;
 }
+
+
+/* Hybrid H1 — React owns the Block Editor UI shell; world/runtime stays plain JS. */
+.bw-react-editor-host{position:contents}

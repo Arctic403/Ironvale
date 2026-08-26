@@ -54,12 +54,13 @@ The `player_inventory` D1 table self-creates on the first inventory request. `sc
 
 The backend includes generic `addItemToInventory()` and `removeItemFromInventory()` helpers for future shops, crimes, rewards, drops and admin tools. They are intentionally not exposed as public grant endpoints.
 
-## JavaScript-only architecture
+## JavaScript + React hybrid architecture
 
-This repository is intentionally JavaScript-only end to end:
+RiftCity remains JavaScript end to end, but the browser UI now uses a deliberate hybrid architecture. React is introduced as UI islands while the timing-sensitive 2.5D runtime remains plain JavaScript:
 
 - Cloudflare Worker/API: `src/*.js`
-- Browser client: `public/*.js`
+- Browser game/runtime: plain ES-module JavaScript under `public/`
+- React UI islands: JavaScript/JSX under `client/react/`, bundled to `public/react-ui.js`
 - Wrangler entry point: `src/index.js`
 - No TypeScript source files, declaration files, `tsconfig`, TypeScript compiler, `ts-node`, `tsx`, or `@types/*` packages are required.
 - `npm run build` runs a JS-only guard first and fails if TypeScript is introduced later.
@@ -461,3 +462,23 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Selecting or dragging an object no longer forces a minimized inspector to reopen.
 - Portrait mobile uses a wide shallow top inspector; landscape/fullscreen mobile uses a shorter wide top inspector.
 - Touch, mouse/trackpad and keyboard editing remain supported. The inspector X exits edit mode completely.
+
+
+## Hybrid H1 — React UI foundation + Block Editor
+
+RiftCity now uses a hybrid JavaScript/React frontend rather than planning a full React rewrite.
+
+- React owns the Block Editor's component/UI shell.
+- The existing plain-JavaScript Block World continues to own movement, camera, collision,
+  fullscreen/orientation, touch input, world-space dragging and the animation loop.
+- The first migration deliberately preserves the Block Editor's existing DOM IDs so the
+  proven runtime behavior can attach to React-rendered controls without simultaneously
+  rewriting game logic.
+- `esbuild` bundles `client/react/index.jsx` to `public/react-ui.js` before the normal JS checks.
+- Wrangler still serves `./public`; Cloudflare Worker/D1 architecture is unchanged.
+- TypeScript is not introduced.
+- Future React migration order and hard ownership boundaries live in
+  `docs/HYBRID-REACT-ROADMAP.md`.
+
+This is an incremental migration: React takes over UI-heavy surfaces one feature at a time,
+while real-time city/gameplay code stays direct JavaScript.

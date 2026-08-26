@@ -2,6 +2,7 @@ import { api } from '../ui/api.js';
 import { go } from '../ui/router.js';
 import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
 import { BLOCK_ASSETS } from '../block-assets.js';
+import { mountBlockEditor } from '../react-ui.js';
 
 let cleanup=null;
 export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
@@ -54,71 +55,15 @@ export async function renderBlockWorld(root){
         <button class="bw-edit-toggle" id="bw-edit-toggle" type="button">EDIT BLOCK</button>
         <button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button>
       </div>
-      <aside class="bw-editor" id="bw-editor" aria-hidden="true">
-        <header class="bw-editor-head">
-          <div><strong>BLOCK EDITOR</strong><small id="bw-editor-selection">Tap an object in the scene</small></div>
-          <div class="bw-editor-head-actions">
-            <button id="bw-editor-minimize" type="button" aria-label="Minimize editor">—</button>
-            <button id="bw-editor-close" type="button" aria-label="Close editor">×</button>
-          </div>
-        </header>
-        <div class="bw-editor-quickbar">
-          <button type="button" id="bw-editor-undo">↶ UNDO</button>
-          <button type="button" id="bw-editor-redo">↷ REDO</button>
-          <label>SNAP<select id="bw-editor-snap"><option value="1">OFF</option><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option></select></label>
-          <button type="button" id="bw-editor-export">SAVE JSON</button>
-        </div>
-        <div class="bw-editor-body">
-          <label class="bw-editor-object-row">EDIT
-            <select id="bw-editor-object"></select>
-          </label>
-
-          <details open class="bw-editor-section">
-            <summary>POSITION & SIZE</summary>
-            <div class="bw-editor-grid">
-              <label>X<input id="bw-editor-x" inputmode="numeric" type="number" step="5"></label>
-              <label>Y<input id="bw-editor-y" inputmode="numeric" type="number" step="5"></label>
-              <label>W<input id="bw-editor-w" inputmode="numeric" type="number" step="5"></label>
-              <label>H<input id="bw-editor-h" inputmode="numeric" type="number" step="5"></label>
-            </div>
-          </details>
-
-          <details class="bw-editor-section">
-            <summary>OBJECT ACTIONS</summary>
-            <div class="bw-editor-actions">
-              <button type="button" id="bw-editor-duplicate">DUPLICATE</button>
-              <button type="button" id="bw-editor-delete">DELETE</button>
-            </div>
-          </details>
-
-          <details class="bw-editor-section">
-            <summary>ADD PROP</summary>
-            <label>PROP
-              <select id="bw-editor-prop-kind"><option>tree</option><option>lamp</option><option>bench</option><option>hydrant</option><option>box</option><option>news</option><option>car</option><option>van</option></select>
-            </label>
-            <button type="button" id="bw-editor-add-prop">ADD AT PLAYER</button>
-          </details>
-
-          <details class="bw-editor-section">
-            <summary>LEGACY ASSET LAB</summary>
-            <div class="bw-asset-panel">
-              <label class="bw-asset-import">Import asset JSON<input id="bw-asset-file" type="file" accept="application/json,.json"></label>
-              <div id="bw-asset-status">Optional per-building art library.</div>
-              <label>Asset<select id="bw-editor-asset"><option value="">No asset</option></select></label>
-              <div class="bw-editor-actions"><button type="button" id="bw-asset-apply">ASSIGN</button><button type="button" id="bw-asset-clear">CLEAR</button></div>
-            </div>
-          </details>
-
-          <button type="button" class="bw-editor-danger" id="bw-editor-reset">RESET BLOCK</button>
-          <small class="bw-editor-help">Touch: tap + drag geometry. Mouse works the same. Keyboard: arrows nudge selection, Shift = faster, Delete removes, Ctrl/Cmd+Z undo, Ctrl/Cmd+Y redo, E toggles editor.</small>
-        </div>
-      </aside>
+      <div id="bw-react-editor-root" class="bw-react-editor-host"></div>
       <div class="bw-controls">
         <div class="bw-stick" id="bw-stick"><div class="bw-knob" id="bw-knob"></div></div>
         <button type="button" class="bw-run" id="bw-run">RUN</button>
         <button type="button" class="bw-interact" id="bw-interact" disabled>ENTER</button>
       </div>
     </section>`;
+
+  const unmountReactEditor=mountBlockEditor(root.querySelector('#bw-react-editor-root'));
 
   const viewport=root.querySelector('#blockworld-viewport');
   const scene=root.querySelector('#blockworld-scene');
@@ -729,6 +674,7 @@ export async function renderBlockWorld(root){
   raf=requestAnimationFrame(tick);
   cleanup=()=>{
     cancelAnimationFrame(raf);
+    unmountReactEditor?.();
     removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);
     stick.removeEventListener('pointerdown',down);stick.removeEventListener('pointermove',move);
     stick.removeEventListener('pointerup',up);stick.removeEventListener('pointercancel',up);
