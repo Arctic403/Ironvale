@@ -3102,3 +3102,54 @@ body.dev-block-editor-page{
   }
 }
 
+
+
+/* =====================================================================
+   Hybrid H1.19 — true isolated sub-area scene
+   Commerce Street and Commerce Alley are separate camera/DOM scenes.
+   ===================================================================== */
+.blockworld-subarea-scene{
+  position:absolute;
+  left:0;
+  top:0;
+  display:none;
+  width:var(--bw-subarea-width,1672px);
+  height:var(--bw-subarea-height,941px);
+  transform-origin:0 0;
+  will-change:transform;
+  background:#090d10;
+}
+.blockworld-shell.bw-subarea-active .blockworld-scene{
+  display:none!important;
+}
+.blockworld-shell.bw-subarea-active .blockworld-subarea-scene{
+  display:block!important;
+  width:var(--bw-subarea-width)!important;
+  height:var(--bw-subarea-height)!important;
+}
+.blockworld-shell:not(.bw-subarea-active) .blockworld-subarea-scene{
+  display:none!important;
+}
+.blockworld-shell.bw-subarea-active .blockworld-subarea-scene .bw-subarea-plate{
+  display:block!important;
+  width:var(--bw-subarea-width)!important;
+  height:var(--bw-subarea-height)!important;
+  object-fit:fill!important;
+}
+.blockworld-shell.bw-subarea-active.bw-subarea-asset-error .blockworld-subarea-scene{
+  background:
+    radial-gradient(ellipse at 50% 100%,#26343a 0 22%,transparent 58%),
+    linear-gradient(#11181d,#080b0e);
+}
+.blockworld-shell.bw-subarea-active.bw-subarea-asset-error .blockworld-subarea-scene::after{
+  content:"COMMERCE ALLEY · SCENE ART UNAVAILABLE";
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  color:#d7e2e5aa;
+  font:900 12px/1.2 system-ui,sans-serif;
+  letter-spacing:.12em;
+  white-space:nowrap;
+  z-index:3;
+}

@@ -31,7 +31,6 @@ export async function renderBlockWorld(root, options={}){
       <div class="blockworld-viewport" id="blockworld-viewport">
         <div class="blockworld-scene" id="blockworld-scene">
           <img class="bw-scene-plate" id="bw-scene-plate" src="/assets/blocks/commerce-street.svg" alt="" draggable="false" decoding="async" fetchpriority="high">
-          <img class="bw-subarea-plate" id="bw-subarea-plate" alt="" draggable="false" decoding="async" aria-hidden="true">
           <div class="bw-sky"></div>
           <div class="bw-backdrop">
             <div class="bw-haze"></div>
@@ -58,11 +57,14 @@ export async function renderBlockWorld(root, options={}){
           <div class="bw-sidewalk bw-sidewalk-south"></div>
           <div class="bw-buildings"></div>
           <div class="bw-props"></div>
-          <div class="bw-subarea-debug" id="bw-subarea-debug" aria-hidden="true"></div>
           <div class="bw-player" id="bw-player"><i></i></div>
           <div class="bw-prompt" id="bw-prompt"></div>
           <div class="bw-exit bw-exit-west">← NEXT BLOCK</div>
           <div class="bw-exit bw-exit-east">NEXT BLOCK →</div>
+        </div>
+        <div class="blockworld-subarea-scene" id="blockworld-subarea-scene" aria-hidden="true">
+          <img class="bw-subarea-plate" id="bw-subarea-plate" alt="" draggable="false" decoding="async" aria-hidden="true">
+          <div class="bw-subarea-debug" id="bw-subarea-debug" aria-hidden="true"></div>
         </div>
       </div>
       <div class="bw-block-label"><small id="bw-area-kicker">DOWNTOWN / BLOCK 01</small><strong id="bw-area-name">Commerce Street</strong></div>
@@ -112,11 +114,12 @@ export async function renderBlockWorld(root, options={}){
 
   const viewport=root.querySelector('#blockworld-viewport');
   const scene=root.querySelector('#blockworld-scene');
+  const subareaScene=root.querySelector('#blockworld-subarea-scene');
   const buildings=scene.querySelector('.bw-buildings');
   const props=scene.querySelector('.bw-props');
   const scenePlate=scene.querySelector('#bw-scene-plate');
-  const subareaPlate=scene.querySelector('#bw-subarea-plate');
-  const subareaDebug=scene.querySelector('#bw-subarea-debug');
+  const subareaPlate=subareaScene.querySelector('#bw-subarea-plate');
+  const subareaDebug=subareaScene.querySelector('#bw-subarea-debug');
   const player=scene.querySelector('#bw-player');
   const prompt=scene.querySelector('#bw-prompt');
   const areaKicker=root.querySelector('#bw-area-kicker');
@@ -1250,24 +1253,35 @@ export async function renderBlockWorld(root, options={}){
     }
   }
 
+  function activeSceneElement(){
+    return activeSubarea ? subareaScene : scene;
+  }
+
   function applyAreaVisuals(){
     if(activeSubarea){
       shell.classList.add('bw-subarea-active','bw-subarea-alley');
       shell.dataset.activeArea=activeSubarea.id;
       shell.style.setProperty('--bw-subarea-width',`${activeSubarea.width}px`);
       shell.style.setProperty('--bw-subarea-height',`${activeSubarea.height}px`);
-      scene.style.width=`${activeSubarea.width}px`;
-      scene.style.height=`${activeSubarea.height}px`;
 
-      // Keep the street and sub-area plates as separate DOM images. Reusing the
-      // Commerce Street <img> allowed Safari to keep painting the previous
-      // decoded frame while the alley asset was loading, which made the alley
-      // look like a tiny/cropped part of the street instead of a new scene.
-      if(scenePlate)scenePlate.style.display='none';
+      // H1.19: the alley is a separate scene node. Do not resize/repaint the
+      // Commerce Street scene in-place; hide it completely while the sub-area
+      // is active so Safari cannot expose a stale street frame.
+      scene.style.display='none';
+      scene.setAttribute('aria-hidden','true');
+      subareaScene.style.display='block';
+      subareaScene.setAttribute('aria-hidden','false');
+      subareaScene.style.width=`${activeSubarea.width}px`;
+      subareaScene.style.height=`${activeSubarea.height}px`;
+      subareaScene.appendChild(player);
+      subareaScene.appendChild(prompt);
+
+      if(scenePlate)scenePlate.style.display='block';
       if(subareaPlate){
         const plate=activeSubarea.scenePlate||{};
         const nextSrc=plate.src||'';
         if(subareaPlate.dataset.src!==nextSrc){
+          shell.classList.remove('bw-subarea-asset-error');
           subareaPlate.dataset.src=nextSrc;
           subareaPlate.src=nextSrc;
         }
@@ -1290,8 +1304,17 @@ export async function renderBlockWorld(root, options={}){
     delete shell.dataset.activeArea;
     shell.style.removeProperty('--bw-subarea-width');
     shell.style.removeProperty('--bw-subarea-height');
+
+    subareaScene.style.display='none';
+    subareaScene.setAttribute('aria-hidden','true');
+    subareaScene.style.transform='none';
+    scene.style.display='block';
+    scene.setAttribute('aria-hidden','false');
     scene.style.width=`${working.width||BLOCK1.width}px`;
     scene.style.height=`${working.height||BLOCK1.height}px`;
+    scene.appendChild(player);
+    scene.appendChild(prompt);
+
     if(subareaPlate)subareaPlate.style.display='none';
     if(scenePlate){
       scenePlate.style.display='block';
@@ -1327,6 +1350,7 @@ export async function renderBlockWorld(root, options={}){
     const viewportHeight=Math.max(1,viewport.clientHeight||1);
     const authoredWidth=Math.max(1,Number(area.width)||1);
     const authoredHeight=Math.max(1,Number(area.height)||1);
+    const cameraScene=activeSceneElement();
 
     let fitScale=1,cameraX=0,cameraY=0;
 
@@ -1341,19 +1365,27 @@ export async function renderBlockWorld(root, options={}){
 
       const visibleWorldWidth=viewportWidth/fitScale;
       const visibleWorldHeight=viewportHeight/fitScale;
-      const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.38;
+      const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.5;
       const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.72;
+      const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
+      const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
 
       cameraX=clampCamera(
         state.x-visibleWorldWidth*anchorX,
         0,
-        Math.max(0,authoredWidth-visibleWorldWidth)
+        maxX
       );
-      cameraY=clampCamera(
-        state.y-visibleWorldHeight*anchorY,
-        0,
-        Math.max(0,authoredHeight-visibleWorldHeight)
-      );
+
+      // Room/sub-area art is authored around the playable ground lane. On
+      // short landscape viewports, bottom-align the camera instead of tracking
+      // upward into skyline/ceiling space.
+      cameraY=camera.vertical==='ground'
+        ? maxY
+        : clampCamera(
+            state.y-visibleWorldHeight*anchorY,
+            0,
+            maxY
+          );
     }else{
       const editorBaseFit=Math.min(
         1,
@@ -1374,7 +1406,7 @@ export async function renderBlockWorld(root, options={}){
       );
     }
 
-    scene.style.transform=`translate3d(${-cameraX*fitScale}px,${-cameraY*fitScale}px,0) scale(${fitScale})`;
+    cameraScene.style.transform=`translate3d(${-cameraX*fitScale}px,${-cameraY*fitScale}px,0) scale(${fitScale})`;
   }
 
   function enterSubarea(targetId){
@@ -1713,7 +1745,7 @@ export async function renderBlockWorld(root, options={}){
   }
 
   function pointerScaleToWorld(){
-    const rect=scene.getBoundingClientRect();
+    const rect=activeSceneElement().getBoundingClientRect();
     const worldWidth=currentArea().width||working.width||BLOCK1.width||1;
     return Math.max(0.0001,(usesRotatedIOSFullscreen()?rect.height:rect.width)/worldWidth);
   }

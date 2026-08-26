@@ -22,9 +22,11 @@ export const SUBAREAS = Object.freeze({
     walkable:{x:70,y:560,width:1530,height:330},
     exit:{id:'street-exit',x:18,y:535,width:250,height:355,label:'Commerce Street'},
 
-    // Cover the viewport like a real room/scene, then follow the player inside
-    // the cropped horizontal range on portrait phones.
-    camera:{mode:'cover',anchorX:.36,anchorY:.72,minScale:.24,maxScale:1.35},
+    // Cover the viewport like a real room/scene. Horizontal framing follows the
+    // player only when the viewport is narrower than the alley; vertical
+    // framing stays ground-aligned so short iPhone landscape viewports never
+    // drift upward into empty skyline/ceiling space.
+    camera:{mode:'cover',vertical:'ground',anchorX:.50,anchorY:.72,minScale:.24,maxScale:1.35},
 
     obstacles:[
       {id:'left-clutter',x:330,y:500,width:245,height:205},

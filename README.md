@@ -716,3 +716,13 @@ npx wrangler r2 bucket create riftcityassets
 
 The normal D1 schema migration also creates `approved_assets`. The Worker keeps the same `CREATE TABLE IF NOT EXISTS` guard for development deployments.
 
+
+
+## Hybrid H1.19 — true Commerce Alley scene isolation
+
+- Commerce Alley is now a separate DOM/camera scene instead of reusing and resizing the Commerce Street scene node.
+- Entering the authored alley hides Commerce Street completely, mounts the dedicated alley scene, moves the player/prompt into that scene context, and applies the alley's own world/camera dimensions.
+- Leaving the alley restores the player/prompt to Commerce Street and returns to the exact saved street position.
+- Alley camera framing is ground-aligned on short landscape/iPhone fullscreen viewports so the camera cannot drift upward into mostly sky/ceiling.
+- The existing `commerce-alley.webp` scene plate remains the primary art. If that file fails to load, RiftCity shows a dark Commerce Alley diagnostic fallback instead of ever showing a stale Commerce Street frame.
+- R2/D1 asset verification from H1.18 is unchanged. Scavenging remains deferred until the alley enter → move → exit loop is visually verified.
