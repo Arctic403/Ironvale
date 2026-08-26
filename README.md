@@ -441,3 +441,12 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Mobile and fullscreen camera fitting now uses gameplay dimensions rather than the panorama bitmap height.
 - Touch controls are explicitly layered above scene/editor guides in play mode and use pointer capture/preventDefault for Safari reliability.
 - The Block Editor remains minimizable and continues to disable gameplay controls only while edit mode is active.
+
+
+## Phase 12.3 — unobstructed mobile Block Editor
+
+- EDIT BLOCK remains a compact top control and becomes DONE while editing.
+- Entering edit mode no longer opens an inspector over the scene.
+- Tapping/selecting an editable scene object opens the inspector only when needed.
+- Minimize now fully hides the inspector instead of leaving a bottom bar over gameplay.
+- Selecting another object reopens the inspector, keeping touch and mouse/keyboard workflows intact.

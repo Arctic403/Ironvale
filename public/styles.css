@@ -1046,3 +1046,14 @@ body.bw-fullscreen-mode .bw-controls{z-index:10001!important}
 body.bw-fullscreen-mode .bw-dev-buttons,
 body.bw-fullscreen-mode .bw-block-label{z-index:10002!important}
 body.bw-fullscreen-mode .bw-editor{z-index:10010!important}
+
+
+/* Phase 12.3 — unobstructed mobile Block Editor */
+.bw-edit-mode .bw-dev-buttons{z-index:95}
+.bw-edit-mode .bw-edit-toggle{background:#203b38f2;border-color:#8fb8ad88}
+@media(max-width:700px){
+  .bw-dev-buttons{top:max(6px,env(safe-area-inset-top));right:max(6px,env(safe-area-inset-right));gap:5px;transform:none}
+  .bw-edit-toggle,.bw-fullscreen{min-height:34px!important;padding:6px 9px!important;font-size:9px!important;border-radius:8px!important}
+  .bw-editor.show{left:6px!important;right:6px!important;bottom:max(6px,env(safe-area-inset-bottom))!important;max-height:min(52%,430px)!important}
+  .bw-editor:not(.show){display:none!important}
+}

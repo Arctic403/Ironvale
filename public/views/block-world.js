@@ -311,6 +311,15 @@ export async function renderBlockWorld(root){
     const selected=currentEditable();if(editorSelection)editorSelection.textContent=selected?`${selected.type.toUpperCase()} · ${selected.label}`:'Tap an object in the scene';
     scene.querySelectorAll('.bw-edit-selected').forEach(x=>x.classList.remove('bw-edit-selected'));
     if(key)scene.querySelector(`[data-edit-key="${key}"]`)?.classList.add('bw-edit-selected');
+    // Keep the city unobstructed in edit mode. The inspector only opens when
+    // an object is actually selected, and minimizing hides it completely.
+    if(editMode&&key){
+      editor.classList.add('show');
+      editor.classList.remove('minimized');
+      editor.setAttribute('aria-hidden','false');
+      editorMinimize.textContent='—';
+      editorMinimize.setAttribute('aria-label','Hide editor');
+    }
   }
   function renderEditorObjects(){
     // Keep authored markup but reposition it from working data.
@@ -370,15 +379,24 @@ export async function renderBlockWorld(root){
     populateObjectSelect(); if(selectedKey)select(selectedKey);
   }
   function setEditMode(on){
-    editMode=!!on;shell.classList.toggle('bw-edit-mode',editMode);editor.classList.toggle('show',editMode);
-    editor.setAttribute('aria-hidden',String(!editMode));editToggle.textContent=editMode?'PLAY MODE':'EDIT BLOCK';
-    if(editMode){populateObjectSelect();syncInspector();renderEditorObjects();}else{editor.classList.remove('minimized');select('');renderEditorObjects();}
+    editMode=!!on;shell.classList.toggle('bw-edit-mode',editMode);
+    editToggle.textContent=editMode?'DONE':'EDIT BLOCK';
+    if(editMode){
+      // Enter edit mode without throwing an inspector over the scene.
+      editor.classList.remove('show','minimized');
+      editor.setAttribute('aria-hidden','true');
+      populateObjectSelect();syncInspector();renderEditorObjects();
+    }else{
+      editor.classList.remove('show','minimized');
+      editor.setAttribute('aria-hidden','true');select('');renderEditorObjects();
+    }
   }
   function toggleEditorMinimized(){
     if(!editMode)return;
-    const minimized=editor.classList.toggle('minimized');
-    editorMinimize.textContent=minimized?'▴':'—';
-    editorMinimize.setAttribute('aria-label',minimized?'Expand editor':'Minimize editor');
+    // On phones a collapsed bottom bar still blocks the scene, so minimize
+    // means fully hide. Selecting any object opens the inspector again.
+    editor.classList.remove('show','minimized');
+    editor.setAttribute('aria-hidden','true');
   }
   function applyInspector(){
     const item=currentEditable();if(!item)return;const before=snapshot(),o=item.o;
