@@ -3034,3 +3034,71 @@ body.dev-block-editor-page{
     min-height:0!important;
   }
 }
+
+/* =====================================================================
+   Hybrid H1.17 — dedicated sub-area scene plate + mobile camera framing
+   Commerce Alley is a real scene context, not a resized Commerce Street.
+   ===================================================================== */
+
+.bw-subarea-plate{
+  position:absolute;
+  left:0;
+  top:0;
+  z-index:1;
+  display:none;
+  max-width:none;
+  max-height:none;
+  object-fit:fill;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+
+.blockworld-shell.bw-subarea-active .bw-scene-plate{
+  display:none!important;
+}
+
+.blockworld-shell.bw-subarea-active .bw-subarea-plate{
+  display:block!important;
+  width:var(--bw-subarea-width)!important;
+  height:var(--bw-subarea-height)!important;
+}
+
+.blockworld-shell.bw-subarea-active .blockworld-viewport{
+  background:#090d10!important;
+}
+
+/* Never leave the previous Commerce Street frame visible if the alley asset
+   has a network/cache problem. A dark fallback is much less misleading. */
+.blockworld-shell.bw-subarea-active.bw-subarea-asset-error .bw-subarea-plate{
+  visibility:hidden!important;
+}
+.blockworld-shell.bw-subarea-active.bw-subarea-asset-error .blockworld-viewport{
+  background:
+    radial-gradient(circle at 50% 58%,#20282d 0 22%,transparent 55%),
+    linear-gradient(#11181d,#080b0e)!important;
+}
+
+/* Keep the scene context label readable without occupying the player's lane. */
+.blockworld-shell.bw-subarea-active .bw-block-label{
+  max-width:min(280px,52vw);
+}
+.blockworld-shell.bw-subarea-active .bw-block-label strong{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+@media(max-width:700px){
+  .blockworld-shell.bw-subarea-active .blockworld-scene{
+    width:var(--bw-subarea-width)!important;
+    height:var(--bw-subarea-height)!important;
+    min-height:0!important;
+  }
+  .blockworld-shell.bw-subarea-active .bw-subarea-plate{
+    width:var(--bw-subarea-width)!important;
+    height:var(--bw-subarea-height)!important;
+  }
+}
+

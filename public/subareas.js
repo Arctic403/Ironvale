@@ -1,24 +1,39 @@
-// RiftCity H1.16 — reusable 2.5D sub-area registry.
-// Scene artwork is presentation only. Walkable bounds, collision, entry/exit and
-// future interaction hotspots remain separate gameplay data.
+// RiftCity H1.17 — reusable 2.5D sub-area registry.
+// Scene artwork is presentation only. Walkable bounds, collision, entry/exit,
+// camera framing and future interaction hotspots remain separate gameplay data.
 export const SUBAREAS = Object.freeze({
   'alley-commerce-01': Object.freeze({
     id:'alley-commerce-01',
     name:'Commerce Alley',
+    kicker:'DOWNTOWN / BLOCK 01',
     parentBlock:'downtown-commercial-01',
-    width:1920,
-    height:1080,
-    scenePlate:{src:'/assets/blocks/commerce-alley.webp',x:0,y:0,width:1920,height:1080,scale:1},
-    spawn:{x:330,y:850},
-    walkable:{x:70,y:590,width:1780,height:420},
-    exit:{id:'street-exit',x:45,y:610,width:230,height:360,label:'Commerce Street'},
+
+    // Match the shipped alley scene plate's native 16:9-ish canvas so the
+    // sub-area camera never inherits Commerce Street's much wider world size.
+    width:1672,
+    height:941,
+    scenePlate:{src:'/assets/blocks/commerce-alley.webp',x:0,y:0,width:1672,height:941,scale:1},
+
+    // Spawn is intentionally clear of the left-side mobile joystick. The exit
+    // still occupies the visible street opening, but the player starts just
+    // outside its activation radius so entering the alley does not instantly
+    // offer EXIT again.
+    spawn:{x:380,y:790},
+    walkable:{x:70,y:560,width:1530,height:330},
+    exit:{id:'street-exit',x:18,y:535,width:250,height:355,label:'Commerce Street'},
+
+    // Cover the viewport like a real room/scene, then follow the player inside
+    // the cropped horizontal range on portrait phones.
+    camera:{mode:'cover',anchorX:.36,anchorY:.72,minScale:.24,maxScale:1.35},
+
     obstacles:[
-      {id:'left-clutter',x:330,y:545,width:300,height:210},
-      {id:'dumpster',x:930,y:505,width:360,height:265},
-      {id:'right-steps',x:1370,y:505,width:390,height:275}
+      {id:'left-clutter',x:330,y:500,width:245,height:205},
+      {id:'dumpster',x:805,y:455,width:355,height:245},
+      {id:'right-steps',x:1235,y:455,width:360,height:255}
     ],
-    // Reserved for the next pass. These are intentionally non-functional until
-    // scavenging is wired to the existing server-authoritative crime engine.
+
+    // Reserved for the scavenging pass. These stay non-functional until wired
+    // to the existing server-authoritative crime engine.
     interactions:[]
   })
 });

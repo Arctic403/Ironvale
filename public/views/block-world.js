@@ -23,6 +23,7 @@ export async function renderBlockWorld(root, options={}){
       <div class="blockworld-viewport" id="blockworld-viewport">
         <div class="blockworld-scene" id="blockworld-scene">
           <img class="bw-scene-plate" id="bw-scene-plate" src="/assets/blocks/commerce-street.svg" alt="" draggable="false" decoding="async" fetchpriority="high">
+          <img class="bw-subarea-plate" id="bw-subarea-plate" alt="" draggable="false" decoding="async" aria-hidden="true">
           <div class="bw-sky"></div>
           <div class="bw-backdrop">
             <div class="bw-haze"></div>
@@ -106,6 +107,7 @@ export async function renderBlockWorld(root, options={}){
   const buildings=scene.querySelector('.bw-buildings');
   const props=scene.querySelector('.bw-props');
   const scenePlate=scene.querySelector('#bw-scene-plate');
+  const subareaPlate=scene.querySelector('#bw-subarea-plate');
   const subareaDebug=scene.querySelector('#bw-subarea-debug');
   const player=scene.querySelector('#bw-player');
   const prompt=scene.querySelector('#bw-prompt');
@@ -116,6 +118,16 @@ export async function renderBlockWorld(root, options={}){
   const fullscreenButton=root.querySelector('#bw-fullscreen')||editorQuery('#bw-fullscreen');
   const shell=root.querySelector('.blockworld-shell');
   const stick=root.querySelector('#bw-stick');
+
+  // A failed alley asset should never fall back visually to Commerce Street.
+  // Keep the sub-area canvas active and expose a dark fallback instead.
+  subareaPlate?.addEventListener('load',()=>shell.classList.remove('bw-subarea-asset-error'));
+  subareaPlate?.addEventListener('error',()=>shell.classList.add('bw-subarea-asset-error'));
+  const initialAlley=getSubarea('alley-commerce-01');
+  if(subareaPlate&&initialAlley?.scenePlate?.src){
+    subareaPlate.dataset.src=initialAlley.scenePlate.src;
+    subareaPlate.src=initialAlley.scenePlate.src;
+  }
   const editToggle=editorQuery('#bw-edit-toggle');
   const editorPanelToggle=editorQuery('#bw-editor-panel-toggle');
   const editor=editorQuery('#bw-editor');
@@ -1114,25 +1126,48 @@ export async function renderBlockWorld(root, options={}){
   function applyAreaVisuals(){
     if(activeSubarea){
       shell.classList.add('bw-subarea-active','bw-subarea-alley');
+      shell.dataset.activeArea=activeSubarea.id;
       shell.style.setProperty('--bw-subarea-width',`${activeSubarea.width}px`);
       shell.style.setProperty('--bw-subarea-height',`${activeSubarea.height}px`);
-      if(scenePlate){
-        scenePlate.src=activeSubarea.scenePlate?.src||'';
-        scenePlate.style.left=`${activeSubarea.scenePlate?.x||0}px`;
-        scenePlate.style.top=`${activeSubarea.scenePlate?.y||0}px`;
-        scenePlate.style.transform=`scale(${Number(activeSubarea.scenePlate?.scale)||1})`;
-        scenePlate.style.transformOrigin='0 0';
+      scene.style.width=`${activeSubarea.width}px`;
+      scene.style.height=`${activeSubarea.height}px`;
+
+      // Keep the street and sub-area plates as separate DOM images. Reusing the
+      // Commerce Street <img> allowed Safari to keep painting the previous
+      // decoded frame while the alley asset was loading, which made the alley
+      // look like a tiny/cropped part of the street instead of a new scene.
+      if(scenePlate)scenePlate.style.display='none';
+      if(subareaPlate){
+        const plate=activeSubarea.scenePlate||{};
+        const nextSrc=plate.src||'';
+        if(subareaPlate.dataset.src!==nextSrc){
+          subareaPlate.dataset.src=nextSrc;
+          subareaPlate.src=nextSrc;
+        }
+        subareaPlate.style.display='block';
+        subareaPlate.style.left=`${Number(plate.x)||0}px`;
+        subareaPlate.style.top=`${Number(plate.y)||0}px`;
+        subareaPlate.style.width=`${Number(plate.width)||activeSubarea.width}px`;
+        subareaPlate.style.height=`${Number(plate.height)||activeSubarea.height}px`;
+        subareaPlate.style.transform=`scale(${Number(plate.scale)||1})`;
+        subareaPlate.style.transformOrigin='0 0';
       }
-      if(areaKicker)areaKicker.textContent='DOWNTOWN / COMMERCE STREET';
-      if(areaName)areaName.textContent=activeSubarea.name||'Alley';
+
+      if(areaKicker)areaKicker.textContent=activeSubarea.kicker||'DOWNTOWN / BLOCK 01';
+      if(areaName)areaName.textContent=activeSubarea.name||'Commerce Alley';
       renderSubareaDebug();
       return;
     }
 
-    shell.classList.remove('bw-subarea-active','bw-subarea-alley');
+    shell.classList.remove('bw-subarea-active','bw-subarea-alley','bw-subarea-asset-error');
+    delete shell.dataset.activeArea;
     shell.style.removeProperty('--bw-subarea-width');
     shell.style.removeProperty('--bw-subarea-height');
+    scene.style.width=`${working.width||BLOCK1.width}px`;
+    scene.style.height=`${working.height||BLOCK1.height}px`;
+    if(subareaPlate)subareaPlate.style.display='none';
     if(scenePlate){
+      scenePlate.style.display='block';
       scenePlate.src=working.scenePlate?.src||'/assets/blocks/commerce-street.svg';
       scenePlate.style.left=`${working.scenePlate?.x||0}px`;
       scenePlate.style.top=`${working.scenePlate?.y||0}px`;
@@ -1155,6 +1190,66 @@ export async function renderBlockWorld(root, options={}){
     player.style.zIndex=String(30+Math.round(state.y));
   }
 
+  function clampCamera(value,min,max){
+    return Math.max(min,Math.min(max,value));
+  }
+
+  function applyCamera(){
+    const area=currentArea();
+    const viewportWidth=Math.max(1,viewport.clientWidth||1);
+    const viewportHeight=Math.max(1,viewport.clientHeight||1);
+    const authoredWidth=Math.max(1,Number(area.width)||1);
+    const authoredHeight=Math.max(1,Number(area.height)||1);
+
+    let fitScale=1,cameraX=0,cameraY=0;
+
+    if(activeSubarea){
+      const camera=area.camera||{};
+      const containScale=Math.min(viewportWidth/authoredWidth,viewportHeight/authoredHeight);
+      const coverScale=Math.max(viewportWidth/authoredWidth,viewportHeight/authoredHeight);
+      const requested=camera.mode==='contain'?containScale:coverScale;
+      const minScale=Number(camera.minScale)||.20;
+      const maxScale=Number(camera.maxScale)||1.5;
+      fitScale=clampCamera(requested,minScale,maxScale);
+
+      const visibleWorldWidth=viewportWidth/fitScale;
+      const visibleWorldHeight=viewportHeight/fitScale;
+      const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.38;
+      const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.72;
+
+      cameraX=clampCamera(
+        state.x-visibleWorldWidth*anchorX,
+        0,
+        Math.max(0,authoredWidth-visibleWorldWidth)
+      );
+      cameraY=clampCamera(
+        state.y-visibleWorldHeight*anchorY,
+        0,
+        Math.max(0,authoredHeight-visibleWorldHeight)
+      );
+    }else{
+      const editorBaseFit=Math.min(
+        1,
+        Math.max(.06,viewportHeight/authoredHeight),
+        Math.max(.06,viewportWidth/authoredWidth)
+      );
+      const baseFitScale=editorWorkspace
+        ? editorBaseFit
+        : Math.max(.20,Math.min(1,viewportHeight/authoredHeight));
+      fitScale=editorWorkspace
+        ? Math.max(.06,Math.min(1.8,baseFitScale*editorZoom))
+        : baseFitScale;
+
+      const visibleWorldWidth=viewportWidth/fitScale;
+      cameraX=Math.max(
+        0,
+        Math.min(Math.max(0,authoredWidth-visibleWorldWidth),state.x-visibleWorldWidth*.46)
+      );
+    }
+
+    scene.style.transform=`translate3d(${-cameraX*fitScale}px,${-cameraY*fitScale}px,0) scale(${fitScale})`;
+  }
+
   function enterSubarea(targetId){
     const next=getSubarea(targetId);
     if(!next)return false;
@@ -1169,6 +1264,8 @@ export async function renderBlockWorld(root, options={}){
     knob.style.transform='translate(0,0)';
     applyAreaVisuals();
     updatePlayer();
+    applyCamera();
+    requestAnimationFrame(applyCamera);
     return true;
   }
 
@@ -1189,6 +1286,8 @@ export async function renderBlockWorld(root, options={}){
     knob.style.transform='translate(0,0)';
     applyAreaVisuals();
     updatePlayer();
+    applyCamera();
+    requestAnimationFrame(applyCamera);
     return true;
   }
 
@@ -1244,25 +1343,7 @@ export async function renderBlockWorld(root, options={}){
     if(!collidesAt(state.x,ny))state.y=ny;
     updatePlayer();
 
-    const authoredHeight=area.height;
-    const authoredWidth=area.width;
-    const editorBaseFit=Math.min(
-      1,
-      Math.max(.06,viewport.clientHeight/Math.max(1,authoredHeight)),
-      Math.max(.06,viewport.clientWidth/Math.max(1,authoredWidth))
-    );
-    const baseFitScale=editorWorkspace
-      ? editorBaseFit
-      : Math.max(.20,Math.min(1,viewport.clientHeight/authoredHeight));
-    const fitScale=editorWorkspace
-      ? Math.max(.06,Math.min(1.8,baseFitScale*editorZoom))
-      : baseFitScale;
-    const visibleWorldWidth=viewport.clientWidth/fitScale;
-    const cameraX=Math.max(
-      0,
-      Math.min(Math.max(0,area.width-visibleWorldWidth),state.x-visibleWorldWidth*.46)
-    );
-    scene.style.transform=`translate3d(${-cameraX*fitScale}px,0,0) scale(${fitScale})`;
+    applyCamera();
     updatePrompt();
     raf=requestAnimationFrame(tick);
   }
@@ -1553,6 +1634,7 @@ export async function renderBlockWorld(root, options={}){
         }
       }catch(_){}
     }
+    requestAnimationFrame(()=>requestAnimationFrame(applyCamera));
   }
 
   async function exitFullscreen(){
@@ -1564,7 +1646,10 @@ export async function renderBlockWorld(root, options={}){
     try{
       if(document.fullscreenElement)await document.exitFullscreen?.();
     }catch(_){}
-    requestAnimationFrame(updateShellSize);
+    requestAnimationFrame(()=>{
+      updateShellSize();
+      requestAnimationFrame(applyCamera);
+    });
   }
 
   async function toggleFullscreen(){
@@ -1579,12 +1664,16 @@ export async function renderBlockWorld(root, options={}){
       document.body.classList.remove('bw-fullscreen-mode');
       shell.classList.remove('bw-fullscreen-active');
       fullscreenButton.textContent='FULLSCREEN';
-      requestAnimationFrame(updateShellSize);
+      requestAnimationFrame(()=>{
+        updateShellSize();
+        requestAnimationFrame(applyCamera);
+      });
     }
   }
 
   function onViewportChange(){
     if(!fullscreenMode)updateShellSize();
+    requestAnimationFrame(applyCamera);
   }
 
   fullscreenButton.addEventListener('click',toggleFullscreen);
@@ -1606,6 +1695,7 @@ export async function renderBlockWorld(root, options={}){
 
   applyAreaVisuals();
   updatePlayer();
+  applyCamera();
   if(editorWorkspace)await setEditMode(true);
   raf=requestAnimationFrame(tick);
   cleanup=()=>{

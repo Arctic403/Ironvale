@@ -669,3 +669,15 @@ Research-driven state cleanup:
 - The alley exit returns the player to the exact Commerce Street position they entered from.
 - Editor Play Mode can test the transition; entering Edit Mode while inside a sub-area returns to Commerce Street before editing.
 - Scavenging is intentionally not wired in this pass. The alley config contains an empty interaction registry ready for the existing server-authoritative scavenging crime in the next pass.
+
+## Hybrid H1.17 — Commerce Alley scene/camera repair
+
+- Commerce Alley now owns a dedicated scene-plate element instead of reusing the Commerce Street image element. This prevents Safari from continuing to paint the previously decoded Commerce Street frame while the alley asset changes.
+- Entering the alley now switches the runtime to the alley's native `1672 × 941` world context, including its own scene dimensions, walkable bounds, collision data and camera profile.
+- The alley camera uses viewport-cover framing and player tracking rather than Commerce Street's tall-world fit, so the alley reads as its own room/sub-area in both normal mobile play and fullscreen.
+- The alley spawn is moved clear of the left-side joystick and starts just outside the exit trigger radius.
+- Scene framing is recalculated immediately on enter/leave, viewport changes and fullscreen transitions, including the iPhone CSS-rotated fullscreen fallback.
+- The block label now switches explicitly to **Commerce Alley** while inside and back to **Commerce Street** on exit.
+- If the alley art fails to load, the old street image is never shown as a false fallback; the sub-area remains active over a dark diagnostic-safe background.
+- Scavenging remains intentionally deferred until enter → move → exit behavior is verified on mobile.
+
