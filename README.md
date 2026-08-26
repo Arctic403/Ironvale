@@ -421,3 +421,15 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Invisible gameplay geometry was realigned to the visible Corner Mart, Northside Warehouse, Auto Repair, apartments, Pawn Shop and Apartment Rentals entrances.
 - The block keeps horizontal camera travel, 2-axis walk-up movement, mobile controls, fullscreen behavior and the live block editor.
 - Future blocks can use the same pattern and be preloaded/streamed as neighboring scene plates rather than building one giant city raster.
+
+
+## Phase 12.1 — wide scene plate + mobile-first Block Editor
+
+- Commerce Street now uses the latest supplied wide panoramic background while preserving the artwork's native 2:1 proportions instead of squeezing it into the older scene ratio.
+- Gameplay geometry remains independent from the artwork and has been re-aligned to the panorama.
+- The Block Editor is now designed for iPhone first: a compact bottom sheet that can be minimized without leaving edit mode.
+- Landscape and larger screens automatically use a narrow right-side inspector so the scene remains visible.
+- Touch, Apple mouse/trackpad and normal desktop pointer input all use the same direct-selection/drag path.
+- Keyboard editing supports `E` to toggle edit mode, arrow-key nudging, Shift for larger nudges, Delete/Backspace for removable objects, Ctrl/Cmd+Z undo and Ctrl/Cmd+Y redo.
+- Editor targets now include buildings, props, player spawn, west/east block exits, the walkable area and the panoramic scene plate. Legacy Asset Lab controls remain available in a collapsed compatibility section.
+- Block Editor JSON schema is now version 2.

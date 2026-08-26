@@ -450,7 +450,7 @@ body.city2d-game-mode{overflow:hidden}.city2d-game-mode .topbar,.city2d-game-mod
 /* Phase 11 — 2.5D streaming block world vertical slice */
 .blockworld-shell{position:fixed;inset:var(--hud-height,0) 0 0;background:#101820;overflow:hidden;touch-action:none;z-index:20}
 .blockworld-viewport{position:absolute;inset:0;overflow:hidden;background:linear-gradient(#a9c8d6 0 48%,#89999c 48% 100%);touch-action:none}
-.blockworld-scene{position:absolute;left:0;top:0;width:3600px;height:100%;min-height:760px;transform-origin:0 0;will-change:transform}
+.blockworld-scene{position:absolute;left:0;top:0;width:3600px;height:1800px;min-height:760px;transform-origin:0 0;will-change:transform}
 .bw-sky{position:absolute;inset:0 0 auto;width:3600px;height:45%;background:linear-gradient(#9bbdca,#d8d8cb)}
 .bw-backdrop{position:absolute;left:0;right:0;top:80px;height:330px;opacity:.34;overflow:hidden}
 .bw-backdrop span{position:relative;display:inline-block;width:640px;height:330px;margin-right:80px;background:#738087;border-top:12px solid #626e74;box-shadow:inset 0 0 0 2px #66737a}
@@ -931,7 +931,7 @@ body.bw-fullscreen-mode .blockworld-shell{
 /* Phase 12 — authored Commerce Street panoramic scene plate.
    The plate owns visuals; gameplay geometry stays independent and invisible. */
 .bw-scene-plate{
-  position:absolute;left:0;top:0;width:3600px;height:1440px;z-index:1;
+  position:absolute;left:0;top:0;width:3600px;height:1800px;z-index:1;
   display:block;max-width:none;max-height:none;object-fit:fill;
   pointer-events:none;user-select:none;-webkit-user-drag:none;
 }
@@ -948,3 +948,76 @@ body.bw-fullscreen-mode .blockworld-shell{
 .bw-edit-mode .bw-building-geometry{outline:3px dashed #65d9ff88!important;background:#65d9ff12!important}
 .bw-edit-mode .bw-building-geometry.bw-edit-selected{outline-color:#ffd166!important;background:#ffd1661c!important}
 .bw-edit-mode .bw-door-marker{display:block!important}
+
+
+/* Phase 12.1 — mobile-first Block Editor
+   Bottom sheet on phones, right dock in landscape/desktop, fully minimizable.
+   Pointer events work for touch, mouse and trackpad; keyboard shortcuts live in JS. */
+.bw-editor{
+  position:absolute!important;z-index:100!important;
+  left:10px!important;right:10px!important;top:auto!important;
+  bottom:max(10px,env(safe-area-inset-bottom))!important;
+  width:auto!important;max-height:min(48vh,420px)!important;
+  display:none;overflow:hidden!important;
+  background:#0d171ceb!important;border:1px solid #ffffff35!important;
+  border-radius:18px!important;box-shadow:0 20px 70px #000c!important;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  color:#eef4f2;
+}
+.bw-editor.show{display:flex!important;flex-direction:column}
+.bw-editor-head{
+  flex:0 0 auto;display:flex!important;align-items:center!important;justify-content:space-between!important;
+  padding:9px 10px 8px!important;background:#152126f5!important;border-bottom:1px solid #ffffff1d!important;
+  position:relative!important;top:auto!important;
+}
+.bw-editor-head>div:first-child{min-width:0;display:grid;gap:1px}
+.bw-editor-head strong{font-size:13px;letter-spacing:.06em}
+.bw-editor-head small{font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#94a5aa}
+.bw-editor-head-actions{display:flex!important;gap:6px}
+.bw-editor-head-actions button{width:42px!important;height:38px!important;min-height:38px!important;padding:0!important;font-size:20px!important}
+.bw-editor-quickbar{
+  flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr 1.15fr 1fr;gap:5px;
+  padding:6px 8px;background:#101c21e8;border-bottom:1px solid #ffffff12;
+}
+.bw-editor-quickbar button,.bw-editor-quickbar select{min-height:38px!important;padding:5px!important;font-size:9px!important}
+.bw-editor-quickbar label{display:grid!important;grid-template-columns:auto 1fr!important;align-items:center;gap:4px!important;font-size:7px!important}
+.bw-editor-body{overflow:auto!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:8px!important;gap:7px!important}
+.bw-editor-object-row{position:sticky;top:0;z-index:3;background:#0d171cf2;padding-bottom:5px}
+.bw-editor input,.bw-editor select,.bw-editor button{min-height:44px!important;font-size:16px!important}
+.bw-editor label{font-size:9px!important}
+.bw-editor-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:5px!important}
+.bw-editor-grid input{width:100%;padding:6px!important;text-align:center}
+.bw-editor-section{border:1px solid #ffffff18;border-radius:10px;background:#ffffff05;overflow:hidden}
+.bw-editor-section summary{list-style:none;padding:10px 11px;cursor:pointer;font-size:9px;font-weight:950;letter-spacing:.08em;color:#c3d0d3}
+.bw-editor-section summary::-webkit-details-marker{display:none}
+.bw-editor-section[open] summary{border-bottom:1px solid #ffffff12;background:#ffffff05}
+.bw-editor-section>div,.bw-editor-section>label,.bw-editor-section>button{margin:8px}
+.bw-editor-actions{gap:6px!important}
+.bw-editor-danger{background:#4a2326!important;border-color:#8e454b!important;color:#ffd7d9!important}
+.bw-editor-help{display:block;padding:5px 2px 3px;line-height:1.35}
+.bw-editor.minimized{max-height:58px!important}
+.bw-editor.minimized .bw-editor-quickbar,.bw-editor.minimized .bw-editor-body{display:none!important}
+.bw-editor.minimized .bw-editor-head{height:58px}
+.bw-edit-mode .bw-controls{opacity:.12!important;pointer-events:none!important}
+.bw-editor-guide{position:absolute;z-index:80;border:3px dashed #5ed7ff;box-sizing:border-box;pointer-events:auto;background:#5ed7ff10}
+.bw-editor-guide>span{position:absolute;left:3px;top:3px;padding:3px 5px;background:#071216d9;color:#dff8ff;font:900 8px/1 sans-serif;letter-spacing:.07em;border-radius:4px;white-space:nowrap}
+.bw-guide-spawn{width:34px;height:34px;margin:-17px;border-radius:50%;border-style:solid;background:#69e39b55}
+.bw-guide-spawn>span{left:36px;top:8px}
+.bw-guide-exit{border-color:#ffb84d;background:#ffb84d12}
+.bw-guide-walkable{border-color:#74e09577;background:#74e09508;pointer-events:auto}
+.bw-guide-scene{border-color:#b987ff77;background:transparent;pointer-events:none}
+.bw-guide-scene>span{background:#39245bd9}
+
+@media (orientation:landscape) and (min-width:650px){
+  .bw-editor{
+    left:auto!important;right:max(10px,env(safe-area-inset-right))!important;
+    top:10px!important;bottom:10px!important;
+    width:min(360px,36vw)!important;max-height:none!important;
+  }
+  .bw-editor.minimized{top:auto!important;height:58px!important;width:230px!important}
+  .bw-editor-quickbar{grid-template-columns:1fr 1fr}
+  .bw-editor-grid{grid-template-columns:1fr 1fr!important}
+}
+@media (min-width:1000px){
+  .bw-editor{width:390px!important}
+}
