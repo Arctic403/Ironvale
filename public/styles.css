@@ -1560,3 +1560,27 @@ body.bw-fullscreen-mode .bw-editor-more{display:none!important}
 @media (pointer:coarse){
   .bw-editor-panel-toggle{min-height:44px;padding:8px 13px}
 }
+
+
+/* Hybrid H1.9 — mobile authoring palette */
+.bw-editor{max-height:min(46vh,420px)!important;overflow:hidden!important}
+.bw-editor-mainrow{flex-wrap:nowrap!important}
+.bw-editor-more{overflow:auto!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.bw-editor-more[open]{max-height:min(30vh,260px)}
+.bw-editor-more-grid{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+.bw-editor-create{display:grid;gap:7px}
+.bw-editor-create>strong{font-size:12px;letter-spacing:.14em}
+.bw-editor-create-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.bw-editor-create-grid button,.bw-editor-more button,.bw-editor-more select{min-height:44px}
+@media (max-width:700px){
+  .bw-editor{left:8px!important;right:8px!important;width:auto!important;max-height:52vh!important}
+  .bw-editor-head{min-height:48px!important;padding:7px 10px!important}
+  .bw-editor-mainrow{overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .bw-editor-more[open]{max-height:30vh}
+  .bw-editor-create-grid{grid-template-columns:repeat(2,minmax(132px,1fr))}
+}
+@media (orientation:landscape) and (max-height:520px){
+  .bw-editor{max-height:58vh!important}
+  .bw-editor-more[open]{max-height:27vh}
+  .bw-editor-create-grid{grid-template-columns:repeat(5,minmax(125px,1fr));overflow-x:auto}
+}

@@ -200,3 +200,8 @@ mutation is allowed while directly manipulating a draft, but crossing into a pub
 the validated block returned by the write transaction itself instead of issuing an immediate second
 read. Future block streaming should reuse this hydrate/unhydrate boundary rather than adding parallel
 render-state stores.
+
+
+## H1.9 mobile authoring palette
+
+The editor now exposes creation as well as manipulation. The open inspector may use more screen space because SHOW/HIDE PANEL is independent from Edit/Play. Creation remains a semantic UI action in React while the plain-JavaScript runtime owns the resulting world geometry, selection, dragging, snapping, autosave and publishing.

@@ -780,6 +780,33 @@ export async function renderBlockWorld(root){
   revertDraftButton?.addEventListener('click',revertServerDraft);
   resetButton.addEventListener('click',()=>{const before=snapshot();working=JSON.parse(JSON.stringify(BLOCK1));commit(before);select('');renderEditorObjects();});
   addPropButton.addEventListener('click',()=>{const before=snapshot();working.props.push({kind:propKind.value,x:snap(state.x+70),y:snap(state.y)});commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);});
+  root.querySelectorAll('[data-bw-add-object]').forEach(button=>button.addEventListener('click',()=>{
+    const kind=button.dataset.bwAddObject;
+    const before=snapshot();
+    if(kind==='alley'){
+      if(!working.alley) working.alley={x:snap(state.x),y:snap(state.y),width:180,height:260};
+      else { working.alley.x=snap(state.x); working.alley.y=snap(state.y); }
+      commit(before);renderEditorObjects();select('alley:0');return;
+    }
+    if(kind==='exit'){
+      working.exits=working.exits||[];
+      const id=`exit-${Date.now().toString(36)}`;
+      working.exits.push({id,x:snap(state.x),y:snap(state.y),width:120,height:220,targetBlock:''});
+      commit(before);renderEditorObjects();select(`exit:${working.exits.length-1}`);return;
+    }
+    if(kind==='spawn'){
+      working.spawn={...(working.spawn||{}),x:snap(state.x),y:snap(state.y)};
+      commit(before);renderEditorObjects();select('spawn:0');return;
+    }
+    if(kind==='walkable'){
+      working.walkable={x:snap(Math.max(0,state.x-500)),y:snap(Math.max(0,state.y-180)),width:1000,height:360};
+      commit(before);renderEditorObjects();select('walkable:0');return;
+    }
+    if(kind==='door'){
+      const nearest=(working.buildings||[]).map((b,i)=>({b,i,d:Math.hypot((b.doorX??b.x)-state.x,(b.doorY??b.y)-state.y)})).sort((a,b)=>a.d-b.d)[0];
+      if(nearest){nearest.b.doorX=snap(state.x);nearest.b.doorY=snap(state.y);commit(before);renderEditorObjects();select(`building:${nearest.i}`);}
+    }
+  }));
   duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item)return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}});
   deleteButton.addEventListener('click',()=>{const item=currentEditable();if(!item||item.type==='alley')return;const before=snapshot();if(item.type==='building')working.buildings.splice(item.i,1);else working.props.splice(item.i,1);commit(before);select('');renderEditorObjects();});
   scene.addEventListener('pointerdown',onEditorPointerDown,true);

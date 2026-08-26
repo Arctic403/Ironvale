@@ -579,3 +579,12 @@ Research-driven state cleanup:
 - Play Mode always hydrates from `publishedWorking`; Edit Mode may continue using the server draft.
 - Publishing does not teleport the player to spawn; the current position is preserved and clamped to the newly published walkable region.
 - Autosave remains draft-only. Publish remains the only operation that changes the server-wide live block.
+
+
+## Hybrid H1.9 — mobile authoring palette
+
+- The Block Editor can now expand into a larger, scrollable authoring palette because the panel can be hidden independently from Edit Mode.
+- Added direct creation controls for alley placement, entrances, block exits, player spawn, walkable zones and props.
+- New objects are created at/around the player's current world position so mobile authoring does not require typing coordinates first.
+- The compact transform row remains horizontally scrollable in portrait and landscape/fullscreen.
+- Existing direct manipulation, large touch resize gizmos, draft autosave and authoritative Publish behavior are preserved.

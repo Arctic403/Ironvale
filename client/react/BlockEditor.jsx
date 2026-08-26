@@ -44,9 +44,20 @@ export function BlockEditor() {
         </div>
       </div>
 
-      <details className="bw-editor-more">
-        <summary>MORE TOOLS</summary>
+      <details className="bw-editor-more" open>
+        <summary>OBJECTS + TOOLS</summary>
         <div className="bw-editor-more-grid">
+          <section className="bw-editor-create">
+            <strong>ADD OBJECT</strong>
+            <div className="bw-editor-create-grid">
+              <button type="button" data-bw-add-object="alley">ALLEY ENTRANCE</button>
+              <button type="button" data-bw-add-object="door">DOOR / ENTRANCE</button>
+              <button type="button" data-bw-add-object="exit">BLOCK EXIT</button>
+              <button type="button" data-bw-add-object="spawn">SPAWN POINT</button>
+              <button type="button" data-bw-add-object="walkable">WALKABLE ZONE</button>
+            </div>
+          </section>
+
           <div className="bw-editor-actions">
             <button type="button" id="bw-editor-duplicate">DUPLICATE</button>
             <button type="button" id="bw-editor-delete">DELETE</button>
@@ -58,6 +69,7 @@ export function BlockEditor() {
             <select id="bw-editor-prop-kind" defaultValue="tree" aria-label="Prop type">
               <option>tree</option><option>lamp</option><option>bench</option><option>hydrant</option>
               <option>box</option><option>news</option><option>car</option><option>van</option>
+              <option>dumpster</option><option>bin</option><option>crate</option><option>barrier</option>
             </select>
             <button type="button" id="bw-editor-add-prop">ADD PROP</button>
           </div>
