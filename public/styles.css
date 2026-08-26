@@ -1976,3 +1976,64 @@ body.dev-block-editor-page{
   .bw-studio-viewport-tools{right:calc(max(8px,env(safe-area-inset-right)) + var(--be-right) + 9px)}
   .bw-studio-viewport-tools button{width:33px;height:33px;min-height:33px}
 }
+
+
+/* Hybrid H1.12 — developer drawer + editor quality-of-life tools */
+.drawer-group-dev{
+  margin-top:8px;
+  padding-top:9px;
+  border-top:1px solid rgba(91,226,169,.22);
+}
+.drawer-group-dev .drawer-group-label{color:#66e7a5}
+.drawer-group-dev .drawer-dev-link{
+  display:grid!important;
+  grid-template-columns:28px minmax(0,1fr);
+  grid-template-areas:"icon title" "icon meta";
+  gap:1px 8px;
+  align-items:center;
+  border:1px solid rgba(82,222,165,.34)!important;
+  background:linear-gradient(180deg,rgba(8,38,28,.82),rgba(7,25,21,.82))!important;
+}
+.drawer-group-dev .drawer-dev-link>span{grid-area:icon;font-size:18px;color:#64e9a7}
+.drawer-group-dev .drawer-dev-link>strong{grid-area:title;font-size:11px}
+.drawer-group-dev .drawer-dev-link>small{grid-area:meta;font-size:8px;color:#8fa8a2;font-weight:700}
+
+.bw-studio-history{
+  display:grid;
+  gap:6px;
+  margin-top:9px;
+  padding-top:8px;
+  border-top:1px solid rgba(73,124,137,.34);
+}
+.bw-studio-history>strong{font-size:8px;letter-spacing:.1em;color:#67eaa6}
+.bw-studio-history select,
+.bw-studio-history button{width:100%;min-height:38px}
+.bw-studio-history small{font-size:7px;line-height:1.35;color:#8fa4aa}
+
+.bw-studio-nudge{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(34px,1fr));
+  gap:4px;
+  width:min(190px,100%);
+}
+.bw-studio-nudge button{
+  min-height:34px!important;
+  padding:4px!important;
+  border:1px solid rgba(77,130,143,.58);
+  background:#0c1d23;
+  color:#eef7f7;
+  border-radius:7px;
+  font:900 12px/1 system-ui,sans-serif;
+}
+.bw-studio-nudge #bw-editor-focus{
+  font-size:7px;
+  color:#6cebaa;
+  border-color:rgba(88,228,169,.48);
+}
+.bw-studio-settings-actions{margin-top:5px!important}
+.bw-studio-settings-actions button{white-space:nowrap}
+
+@media (pointer:coarse){
+  .bw-studio-nudge button{min-height:42px!important;font-size:15px}
+  .bw-studio-nudge #bw-editor-focus{font-size:8px}
+}

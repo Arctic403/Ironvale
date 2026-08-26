@@ -86,6 +86,12 @@ export function BlockEditor() {
                 <select id="bw-editor-asset" defaultValue=""><option value="">No asset</option></select>
                 <div className="bw-editor-actions"><button type="button" id="bw-asset-apply">ASSIGN</button><button type="button" id="bw-asset-clear">CLEAR</button></div>
               </div>
+              <div className="bw-studio-history">
+                <strong>VERSION HISTORY</strong>
+                <select id="bw-editor-history" defaultValue=""><option value="">Published revisions…</option></select>
+                <button type="button" id="bw-editor-load-history">LOAD REVISION AS DRAFT</button>
+                <small>Restore only changes the draft. Publish is still required to make it live.</small>
+              </div>
             </details>
           </div>
           <div className="bw-panel-resizer bw-panel-resizer-x" data-panel-resizer="palette" />
@@ -133,9 +139,18 @@ export function BlockEditor() {
               </div>
             </div>
             <div className="bw-studio-toolgroup">
-              <small>SNAP & SETTINGS</small>
-              <div className="bw-studio-help">Drag panel dividers to resize. Layout is saved on this device.</div>
-              <div className="bw-editor-actions"><button type="button" id="bw-editor-revert-draft">REVERT DRAFT</button></div>
+              <small>PRECISION & SETTINGS</small>
+              <div className="bw-studio-nudge" aria-label="Nudge selected object">
+                <span></span><button type="button" data-bw-nudge="up" aria-label="Nudge up">↑</button><span></span>
+                <button type="button" data-bw-nudge="left" aria-label="Nudge left">←</button>
+                <button type="button" id="bw-editor-focus">FOCUS</button>
+                <button type="button" data-bw-nudge="right" aria-label="Nudge right">→</button>
+                <span></span><button type="button" data-bw-nudge="down" aria-label="Nudge down">↓</button><span></span>
+              </div>
+              <div className="bw-editor-actions bw-studio-settings-actions">
+                <button type="button" id="bw-editor-revert-draft">REVERT DRAFT</button>
+                <button type="button" id="bw-editor-reset-layout">RESET UI</button>
+              </div>
             </div>
             <div className="bw-studio-toolgroup bw-studio-status-summary">
               <small>STATUS</small>

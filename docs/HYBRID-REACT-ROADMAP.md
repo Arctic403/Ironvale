@@ -224,3 +224,11 @@ authoring surface, and its React UI is dynamically imported only there. Player k
 for interaction. The remaining imperative editor functions still share the Block World module for this
 phase, but they are detached from the player DOM; a later cleanup may split them physically without
 changing this user-facing boundary.
+
+
+## H1.12 editor quality-of-life rule
+
+Developer discoverability now belongs in the normal drawer, but only as a role-aware link to the private
+server-gated authoring page. Recovery and precision tooling stays inside the private editor: nudge controls,
+focus selection, resettable local panel layout and D1-backed published revision history. Loading an old
+revision restores only the draft so it can be inspected before an explicit Publish.

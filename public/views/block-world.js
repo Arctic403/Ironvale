@@ -142,6 +142,8 @@ export async function renderBlockWorld(root, options={}){
   const viewZonesButton=editorQuery('#bw-view-zones'),viewLabelsButton=editorQuery('#bw-view-labels');
   const statusObjects=editorQuery('#bw-status-objects'),statusEntrances=editorQuery('#bw-status-entrances');
   const statusExits=editorQuery('#bw-status-exits'),statusProps=editorQuery('#bw-status-props');
+  const historySelect=editorQuery('#bw-editor-history'),historyLoadButton=editorQuery('#bw-editor-load-history');
+  const focusButton=editorQuery('#bw-editor-focus'),resetLayoutButton=editorQuery('#bw-editor-reset-layout');
 
   const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v1';
   function setupStudioPanels(){
@@ -221,8 +223,16 @@ export async function renderBlockWorld(root, options={}){
     editor.addEventListener('pointerup',up,true);
     editor.addEventListener('pointercancel',up,true);
 
+    const resetLayout=()=>{
+      try{localStorage.removeItem(STUDIO_LAYOUT_KEY);}catch(_){}
+      ['--be-left','--be-right','--be-bottom','--be-transform'].forEach(name=>editor.style.removeProperty(name));
+      panels.forEach(panel=>panel.dataset.collapsed='false');
+    };
+    resetLayoutButton?.addEventListener('click',resetLayout);
+
     return ()=>{
       collapseHandlers.forEach(fn=>fn());
+      resetLayoutButton?.removeEventListener('click',resetLayout);
       editor.removeEventListener('pointerdown',down,true);
       editor.removeEventListener('pointermove',move,true);
       editor.removeEventListener('pointerup',up,true);
@@ -408,6 +418,7 @@ export async function renderBlockWorld(root, options={}){
     draftDirty=false;
     hydrateBlock(publishedWorking,{preservePlayer:true});
     syncInspector();
+    await loadVersionHistory();
     setServerStatus(`LIVE · r${publishedRevision}`,'published');
   }
 
@@ -422,6 +433,40 @@ export async function renderBlockWorld(root, options={}){
     draftDirty=false;undoStack=[];redoStack=[];
     renderEditorObjects();syncInspector();
     setServerStatus(`DRAFT · reverted to ${result.revertedTo}`,'saved');
+  }
+
+  async function loadVersionHistory(){
+    if(!historySelect)return;
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/history`);
+    if(!result.ok){
+      historySelect.innerHTML='<option value="">History unavailable</option>';
+      return;
+    }
+    const history=result.history||[];
+    historySelect.innerHTML='<option value="">Published revisions…</option>'+history.map(item=>{
+      const stamp=item.published_at?new Date(Number(item.published_at)).toLocaleString():'unknown time';
+      return `<option value="${Number(item.revision)||0}">r${Number(item.revision)||0} · ${escapeText(stamp)}</option>`;
+    }).join('');
+  }
+
+  async function restoreHistoryToDraft(){
+    const revision=Number(historySelect?.value||0);
+    if(!revision)return;
+    setServerStatus(`RESTORE · r${revision}…`,'saving');
+    const result=await api(`/api/admin/blocks/${encodeURIComponent(BLOCK1.id)}/restore-revision`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({revision})
+    });
+    if(!result.ok||!result.block){
+      setServerStatus(`RESTORE · ${result.error||'failed'}`,'error');
+      return;
+    }
+    working=cloneBlock(result.block);
+    draftRevision=Number(result.draftRevision||draftRevision);
+    draftDirty=false;undoStack=[];redoStack=[];selectedKey='';
+    renderEditorObjects();populateObjectSelect();syncInspector();
+    setServerStatus(`DRAFT · restored from live r${revision}`,'saved');
   }
 
   // Drag-end/change schedules a fast save; this interval is a second safety net.
@@ -450,6 +495,22 @@ export async function renderBlockWorld(root, options={}){
     }
   }
   function snap(v){const n=Number(snapSelect.value)||1;return Math.round(v/n)*n;}
+  function nudgeSelected(dx,dy){
+    const item=currentEditable();if(!item)return;
+    const before=snapshot(),step=Number(snapSelect.value)||1;
+    item.o.x=(Number(item.o.x)||0)+dx*step;
+    item.o.y=(Number(item.o.y)||0)+dy*step;
+    if(item.type==='building'){
+      item.o.doorX=(Number(item.o.doorX)||0)+dx*step;
+      item.o.doorY=item.o.y+item.o.h;
+    }
+    commit(before);renderEditorObjects();syncInspector();
+  }
+  function focusSelected(){
+    const item=currentEditable();if(!item)return;
+    const o=item.o||{},width=Number(o.w??o.width??0);
+    state.x=Math.max(0,Math.min(working.width||BLOCK1.width,(Number(o.x)||0)+width/2));
+  }
   function populateObjectSelect(){
     const current=selectedKey;
     objectSelect.innerHTML='<option value="">Choose object…</option>'+allEditable().map(x=>`<option value="${x.key}">${x.type.toUpperCase()} · ${x.label}</option>`).join('');
@@ -686,6 +747,7 @@ export async function renderBlockWorld(root, options={}){
       editToggle.textContent='PLAY';
       editToggle.setAttribute('aria-label','Switch to play mode');
       await loadDraftForEditor();
+      await loadVersionHistory();
       populateObjectSelect();syncInspector();renderEditorObjects();
       syncEditorPanelUI();
     }else{
@@ -1006,6 +1068,15 @@ export async function renderBlockWorld(root, options={}){
   exportButton.addEventListener('click',publishDraft);
   localExportButton?.addEventListener('click',downloadWorld);
   revertDraftButton?.addEventListener('click',revertServerDraft);
+  historyLoadButton?.addEventListener('click',restoreHistoryToDraft);
+  focusButton?.addEventListener('click',focusSelected);
+  editorScope.querySelectorAll('[data-bw-nudge]').forEach(button=>button.addEventListener('click',()=>{
+    const dir=button.dataset.bwNudge;
+    if(dir==='up')nudgeSelected(0,-1);
+    if(dir==='down')nudgeSelected(0,1);
+    if(dir==='left')nudgeSelected(-1,0);
+    if(dir==='right')nudgeSelected(1,0);
+  }));
   resetButton.addEventListener('click',()=>{const before=snapshot();working=JSON.parse(JSON.stringify(BLOCK1));commit(before);select('');renderEditorObjects();});
   addPropButton.addEventListener('click',()=>{const before=snapshot();working.props.push({kind:propKind.value,x:snap(state.x+70),y:snap(state.y)});commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);});
   editorScope.querySelectorAll('[data-bw-add-object]').forEach(button=>button.addEventListener('click',()=>{

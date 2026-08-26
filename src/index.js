@@ -203,6 +203,7 @@ async function handleApi(request, env, url, requestId) {
     if (method === 'PUT' && url.pathname.endsWith('/draft')) return saveBlockDraft(request, env, url, requestId);
     if (method === 'POST' && url.pathname.endsWith('/publish')) return publishBlockDraft(request, env, url, requestId);
     if (method === 'POST' && url.pathname.endsWith('/revert-draft')) return revertBlockDraft(request, env, url, requestId);
+    if (method === 'POST' && url.pathname.endsWith('/restore-revision')) return restoreBlockHistoryToDraft(request, env, url, requestId);
   }
 
   if (method === 'POST' && url.pathname.startsWith('/api/admin/logs/') && url.pathname.endsWith('/resolve')) {
@@ -1314,6 +1315,69 @@ async function revertBlockDraft(request, env, url, requestId) {
     blockId,
     revertedTo: 'published',
     block: JSON.parse(row.published_json),
+    requestId
+  });
+}
+
+
+async function restoreBlockHistoryToDraft(request, env, url, requestId) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const blockId = blockIdFromPath(url.pathname, '/restore-revision');
+  if (!blockId) return json({ ok: false, error: 'Invalid block id' }, 400);
+
+  const body = await readJson(request);
+  const revision = Number(body?.revision);
+  if (!Number.isInteger(revision) || revision < 1) {
+    return json({ ok: false, error: 'A valid published revision is required' }, 400);
+  }
+
+  await ensureBlockEditorTables(env);
+  const history = await env.DB.prepare(`
+    SELECT layout_json, published_at
+    FROM block_layout_history
+    WHERE block_id = ? AND revision = ?
+    LIMIT 1
+  `).bind(blockId, revision).first();
+
+  if (!history?.layout_json) {
+    return json({ ok: false, error: 'Published revision not found' }, 404);
+  }
+
+  let block;
+  try { block = JSON.parse(history.layout_json); }
+  catch { return json({ ok: false, error: 'Stored revision JSON is corrupted' }, 500); }
+
+  const validationError = validateBlockLayout(block, blockId);
+  if (validationError) return json({ ok: false, error: validationError }, 400);
+
+  const now = Date.now();
+  await env.DB.prepare(`
+    INSERT INTO block_layouts (
+      block_id, draft_json, draft_revision, published_json, published_revision,
+      updated_by, updated_at, published_at
+    ) VALUES (?, ?, 1, NULL, 0, ?, ?, NULL)
+    ON CONFLICT(block_id) DO UPDATE SET
+      draft_json = excluded.draft_json,
+      draft_revision = block_layouts.draft_revision + 1,
+      updated_by = excluded.updated_by,
+      updated_at = excluded.updated_at
+  `).bind(blockId, history.layout_json, gate.auth.user.id, now).run();
+
+  const row = await env.DB.prepare(`
+    SELECT draft_revision FROM block_layouts WHERE block_id = ?
+  `).bind(blockId).first();
+
+  await writeAudit(env, gate.auth.user.id, 'block.history_restored', gate.auth.user.id, {
+    blockId, sourceRevision: revision, draftRevision: Number(row?.draft_revision || 0)
+  });
+
+  return json({
+    ok: true,
+    blockId,
+    restoredRevision: revision,
+    draftRevision: Number(row?.draft_revision || 0),
+    block,
     requestId
   });
 }

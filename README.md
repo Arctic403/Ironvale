@@ -613,3 +613,15 @@ Research-driven state cleanup:
 - Resizable/collapsible dock panels and locally persisted editor layout are preserved.
 - Lightweight label/target/requires/active/rotation/z-index metadata now round-trip in the draft where applicable.
 - The private iPhone fullscreen fallback now rotates the dedicated developer root itself so the editor truly fills the landscape viewport.
+
+
+## Hybrid H1.12 — developer navigation + editor recovery/precision tools
+
+- The normal left RiftCity drawer now shows **Developer → Block Editor** only when the signed-in account role is `developer` or `admin`.
+- The private `/dev/block-editor` server gate remains the security boundary; ordinary players cannot open it by typing the URL.
+- Added mobile precision nudge controls for the selected object; each tap uses the current Snap step.
+- Added **Focus** to center horizontal editor attention on the selected object without changing authored spawn data.
+- Added **Reset UI** to restore default dock sizes/collapse state if a mobile layout becomes awkward.
+- Added published **Version History** to the private editor.
+- A historical published revision can be loaded back into the current D1 draft without publishing automatically.
+- History restores are server-validated, developer/admin-gated and written to the audit trail.

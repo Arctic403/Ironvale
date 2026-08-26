@@ -45,11 +45,20 @@ export function initShell() {
 function renderDrawer() {
   const root=$('#drawer-nav');
   if (!root) return;
-  root.innerHTML=DRAWER_GROUPS.map(([label,items])=>`
+  const normal=DRAWER_GROUPS.map(([label,items])=>`
     <section class="drawer-group">
       <span class="drawer-group-label">${escapeHtml(label)}</span>
       ${items.map(([route,name])=>`<a href="#${route}" data-route="${escapeHtml(route)}">${escapeHtml(name)}</a>`).join('')}
     </section>`).join('');
+  const canDevelop=['admin','developer'].includes(state.user?.role);
+  const developer=canDevelop?`
+    <section class="drawer-group drawer-group-dev">
+      <span class="drawer-group-label">DEVELOPER</span>
+      <a href="/dev/block-editor" class="drawer-dev-link">
+        <span>▧</span><strong>Block Editor</strong><small>Private authoring workspace</small>
+      </a>
+    </section>`:'';
+  root.innerHTML=normal+developer;
 }
 
 function renderBottomNav() {
@@ -157,6 +166,7 @@ export async function refreshSession({navigate=true}={}) {
   state.user=result.user;
   state.player=result.player;
   state.location=result.location||state.location;
+  renderDrawer();
   $('#auth-grid')?.classList.add('hidden');
   $('#game-root')?.classList.remove('hidden');
   $('#hud-shell')?.classList.remove('hidden');
