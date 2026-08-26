@@ -601,3 +601,15 @@ Research-driven state cleanup:
 - Existing touch/mouse/keyboard world manipulation remains plain JavaScript; React owns the studio UI chrome.
 - Mobile editor gizmos have larger visible handles and touch targets on the private editor page.
 - Fullscreen uses the entire dynamic viewport and preserves the existing iPhone CSS-rotation fallback when Safari cannot orientation-lock.
+
+
+## Hybrid H1.11 — private reference studio + player/editor separation
+
+- The normal City / Commerce Street page no longer renders Block Editor UI or mounts the React editor.
+- The editor React bundle is dynamically imported only by the server-gated `/dev/block-editor` workspace.
+- Player-facing Commerce Street keeps gameplay controls + Fullscreen only, and keyboard `E` is restored to Enter/interact.
+- `/dev/block-editor` remains restricted to `developer` / `admin` accounts and is the only authoring surface.
+- The private UI now follows the approved reference much more closely: project/status header, Play/Hide/Publish/Fullscreen/Exit controls, Object + ID/Label + X/Y/W/H + Rotation + Z-index + Snap strip, left Add Object palette, right Properties inspector, center zoom controls and bottom Tools/View/Settings/Status tray.
+- Resizable/collapsible dock panels and locally persisted editor layout are preserved.
+- Lightweight label/target/requires/active/rotation/z-index metadata now round-trip in the draft where applicable.
+- The private iPhone fullscreen fallback now rotates the dedicated developer root itself so the editor truly fills the landscape viewport.

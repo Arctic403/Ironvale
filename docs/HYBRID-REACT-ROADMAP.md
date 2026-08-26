@@ -215,3 +215,12 @@ studio chrome; the existing Block World module continues to own scene rendering,
 conversion, fullscreen, manipulation, draft autosave and Publish. Panel layout is local UI preference,
 while block geometry remains D1 draft/published state. This separation is the intended base for future
 multi-block authoring, object property schemas and asset-browser tooling.
+
+
+## H1.11 editor isolation rule
+
+Normal gameplay must not mount editor UI. The server-gated `/dev/block-editor` workspace is the only
+authoring surface, and its React UI is dynamically imported only there. Player keyboard `E` is reserved
+for interaction. The remaining imperative editor functions still share the Block World module for this
+phase, but they are detached from the player DOM; a later cleanup may split them physically without
+changing this user-facing boundary.

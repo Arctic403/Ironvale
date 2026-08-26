@@ -2,7 +2,6 @@ import { api } from '../ui/api.js';
 import { go } from '../ui/router.js';
 import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
 import { BLOCK_ASSETS } from '../block-assets.js';
-import { mountBlockEditor } from '../react-ui.js';
 
 let cleanup=null;
 export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
@@ -56,13 +55,9 @@ export async function renderBlockWorld(root, options={}){
         </div>
       </div>
       <div class="bw-block-label"><small>DOWNTOWN / BLOCK 01</small><strong>Commerce Street</strong></div>
-      <div class="bw-dev-buttons">
-        <button class="bw-edit-toggle" id="bw-edit-toggle" type="button">${editorWorkspace?'PLAY':'EDIT'}</button>
-        <button class="bw-editor-panel-toggle" id="bw-editor-panel-toggle" type="button" hidden>HIDE PANEL</button>
-        <button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button>
-        ${editorWorkspace?'<a class="bw-editor-exit" href="/#city">EXIT</a>':''}
-      </div>
-      <div id="bw-react-editor-root" class="bw-react-editor-host"></div>
+      ${editorWorkspace
+        ? '<div id="bw-react-editor-root" class="bw-react-editor-host"></div>'
+        : '<div class="bw-dev-buttons bw-player-only-buttons"><button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button></div>'}
       <div class="bw-controls">
         <div class="bw-stick" id="bw-stick"><div class="bw-knob" id="bw-knob"></div></div>
         <button type="button" class="bw-run" id="bw-run">RUN</button>
@@ -70,7 +65,39 @@ export async function renderBlockWorld(root, options={}){
       </div>
     </section>`;
 
-  const unmountReactEditor=mountBlockEditor(root.querySelector('#bw-react-editor-root'));
+  let unmountReactEditor=()=>{};
+  let editorScope=root;
+
+  if(editorWorkspace){
+    const { mountBlockEditor }=await import('../react-ui.js');
+    unmountReactEditor=mountBlockEditor(root.querySelector('#bw-react-editor-root'));
+  }else{
+    editorScope=document.createElement('div');
+    editorScope.innerHTML=`
+      <button id="bw-edit-toggle"></button><button id="bw-editor-panel-toggle"></button>
+      <aside id="bw-editor"><button id="bw-editor-close"></button><button id="bw-editor-minimize"></button>
+        <span id="bw-editor-selection"></span><span id="bw-editor-server-status"></span>
+        <select id="bw-editor-object"></select>
+        <input id="bw-editor-x"><input id="bw-editor-y"><input id="bw-editor-w"><input id="bw-editor-h">
+        <input id="bw-editor-idlabel"><input id="bw-editor-rotation"><input id="bw-editor-zindex">
+        <select id="bw-editor-snap"><option value="10" selected>10</option></select>
+        <button id="bw-editor-duplicate"></button><button id="bw-editor-delete"></button>
+        <button id="bw-editor-undo"></button><button id="bw-editor-redo"></button>
+        <button id="bw-editor-export"></button><button id="bw-editor-reset"></button>
+        <button id="bw-editor-revert-draft"></button><button id="bw-editor-local-export"></button>
+        <button id="bw-editor-add-prop"></button><select id="bw-editor-prop-kind"><option>tree</option></select>
+        <input id="bw-asset-file" type="file"><select id="bw-editor-asset"><option value=""></option></select>
+        <span id="bw-asset-status"></span><button id="bw-asset-apply"></button><button id="bw-asset-clear"></button>
+        <input id="bw-prop-type"><input id="bw-prop-target"><input id="bw-prop-requires">
+        <input id="bw-prop-label"><input id="bw-prop-active" type="checkbox">
+        <input id="bw-prop-width"><input id="bw-prop-height"><input id="bw-prop-zindex">
+        <button id="bw-editor-zoom-in"></button><button id="bw-editor-zoom-out"></button><button id="bw-editor-fit"></button>
+        <button id="bw-view-grid"></button><button id="bw-view-colliders"></button><button id="bw-view-zones"></button><button id="bw-view-labels"></button>
+        <span id="bw-status-objects"></span><span id="bw-status-entrances"></span><span id="bw-status-exits"></span><span id="bw-status-props"></span>
+      </aside>`;
+  }
+
+  const editorQuery=selector=>editorScope.querySelector(selector);
 
   const viewport=root.querySelector('#blockworld-viewport');
   const scene=root.querySelector('#blockworld-scene');
@@ -80,29 +107,41 @@ export async function renderBlockWorld(root, options={}){
   const prompt=scene.querySelector('#bw-prompt');
   const interact=root.querySelector('#bw-interact');
   const run=root.querySelector('#bw-run');
-  const fullscreenButton=root.querySelector('#bw-fullscreen');
+  const fullscreenButton=root.querySelector('#bw-fullscreen')||editorQuery('#bw-fullscreen');
   const shell=root.querySelector('.blockworld-shell');
   const stick=root.querySelector('#bw-stick');
-  const editToggle=root.querySelector('#bw-edit-toggle');
-  const editorPanelToggle=root.querySelector('#bw-editor-panel-toggle');
-  const editor=root.querySelector('#bw-editor');
-  const editorClose=root.querySelector('#bw-editor-close');
-  const editorMinimize=root.querySelector('#bw-editor-minimize');
-  const editorSelection=root.querySelector('#bw-editor-selection');
-  const objectSelect=root.querySelector('#bw-editor-object');
-  const inputX=root.querySelector('#bw-editor-x'),inputY=root.querySelector('#bw-editor-y');
-  const inputW=root.querySelector('#bw-editor-w'),inputH=root.querySelector('#bw-editor-h');
-  const snapSelect=root.querySelector('#bw-editor-snap');
-  const duplicateButton=root.querySelector('#bw-editor-duplicate'),deleteButton=root.querySelector('#bw-editor-delete');
-  const undoButton=root.querySelector('#bw-editor-undo'),redoButton=root.querySelector('#bw-editor-redo');
-  const exportButton=root.querySelector('#bw-editor-export'),resetButton=root.querySelector('#bw-editor-reset');
-  const serverStatus=root.querySelector('#bw-editor-server-status');
-  const revertDraftButton=root.querySelector('#bw-editor-revert-draft');
-  const localExportButton=root.querySelector('#bw-editor-local-export');
-  const addPropButton=root.querySelector('#bw-editor-add-prop'),propKind=root.querySelector('#bw-editor-prop-kind');
-  const assetFile=root.querySelector('#bw-asset-file'),assetSelect=root.querySelector('#bw-editor-asset');
-  const assetStatus=root.querySelector('#bw-asset-status');
-  const assetApply=root.querySelector('#bw-asset-apply'),assetClear=root.querySelector('#bw-asset-clear');
+  const editToggle=editorQuery('#bw-edit-toggle');
+  const editorPanelToggle=editorQuery('#bw-editor-panel-toggle');
+  const editor=editorQuery('#bw-editor');
+  const editorClose=editorQuery('#bw-editor-close');
+  const editorMinimize=editorQuery('#bw-editor-minimize');
+  const editorSelection=editorQuery('#bw-editor-selection');
+  const objectSelect=editorQuery('#bw-editor-object');
+  const inputX=editorQuery('#bw-editor-x'),inputY=editorQuery('#bw-editor-y');
+  const inputW=editorQuery('#bw-editor-w'),inputH=editorQuery('#bw-editor-h');
+  const inputIdLabel=editorQuery('#bw-editor-idlabel');
+  const inputRotation=editorQuery('#bw-editor-rotation');
+  const inputZIndex=editorQuery('#bw-editor-zindex');
+  const snapSelect=editorQuery('#bw-editor-snap');
+  const duplicateButton=editorQuery('#bw-editor-duplicate'),deleteButton=editorQuery('#bw-editor-delete');
+  const undoButton=editorQuery('#bw-editor-undo'),redoButton=editorQuery('#bw-editor-redo');
+  const exportButton=editorQuery('#bw-editor-export'),resetButton=editorQuery('#bw-editor-reset');
+  const serverStatus=editorQuery('#bw-editor-server-status');
+  const revertDraftButton=editorQuery('#bw-editor-revert-draft');
+  const localExportButton=editorQuery('#bw-editor-local-export');
+  const addPropButton=editorQuery('#bw-editor-add-prop'),propKind=editorQuery('#bw-editor-prop-kind');
+  const assetFile=editorQuery('#bw-asset-file'),assetSelect=editorQuery('#bw-editor-asset');
+  const assetStatus=editorQuery('#bw-asset-status');
+  const assetApply=editorQuery('#bw-asset-apply'),assetClear=editorQuery('#bw-asset-clear');
+  const propType=editorQuery('#bw-prop-type'),propTarget=editorQuery('#bw-prop-target');
+  const propRequires=editorQuery('#bw-prop-requires'),propLabel=editorQuery('#bw-prop-label');
+  const propActive=editorQuery('#bw-prop-active'),propWidth=editorQuery('#bw-prop-width');
+  const propHeight=editorQuery('#bw-prop-height'),propZIndex=editorQuery('#bw-prop-zindex');
+  const zoomInButton=editorQuery('#bw-editor-zoom-in'),zoomOutButton=editorQuery('#bw-editor-zoom-out'),fitButton=editorQuery('#bw-editor-fit');
+  const viewGridButton=editorQuery('#bw-view-grid'),viewColliderButton=editorQuery('#bw-view-colliders');
+  const viewZonesButton=editorQuery('#bw-view-zones'),viewLabelsButton=editorQuery('#bw-view-labels');
+  const statusObjects=editorQuery('#bw-status-objects'),statusEntrances=editorQuery('#bw-status-entrances');
+  const statusExits=editorQuery('#bw-status-exits'),statusProps=editorQuery('#bw-status-props');
 
   const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v1';
   function setupStudioPanels(){
@@ -478,12 +517,65 @@ export async function renderBlockWorld(root, options={}){
     const item=currentEditable();if(item?.type!=='building')return;
     const before=snapshot();delete item.o.assetId;delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();
   }
+  function objectDisplayLabel(item){
+    if(!item)return '';
+    const o=item.o||{};
+    if(item.type==='building')return o.name||o.id||item.label||'Building';
+    if(item.type==='exit')return o.label||o.id||'Block Exit';
+    if(item.type==='prop')return o.label||o.kind||'Prop';
+    return o.label||item.label||item.type;
+  }
+  function objectTarget(item){
+    if(!item)return '';
+    const o=item.o||{};
+    if(item.type==='building')return o.locationId||'';
+    if(item.type==='exit')return o.targetBlock||'';
+    return o.target||o.targetBlock||'';
+  }
+  function syncStudioStatus(){
+    statusObjects && (statusObjects.textContent=String(allEditable().length));
+    statusEntrances && (statusEntrances.textContent=String((working.buildings||[]).length+(working.alley?1:0)));
+    statusExits && (statusExits.textContent=String((working.exits||[]).length));
+    statusProps && (statusProps.textContent=String((working.props||[]).length));
+  }
   function syncInspector(){
-    const item=currentEditable(); if(!item){inputX.value=inputY.value=inputW.value=inputH.value='';inputW.disabled=inputH.disabled=true;return;}
-    const o=item.o; inputX.value=Math.round(o.x||0);inputY.value=Math.round(o.y||0);
+    const item=currentEditable();
+    if(!item){
+      inputX.value=inputY.value=inputW.value=inputH.value='';
+      inputIdLabel && (inputIdLabel.value='');
+      inputRotation && (inputRotation.value='0');
+      inputZIndex && (inputZIndex.value='0');
+      inputW.disabled=inputH.disabled=true;
+      if(propType)propType.value='';
+      if(propTarget)propTarget.value='';
+      if(propRequires)propRequires.value='';
+      if(propLabel)propLabel.value='';
+      if(propActive)propActive.checked=false;
+      if(propWidth)propWidth.value='';
+      if(propHeight)propHeight.value='';
+      if(propZIndex)propZIndex.value='';
+      syncStudioStatus();
+      return;
+    }
+    const o=item.o||{};
+    inputX.value=Math.round(o.x||0);inputY.value=Math.round(o.y||0);
     inputW.value=Math.round(o.w??o.width??0);inputH.value=Math.round(o.h??o.height??0);
     const pointOnly=item.type==='prop'||item.type==='spawn';
-    inputW.disabled=pointOnly;inputH.disabled=pointOnly;syncAssetInspector();
+    inputW.disabled=pointOnly;inputH.disabled=pointOnly;
+    const label=objectDisplayLabel(item);
+    if(inputIdLabel)inputIdLabel.value=label;
+    if(inputRotation)inputRotation.value=String(Number(o.rotation||0));
+    if(inputZIndex)inputZIndex.value=String(Number(o.zIndex||0));
+    if(propType)propType.value=item.type.replace(/(^|[-_])(\w)/g,(_,a,b)=>`${a?' ':''}${b.toUpperCase()}`);
+    if(propTarget)propTarget.value=objectTarget(item);
+    if(propRequires)propRequires.value=String(o.requires||'');
+    if(propLabel)propLabel.value=label;
+    if(propActive)propActive.checked=o.active!==false;
+    if(propWidth){propWidth.value=inputW.value;propWidth.disabled=pointOnly;}
+    if(propHeight){propHeight.value=inputH.value;propHeight.disabled=pointOnly;}
+    if(propZIndex)propZIndex.value=String(Number(o.zIndex||0));
+    syncAssetInspector();
+    syncStudioStatus();
   }
   function select(key){
     selectedKey=key||'';populateObjectSelect();syncInspector();
@@ -538,6 +630,8 @@ export async function renderBlockWorld(root, options={}){
         const point=kind==='spawn';
         g.style.left=`${o.x||0}px`;g.style.top=`${o.y||0}px`;
         if(!point){g.style.width=`${o.w??o.width??40}px`;g.style.height=`${o.h??o.height??40}px`;}
+        g.style.zIndex=String(5000+Number(o.zIndex||0));
+        if(Number(o.rotation||0)){g.style.transform=`rotate(${Number(o.rotation)||0}deg)`;g.style.transformOrigin='50% 50%';}
         g.innerHTML=`<span>${label}</span>`;scene.appendChild(g);
       };
       addGuide('spawn:0',working.spawn,'spawn','SPAWN');
@@ -619,13 +713,33 @@ export async function renderBlockWorld(root, options={}){
     await setEditMode(!editMode);
   }
   function applyInspector(){
-    const item=currentEditable();if(!item)return;const before=snapshot(),o=item.o;
+    const item=currentEditable();if(!item)return;
+    const before=snapshot(),o=item.o;
     o.x=snap(inputX.value);o.y=snap(inputY.value);
     if(item.type!=='prop'&&item.type!=='spawn'){
       const wk='w' in o?'w':'width',hk='h' in o?'h':'height';
-      o[wk]=Math.max(20,snap(inputW.value));o[hk]=Math.max(20,snap(inputH.value));
+      const desiredW=propWidth&&!propWidth.disabled?propWidth.value:inputW.value;
+      const desiredH=propHeight&&!propHeight.disabled?propHeight.value:inputH.value;
+      o[wk]=Math.max(20,snap(desiredW));o[hk]=Math.max(20,snap(desiredH));
     }
-    if(item.type==='building'){o.doorX=Math.max(o.x,Math.min(o.x+o.w,o.doorX));o.doorY=o.y+o.h;}
+    const nextLabel=(propLabel?.value||inputIdLabel?.value||'').trim();
+    if(nextLabel){
+      if(item.type==='building')o.name=nextLabel;
+      else if(item.type==='exit')o.label=nextLabel;
+      else o.label=nextLabel;
+    }
+    const target=(propTarget?.value||'').trim();
+    if(item.type==='building')o.locationId=target;
+    else if(item.type==='exit')o.targetBlock=target;
+    else if(target)o.target=target;
+    if(propRequires)o.requires=propRequires.value.trim();
+    if(propActive)o.active=!!propActive.checked;
+    o.rotation=Number(inputRotation?.value||o.rotation||0);
+    o.zIndex=Number(propZIndex?.value||inputZIndex?.value||o.zIndex||0);
+    if(item.type==='building'){
+      o.doorX=Math.max(o.x,Math.min(o.x+o.w,o.doorX));
+      o.doorY=o.y+o.h;
+    }
     commit(before);renderEditorObjects();syncInspector();
   }
   function undo(){if(!undoStack.length)return;redoStack.push(snapshot());working=JSON.parse(undoStack.pop());renderEditorObjects();syncInspector();markDraftDirty();}
@@ -740,7 +854,8 @@ export async function renderBlockWorld(root, options={}){
     // Fit the playable 1440-unit block to the available viewport; the plate
     // may extend below it visually without changing movement/camera scale.
     const authoredHeight=working.height||BLOCK1.height;
-    const fitScale=Math.max(.20,Math.min(1,viewport.clientHeight/authoredHeight));
+    const baseFitScale=Math.max(.20,Math.min(1,viewport.clientHeight/authoredHeight));
+    const fitScale=editorWorkspace?Math.max(.20,Math.min(1.8,baseFitScale*editorZoom)):baseFitScale;
     const visibleWorldWidth=viewport.clientWidth/fitScale;
     const cameraX=Math.max(
       0,
@@ -753,11 +868,15 @@ export async function renderBlockWorld(root, options={}){
   function keydown(e){
     const k=e.key.toLowerCase();
     const typing=/input|select|textarea/i.test(e.target?.tagName||'');
-    if(!typing&&k==='e'){toggleTopEditor();e.preventDefault();return;}
+    if(!typing&&k==='e'){
+      if(editorWorkspace)toggleTopEditor();
+      else enter();
+      e.preventDefault();return;
+    }
     if(editMode){
       if((e.ctrlKey||e.metaKey)&&k==='z'){e.shiftKey?redo():undo();e.preventDefault();return;}
       if((e.ctrlKey||e.metaKey)&&k==='y'){redo();e.preventDefault();return;}
-      if(k==='escape'){if(editorCollapsed)setEditMode(false);else toggleEditorMinimized();e.preventDefault();return;}
+      if(k==='escape'){if(editorCollapsed)setEditMode(false);else toggleEditorPanel();e.preventDefault();return;}
       const item=currentEditable();
       if(item&&!typing&&['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){
         const before=snapshot(),step=(Number(snapSelect.value)||1)*(e.shiftKey?5:1);
@@ -863,14 +982,33 @@ export async function renderBlockWorld(root, options={}){
   editorClose.addEventListener('click',toggleEditorPanel);
   editorMinimize.addEventListener('click',toggleEditorPanel);
   objectSelect.addEventListener('change',()=>select(objectSelect.value));
-  [inputX,inputY,inputW,inputH].forEach(el=>el.addEventListener('change',applyInspector));
+  [inputX,inputY,inputW,inputH,inputIdLabel,inputRotation,inputZIndex].filter(Boolean).forEach(el=>el.addEventListener('change',applyInspector));
+  [propTarget,propRequires,propLabel,propZIndex].filter(Boolean).forEach(el=>el.addEventListener('change',applyInspector));
+  propActive?.addEventListener('change',applyInspector);
+  propWidth?.addEventListener('change',()=>{inputW.value=propWidth.value;applyInspector();});
+  propHeight?.addEventListener('change',()=>{inputH.value=propHeight.value;applyInspector();});
+  let editorZoom=1;
+  const setEditorZoom=value=>{editorZoom=Math.max(.55,Math.min(1.8,value));};
+  zoomInButton?.addEventListener('click',()=>setEditorZoom(editorZoom+.1));
+  zoomOutButton?.addEventListener('click',()=>setEditorZoom(editorZoom-.1));
+  fitButton?.addEventListener('click',()=>setEditorZoom(1));
+  const toggleView=(button,className)=>{
+    button?.addEventListener('click',()=>{
+      shell.classList.toggle(className);
+      button.classList.toggle('active',shell.classList.contains(className));
+    });
+  };
+  toggleView(viewGridButton,'bw-view-grid');
+  toggleView(viewColliderButton,'bw-view-colliders');
+  toggleView(viewZonesButton,'bw-view-zones');
+  toggleView(viewLabelsButton,'bw-view-labels');
   undoButton.addEventListener('click',undo);redoButton.addEventListener('click',redo);
   exportButton.addEventListener('click',publishDraft);
   localExportButton?.addEventListener('click',downloadWorld);
   revertDraftButton?.addEventListener('click',revertServerDraft);
   resetButton.addEventListener('click',()=>{const before=snapshot();working=JSON.parse(JSON.stringify(BLOCK1));commit(before);select('');renderEditorObjects();});
   addPropButton.addEventListener('click',()=>{const before=snapshot();working.props.push({kind:propKind.value,x:snap(state.x+70),y:snap(state.y)});commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);});
-  root.querySelectorAll('[data-bw-add-object]').forEach(button=>button.addEventListener('click',()=>{
+  editorScope.querySelectorAll('[data-bw-add-object]').forEach(button=>button.addEventListener('click',()=>{
     const kind=button.dataset.bwAddObject;
     const before=snapshot();
     if(kind==='alley'){
