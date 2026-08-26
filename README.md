@@ -747,3 +747,22 @@ The normal D1 schema migration also creates `approved_assets`. The Worker keeps 
 - The repo fallback now matches the authored Commerce Street D1 geometry for world size, scene plate, spawn, walkable region, road/sidewalk, all six building rectangles and door positions, the authored tree prop, alley bounds and west/east exits.
 - Preserved the repo-only Commerce Alley `target` / `label` routing metadata so the existing `alley-commerce-01` sub-area transition continues to work even though those fields were not present in the exported edit JSON.
 - This changes only the source fallback. Runtime D1 publish/hydration behavior and server-authoritative gameplay remain unchanged.
+
+
+## Hybrid H1.22 — Commerce Alley ownership rollback + guaranteed fallback scene
+
+- Fixed the failed-transition behavior that could move the player to Commerce Alley spawn coordinates and then restore Commerce Street, which appeared as a jump to the far-left side of the street.
+- Alley entry is now transactional: if scene ownership cannot be established, player coordinates and scene state are fully restored to the exact street entry position.
+- Added runtime ownership assertions requiring Commerce Street to be hidden, the alley viewport to be visible, and the player/prompt to actually belong to the alley world before the transition is committed.
+- Added a source-controlled `commerce-alley-fallback.svg`. The preferred `commerce-alley.webp` is still used when available; if that binary asset is unavailable in Local Test or a deployment, the dedicated alley fallback loads instead of showing Commerce Street.
+- Added final CSS ownership rules making Commerce Street and sub-area rendering mutually exclusive.
+
+
+## Hybrid H1.23 — bounded alley preload + fallback handoff
+
+- Fixed the Local Test hang where `LOADING ALLEY…` could remain forever if Safari never fired `load` or `error` for an `Image()` preload.
+- Scene preloading now has a hard 1.1-second bound per candidate.
+- Commerce Alley tries the preferred `commerce-alley.webp` first, then the source-controlled `commerce-alley-fallback.svg`.
+- If neither image reports completion, scene entry still resolves instead of hanging forever; the existing dedicated alley diagnostic background remains available.
+- Successful preload results record the actual loaded source for diagnostics.
+- The transition timeout is generic in `SceneManager`, so future rooms/interiors cannot deadlock the game on a missing image either.

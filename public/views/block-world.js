@@ -143,10 +143,22 @@ export async function renderBlockWorld(root, options={}){
   const stick=root.querySelector('#bw-stick');
 
   // Scene art is preloaded before the runtime swaps away from Commerce Street.
-  // If it fails, the dedicated sub-area canvas still opens with a diagnostic
-  // fallback; the old street scene is never reused as substitute artwork.
-  subareaPlate?.addEventListener('load',()=>shell.classList.remove('bw-subarea-asset-error'));
-  subareaPlate?.addEventListener('error',()=>shell.classList.add('bw-subarea-asset-error'));
+  // If the preferred binary plate is unavailable in a local/browser workspace,
+  // swap to the source-controlled SVG fallback. Commerce Street is never reused
+  // as substitute artwork.
+  subareaPlate?.addEventListener('load',()=>{
+    shell.classList.remove('bw-subarea-asset-error');
+  });
+  subareaPlate?.addEventListener('error',()=>{
+    const fallback=String(subareaPlate.dataset.fallbackSrc||'');
+    const attemptedFallback=subareaPlate.dataset.fallbackAttempted==='1';
+    if(fallback&&!attemptedFallback&&subareaPlate.src!==new URL(fallback,location.href).href){
+      subareaPlate.dataset.fallbackAttempted='1';
+      subareaPlate.src=fallback;
+      return;
+    }
+    shell.classList.add('bw-subarea-asset-error');
+  });
   const editToggle=editorQuery('#bw-edit-toggle');
   const editorPanelToggle=editorQuery('#bw-editor-panel-toggle');
   const editor=editorQuery('#bw-editor');
@@ -1312,11 +1324,14 @@ export async function renderBlockWorld(root, options={}){
       if(subareaPlate){
         const plate=activeSubarea.scenePlate||{};
         const nextSrc=plate.src||'';
+        const fallbackSrc=plate.fallbackSrc||'';
+        subareaPlate.dataset.fallbackSrc=fallbackSrc;
+        subareaPlate.dataset.fallbackAttempted='0';
         if(subareaPlate.dataset.src!==nextSrc){
           subareaPlate.dataset.src=nextSrc;
           subareaPlate.src=nextSrc;
         }
-        subareaPlate.style.display=nextSrc?'block':'none';
+        subareaPlate.style.display=nextSrc||fallbackSrc?'block':'none';
         subareaPlate.style.left=`${Number(plate.x)||0}px`;
         subareaPlate.style.top=`${Number(plate.y)||0}px`;
         subareaPlate.style.width=`${Number(plate.width)||activeSubarea.width}px`;
@@ -1358,6 +1373,20 @@ export async function renderBlockWorld(root, options={}){
     if(areaKicker)areaKicker.textContent='DOWNTOWN / BLOCK 01';
     if(areaName)areaName.textContent='Commerce Street';
     renderSubareaDebug();
+  }
+
+  function assertSceneOwnership(){
+    if(!activeSubarea)return true;
+    const streetHidden=scene.style.display==='none'
+      && getComputedStyle(scene).display==='none';
+    const alleyVisible=getComputedStyle(subareaScene).display!=='none'
+      && getComputedStyle(subareaScene).visibility!=='hidden';
+    const playerOwned=player.parentElement===subareaWorld;
+    const promptOwned=prompt.parentElement===subareaWorld;
+    if(streetHidden&&alleyVisible&&playerOwned&&promptOwned)return true;
+    throw new Error(
+      `Sub-area ownership failed: streetHidden=${streetHidden}, alleyVisible=${alleyVisible}, playerOwned=${playerOwned}, promptOwned=${promptOwned}`
+    );
   }
 
   function updatePlayer(){
@@ -1453,18 +1482,63 @@ export async function renderBlockWorld(root, options={}){
     const next=getSubarea(targetId);
     if(!next)return false;
 
+    const streetReturn={x:state.x,y:state.y};
     setSceneTransition(true,'LOADING ALLEY…');
     state.near=null;
     prompt.classList.remove('show');
     interact.disabled=true;
+
     try{
-      // Preload before changing scene ownership. This avoids Safari briefly
-      // presenting the previous decoded Commerce Street image as alley art.
-      const result=await sceneManager.enter(targetId,{x:state.x,y:state.y});
+      const result=await sceneManager.enter(targetId,streetReturn);
       if(!result||result.cancelled)return false;
+
       activeSubarea=result.scene;
       state.x=Number(activeSubarea.spawn?.x)||220;
       state.y=Number(activeSubarea.spawn?.y)||800;
+      state.running=false;
+      joyX=joyY=0;
+      keys.clear();
+      knob.style.transform='translate(0,0)';
+
+      // Ownership changes before camera/player updates. If the DOM cannot be
+      // switched cleanly, fail the whole transaction instead of keeping alley
+      // coordinates inside Commerce Street.
+      applyAreaVisuals();
+      assertSceneOwnership();
+      updatePlayer();
+      applyCamera();
+      updatePrompt();
+
+      requestAnimationFrame(()=>{
+        try{
+          assertSceneOwnership();
+          applyCamera();
+          requestAnimationFrame(()=>setSceneTransition(false));
+        }catch(error){
+          console.error('Sub-area ownership failed after frame commit',error);
+          sceneManager.reset();
+          activeSubarea=null;
+          state.x=streetReturn.x;
+          state.y=streetReturn.y;
+          applyAreaVisuals();
+          updatePlayer();
+          applyCamera();
+          updatePrompt();
+          setSceneTransition(false);
+        }
+      });
+      return true;
+    }catch(error){
+      console.error('Could not enter sub-area',error);
+
+      // Roll back ALL transition state. H1.20 used to clear activeSubarea but
+      // leave the alley spawn coordinates behind, which is what made the player
+      // appear at the far-left edge of Commerce Street when a scene swap failed.
+      sceneManager.reset();
+      activeSubarea=null;
+      state.x=streetReturn.x;
+      state.y=streetReturn.y;
+      state.near=null;
       state.running=false;
       joyX=joyY=0;
       keys.clear();
@@ -1473,18 +1547,6 @@ export async function renderBlockWorld(root, options={}){
       updatePlayer();
       applyCamera();
       updatePrompt();
-      requestAnimationFrame(()=>{
-        applyCamera();
-        requestAnimationFrame(()=>setSceneTransition(false));
-      });
-      return true;
-    }catch(error){
-      console.error('Could not enter sub-area',error);
-      sceneManager.cancel();
-      activeSubarea=null;
-      applyAreaVisuals();
-      updatePlayer();
-      applyCamera();
       setSceneTransition(false);
       return false;
     }

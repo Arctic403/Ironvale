@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1672" height="941" viewBox="0 0 1672 941">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#081018"/><stop offset="1" stop-color="#1a2630"/></linearGradient>
+  <linearGradient id="brick" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#352d29"/><stop offset="1" stop-color="#17191a"/></linearGradient>
+  <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#272b2c"/><stop offset="1" stop-color="#0b0f11"/></linearGradient>
+  <pattern id="bricks" width="84" height="38" patternUnits="userSpaceOnUse">
+    <rect width="84" height="38" fill="none"/>
+    <path d="M0 0H84M0 38H84M0 19H84M42 0V19M21 19V38M63 19V38" stroke="#ffffff" stroke-opacity=".045" stroke-width="2"/>
+  </pattern>
+  <filter id="glow"><feGaussianBlur stdDeviation="10"/></filter>
+</defs>
+<rect width="1672" height="941" fill="url(#sky)"/>
+<rect x="0" y="125" width="1672" height="600" fill="url(#brick)"/>
+<rect x="0" y="125" width="1672" height="600" fill="url(#bricks)"/>
+<rect x="0" y="710" width="1672" height="231" fill="url(#ground)"/>
+<polygon points="0,710 1672,710 1500,941 115,941" fill="#151a1c"/>
+<rect x="0" y="215" width="285" height="510" fill="#111719"/>
+<rect x="1380" y="205" width="292" height="520" fill="#111719"/>
+<rect x="48" y="263" width="155" height="275" fill="#0a0d0f" stroke="#465058" stroke-width="8"/>
+<rect x="1460" y="245" width="138" height="310" fill="#0a0d0f" stroke="#465058" stroke-width="8"/>
+<g stroke="#596168" stroke-width="12" fill="none" opacity=".75">
+ <path d="M255 155V596H485V155"/>
+ <path d="M1185 150V560H1410V150"/>
+ <path d="M275 260H465M275 370H465M1205 255H1390M1205 365H1390"/>
+</g>
+<g fill="#22292c" stroke="#050708" stroke-width="8">
+ <rect x="690" y="570" width="365" height="175" rx="12"/>
+ <rect x="735" y="535" width="275" height="55" rx="10"/>
+</g>
+<g fill="#242b2e" stroke="#07090a" stroke-width="7">
+ <rect x="410" y="635" width="145" height="92"/>
+ <rect x="1125" y="635" width="135" height="92"/>
+ <rect x="1290" y="650" width="105" height="77"/>
+</g>
+<g fill="#775634" stroke="#251b11" stroke-width="6">
+ <rect x="575" y="666" width="88" height="65"/>
+ <rect x="1085" y="674" width="86" height="58"/>
+</g>
+<g stroke="#5a6468" stroke-width="13" fill="none">
+ <path d="M92 150V390H165"/>
+ <path d="M1540 148V410H1608"/>
+</g>
+<circle cx="835" cy="510" r="32" fill="#d9a355" opacity=".28" filter="url(#glow)"/>
+<circle cx="835" cy="510" r="10" fill="#ffd28d"/>
+<path d="M110 860C420 780 615 885 835 820S1270 790 1550 850" fill="none" stroke="#52616a" stroke-opacity=".28" stroke-width="22"/>
+<g opacity=".25" fill="#7ab3c4">
+ <ellipse cx="560" cy="842" rx="120" ry="18"/>
+ <ellipse cx="1020" cy="830" rx="170" ry="20"/>
+</g>
+<text x="836" y="92" text-anchor="middle" fill="#dce4e7" fill-opacity=".52" font-family="system-ui,sans-serif" font-size="28" font-weight="800" letter-spacing="8">COMMERCE ALLEY</text>
+</svg>

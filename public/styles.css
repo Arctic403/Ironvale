@@ -3227,3 +3227,29 @@ body.dev-block-editor-page{
   transition:opacity .12s ease;
   pointer-events:auto;
 }
+
+
+/* =====================================================================
+   Hybrid H1.22 — hard scene ownership lock
+   The street and room are mutually exclusive render surfaces.
+   ===================================================================== */
+.blockworld-shell.bw-subarea-active > .blockworld-viewport > .blockworld-scene{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+.blockworld-shell.bw-subarea-active > .blockworld-viewport > .blockworld-subarea-scene{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  overflow:hidden!important;
+}
+.blockworld-shell:not(.bw-subarea-active) > .blockworld-viewport > .blockworld-subarea-scene{
+  display:none!important;
+  visibility:hidden!important;
+}

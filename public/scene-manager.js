@@ -19,21 +19,28 @@ export class SceneManager {
   preload(id){
     const scene=this.resolve(id);
     if(!scene) return Promise.reject(new Error(`Unknown scene: ${id}`));
-    const src=String(scene.scenePlate?.src||'');
-    if(!src) return Promise.resolve({scene,assetError:false});
-    if(this.preloads.has(src)) return this.preloads.get(src);
 
-    const pending=new Promise((resolve)=>{
-      const image=new Image();
-      image.decoding='async';
-      image.onload=()=>resolve({scene,assetError:false});
-      image.onerror=()=>resolve({scene,assetError:true});
-      image.src=src;
-      if(image.complete){
-        queueMicrotask(()=>resolve({scene,assetError:!image.naturalWidth}));
+    const primary=String(scene.scenePlate?.src||'');
+    const fallback=String(scene.scenePlate?.fallbackSrc||'');
+    const candidates=[...new Set([primary,fallback].filter(Boolean))];
+    if(!candidates.length) return Promise.resolve({scene,assetError:false,loadedSrc:''});
+
+    const cacheKey=candidates.join('|');
+    if(this.preloads.has(cacheKey)) return this.preloads.get(cacheKey);
+
+    // Safari can occasionally leave Image() in limbo when a preview/service-worker
+    // asset is missing. Never allow scene entry to wait forever on an image event.
+    // Try the preferred plate first, then the source-controlled fallback, and finally
+    // resolve anyway so the room can open with its diagnostic background.
+    const pending=(async()=>{
+      for(const src of candidates){
+        const loaded=await preloadImageWithTimeout(src,1100);
+        if(loaded) return {scene,assetError:false,loadedSrc:src};
       }
-    });
-    this.preloads.set(src,pending);
+      return {scene,assetError:true,loadedSrc:''};
+    })();
+
+    this.preloads.set(cacheKey,pending);
     return pending;
   }
 
@@ -47,6 +54,7 @@ export class SceneManager {
     this.active={
       scene:loaded.scene,
       assetError:!!loaded.assetError,
+      loadedSrc:String(loaded.loadedSrc||''),
       returnState:returnState?structuredCloneSafe(returnState):null
     };
     return {cancelled:false,...this.active};
@@ -76,6 +84,38 @@ export class SceneManager {
     this.active=null;
     this.stack.length=0;
   }
+}
+
+
+function preloadImageWithTimeout(src,timeoutMs=1100){
+  return new Promise((resolve)=>{
+    const image=new Image();
+    let settled=false;
+    let timer=0;
+
+    const finish=(ok)=>{
+      if(settled)return;
+      settled=true;
+      if(timer)clearTimeout(timer);
+      image.onload=null;
+      image.onerror=null;
+      resolve(!!ok);
+    };
+
+    image.decoding='async';
+    image.onload=()=>finish(image.naturalWidth>0);
+    image.onerror=()=>finish(false);
+    timer=setTimeout(()=>finish(false),Math.max(250,Number(timeoutMs)||1100));
+
+    try{
+      image.src=src;
+      if(image.complete){
+        queueMicrotask(()=>finish(image.naturalWidth>0));
+      }
+    }catch(_){
+      finish(false);
+    }
+  });
 }
 
 function structuredCloneSafe(value){

@@ -12,7 +12,11 @@ export const SUBAREAS = Object.freeze({
     // sub-area camera never inherits Commerce Street's much wider world size.
     width:1672,
     height:941,
-    scenePlate:{src:'/assets/blocks/commerce-alley.webp',x:0,y:0,width:1672,height:941,scale:1},
+    scenePlate:{
+      src:'/assets/blocks/commerce-alley.webp',
+      fallbackSrc:'/assets/blocks/commerce-alley-fallback.svg',
+      x:0,y:0,width:1672,height:941,scale:1
+    },
 
     // Spawn is intentionally clear of the left-side mobile joystick. The exit
     // still occupies the visible street opening, but the player starts just
