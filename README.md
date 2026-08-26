@@ -505,3 +505,14 @@ while real-time city/gameplay code stays direct JavaScript.
 - Gizmos share one pointer path across iPhone touch, Apple mouse/trackpad and desktop pointers.
 - Building interaction doors remain aligned while building geometry is moved or resized.
 - Plain JavaScript continues to own world-space manipulation; React continues to own the inspector UI.
+
+
+## Hybrid H1.3 — compact iPhone editor toolbar
+
+- The Block Editor is now a shallow top toolbar instead of a large mobile form.
+- Object selection and X/Y/W/H precision controls are kept immediately accessible.
+- Undo, redo, snap and save are compressed into one small quick bar.
+- Secondary object/prop/legacy controls remain collapsed and scroll only when explicitly opened.
+- Landscape/fullscreen uses an extra-short toolbar so the playable scene stays visible.
+- Resize gizmos and direct dragging remain the primary touch/mouse editing workflow.
+- Existing editor DOM IDs and the plain-JavaScript world manipulation runtime are preserved.

@@ -1200,3 +1200,94 @@ body.bw-fullscreen-mode .bw-editor{
   .bw-editor-body{max-height:170px!important}
   .bw-editor-compactbar{padding-top:5px!important;padding-bottom:5px!important}
 }
+
+
+/* Hybrid H1.3 — genuinely compact mobile Block Editor.
+   Direct scene manipulation/gizmos are primary; inspector is a shallow precision toolbar. */
+.bw-editor{
+  border-radius:12px!important;
+  max-height:min(34vh,260px)!important;
+}
+.bw-editor-head{
+  min-height:38px!important;
+  padding:4px 7px!important;
+}
+.bw-editor-head strong{font-size:12px!important;line-height:1!important}
+.bw-editor-head small{font-size:8px!important;line-height:1.1!important}
+.bw-editor-head-actions{gap:4px!important}
+.bw-editor-head-actions button{
+  width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;
+  padding:0!important;font-size:17px!important;border-radius:7px!important;
+}
+.bw-editor-compactbar{
+  grid-template-columns:36px 36px minmax(82px,112px) 58px!important;
+  justify-content:start!important;gap:4px!important;padding:4px 7px!important;
+}
+.bw-editor-compactbar>button{
+  min-height:32px!important;height:32px!important;padding:2px!important;font-size:16px!important;
+}
+.bw-editor-compactbar #bw-editor-export{font-size:9px!important}
+.bw-editor-snap-compact{
+  min-height:32px!important;height:32px!important;padding:2px 5px!important;gap:3px!important;
+}
+.bw-editor-snap-compact span{font-size:7px!important}
+.bw-editor-snap-compact select{
+  min-height:27px!important;height:27px!important;font-size:12px!important;padding:1px 18px 1px 4px!important;
+}
+.bw-editor-body{padding:5px 7px 7px!important;gap:5px!important}
+.bw-editor-primary-row{
+  display:grid!important;grid-template-columns:minmax(130px,1.5fr) minmax(190px,2fr)!important;
+  gap:6px!important;align-items:end!important;
+}
+.bw-editor-object-row{
+  position:static!important;padding:0!important;display:grid!important;grid-template-columns:auto 1fr!important;
+  gap:5px!important;align-items:center!important;background:transparent!important;font-size:8px!important;
+}
+.bw-editor-object-row select{
+  min-height:32px!important;height:32px!important;font-size:12px!important;padding:2px 24px 2px 6px!important;
+}
+.bw-editor-transform-grid{
+  display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:4px!important;padding:0!important;
+}
+.bw-editor-transform-grid label{font-size:7px!important;gap:1px!important}
+.bw-editor-transform-grid input{
+  min-height:32px!important;height:32px!important;font-size:12px!important;padding:2px 4px!important;
+}
+.bw-editor-section summary{
+  min-height:30px!important;padding:5px 7px!important;font-size:9px!important;
+}
+.bw-editor-section>div,.bw-editor-section>label,.bw-editor-section>button{margin:5px!important}
+.bw-editor-danger{min-height:32px!important;font-size:9px!important}
+.bw-editor-help{display:none!important}
+
+@media (max-width:700px){
+  .bw-editor{
+    left:5px!important;right:5px!important;
+    top:max(50px,calc(env(safe-area-inset-top) + 44px))!important;
+    max-height:min(31vh,225px)!important;overflow:hidden!important;
+  }
+  .bw-editor-body{max-height:116px!important;overflow:auto!important}
+  .bw-editor-primary-row{grid-template-columns:1fr!important;gap:4px!important}
+  .bw-editor-object-row{grid-template-columns:34px 1fr!important}
+  .bw-editor-transform-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .bw-editor-section{margin-top:1px!important}
+  .bw-editor-section:not([open]){display:block!important}
+  .bw-resize-handle{
+    width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;
+  }
+}
+
+@media (orientation:landscape) and (max-height:600px){
+  .bw-editor{
+    left:5px!important;right:5px!important;
+    top:max(45px,calc(env(safe-area-inset-top) + 40px))!important;
+    max-height:170px!important;
+  }
+  .bw-editor-head{min-height:34px!important}
+  .bw-editor-body{max-height:70px!important;overflow:auto!important}
+  .bw-editor-primary-row{grid-template-columns:minmax(150px,1.25fr) minmax(240px,2fr)!important}
+  .bw-editor-compactbar{position:absolute!important;right:78px!important;top:3px!important;background:transparent!important;border:0!important;padding:0!important}
+  .bw-editor-head{padding-right:330px!important}
+  .bw-editor-section,.bw-editor-danger{display:none!important}
+}

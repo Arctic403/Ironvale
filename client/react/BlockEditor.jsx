@@ -30,20 +30,19 @@ export function BlockEditor() {
       </div>
 
       <div className="bw-editor-body">
-        <label className="bw-editor-object-row">
-          EDIT
-          <select id="bw-editor-object" />
-        </label>
+        <div className="bw-editor-primary-row">
+          <label className="bw-editor-object-row">
+            <span>EDIT</span>
+            <select id="bw-editor-object" />
+          </label>
 
-        <details open className="bw-editor-section bw-editor-transform-section">
-          <summary>TRANSFORM</summary>
-          <div className="bw-editor-grid bw-editor-transform-grid">
+          <div className="bw-editor-grid bw-editor-transform-grid" aria-label="Transform">
             <label>X<input id="bw-editor-x" inputMode="numeric" type="number" step="5" /></label>
             <label>Y<input id="bw-editor-y" inputMode="numeric" type="number" step="5" /></label>
             <label>W<input id="bw-editor-w" inputMode="numeric" type="number" step="5" /></label>
             <label>H<input id="bw-editor-h" inputMode="numeric" type="number" step="5" /></label>
           </div>
-        </details>
+        </div>
 
         <details className="bw-editor-section">
           <summary>OBJECT ACTIONS</summary>
