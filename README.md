@@ -391,3 +391,12 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - `building.<building-id>.*` assets auto-assign to the matching authored building on import.
 - Editor-imported assets are cached locally so a refresh no longer immediately loses them.
 - Source-integrated assets remain available after refresh and deployment without re-importing the JSON.
+
+
+## Phase 11.8 — Asset Lab-compatible runtime library
+
+- RiftCity now keeps imported `riftcity-asset-pack` entries as complete Asset Lab objects instead of stripping them down to a source URL.
+- The stable `assetId` is used by buildings, while the Asset Lab internal `id`, embedded image data, source dimensions, X/Y/scale/rotation/opacity, baseline and shadow metadata are preserved.
+- Imported packs are persisted in the browser asset library and restored on reload, matching the Asset Lab workflow.
+- Runtime building placement stays separate from the Asset Lab metadata so collision and door geometry remain untouched.
+- The previous Corner Mart-only baked source blob was removed; the same importer path now works for every storefront asset pack.

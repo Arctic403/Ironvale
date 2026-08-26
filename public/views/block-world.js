@@ -123,19 +123,66 @@ export async function renderBlockWorld(root){
   const assetX=root.querySelector('#bw-asset-x'),assetY=root.querySelector('#bw-asset-y'),assetFit=root.querySelector('#bw-asset-fit');
   const assetApply=root.querySelector('#bw-asset-apply'),assetClear=root.querySelector('#bw-asset-clear');
 
-  // Built-in source assets are permanent. Editor imports are also cached locally so
-  // they survive refreshes until they are deliberately integrated into source.
-  const ASSET_CACHE_KEY='riftcity:block-assets:v2';
-  const importedAssets=new Map(Object.entries(BLOCK_ASSETS).map(([id,a])=>[id,{...a,id}]));
+  // Asset Lab-compatible runtime library. Keep every imported asset object intact:
+  // internal id, stable assetId, embedded src, source dimensions and transform metadata.
+  // Buildings resolve by stable assetId; Asset Lab's internal id remains preserved.
+  const ASSET_CACHE_KEY='riftcity:block-assets:v3';
+  const importedAssets=new Map();
+  const sourceAssetIds=new Set();
+
+  function normalizeAsset(raw,preview={}){
+    if(!raw||typeof raw!=='object')return null;
+    const assetId=String(raw.assetId||raw.id||raw.slug||raw.name||'').trim();
+    const internalId=String(raw.id||assetId).trim();
+    let src=String(raw.src||raw.dataUrl||raw.image||raw.imageData||raw.data||'').trim();
+    const mime=String(raw.mimeType||raw.mime||'image/png').trim()||'image/png';
+    if(src&&!src.startsWith('data:image/')&&/^[A-Za-z0-9+/=\s]+$/.test(src)){
+      src=`data:${mime};base64,${src.replace(/\s+/g,'')}`;
+    }
+    if(!assetId||!src.startsWith('data:image/'))return null;
+    return {
+      ...raw,
+      id:internalId,
+      assetId,
+      name:String(raw.name||raw.label||assetId),
+      mime,
+      src,
+      sourceWidth:Number(raw.sourceWidth||raw.width||0),
+      sourceHeight:Number(raw.sourceHeight||raw.height||0),
+      x:Number(raw.x||0),
+      y:Number(raw.y||0),
+      scale:Number(raw.scale??1),
+      rotation:Number(raw.rotation||0),
+      opacity:Number(raw.opacity??1),
+      groundY:Number(raw.groundY||0),
+      shadow:raw.shadow!==false,
+      preview:{
+        width:Number(preview.width||raw.preview?.width||0),
+        height:Number(preview.height||raw.preview?.height||0),
+        background:String(preview.background||raw.preview?.background||'')
+      }
+    };
+  }
+
+  for(const [key,raw] of Object.entries(BLOCK_ASSETS)){
+    const asset=normalizeAsset({...raw,assetId:raw.assetId||key,id:raw.id||key},raw.preview||{});
+    if(asset){importedAssets.set(asset.assetId,asset);sourceAssetIds.add(asset.assetId);}
+  }
   try{
     const cached=JSON.parse(localStorage.getItem(ASSET_CACHE_KEY)||'[]');
-    for(const a of Array.isArray(cached)?cached:[])if(a?.id&&String(a.src||'').startsWith('data:image/'))importedAssets.set(a.id,a);
+    for(const raw of Array.isArray(cached)?cached:[]){
+      const asset=normalizeAsset(raw,raw.preview||{});
+      if(asset)importedAssets.set(asset.assetId,asset);
+    }
   }catch(_){}
   function persistImportedAssets(){
     try{
-      const cached=[...importedAssets.values()].filter(a=>!BLOCK_ASSETS[a.id]);
+      const cached=[...importedAssets.values()].filter(a=>!sourceAssetIds.has(a.assetId));
       localStorage.setItem(ASSET_CACHE_KEY,JSON.stringify(cached));
-    }catch(err){console.warn('RiftCity asset cache could not be saved',err);}
+    }catch(err){
+      console.warn('RiftCity asset library could not be saved',err);
+      assetStatus.textContent='Asset imported, but browser storage is full. Export/trim older assets before reloading.';
+    }
   }
 
   // Editable working copy; the imported authored block remains untouched.
@@ -163,7 +210,7 @@ export async function renderBlockWorld(root){
   }
   function populateAssetSelect(){
     const current=assetSelect.value;
-    assetSelect.innerHTML='<option value="">No asset</option>'+[...importedAssets.values()].map(a=>`<option value="${escapeAttr(a.id)}">${escapeText(a.name||a.id)}</option>`).join('');
+    assetSelect.innerHTML='<option value="">No asset</option>'+[...importedAssets.values()].map(a=>`<option value="${escapeAttr(a.assetId)}">${escapeText(a.name||a.assetId)}</option>`).join('');
     if(importedAssets.has(current))assetSelect.value=current;
   }
   function escapeText(v){return String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -171,62 +218,46 @@ export async function renderBlockWorld(root){
   function syncAssetInspector(){
     const item=currentEditable(); const b=item?.type==='building'?item.o:null;
     assetSelect.disabled=!b;assetApply.disabled=!b;assetClear.disabled=!b;
-    assetSelect.value=b?.asset?.id&&importedAssets.has(b.asset.id)?b.asset.id:'';
+    assetSelect.value=b?.asset?.assetId&&importedAssets.has(b.asset.assetId)?b.asset.assetId:(b?.asset?.id&&importedAssets.has(b.asset.id)?b.asset.id:'');
     assetScale.value=b?.asset?.scale??1;assetX.value=b?.asset?.x??0;assetY.value=b?.asset?.y??0;assetFit.value=b?.asset?.fit||'contain';
   }
   async function importAssetPack(file){
     if(!file)return;
     try{
       const payload=JSON.parse(await file.text());
-
-      // Accept RiftAssets packs, a single RiftAssets asset object, and older
-      // asset JSON shapes so the importer is forgiving on mobile.
-      const packFormats=new Set(['riftcity-asset-pack','riftcity-assets','riftcity-asset']);
-      let list=[];
-      if(Array.isArray(payload?.assets)) list=payload.assets;
-      else if(Array.isArray(payload)) list=payload;
-      else if(payload && typeof payload==='object'){
-        const looksLikeAsset=payload.src||payload.dataUrl||payload.image||payload.imageData||payload.data;
-        if(looksLikeAsset) list=[payload];
+      if(payload?.format!=='riftcity-asset-pack'||!Array.isArray(payload.assets)){
+        throw new Error(`Expected a RiftAssets riftcity-asset-pack JSON.`);
       }
-      if(payload?.format && !packFormats.has(payload.format) && !list.length){
-        throw new Error(`Unsupported asset format: ${payload.format}`);
-      }
-      if(!list.length)throw new Error('This JSON contains no importable RiftCity building assets.');
+      if(!payload.assets.length)throw new Error('This asset pack is empty.');
 
-      let added=0;
-      for(const raw of list){
-        const id=String(raw.assetId||raw.id||raw.slug||raw.name||`asset-${added+1}`).trim();
-        let src=String(raw.src||raw.dataUrl||raw.image||raw.imageData||raw.data||'').trim();
-        const mime=String(raw.mimeType||raw.mime||'image/png').trim()||'image/png';
-        if(src && !src.startsWith('data:image/') && /^[A-Za-z0-9+/=\s]+$/.test(src)){
-          src=`data:${mime};base64,${src.replace(/\s+/g,'')}`;
-        }
-        if(!id||!src.startsWith('data:image/'))continue;
-        const imported={
-          id,
-          name:raw.name||raw.label||id,
-          src,
-          sourceWidth:Number(raw.sourceWidth||raw.width||0),
-          sourceHeight:Number(raw.sourceHeight||raw.height||0)
-        };
-        importedAssets.set(id,imported);
+      const preview={
+        width:Number(payload.preview?.width||0),
+        height:Number(payload.preview?.height||0),
+        background:String(payload.preview?.background||'')
+      };
+      let added=0,matched=0;
+      for(const raw of payload.assets.slice(0,100)){
+        const imported=normalizeAsset(raw,preview);
+        if(!imported)continue;
+        importedAssets.set(imported.assetId,imported);
 
-        // Stable RiftAssets ids such as building.corner-mart.a auto-target the
-        // corresponding authored building without requiring a second manual step.
-        const hinted=String(raw.assetId||id).match(/^building\.([a-z0-9-]+)(?:\.|$)/i)?.[1];
+        // Stable Asset Lab ids such as building.corner-mart.a target the matching
+        // authored building. The full Asset Lab transform remains on the asset
+        // object; runtime placement overrides are stored separately on the building.
+        const hinted=imported.assetId.match(/^building\.([a-z0-9-]+)(?:\.|$)/i)?.[1];
         const target=working.buildings.find(b=>b.id===hinted)
-          || working.buildings.find(b=>String(b.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===hinted);
+          ||working.buildings.find(b=>String(b.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')===hinted);
         if(target){
-          target.asset={id,scale:1,x:0,y:0,fit:'contain'};
+          target.asset={assetId:imported.assetId,scale:1,x:0,y:0,fit:'contain'};
           selectedKey=`building:${working.buildings.indexOf(target)}`;
+          matched++;
         }
         added++;
       }
-      if(!added)throw new Error('No embedded image data was found. Expected src/dataUrl/image containing a data:image URL or base64 image.');
+      if(!added)throw new Error('No valid embedded image assets were found in this pack.');
       persistImportedAssets();
       populateAssetSelect();
-      assetStatus.textContent=`${added} asset${added===1?'':'s'} imported & saved · ${file.name}`;
+      assetStatus.textContent=`${added} Asset Lab asset${added===1?'':'s'} imported & saved${matched?` · ${matched} auto-matched`:''}`;
       syncAssetInspector();renderEditorObjects();syncInspector();
     }catch(err){assetStatus.textContent=`Import failed: ${err.message}`;}
     finally{assetFile.value='';}
@@ -234,7 +265,7 @@ export async function renderBlockWorld(root){
   function applyBuildingAsset(){
     const item=currentEditable();if(item?.type!=='building')return;
     const id=assetSelect.value;if(!id||!importedAssets.has(id)){assetStatus.textContent='Choose an imported asset first.';return;}
-    const before=snapshot();item.o.asset={id,scale:Math.max(.05,Number(assetScale.value)||1),x:Number(assetX.value)||0,y:Number(assetY.value)||0,fit:assetFit.value==='cover'?'cover':'contain'};commit(before);renderEditorObjects();syncAssetInspector();
+    const before=snapshot();item.o.asset={assetId:id,scale:Math.max(.05,Number(assetScale.value)||1),x:Number(assetX.value)||0,y:Number(assetY.value)||0,fit:assetFit.value==='cover'?'cover':'contain'};commit(before);renderEditorObjects();syncAssetInspector();
   }
   function clearBuildingAsset(){const item=currentEditable();if(item?.type!=='building')return;const before=snapshot();delete item.o.asset;commit(before);renderEditorObjects();syncAssetInspector();}
   function syncInspector(){
@@ -258,11 +289,17 @@ export async function renderBlockWorld(root){
       if(!marker){marker=document.createElement('span');marker.className='bw-door-marker';el.appendChild(marker);}
       marker.style.left=`${(b.doorX??b.x+b.w/2)-b.x}px`;marker.title='Interaction door';
       let art=el.querySelector('.bw-building-art');
-      const imported=b.asset?.id?importedAssets.get(b.asset.id):null;
+      const assetKey=b.asset?.assetId||b.asset?.id;
+      const imported=assetKey?importedAssets.get(assetKey):null;
       if(imported){
         if(!art){art=document.createElement('img');art.className='bw-building-art';art.draggable=false;el.prepend(art);}
         art.src=imported.src;art.alt=b.name;art.style.objectFit=b.asset.fit||'contain';
-        art.style.transform=`translate(${Number(b.asset.x)||0}px,${Number(b.asset.y)||0}px) scale(${Number(b.asset.scale)||1})`;
+        art.style.opacity=String(Math.max(0,Math.min(1,Number(imported.opacity??1))));
+        const runtimeScale=Number(b.asset.scale)||1;
+        const runtimeX=Number(b.asset.x)||0,runtimeY=Number(b.asset.y)||0;
+        art.style.transform=`translate(${runtimeX}px,${runtimeY}px) scale(${runtimeScale}) rotate(${Number(imported.rotation)||0}deg)`;
+        art.dataset.assetId=imported.assetId;
+        art.dataset.assetInternalId=imported.id;
         el.classList.add('has-building-art');
       }else{art?.remove();el.classList.remove('has-building-art');}
     });
