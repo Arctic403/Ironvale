@@ -482,3 +482,15 @@ RiftCity now uses a hybrid JavaScript/React frontend rather than planning a full
 
 This is an incremental migration: React takes over UI-heavy surfaces one feature at a time,
 while real-time city/gameplay code stays direct JavaScript.
+
+
+## Hybrid H1.1 — mobile Block Editor runtime repair
+
+- Fixed the editor state crash introduced during the H1 React island migration: the runtime now
+  explicitly initializes `editorCollapsed`.
+- Restored reliable EDIT BLOCK open/minimize/reopen/close behavior.
+- Editor guides and boundaries render immediately when edit mode starts.
+- Touch dragging is hardened for iPhone Safari with scene-level pointer capture and gesture suppression.
+- Building geometry, spawn, exits and walkable boundaries remain draggable while the inspector is hidden.
+- The fix preserves the hybrid boundary: React owns the inspector UI; plain JavaScript owns world-space
+  selection, dragging, camera, collision and fullscreen.

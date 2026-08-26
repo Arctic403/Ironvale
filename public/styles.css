@@ -1130,3 +1130,34 @@ body.bw-fullscreen-mode .bw-editor{
 
 /* Hybrid H1 — React owns the Block Editor UI shell; world/runtime stays plain JS. */
 .bw-react-editor-host{position:contents}
+
+
+/* Hybrid H1.1 — mobile Block Editor runtime repair */
+.bw-edit-mode [data-edit-key]{
+  touch-action:none!important;
+  -webkit-user-select:none!important;
+  user-select:none!important;
+}
+.bw-edit-mode .bw-building-geometry{
+  pointer-events:auto!important;
+  touch-action:none!important;
+}
+.bw-editor-guide{
+  pointer-events:auto!important;
+  touch-action:none!important;
+  min-width:18px;
+  min-height:18px;
+}
+.bw-guide-scene{
+  pointer-events:none!important;
+}
+.bw-guide-walkable,
+.bw-guide-exit,
+.bw-guide-spawn{
+  pointer-events:auto!important;
+}
+@media (pointer:coarse){
+  .bw-edit-mode .bw-building-geometry{outline-width:5px!important}
+  .bw-editor-guide{border-width:5px!important}
+  .bw-guide-spawn{width:46px!important;height:46px!important;margin:-23px!important}
+}

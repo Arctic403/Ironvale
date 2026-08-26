@@ -92,7 +92,7 @@ src/
 
 ## Migration phases
 
-### Hybrid H1 — Foundation + Block Editor (current)
+### Hybrid H1 — Foundation + Block Editor (current, H1.1 mobile runtime repair applied)
 
 - Add React + ReactDOM.
 - Add esbuild as the tiny React build step.
@@ -158,3 +158,14 @@ RiftCity already has a working JavaScript backend and an imperative real-time ci
 A full rewrite would combine unrelated risks: rendering, input, camera, routing, mobile
 fullscreen and UI migration. The hybrid boundary lets React improve the parts it is good at
 without touching the game loop that is better served by direct JavaScript.
+
+
+## H1.1 repair note
+
+The first H1 integration exposed a state-wiring regression in the existing Block World editor:
+`editorCollapsed` was referenced by the Phase 12.4 editor functions but was omitted from the runtime
+state declaration. On ES modules this throws a `ReferenceError` as soon as edit mode opens, which
+explains the stuck top button, missing guides and non-working dragging.
+
+H1.1 fixes that root cause and also hardens pointer capture for iPhone Safari. Do not migrate more
+screens to React until the H1 exit criteria pass on mobile.

@@ -156,7 +156,7 @@ export async function renderBlockWorld(root){
   }
 
   // Editable working copy; the imported authored block remains untouched.
-  let editMode=false, selectedKey='', drag=null;
+  let editMode=false, editorCollapsed=false, selectedKey='', drag=null;
   let working=JSON.parse(JSON.stringify(BLOCK1));
   let undoStack=[],redoStack=[];
 
@@ -320,7 +320,8 @@ export async function renderBlockWorld(root){
     populateObjectSelect(); if(selectedKey)select(selectedKey);
   }
   function setEditMode(on){
-    editMode=!!on;shell.classList.toggle('bw-edit-mode',editMode);
+    editMode=!!on;
+    shell.classList.toggle('bw-edit-mode',editMode);
     if(editMode){
       editorCollapsed=false;
       editor.classList.add('show');
@@ -524,22 +525,41 @@ export async function renderBlockWorld(root){
   function onEditorPointerDown(e){
     if(!editMode)return;
     const target=e.target.closest('[data-edit-key]');if(!target)return;
-    e.preventDefault();e.stopPropagation();select(target.dataset.editKey);
+    e.preventDefault();e.stopPropagation();
+    select(target.dataset.editKey);
     const item=currentEditable();if(!item)return;
-    drag={id:e.pointerId,key:selectedKey,startX:e.clientX,startY:e.clientY,ox:item.o.x,oy:item.o.y,before:snapshot()};
-    target.setPointerCapture?.(e.pointerId);
+    drag={
+      id:e.pointerId,
+      key:selectedKey,
+      startX:e.clientX,
+      startY:e.clientY,
+      ox:Number(item.o.x)||0,
+      oy:Number(item.o.y)||0,
+      doorX:item.type==='building'?(Number(item.o.doorX)||0):null,
+      before:snapshot()
+    };
+    scene.setPointerCapture?.(e.pointerId);
   }
   function onEditorPointerMove(e){
-    if(!drag||e.pointerId!==drag.id)return;const item=currentEditable();if(!item)return;
-    // scene screen scale can differ from authored world scale.
-    const scale=scene.getBoundingClientRect().width/BLOCK1.width||1;
+    if(!drag||e.pointerId!==drag.id)return;
+    e.preventDefault();e.stopPropagation();
+    const item=allEditable().find(x=>x.key===drag.key);if(!item)return;
+    const scale=scene.getBoundingClientRect().width/(working.width||BLOCK1.width)||1;
     item.o.x=snap(drag.ox+(e.clientX-drag.startX)/scale);
     item.o.y=snap(drag.oy+(e.clientY-drag.startY)/scale);
-    if(item.type==='building'){item.o.doorX+=item.o.x-Number(inputX.value||drag.ox);item.o.doorY=item.o.y+item.o.h;}
+    if(item.type==='building'){
+      item.o.doorX=(drag.doorX??item.o.doorX)+(item.o.x-drag.ox);
+      item.o.doorY=item.o.y+item.o.h;
+    }
+    selectedKey=drag.key;
     renderEditorObjects();syncInspector();
   }
   function onEditorPointerUp(e){
-    if(!drag||e.pointerId!==drag.id)return;commit(drag.before);drag=null;
+    if(!drag||e.pointerId!==drag.id)return;
+    e.preventDefault();e.stopPropagation();
+    commit(drag.before);
+    try{scene.releasePointerCapture?.(e.pointerId);}catch(_){}
+    drag=null;
   }
   assetFile.addEventListener('click',e=>{e.stopPropagation();});
   assetFile.addEventListener('change',async e=>{
