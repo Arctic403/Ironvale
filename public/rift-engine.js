@@ -29,20 +29,21 @@ uniform float uFogEnd;
 uniform float uNoise;
 uniform vec3 uCameraPosition;
 out vec4 outColor;
-float hash21(vec2 p){
-  p = fract(p * vec2(123.34,456.21));
-  p += dot(p,p+45.32);
-  return fract(p.x*p.y);
+float stableVariation(vec2 p){
+  float broad = sin(p.x * 0.29 + sin(p.y * 0.13) * 0.8);
+  float cross = cos(p.y * 0.23 - p.x * 0.09);
+  return broad * 0.62 + cross * 0.38;
 }
 void main(){
   vec3 normal = normalize(vNormal);
   float diffuse = max(dot(normal, normalize(-uLightDirection)), 0.0);
-  float noise = (hash21(vWorldPosition.xz * 3.1) - 0.5) * uNoise;
-  vec3 base = clamp(uColor + vec3(noise), 0.0, 1.0);
-  vec3 lit = base * (0.56 + diffuse * 0.58);
+  float variation = stableVariation(vWorldPosition.xz) * uNoise;
+  vec3 base = clamp(uColor * (1.0 + variation), 0.0, 1.0);
+  vec3 lit = base * (0.59 + diffuse * 0.52);
   float distanceToCamera = distance(vWorldPosition, uCameraPosition);
   float fog = smoothstep(uFogStart, uFogEnd, distanceToCamera);
-  outColor = vec4(mix(lit, uFogColor, fog), 1.0);
+  vec3 finalColor = mix(lit, uFogColor, fog);
+  outColor = vec4(finalColor, 1.0);
 }`;
 
 function compileShader(gl, type, source) {
@@ -74,7 +75,20 @@ function createProgram(gl) {
   return program;
 }
 
-function uploadGeometry(gl, source) {
+function normalizeGeometrySource(source) {
+  if (!source?.vertices || !source?.indices) throw new Error('Custom geometry requires vertices and indices.');
+  const vertices = source.vertices instanceof Float32Array ? source.vertices : new Float32Array(source.vertices);
+  let indices = source.indices;
+  if (!(indices instanceof Uint16Array) && !(indices instanceof Uint32Array)) {
+    let maxIndex = 0;
+    for (const index of indices) maxIndex = Math.max(maxIndex, Number(index) || 0);
+    indices = maxIndex > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+  }
+  return { vertices, indices };
+}
+
+function uploadGeometry(gl, rawSource) {
+  const source = normalizeGeometrySource(rawSource);
   const vao = gl.createVertexArray();
   const vertexBuffer = gl.createBuffer();
   const indexBuffer = gl.createBuffer();
@@ -88,7 +102,13 @@ function uploadGeometry(gl, source) {
   gl.enableVertexAttribArray(1);
   gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
   gl.bindVertexArray(null);
-  return { vao, vertexBuffer, indexBuffer, count: source.indices.length };
+  return {
+    vao,
+    vertexBuffer,
+    indexBuffer,
+    count: source.indices.length,
+    indexType: source.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT
+  };
 }
 
 function hexToRgb(hex) {
@@ -176,6 +196,7 @@ export class RiftEngine {
       sphere: uploadGeometry(gl, createSphereGeometry(10, 6))
     };
     this.drawables = [];
+    this.customGeometryCounter = 1;
     this.projection = new Float32Array(16);
     this.view = new Float32Array(16);
     this.modelScratch = new Float32Array(16);
@@ -185,6 +206,8 @@ export class RiftEngine {
     this.fogEnd = options.fogEnd ?? 150;
     this.lightDirection = normalize3(-0.48, -1, 0.32);
     this.pixelRatio = 1;
+    this.lastFrameDraws = 0;
+    this.contextAttributes = gl.getContextAttributes?.() || {};
     this.disposed = false;
 
     gl.enable(gl.DEPTH_TEST);
@@ -198,6 +221,25 @@ export class RiftEngine {
   addCylinder(options) { return this.addDrawable('cylinder8', options); }
   addSphere(options) { return this.addDrawable('sphere', options); }
 
+  addMesh(source, options = {}) {
+    const key = `custom-${this.customGeometryCounter++}`;
+    this.geometry[key] = uploadGeometry(this.gl, source);
+    const drawable = this.addDrawable(key, options);
+    drawable.ownedGeometry = key;
+    return drawable;
+  }
+
+  deleteGeometry(key) {
+    if (!key || key === 'box' || key === 'cylinder8' || key === 'sphere') return;
+    const mesh = this.geometry[key];
+    if (!mesh) return;
+    const gl = this.gl;
+    gl.deleteVertexArray(mesh.vao);
+    gl.deleteBuffer(mesh.vertexBuffer);
+    gl.deleteBuffer(mesh.indexBuffer);
+    delete this.geometry[key];
+  }
+
   addDrawable(geometry, options = {}) {
     const drawable = {
       geometry,
@@ -209,6 +251,8 @@ export class RiftEngine {
       visible: options.visible !== false,
       modelMatrix: new Float32Array(16),
       dynamic: !!options.dynamic,
+      doubleSided: !!options.doubleSided,
+      ownedGeometry: null,
       dirty: true
     };
     this.drawables.push(drawable);
@@ -220,6 +264,34 @@ export class RiftEngine {
     drawable.rotationY = rotationY;
     drawable.scale[0] = scale[0]; drawable.scale[1] = scale[1]; drawable.scale[2] = scale[2];
     drawable.dirty = true;
+  }
+
+  removeDrawable(drawable) {
+    const index = this.drawables.indexOf(drawable);
+    if (index < 0) return;
+    this.drawables.splice(index, 1);
+    if (drawable.ownedGeometry) this.deleteGeometry(drawable.ownedGeometry);
+  }
+
+  removeDrawables(drawables) {
+    if (!drawables?.length) return;
+    const removing = new Set(drawables);
+    const owned = [];
+    this.drawables = this.drawables.filter(drawable => {
+      if (!removing.has(drawable)) return true;
+      if (drawable.ownedGeometry) owned.push(drawable.ownedGeometry);
+      return false;
+    });
+    for (const key of new Set(owned)) this.deleteGeometry(key);
+  }
+
+  getStats() {
+    return {
+      draws: this.lastFrameDraws,
+      drawables: this.drawables.length,
+      pixelRatio: this.pixelRatio,
+      antialias: !!this.contextAttributes.antialias
+    };
   }
 
   resize(targetPixelRatio = 1) {
@@ -256,6 +328,8 @@ export class RiftEngine {
     gl.uniform3fv(this.uniforms.cameraPosition, camera.position);
 
     let currentGeometry = null;
+    let cullEnabled = true;
+    let draws = 0;
     for (const drawable of this.drawables) {
       if (!drawable.visible) continue;
       if (drawable.dirty) {
@@ -264,6 +338,12 @@ export class RiftEngine {
       }
       const mesh = this.geometry[drawable.geometry];
       if (!mesh) continue;
+      const wantsCull = !drawable.doubleSided;
+      if (wantsCull !== cullEnabled) {
+        if (wantsCull) gl.enable(gl.CULL_FACE);
+        else gl.disable(gl.CULL_FACE);
+        cullEnabled = wantsCull;
+      }
       if (currentGeometry !== mesh) {
         gl.bindVertexArray(mesh.vao);
         currentGeometry = mesh;
@@ -271,8 +351,11 @@ export class RiftEngine {
       gl.uniformMatrix4fv(this.uniforms.model, false, drawable.modelMatrix);
       gl.uniform3fv(this.uniforms.color, drawable.color);
       gl.uniform1f(this.uniforms.noise, drawable.noise);
-      gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_SHORT, 0);
+      gl.drawElements(gl.TRIANGLES, mesh.count, mesh.indexType || gl.UNSIGNED_SHORT, 0);
+      draws += 1;
     }
+    this.lastFrameDraws = draws;
+    if (!cullEnabled) gl.enable(gl.CULL_FACE);
     gl.bindVertexArray(null);
   }
 

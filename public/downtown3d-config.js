@@ -1,8 +1,14 @@
 export const DOWNTOWN3D_FOUNDATION = Object.freeze({
-  version: 1,
+  version: 2,
   id: 'downtown-commerce-avenue-foundation-01',
   label: 'Downtown Street Foundation',
   units: 'meters',
+
+  world: Object.freeze({
+    width: 260,
+    depth: 260,
+    groundHeight: 0.08
+  }),
 
   street: Object.freeze({
     length: 120,
@@ -37,13 +43,13 @@ export const DOWNTOWN3D_FOUNDATION = Object.freeze({
     maxBeta: 1.28,
     fov: Math.PI / 3.25,
     near: 0.08,
-    far: 220
+    far: 360
   }),
 
   render: Object.freeze({
-    fogStart: 62,
-    fogEnd: 150,
-    mobileTargetPixelRatio: 1.35,
-    desktopTargetPixelRatio: 1.7
+    fogStart: 105,
+    fogEnd: 285,
+    mobileTargetPixelRatio: 1.45,
+    desktopTargetPixelRatio: 1.8
   })
 });

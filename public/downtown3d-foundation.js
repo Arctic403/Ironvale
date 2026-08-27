@@ -1,6 +1,9 @@
 import { DOWNTOWN3D_FOUNDATION as CONFIG } from './downtown3d-config.js';
+import { DOWNTOWN_ROAD_NETWORK } from './downtown-road-network.js';
 import { RiftCamera, RiftEngine } from './rift-engine.js';
 import { clamp, lerpAngle, rotateXZ } from './rift-engine-math.js';
+import { RiftRoadNetwork } from './rift-road-network.js';
+import { mountRiftWorldEditor } from './rift-world-editor.js';
 
 let activeFoundation = null;
 
@@ -14,33 +17,34 @@ export async function renderDowntown3D(root) {
   destroyDowntown3D();
 
   root.innerHTML = `
-    <section class="world3d-shell downtown3d-foundation" aria-label="Playable Rift Engine Downtown street foundation">
+    <section class="world3d-shell downtown3d-foundation" aria-label="Playable Rift Engine Downtown foundation">
       <canvas id="riftcity-3d-canvas" aria-label="RiftCity Downtown Rift Engine viewport"></canvas>
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title">
-        <span class="eyebrow">RIFT ENGINE 0.1 · DOWNTOWN</span>
+        <span class="eyebrow">RIFT ENGINE 0.2 · DOWNTOWN</span>
         <strong>Commerce Avenue</strong>
-        <small>Raw WebGL2 · road + curbs + sidewalks · master city scale</small>
+        <small>Raw WebGL2 · procedural road network · meter-based city scale</small>
       </div>
 
-      <div class="world3d-top-right">
-        <button id="downtown3d-reset-camera" class="world3d-hud-button" type="button">RESET CAMERA</button>
+      <div class="world3d-top-right downtown3d-actions">
+        <button id="rift-world-editor-button" class="world3d-hud-button rift-world-editor-button" type="button">WORLD EDITOR</button>
+        <button id="downtown3d-reset-camera" class="world3d-hud-button" type="button">CAMERA</button>
         <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
       </div>
 
       <div id="downtown3d-status" class="downtown3d-status" role="status">
         <strong>STARTING RIFT ENGINE…</strong>
-        <span>Preparing the first raw WebGL2 Downtown foundation.</span>
+        <span>Preparing the custom WebGL2 Downtown renderer.</span>
       </div>
 
       <div class="downtown3d-meter" aria-live="polite">
         <span id="downtown3d-fps">FPS --</span>
         <span id="downtown3d-draws">DRAWS --</span>
+        <span id="downtown3d-aa">MSAA --</span>
         <span>WEBGL2</span>
         <span>ROAD ${CONFIG.street.roadWidth}M</span>
-        <span>SIDEWALK ${CONFIG.street.sidewalkWidth}M</span>
-        <span>BLOCK ${CONFIG.street.length}M</span>
+        <span>WORLD ${CONFIG.world.width}×${CONFIG.world.depth}M</span>
       </div>
 
       <div class="world3d-touch">
@@ -96,7 +100,9 @@ function createFoundation({ root, canvas, status }) {
   });
   camera.setTarget(CONFIG.player.spawn.x, CONFIG.camera.followHeight, CONFIG.player.spawn.z);
 
-  const foundation = buildStreetFoundation(engine);
+  const foundation = buildWorldFoundation(engine);
+  const roadNetwork = new RiftRoadNetwork(engine, DOWNTOWN_ROAD_NETWORK, { connectRadius: 1.8 });
+  const editorGrid = createEditorGrid(engine);
   const player = createScalePlayer(engine);
   player.position.x = CONFIG.player.spawn.x;
   player.position.z = CONFIG.player.spawn.z;
@@ -105,12 +111,14 @@ function createFoundation({ root, canvas, status }) {
   const input = { x: 0, y: 0, run: false };
   const keys = new Set();
   const joystick = setupJoystick(root, input);
-  const orbit = setupCameraOrbit(canvas, camera);
+  let worldEditor = null;
+  const orbit = setupCameraOrbit(canvas, camera, () => !worldEditor?.isOpen?.() || worldEditor?.getTool?.() === 'camera');
   const runButton = root.querySelector('#downtown3d-run');
   const resetCameraButton = root.querySelector('#downtown3d-reset-camera');
   const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
   const fpsLabel = root.querySelector('#downtown3d-fps');
   const drawsLabel = root.querySelector('#downtown3d-draws');
+  const aaLabel = root.querySelector('#downtown3d-aa');
 
   const onKeyDown = event => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -135,7 +143,7 @@ function createFoundation({ root, canvas, status }) {
     camera.alpha = CONFIG.camera.alpha;
     camera.beta = CONFIG.camera.beta;
     camera.radius = CONFIG.camera.radius;
-    camera.updatePosition();
+    camera.setTarget(player.position.x, CONFIG.camera.followHeight, player.position.z);
   };
   resetCameraButton?.addEventListener('click', resetCamera);
 
@@ -150,7 +158,7 @@ function createFoundation({ root, canvas, status }) {
     gameMode = enabled;
     document.body.classList.toggle('world3d-game-mode', enabled);
     fullscreenButton?.classList.toggle('active', enabled);
-    if (fullscreenButton) fullscreenButton.textContent = enabled ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+    if (fullscreenButton) fullscreenButton.textContent = enabled ? 'WINDOW' : 'FULLSCREEN';
 
     if (enabled) {
       try {
@@ -185,6 +193,25 @@ function createFoundation({ root, canvas, status }) {
   window.addEventListener('orientationchange', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
+  worldEditor = mountRiftWorldEditor({
+    root,
+    canvas,
+    engine,
+    camera,
+    roadNetwork,
+    worldBounds: foundation.bounds,
+    onModeChange(enabled) {
+      for (const line of editorGrid) line.visible = enabled;
+      input.x = 0;
+      input.y = 0;
+      setRun(false);
+      joystick?.reset?.();
+      if (!enabled) camera.setTarget(player.position.x, CONFIG.camera.followHeight, player.position.z);
+    }
+  });
+
+  if (aaLabel) aaLabel.textContent = engine.getStats().antialias ? 'MSAA ON' : 'MSAA OFF';
+
   let destroyed = false;
   let frameId = 0;
   let previousTime = performance.now();
@@ -196,45 +223,49 @@ function createFoundation({ root, canvas, status }) {
     if (destroyed) return;
     const dt = clamp((now - previousTime) / 1000, 0, 0.05);
     previousTime = now;
+    const editing = worldEditor?.isOpen?.() || false;
 
-    let inputX = input.x;
-    let inputY = input.y;
-    if (keys.has('KeyA') || keys.has('ArrowLeft')) inputX -= 1;
-    if (keys.has('KeyD') || keys.has('ArrowRight')) inputX += 1;
-    if (keys.has('KeyW') || keys.has('ArrowUp')) inputY -= 1;
-    if (keys.has('KeyS') || keys.has('ArrowDown')) inputY += 1;
-    const magnitude = Math.hypot(inputX, inputY);
-    if (magnitude > 1) { inputX /= magnitude; inputY /= magnitude; }
+    if (!editing) {
+      let inputX = input.x;
+      let inputY = input.y;
+      if (keys.has('KeyA') || keys.has('ArrowLeft')) inputX -= 1;
+      if (keys.has('KeyD') || keys.has('ArrowRight')) inputX += 1;
+      if (keys.has('KeyW') || keys.has('ArrowUp')) inputY -= 1;
+      if (keys.has('KeyS') || keys.has('ArrowDown')) inputY += 1;
+      const magnitude = Math.hypot(inputX, inputY);
+      if (magnitude > 1) { inputX /= magnitude; inputY /= magnitude; }
 
-    const moving = Math.hypot(inputX, inputY) > 0.05;
-    if (moving) {
-      const forward = camera.flatForward();
-      const right = [-forward[2], 0, forward[0]];
-      let dx = right[0] * inputX + forward[0] * -inputY;
-      let dz = right[2] * inputX + forward[2] * -inputY;
-      const directionLength = Math.hypot(dx, dz) || 1;
-      dx /= directionLength; dz /= directionLength;
+      const moving = Math.hypot(inputX, inputY) > 0.05;
+      if (moving) {
+        const forward = camera.flatForward();
+        const right = [-forward[2], 0, forward[0]];
+        let dx = right[0] * inputX + forward[0] * -inputY;
+        let dz = right[2] * inputX + forward[2] * -inputY;
+        const directionLength = Math.hypot(dx, dz) || 1;
+        dx /= directionLength; dz /= directionLength;
 
-      const running = input.run || keys.has('ShiftLeft') || keys.has('ShiftRight');
-      const speed = running ? CONFIG.player.runSpeed : CONFIG.player.walkSpeed;
-      player.position.x = clamp(player.position.x + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
-      player.position.z = clamp(player.position.z + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
-      const targetYaw = Math.atan2(dx, dz);
-      player.yaw = lerpAngle(player.yaw, targetYaw, Math.min(1, dt * 12));
-      player.walkPhase += dt * (running ? 11 : 7.5);
-      player.bob = Math.sin(player.walkPhase) * (running ? 0.035 : 0.02);
+        const running = input.run || keys.has('ShiftLeft') || keys.has('ShiftRight');
+        const speed = running ? CONFIG.player.runSpeed : CONFIG.player.walkSpeed;
+        player.position.x = clamp(player.position.x + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
+        player.position.z = clamp(player.position.z + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
+        const targetYaw = Math.atan2(dx, dz);
+        player.yaw = lerpAngle(player.yaw, targetYaw, Math.min(1, dt * 12));
+        player.walkPhase += dt * (running ? 11 : 7.5);
+        player.bob = Math.sin(player.walkPhase) * (running ? 0.035 : 0.02);
+      } else {
+        player.bob += (0 - player.bob) * Math.min(1, dt * 10);
+      }
+
+      const followT = 1 - Math.exp(-CONFIG.camera.followSharpness * dt);
+      camera.target[0] += (player.position.x - camera.target[0]) * followT;
+      camera.target[1] += (CONFIG.camera.followHeight - camera.target[1]) * followT;
+      camera.target[2] += (player.position.z - camera.target[2]) * followT;
+      camera.updatePosition();
     } else {
       player.bob += (0 - player.bob) * Math.min(1, dt * 10);
     }
 
     updatePlayerVisual(engine, player, player.bob);
-    const followT = 1 - Math.exp(-CONFIG.camera.followSharpness * dt);
-    camera.target[0] += (player.position.x - camera.target[0]) * followT;
-    camera.target[1] += (CONFIG.camera.followHeight - camera.target[1]) * followT;
-    camera.target[2] += (player.position.z - camera.target[2]) * followT;
-    camera.updatePosition();
-
-    resize();
     engine.render(camera);
 
     fpsFrames += 1;
@@ -242,8 +273,9 @@ function createFoundation({ root, canvas, status }) {
     if (fpsTimer >= 0.5) {
       const instant = fpsFrames / fpsTimer;
       fpsAverage = fpsAverage ? fpsAverage * 0.6 + instant * 0.4 : instant;
+      const stats = engine.getStats();
       if (fpsLabel) fpsLabel.textContent = `FPS ${Math.round(fpsAverage)}`;
-      if (drawsLabel) drawsLabel.textContent = `DRAWS ${engine.drawables.length}`;
+      if (drawsLabel) drawsLabel.textContent = `DRAWS ${stats.draws}`;
       fpsTimer = 0;
       fpsFrames = 0;
     }
@@ -256,16 +288,20 @@ function createFoundation({ root, canvas, status }) {
 
   if (status) {
     status.classList.add('ready');
-    status.innerHTML = '<strong>RIFT ENGINE 0.1 ONLINE</strong><span>100% RiftCity JavaScript + WebGL2. No Babylon or Three.js.</span>';
-    setTimeout(() => status?.classList.add('settled'), 2400);
+    status.innerHTML = '<strong>RIFT ENGINE 0.3 ONLINE</strong><span>Continuous curve meshes + repaired semantic junctions. Paint straight or curved roads directly on the ground.</span>';
+    setTimeout(() => status?.classList.add('settled'), 2600);
   }
 
   return {
     engine,
     camera,
+    roadNetwork,
+    worldEditor,
     destroy() {
       destroyed = true;
       cancelAnimationFrame(frameId);
+      worldEditor?.destroy?.();
+      roadNetwork?.dispose?.();
       joystick?.destroy?.();
       orbit?.destroy?.();
       setRun(false);
@@ -291,51 +327,39 @@ function createFoundation({ root, canvas, status }) {
   };
 }
 
-function buildStreetFoundation(engine) {
-  const street = CONFIG.street;
-  const roadHalf = street.roadWidth / 2;
-  const sidewalkHalf = street.sidewalkWidth / 2;
-  const sidewalkCenter = roadHalf + sidewalkHalf;
-  const totalHalfWidth = roadHalf + street.sidewalkWidth + street.buildableDepth;
-  const totalLength = street.length + street.worldMargin * 2;
-
-  engine.addBox({ position: [0, -0.04, 0], scale: [totalHalfWidth * 2, 0.08, totalLength], color: '#353a36', noise: 0.055 });
-  engine.addBox({ position: [0, 0.005, 0], scale: [street.roadWidth, 0.05, street.length], color: '#252a2e', noise: 0.075 });
-
-  for (const side of [-1, 1]) {
-    engine.addBox({
-      position: [side * sidewalkCenter, street.sidewalkHeight / 2, 0],
-      scale: [street.sidewalkWidth, street.sidewalkHeight, street.length],
-      color: '#777a77', noise: 0.035
-    });
-    engine.addBox({
-      position: [side * (roadHalf + street.curbWidth / 2), street.curbHeight / 2, 0],
-      scale: [street.curbWidth, street.curbHeight, street.length],
-      color: '#9a9a94', noise: 0.015
-    });
-  }
-
-  const dashStep = street.centerDashLength + street.centerDashGap;
-  const firstDash = -street.length / 2 + street.centerDashLength;
-  for (let z = firstDash; z < street.length / 2; z += dashStep) {
-    engine.addBox({ position: [0, 0.042, z], scale: [0.14, 0.025, street.centerDashLength], color: '#d5a83c' });
-  }
-
-  for (const side of [-1, 1]) {
-    const edgeX = side * (roadHalf - 1.05);
-    for (let z = -street.length / 2 + 5; z <= street.length / 2 - 5; z += 7.5) {
-      engine.addBox({ position: [edgeX, 0.039, z], scale: [1.9, 0.018, 0.07], color: '#d7d9d7' });
-    }
-  }
-
+function buildWorldFoundation(engine) {
+  const halfWidth = CONFIG.world.width * 0.5;
+  const halfDepth = CONFIG.world.depth * 0.5;
+  engine.addBox({
+    position: [0, -CONFIG.world.groundHeight * 0.5, 0],
+    scale: [CONFIG.world.width, CONFIG.world.groundHeight, CONFIG.world.depth],
+    color: '#353a36',
+    noise: 0.012
+  });
   return {
     bounds: {
-      minX: -totalHalfWidth + CONFIG.player.radius,
-      maxX: totalHalfWidth - CONFIG.player.radius,
-      minZ: -street.length / 2 + CONFIG.player.radius,
-      maxZ: street.length / 2 - CONFIG.player.radius
+      minX: -halfWidth + CONFIG.player.radius,
+      maxX: halfWidth - CONFIG.player.radius,
+      minZ: -halfDepth + CONFIG.player.radius,
+      maxZ: halfDepth - CONFIG.player.radius
     }
   };
+}
+
+function createEditorGrid(engine) {
+  const drawables = [];
+  const halfWidth = CONFIG.world.width * 0.5;
+  const halfDepth = CONFIG.world.depth * 0.5;
+  const step = 20;
+  for (let x = -Math.floor(halfWidth / step) * step; x <= halfWidth; x += step) {
+    const line = engine.addBox({ position: [x, 0.055, 0], scale: [0.035, 0.012, CONFIG.world.depth], color: '#59615c', visible: false });
+    drawables.push(line);
+  }
+  for (let z = -Math.floor(halfDepth / step) * step; z <= halfDepth; z += step) {
+    const line = engine.addBox({ position: [0, 0.056, z], scale: [CONFIG.world.width, 0.012, 0.035], color: '#59615c', visible: false });
+    drawables.push(line);
+  }
+  return drawables;
 }
 
 function createScalePlayer(engine) {
@@ -369,14 +393,21 @@ function updatePlayerVisual(engine, player, bob) {
   }
 }
 
-function setupCameraOrbit(canvas, camera) {
+function setupCameraOrbit(canvas, camera, canOrbit = () => true) {
   const pointers = new Map();
   let lastDistance = 0;
   let dragPointer = null;
   let lastX = 0;
   let lastY = 0;
 
+  const resetPointers = () => {
+    pointers.clear();
+    lastDistance = 0;
+    dragPointer = null;
+  };
+
   const pointerDown = event => {
+    if (!canOrbit()) return;
     event.preventDefault();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     try { canvas.setPointerCapture?.(event.pointerId); } catch (_) {}
@@ -391,6 +422,7 @@ function setupCameraOrbit(canvas, camera) {
   };
 
   const pointerMove = event => {
+    if (!canOrbit()) { resetPointers(); return; }
     if (!pointers.has(event.pointerId)) return;
     event.preventDefault();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -424,6 +456,7 @@ function setupCameraOrbit(canvas, camera) {
   };
 
   const wheel = event => {
+    if (!canOrbit()) return;
     event.preventDefault();
     camera.zoom(Math.sign(event.deltaY) * Math.min(1.4, Math.abs(event.deltaY) * 0.008));
   };
@@ -441,7 +474,7 @@ function setupCameraOrbit(canvas, camera) {
       canvas.removeEventListener('pointerup', pointerEnd);
       canvas.removeEventListener('pointercancel', pointerEnd);
       canvas.removeEventListener('wheel', wheel);
-      pointers.clear();
+      resetPointers();
     }
   };
 }
@@ -497,6 +530,7 @@ function setupJoystick(root, input) {
   zone.addEventListener('pointercancel', reset);
 
   return {
+    reset: () => reset(),
     destroy() {
       reset();
       zone.removeEventListener('pointerdown', start);

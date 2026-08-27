@@ -38,7 +38,7 @@ async function scanDirectory(directory) {
       if (repoPath === 'public/views/block-world.js' && /block-editor-ui\.js/.test(source)) {
         violations.push(`${repoPath} -> shared gameplay runtime must not import the private Block Editor UI`);
       }
-      const isRiftRendererBoundary = repoPath === 'public/downtown3d-foundation.js' || repoPath.startsWith('public/rift-engine');
+      const isRiftRendererBoundary = repoPath === 'public/downtown3d-foundation.js' || repoPath === 'public/downtown-road-network.js' || repoPath.startsWith('public/rift-');
       if (isRiftRendererBoundary && /(\bBABYLON\b|cdn\.babylonjs\.com|from\s*['"]three(?:['"/])|import\(\s*['"]three(?:['"/]))/.test(source)) {
         violations.push(`${repoPath} -> Rift Engine boundary must not depend on Babylon.js or Three.js`);
       }

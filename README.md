@@ -981,3 +981,56 @@ The H1.39 Downtown scale test no longer depends on Babylon.js. The active City r
 - Existing older/inactive 3D experiment files remain in the repository as reference/rollback material, but `public/views/city.js` continues to enter only the new Downtown foundation.
 
 Next milestone remains intentionally small: validate road/sidewalk/player/camera scale and FPS on the target iPhone, then add exactly one building using Rift Engine geometry/assets.
+
+## H1.41 — Rift Engine 0.2 stable surfaces + unrestricted Road Painter
+
+The first custom-renderer road test is now promoted into the beginning of a real RiftCity World Editor. This pass deliberately keeps the editor unrestricted while the toolchain is still being built/tested; there is no developer/admin role gate on the new Road Painter yet.
+
+### Renderer cleanup
+
+- Replaced the high-frequency world-position hash noise that made asphalt/ground shimmer and read like TV static while the camera moved.
+- Rift Engine now uses smooth, low-frequency world-space material variation that stays spatially stable instead of aliasing across distant pixels.
+- WebGL2 MSAA remains requested and the HUD now reports whether the browser actually granted antialiasing.
+- Mobile render density is raised modestly from `1.35` to `1.45` while keeping the existing device-pixel-ratio cap.
+- Canvas resizing is event-driven instead of re-running every animation frame.
+- Rift Engine now exposes current draw statistics and can remove groups of generated drawables, which is required for live procedural road rebuilding.
+
+### Rift World Editor 0.1 — Road Painter
+
+- The active Downtown City route now exposes **WORLD EDITOR** to everyone during development; no role/auth restriction is applied in this phase.
+- **PAINT** draws road centerlines directly on the 3D ground with touch/mouse input.
+- **ERASE** removes road segments by swiping across them.
+- **CAMERA** keeps orbit/pinch/wheel controls and lets a quick ground tap move editor focus to another part of the district.
+- Road strokes support meter-grid snapping and optional `45°` angle snapping for clean city-block layouts.
+- Endpoints snap onto nearby road nodes/segments automatically.
+- When a newly painted road crosses an existing road, the graph splits both roads at the crossing and creates one shared intersection node automatically.
+- T-junctions and four-way junctions therefore come from the road graph itself instead of manually placing intersection meshes.
+- Generated asphalt, curbs, sidewalks and markings rebuild from the semantic road graph. Sidewalks/curbs are trimmed back at junction nodes so the crossing reads as an intersection rather than two sidewalks painted through each other.
+- Erasing a branch prunes unused nodes and merges straight degree-two nodes, so a no-longer-needed intersection collapses back into a continuous road.
+- Undo/redo is included from the first road-authoring pass.
+- Road drafts autosave to browser `localStorage`, restore on reload, and can be exported as `riftcity-road-network` JSON for source integration later.
+- **RESET SOURCE** returns to the original 120 m Commerce Avenue seed.
+
+### World scale
+
+- The authored ground canvas expands to `260 × 260 m`, giving the Road Painter enough room to draw several connected Downtown blocks before buildings are introduced.
+- The original `120 m × 14 m` Commerce Avenue remains the source seed and preserves the previously approved road/sidewalk proportions.
+- A lightweight 20 m editor grid appears only while World Editor mode is active.
+
+The road graph is intentionally stored as nodes + segments + road profiles rather than thousands of baked vertices. Rift Engine generates the visual road geometry from that small semantic graph, establishing the path for future road profiles, city-block detection, streaming chunks, procedural sidewalks and building placement.
+
+## H1.42 — Continuous curved roads + junction mesh repair
+
+The Road Painter renderer now treats authored centerline chains as continuous procedural paths instead of rendering every graph segment as an isolated box. This directly targets the broken/gapped geometry seen on bends and at multi-road junctions.
+
+- Added Rift Engine custom mesh support with automatic 16/32-bit index buffers and owned GPU-buffer cleanup when generated road geometry is rebuilt.
+- Same-profile degree-two road nodes are collected into logical render chains. Gentle turns are filleted into smooth quadratic path samples while deliberate sharp city corners remain sharp.
+- Asphalt is generated as a continuous mitered ribbon along the complete path, eliminating cracks/overlaps between the old straight box pieces on curves.
+- Sidewalks and curbs are generated from the same offset path, so their width remains stable through bends instead of separating into triangular slabs.
+- Center dashes and roadside transverse markings now follow local curve tangents rather than keeping the orientation of an individual straight segment.
+- Junction branches are trimmed by real path distance. A raised semantic junction hull masks coplanar road overlap, while generated sidewalk/curb corner wedges close the gaps around T-junctions and four-way intersections.
+- Road painting now samples touch/mouse strokes at roughly 2.2 m instead of 7 m, giving curves enough control points to stay smooth without increasing render draw calls per segment.
+- Road Painter now defaults to 0.5 m grid snapping with free-angle drawing. Optional 45-degree snapping remains available for rigid city-grid streets.
+- Existing saved `riftcity-road-network` drafts remain schema-compatible and are rebuilt with the new geometry automatically.
+
+The network is still semantic nodes + segments; the patch changes how that compact graph is converted into GPU geometry. Curved roads therefore remain editable, splittable at crossings, erasable, undoable and exportable rather than becoming baked meshes.
