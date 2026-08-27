@@ -1,7 +1,7 @@
 import { DOWNTOWN3D_FOUNDATION as CONFIG } from './downtown3d-config.js';
+import { RiftCamera, RiftEngine } from './rift-engine.js';
+import { clamp, lerpAngle, rotateXZ } from './rift-engine-math.js';
 
-const BABYLON_CDN = 'https://cdn.babylonjs.com/babylon.js';
-let babylonPromise = null;
 let activeFoundation = null;
 
 export function destroyDowntown3D() {
@@ -14,14 +14,14 @@ export async function renderDowntown3D(root) {
   destroyDowntown3D();
 
   root.innerHTML = `
-    <section class="world3d-shell downtown3d-foundation" aria-label="Playable 3D Downtown street foundation">
-      <canvas id="riftcity-3d-canvas" aria-label="RiftCity Downtown 3D viewport"></canvas>
+    <section class="world3d-shell downtown3d-foundation" aria-label="Playable Rift Engine Downtown street foundation">
+      <canvas id="riftcity-3d-canvas" aria-label="RiftCity Downtown Rift Engine viewport"></canvas>
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title">
-        <span class="eyebrow">DOWNTOWN 3D · FOUNDATION 01</span>
+        <span class="eyebrow">RIFT ENGINE 0.1 · DOWNTOWN</span>
         <strong>Commerce Avenue</strong>
-        <small>Road + curbs + sidewalks · master city scale</small>
+        <small>Raw WebGL2 · road + curbs + sidewalks · master city scale</small>
       </div>
 
       <div class="world3d-top-right">
@@ -30,12 +30,14 @@ export async function renderDowntown3D(root) {
       </div>
 
       <div id="downtown3d-status" class="downtown3d-status" role="status">
-        <strong>LOADING 3D STREET…</strong>
-        <span>Preparing the first Downtown foundation.</span>
+        <strong>STARTING RIFT ENGINE…</strong>
+        <span>Preparing the first raw WebGL2 Downtown foundation.</span>
       </div>
 
       <div class="downtown3d-meter" aria-live="polite">
         <span id="downtown3d-fps">FPS --</span>
+        <span id="downtown3d-draws">DRAWS --</span>
+        <span>WEBGL2</span>
         <span>ROAD ${CONFIG.street.roadWidth}M</span>
         <span>SIDEWALK ${CONFIG.street.sidewalkWidth}M</span>
         <span>BLOCK ${CONFIG.street.length}M</span>
@@ -56,138 +58,59 @@ export async function renderDowntown3D(root) {
   const status = root.querySelector('#downtown3d-status');
 
   try {
-    const B = await ensureBabylon();
-    if (!root.isConnected || !canvas.isConnected) return null;
-    activeFoundation = createFoundation({ root, canvas, status, B });
+    if (!root.isConnected || !canvas?.isConnected) return null;
+    activeFoundation = createFoundation({ root, canvas, status });
     return activeFoundation;
   } catch (error) {
-    console.error('Downtown 3D foundation failed to start', error);
+    console.error('Rift Engine Downtown foundation failed to start', error);
     if (status) {
       status.classList.add('error');
-      status.innerHTML = `<strong>3D ENGINE FAILED TO LOAD</strong><span>${escapeText(error?.message || 'Check your connection and retry.')}</span>`;
+      status.innerHTML = `<strong>RIFT ENGINE FAILED TO START</strong><span>${escapeText(error?.message || 'WebGL2 could not initialize.')}</span>`;
     }
     return null;
   }
 }
 
-function ensureBabylon() {
-  if (window.BABYLON) return Promise.resolve(window.BABYLON);
-  if (babylonPromise) return babylonPromise;
-
-  babylonPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-riftcity-babylon]');
-    const script = existing || document.createElement('script');
-    let settled = false;
-    const finish = (callback, value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      callback(value);
-    };
-    const timeout = setTimeout(() => {
-      babylonPromise = null;
-      if (!window.BABYLON) script.remove();
-      finish(reject, new Error('Timed out loading the 3D engine.'));
-    }, 15000);
-
-    script.addEventListener('load', () => {
-      if (!window.BABYLON) {
-        babylonPromise = null;
-        finish(reject, new Error('The 3D engine loaded without exposing BABYLON.'));
-        return;
-      }
-      finish(resolve, window.BABYLON);
-    }, { once: true });
-    script.addEventListener('error', () => {
-      babylonPromise = null;
-      script.remove();
-      finish(reject, new Error('Could not download the 3D engine.'));
-    }, { once: true });
-
-    if (!existing) {
-      script.src = BABYLON_CDN;
-      script.async = true;
-      script.dataset.riftcityBabylon = '1';
-      document.head.appendChild(script);
-    }
-  });
-
-  return babylonPromise;
-}
-
-function createFoundation({ root, canvas, status, B }) {
+function createFoundation({ root, canvas, status }) {
   const shell = root.querySelector('.world3d-shell');
   const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
-  const engine = new B.Engine(canvas, true, {
-    preserveDrawingBuffer: false,
-    stencil: true,
-    adaptToDeviceRatio: false,
-    powerPreference: 'high-performance'
+  const engine = new RiftEngine(canvas, {
+    antialias: true,
+    clearColor: [0.105, 0.135, 0.17],
+    fogColor: [0.105, 0.135, 0.17],
+    fogStart: CONFIG.render.fogStart,
+    fogEnd: CONFIG.render.fogEnd
   });
 
-  const targetPixelRatio = coarsePointer ? CONFIG.render.mobileTargetPixelRatio : CONFIG.render.desktopTargetPixelRatio;
-  const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
-  engine.setHardwareScalingLevel(Math.max(1, deviceRatio / targetPixelRatio));
+  const camera = new RiftCamera({
+    alpha: CONFIG.camera.alpha,
+    beta: CONFIG.camera.beta,
+    radius: CONFIG.camera.radius,
+    minRadius: CONFIG.camera.minRadius,
+    maxRadius: CONFIG.camera.maxRadius,
+    minBeta: CONFIG.camera.minBeta,
+    maxBeta: CONFIG.camera.maxBeta,
+    fov: CONFIG.camera.fov,
+    near: CONFIG.camera.near,
+    far: CONFIG.camera.far
+  });
+  camera.setTarget(CONFIG.player.spawn.x, CONFIG.camera.followHeight, CONFIG.player.spawn.z);
 
-  const scene = new B.Scene(engine);
-  scene.clearColor = new B.Color4(0.105, 0.135, 0.17, 1);
-  scene.fogMode = B.Scene.FOGMODE_LINEAR;
-  scene.fogColor = new B.Color3(0.105, 0.135, 0.17);
-  scene.fogStart = CONFIG.render.fogStart;
-  scene.fogEnd = CONFIG.render.fogEnd;
-  scene.skipPointerMovePicking = true;
-  scene.imageProcessingConfiguration.contrast = 1.08;
-  scene.imageProcessingConfiguration.exposure = 1.04;
-
-  const cameraTarget = new B.TransformNode('downtown-camera-target', scene);
-  const camera = new B.ArcRotateCamera(
-    'downtown-player-camera',
-    CONFIG.camera.alpha,
-    CONFIG.camera.beta,
-    CONFIG.camera.radius,
-    new B.Vector3(CONFIG.player.spawn.x, CONFIG.camera.followHeight, CONFIG.player.spawn.z),
-    scene
-  );
-  camera.lowerRadiusLimit = CONFIG.camera.minRadius;
-  camera.upperRadiusLimit = CONFIG.camera.maxRadius;
-  camera.lowerBetaLimit = CONFIG.camera.minBeta;
-  camera.upperBetaLimit = CONFIG.camera.maxBeta;
-  camera.panningSensibility = 0;
-  camera.wheelPrecision = 46;
-  camera.pinchPrecision = 110;
-  camera.angularSensibilityX = 1400;
-  camera.angularSensibilityY = 1400;
-  camera.inertia = 0.78;
-  cameraTarget.position.set(CONFIG.player.spawn.x, CONFIG.camera.followHeight, CONFIG.player.spawn.z);
-  camera.lockedTarget = cameraTarget;
-  camera.attachControl(canvas, true);
-
-  const hemi = new B.HemisphericLight('downtown-sky-light', new B.Vector3(0.22, 1, -0.1), scene);
-  hemi.intensity = 0.78;
-  hemi.groundColor = new B.Color3(0.12, 0.13, 0.14);
-
-  const sun = new B.DirectionalLight('downtown-sun', new B.Vector3(-0.48, -1, 0.32), scene);
-  sun.position = new B.Vector3(34, 52, -30);
-  sun.intensity = 1.05;
-
-  const shadowMapSize = coarsePointer ? CONFIG.render.mobileShadowMapSize : CONFIG.render.desktopShadowMapSize;
-  const shadows = new B.ShadowGenerator(shadowMapSize, sun);
-  shadows.usePercentageCloserFiltering = true;
-  shadows.bias = 0.0015;
-  shadows.normalBias = 0.02;
-
-  const materials = createStreetMaterials(B, scene);
-  const foundation = buildStreetFoundation(B, scene, materials);
-  const player = createScalePlayer(B, scene, materials, shadows);
-  player.root.position.set(CONFIG.player.spawn.x, 0, CONFIG.player.spawn.z);
+  const foundation = buildStreetFoundation(engine);
+  const player = createScalePlayer(engine);
+  player.position.x = CONFIG.player.spawn.x;
+  player.position.z = CONFIG.player.spawn.z;
+  updatePlayerVisual(engine, player, 0);
 
   const input = { x: 0, y: 0, run: false };
   const keys = new Set();
   const joystick = setupJoystick(root, input);
+  const orbit = setupCameraOrbit(canvas, camera);
   const runButton = root.querySelector('#downtown3d-run');
   const resetCameraButton = root.querySelector('#downtown3d-reset-camera');
   const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
   const fpsLabel = root.querySelector('#downtown3d-fps');
+  const drawsLabel = root.querySelector('#downtown3d-draws');
 
   const onKeyDown = event => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -212,10 +135,17 @@ function createFoundation({ root, canvas, status, B }) {
     camera.alpha = CONFIG.camera.alpha;
     camera.beta = CONFIG.camera.beta;
     camera.radius = CONFIG.camera.radius;
+    camera.updatePosition();
   };
   resetCameraButton?.addEventListener('click', resetCamera);
 
   let gameMode = false;
+  const resize = () => {
+    const target = coarsePointer ? CONFIG.render.mobileTargetPixelRatio : CONFIG.render.desktopTargetPixelRatio;
+    const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
+    engine.resize(Math.min(deviceRatio, target));
+  };
+
   const setGameMode = async enabled => {
     gameMode = enabled;
     document.body.classList.toggle('world3d-game-mode', enabled);
@@ -235,7 +165,7 @@ function createFoundation({ root, canvas, status, B }) {
       } catch (_) {}
       try { screen.orientation?.unlock?.(); } catch (_) {}
     }
-    requestAnimationFrame(() => engine.resize());
+    requestAnimationFrame(resize);
   };
   fullscreenButton?.addEventListener('click', () => setGameMode(!gameMode));
 
@@ -246,28 +176,26 @@ function createFoundation({ root, canvas, status, B }) {
       document.body.classList.remove('world3d-game-mode');
       fullscreenButton?.classList.remove('active');
       if (fullscreenButton) fullscreenButton.textContent = 'FULLSCREEN';
-      try { screen.orientation?.unlock?.(); } catch (_) {}
-      requestAnimationFrame(() => engine.resize());
     }
+    requestAnimationFrame(resize);
   };
   document.addEventListener('fullscreenchange', onFullscreenChange);
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-
-  const resize = () => requestAnimationFrame(() => engine.resize());
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
-  let lastTime = performance.now();
-  let fpsTimer = 0;
+  let destroyed = false;
+  let frameId = 0;
+  let previousTime = performance.now();
   let fpsFrames = 0;
+  let fpsTimer = 0;
   let fpsAverage = 0;
 
-  const bounds = foundation.bounds;
-  const tick = () => {
-    const now = performance.now();
-    const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
-    lastTime = now;
+  const tick = now => {
+    if (destroyed) return;
+    const dt = clamp((now - previousTime) / 1000, 0, 0.05);
+    previousTime = now;
 
     let inputX = input.x;
     let inputY = input.y;
@@ -275,40 +203,39 @@ function createFoundation({ root, canvas, status, B }) {
     if (keys.has('KeyD') || keys.has('ArrowRight')) inputX += 1;
     if (keys.has('KeyW') || keys.has('ArrowUp')) inputY -= 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) inputY += 1;
-
     const magnitude = Math.hypot(inputX, inputY);
-    if (magnitude > 1) {
-      inputX /= magnitude;
-      inputY /= magnitude;
-    }
+    if (magnitude > 1) { inputX /= magnitude; inputY /= magnitude; }
 
     const moving = Math.hypot(inputX, inputY) > 0.05;
     if (moving) {
-      const forward = camera.getForwardRay().direction.clone();
-      forward.y = 0;
-      if (forward.lengthSquared() < 0.0001) forward.set(0, 0, -1);
-      forward.normalize();
-      const right = new B.Vector3(-forward.z, 0, forward.x);
-      const direction = right.scale(inputX).add(forward.scale(-inputY));
-      if (direction.lengthSquared() > 0.0001) direction.normalize();
+      const forward = camera.flatForward();
+      const right = [-forward[2], 0, forward[0]];
+      let dx = right[0] * inputX + forward[0] * -inputY;
+      let dz = right[2] * inputX + forward[2] * -inputY;
+      const directionLength = Math.hypot(dx, dz) || 1;
+      dx /= directionLength; dz /= directionLength;
 
       const running = input.run || keys.has('ShiftLeft') || keys.has('ShiftRight');
       const speed = running ? CONFIG.player.runSpeed : CONFIG.player.walkSpeed;
-      player.root.position.addInPlace(direction.scale(speed * dt));
-      player.root.position.x = clamp(player.root.position.x, bounds.minX, bounds.maxX);
-      player.root.position.z = clamp(player.root.position.z, bounds.minZ, bounds.maxZ);
-
-      const targetYaw = Math.atan2(direction.x, direction.z);
-      player.visual.rotation.y = lerpAngle(player.visual.rotation.y, targetYaw, Math.min(1, dt * 12));
+      player.position.x = clamp(player.position.x + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
+      player.position.z = clamp(player.position.z + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
+      const targetYaw = Math.atan2(dx, dz);
+      player.yaw = lerpAngle(player.yaw, targetYaw, Math.min(1, dt * 12));
       player.walkPhase += dt * (running ? 11 : 7.5);
-      player.visual.position.y = Math.sin(player.walkPhase) * (running ? 0.035 : 0.02);
+      player.bob = Math.sin(player.walkPhase) * (running ? 0.035 : 0.02);
     } else {
-      player.visual.position.y += (0 - player.visual.position.y) * Math.min(1, dt * 10);
+      player.bob += (0 - player.bob) * Math.min(1, dt * 10);
     }
 
-    const desiredTarget = new B.Vector3(player.root.position.x, CONFIG.camera.followHeight, player.root.position.z);
+    updatePlayerVisual(engine, player, player.bob);
     const followT = 1 - Math.exp(-CONFIG.camera.followSharpness * dt);
-    cameraTarget.position = B.Vector3.Lerp(cameraTarget.position, desiredTarget, followT);
+    camera.target[0] += (player.position.x - camera.target[0]) * followT;
+    camera.target[1] += (CONFIG.camera.followHeight - camera.target[1]) * followT;
+    camera.target[2] += (player.position.z - camera.target[2]) * followT;
+    camera.updatePosition();
+
+    resize();
+    engine.render(camera);
 
     fpsFrames += 1;
     fpsTimer += dt;
@@ -316,27 +243,31 @@ function createFoundation({ root, canvas, status, B }) {
       const instant = fpsFrames / fpsTimer;
       fpsAverage = fpsAverage ? fpsAverage * 0.6 + instant * 0.4 : instant;
       if (fpsLabel) fpsLabel.textContent = `FPS ${Math.round(fpsAverage)}`;
+      if (drawsLabel) drawsLabel.textContent = `DRAWS ${engine.drawables.length}`;
       fpsTimer = 0;
       fpsFrames = 0;
     }
+
+    frameId = requestAnimationFrame(tick);
   };
 
-  scene.onBeforeRenderObservable.add(tick);
-  engine.runRenderLoop(() => scene.render());
+  resize();
+  frameId = requestAnimationFrame(tick);
 
   if (status) {
     status.classList.add('ready');
-    status.innerHTML = '<strong>EMPTY DOWNTOWN STREET V1</strong><span>Walk the scale test. No buildings are loaded yet.</span>';
-    setTimeout(() => status?.classList.add('settled'), 2200);
+    status.innerHTML = '<strong>RIFT ENGINE 0.1 ONLINE</strong><span>100% RiftCity JavaScript + WebGL2. No Babylon or Three.js.</span>';
+    setTimeout(() => status?.classList.add('settled'), 2400);
   }
 
-  requestAnimationFrame(() => engine.resize());
-
   return {
-    scene,
     engine,
+    camera,
     destroy() {
+      destroyed = true;
+      cancelAnimationFrame(frameId);
       joystick?.destroy?.();
+      orbit?.destroy?.();
       setRun(false);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
@@ -354,14 +285,13 @@ function createFoundation({ root, canvas, status, B }) {
         try { document.exitFullscreen?.() || document.webkitExitFullscreen?.(); } catch (_) {}
       }
       document.body.classList.remove('world3d-game-mode');
-      try { scene.dispose(); } catch (_) {}
-      try { engine.dispose(); } catch (_) {}
+      engine.dispose();
       root.style.height = '';
     }
   };
 }
 
-function buildStreetFoundation(B, scene, materials) {
+function buildStreetFoundation(engine) {
   const street = CONFIG.street;
   const roadHalf = street.roadWidth / 2;
   const sidewalkHalf = street.sidewalkWidth / 2;
@@ -369,64 +299,32 @@ function buildStreetFoundation(B, scene, materials) {
   const totalHalfWidth = roadHalf + street.sidewalkWidth + street.buildableDepth;
   const totalLength = street.length + street.worldMargin * 2;
 
-  const ground = B.MeshBuilder.CreateGround('downtown-foundation-ground', {
-    width: totalHalfWidth * 2,
-    height: totalLength
-  }, scene);
-  ground.position.y = 0;
-  ground.material = materials.ground;
-  ground.receiveShadows = true;
-
-  const road = B.MeshBuilder.CreateGround('commerce-avenue-road', {
-    width: street.roadWidth,
-    height: street.length
-  }, scene);
-  road.position.y = 0.022;
-  road.material = materials.asphalt;
-  road.receiveShadows = true;
+  engine.addBox({ position: [0, -0.04, 0], scale: [totalHalfWidth * 2, 0.08, totalLength], color: '#353a36', noise: 0.055 });
+  engine.addBox({ position: [0, 0.005, 0], scale: [street.roadWidth, 0.05, street.length], color: '#252a2e', noise: 0.075 });
 
   for (const side of [-1, 1]) {
-    const sidewalk = B.MeshBuilder.CreateBox(`commerce-sidewalk-${side < 0 ? 'west' : 'east'}`, {
-      width: street.sidewalkWidth,
-      depth: street.length,
-      height: street.sidewalkHeight
-    }, scene);
-    sidewalk.position.set(side * sidewalkCenter, street.sidewalkHeight / 2, 0);
-    sidewalk.material = materials.sidewalk;
-    sidewalk.receiveShadows = true;
-
-    const curb = B.MeshBuilder.CreateBox(`commerce-curb-${side < 0 ? 'west' : 'east'}`, {
-      width: street.curbWidth,
-      depth: street.length,
-      height: street.curbHeight
-    }, scene);
-    curb.position.set(side * (roadHalf + street.curbWidth / 2), street.curbHeight / 2, 0);
-    curb.material = materials.curb;
-    curb.receiveShadows = true;
+    engine.addBox({
+      position: [side * sidewalkCenter, street.sidewalkHeight / 2, 0],
+      scale: [street.sidewalkWidth, street.sidewalkHeight, street.length],
+      color: '#777a77', noise: 0.035
+    });
+    engine.addBox({
+      position: [side * (roadHalf + street.curbWidth / 2), street.curbHeight / 2, 0],
+      scale: [street.curbWidth, street.curbHeight, street.length],
+      color: '#9a9a94', noise: 0.015
+    });
   }
 
   const dashStep = street.centerDashLength + street.centerDashGap;
   const firstDash = -street.length / 2 + street.centerDashLength;
   for (let z = firstDash; z < street.length / 2; z += dashStep) {
-    const dash = B.MeshBuilder.CreateBox(`center-line-${Math.round(z * 10)}`, {
-      width: 0.14,
-      depth: street.centerDashLength,
-      height: 0.025
-    }, scene);
-    dash.position.set(0, 0.042, z);
-    dash.material = materials.centerLine;
+    engine.addBox({ position: [0, 0.042, z], scale: [0.14, 0.025, street.centerDashLength], color: '#d5a83c' });
   }
 
   for (const side of [-1, 1]) {
     const edgeX = side * (roadHalf - 1.05);
     for (let z = -street.length / 2 + 5; z <= street.length / 2 - 5; z += 7.5) {
-      const parkingTick = B.MeshBuilder.CreateBox(`parking-tick-${side}-${z}`, {
-        width: 1.9,
-        depth: 0.07,
-        height: 0.018
-      }, scene);
-      parkingTick.position.set(edgeX, 0.039, z);
-      parkingTick.material = materials.parkingLine;
+      engine.addBox({ position: [edgeX, 0.039, z], scale: [1.9, 0.018, 0.07], color: '#d7d9d7' });
     }
   }
 
@@ -440,135 +338,112 @@ function buildStreetFoundation(B, scene, materials) {
   };
 }
 
-function createStreetMaterials(B, scene) {
-  const asphalt = dynamicMaterial(B, scene, 'asphalt-material', 512, (ctx, size, random) => {
-    ctx.fillStyle = '#252a2e';
-    ctx.fillRect(0, 0, size, size);
-    for (let i = 0; i < 2600; i++) {
-      const shade = 34 + Math.floor(random() * 25);
-      ctx.fillStyle = `rgba(${shade},${shade + 2},${shade + 4},${0.12 + random() * 0.16})`;
-      const r = random() * 1.7 + 0.35;
-      ctx.fillRect(random() * size, random() * size, r, r);
-    }
-    ctx.strokeStyle = 'rgba(8,10,12,.18)';
-    ctx.lineWidth = 1.2;
-    for (let i = 0; i < 18; i++) {
-      ctx.beginPath();
-      let x = random() * size;
-      let y = random() * size;
-      ctx.moveTo(x, y);
-      for (let j = 0; j < 4; j++) {
-        x += (random() - 0.5) * 52;
-        y += (random() - 0.5) * 52;
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
-  }, 4, 18);
-
-  const sidewalk = dynamicMaterial(B, scene, 'sidewalk-material', 512, (ctx, size, random) => {
-    ctx.fillStyle = '#777a77';
-    ctx.fillRect(0, 0, size, size);
-    ctx.strokeStyle = 'rgba(35,38,37,.38)';
-    ctx.lineWidth = 3;
-    const step = size / 4;
-    for (let n = 0; n <= 4; n++) {
-      const p = Math.round(n * step) + 0.5;
-      ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke();
-    }
-    for (let i = 0; i < 900; i++) {
-      const shade = 85 + Math.floor(random() * 45);
-      ctx.fillStyle = `rgba(${shade},${shade},${shade - 2},.12)`;
-      ctx.fillRect(random() * size, random() * size, 1.4, 1.4);
-    }
-  }, 1, 14);
-
-  const ground = dynamicMaterial(B, scene, 'city-lot-ground', 512, (ctx, size, random) => {
-    ctx.fillStyle = '#353a36';
-    ctx.fillRect(0, 0, size, size);
-    for (let i = 0; i < 1700; i++) {
-      const green = 45 + Math.floor(random() * 28);
-      ctx.fillStyle = `rgba(${green - 7},${green},${green - 5},.18)`;
-      ctx.fillRect(random() * size, random() * size, 1 + random() * 2, 1 + random() * 2);
-    }
-  }, 9, 24);
-
-  const curb = simpleMaterial(B, scene, 'curb-material', '#9a9a94');
-  const centerLine = simpleMaterial(B, scene, 'center-line-material', '#d5a83c');
-  centerLine.emissiveColor = B.Color3.FromHexString('#6d5318').scale(0.08);
-  const parkingLine = simpleMaterial(B, scene, 'parking-line-material', '#d7d9d7');
-  const playerDark = simpleMaterial(B, scene, 'player-dark', '#1e2228');
-  const playerAccent = simpleMaterial(B, scene, 'player-accent', '#c98635');
-  const playerSkin = simpleMaterial(B, scene, 'player-skin', '#a8785e');
-
-  return { asphalt, sidewalk, ground, curb, centerLine, parkingLine, playerDark, playerAccent, playerSkin };
+function createScalePlayer(engine) {
+  const scale = CONFIG.player.height / 1.88;
+  return {
+    position: { x: 0, z: 0 },
+    yaw: 0,
+    bob: 0,
+    walkPhase: 0,
+    parts: [
+      { mesh: engine.addCylinder({ scale: [0.54 * scale, 0.92 * scale, 0.54 * scale], color: '#1e2228', dynamic: true }), local: [0, 1.08 * scale, 0], scale: [0.54 * scale, 0.92 * scale, 0.54 * scale] },
+      { mesh: engine.addBox({ scale: [0.54 * scale, 0.52 * scale, 0.32 * scale], color: '#c98635', dynamic: true }), local: [0, 1.18 * scale, 0.02 * scale], scale: [0.54 * scale, 0.52 * scale, 0.32 * scale] },
+      { mesh: engine.addSphere({ scale: [0.38 * scale, 0.38 * scale, 0.38 * scale], color: '#a8785e', dynamic: true }), local: [0, 1.69 * scale, 0], scale: [0.38 * scale, 0.38 * scale, 0.38 * scale] },
+      { mesh: engine.addBox({ scale: [0.18 * scale, 0.72 * scale, 0.22 * scale], color: '#1e2228', dynamic: true }), local: [-0.16 * scale, 0.46 * scale, 0], scale: [0.18 * scale, 0.72 * scale, 0.22 * scale] },
+      { mesh: engine.addBox({ scale: [0.18 * scale, 0.72 * scale, 0.22 * scale], color: '#1e2228', dynamic: true }), local: [0.16 * scale, 0.46 * scale, 0], scale: [0.18 * scale, 0.72 * scale, 0.22 * scale] },
+      { mesh: engine.addCylinder({ scale: [0.85 * scale, 0.02, 0.85 * scale], color: '#111315', dynamic: true }), local: [0, 0.018, 0], scale: [0.85 * scale, 0.02, 0.85 * scale], shadow: true }
+    ]
+  };
 }
 
-function dynamicMaterial(B, scene, name, size, painter, uScale, vScale) {
-  const texture = new B.DynamicTexture(`${name}-texture`, { width: size, height: size }, scene, false);
-  const context = texture.getContext();
-  painter(context, size, seededRandom(hashString(name)));
-  texture.update(false);
-  texture.wrapU = B.Texture.WRAP_ADDRESS;
-  texture.wrapV = B.Texture.WRAP_ADDRESS;
-  texture.uScale = uScale;
-  texture.vScale = vScale;
-  texture.anisotropicFilteringLevel = 4;
-
-  const material = new B.StandardMaterial(name, scene);
-  material.diffuseTexture = texture;
-  material.specularColor = new B.Color3(0.045, 0.045, 0.045);
-  material.ambientColor = new B.Color3(0.08, 0.08, 0.08);
-  return material;
-}
-
-function simpleMaterial(B, scene, name, hex) {
-  const material = new B.StandardMaterial(name, scene);
-  material.diffuseColor = B.Color3.FromHexString(hex);
-  material.specularColor = new B.Color3(0.05, 0.05, 0.05);
-  return material;
-}
-
-function createScalePlayer(B, scene, materials, shadows) {
-  const root = new B.TransformNode('downtown-player-root', scene);
-  const visual = new B.TransformNode('downtown-player-visual', scene);
-  visual.parent = root;
-  visual.scaling.setAll(CONFIG.player.height / 1.88);
-
-  const body = B.MeshBuilder.CreateCylinder('downtown-player-body', {
-    height: 0.92,
-    diameterTop: 0.48,
-    diameterBottom: 0.58,
-    tessellation: 8
-  }, scene);
-  body.parent = visual;
-  body.position.y = 1.08;
-  body.material = materials.playerDark;
-
-  const jacket = B.MeshBuilder.CreateBox('downtown-player-jacket', { width: 0.54, height: 0.52, depth: 0.32 }, scene);
-  jacket.parent = visual;
-  jacket.position.set(0, 1.18, 0.02);
-  jacket.material = materials.playerAccent;
-
-  const head = B.MeshBuilder.CreateSphere('downtown-player-head', { diameter: 0.38, segments: 10 }, scene);
-  head.parent = visual;
-  head.position.y = 1.69;
-  head.material = materials.playerSkin;
-
-  for (const x of [-0.16, 0.16]) {
-    const leg = B.MeshBuilder.CreateBox(`downtown-player-leg-${x}`, { width: 0.18, height: 0.72, depth: 0.22 }, scene);
-    leg.parent = visual;
-    leg.position.set(x, 0.46, 0);
-    leg.material = materials.playerDark;
-    shadows.addShadowCaster(leg);
+function updatePlayerVisual(engine, player, bob) {
+  for (const part of player.parts) {
+    const rotated = rotateXZ(part.local[0], part.local[2], player.yaw);
+    const y = part.shadow ? part.local[1] : part.local[1] + bob;
+    engine.setTransform(
+      part.mesh,
+      [player.position.x + rotated[0], y, player.position.z + rotated[1]],
+      part.shadow ? 0 : player.yaw,
+      part.scale
+    );
   }
+}
 
-  shadows.addShadowCaster(body);
-  shadows.addShadowCaster(jacket);
-  shadows.addShadowCaster(head);
+function setupCameraOrbit(canvas, camera) {
+  const pointers = new Map();
+  let lastDistance = 0;
+  let dragPointer = null;
+  let lastX = 0;
+  let lastY = 0;
 
-  return { root, visual, walkPhase: 0 };
+  const pointerDown = event => {
+    event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    try { canvas.setPointerCapture?.(event.pointerId); } catch (_) {}
+    if (pointers.size === 1) {
+      dragPointer = event.pointerId;
+      lastX = event.clientX;
+      lastY = event.clientY;
+    } else if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      lastDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    }
+  };
+
+  const pointerMove = event => {
+    if (!pointers.has(event.pointerId)) return;
+    event.preventDefault();
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2) {
+      const pts = [...pointers.values()];
+      const distance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+      if (lastDistance > 0) camera.zoom((lastDistance - distance) * 0.018);
+      lastDistance = distance;
+      return;
+    }
+    if (event.pointerId === dragPointer) {
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      camera.orbit(-dx * 0.006, -dy * 0.0045);
+    }
+  };
+
+  const pointerEnd = event => {
+    pointers.delete(event.pointerId);
+    try { canvas.releasePointerCapture?.(event.pointerId); } catch (_) {}
+    if (dragPointer === event.pointerId) dragPointer = null;
+    if (pointers.size < 2) lastDistance = 0;
+    if (pointers.size === 1) {
+      const [id, point] = pointers.entries().next().value;
+      dragPointer = id;
+      lastX = point.x;
+      lastY = point.y;
+    }
+  };
+
+  const wheel = event => {
+    event.preventDefault();
+    camera.zoom(Math.sign(event.deltaY) * Math.min(1.4, Math.abs(event.deltaY) * 0.008));
+  };
+
+  canvas.addEventListener('pointerdown', pointerDown);
+  canvas.addEventListener('pointermove', pointerMove);
+  canvas.addEventListener('pointerup', pointerEnd);
+  canvas.addEventListener('pointercancel', pointerEnd);
+  canvas.addEventListener('wheel', wheel, { passive: false });
+
+  return {
+    destroy() {
+      canvas.removeEventListener('pointerdown', pointerDown);
+      canvas.removeEventListener('pointermove', pointerMove);
+      canvas.removeEventListener('pointerup', pointerEnd);
+      canvas.removeEventListener('pointercancel', pointerEnd);
+      canvas.removeEventListener('wheel', wheel);
+      pointers.clear();
+    }
+  };
 }
 
 function setupJoystick(root, input) {
@@ -630,36 +505,6 @@ function setupJoystick(root, input) {
       zone.removeEventListener('pointercancel', reset);
     }
   };
-}
-
-function hashString(value) {
-  let hash = 2166136261;
-  for (const char of String(value)) {
-    hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function seededRandom(seed) {
-  let state = seed || 1;
-  return () => {
-    state += 0x6D2B79F5;
-    let value = state;
-    value = Math.imul(value ^ value >>> 15, value | 1);
-    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
-    return ((value ^ value >>> 14) >>> 0) / 4294967296;
-  };
-}
-
-function lerpAngle(current, target, amount) {
-  let delta = (target - current + Math.PI) % (Math.PI * 2) - Math.PI;
-  if (delta < -Math.PI) delta += Math.PI * 2;
-  return current + delta * amount;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function escapeText(value) {

@@ -34,15 +34,16 @@ export const DOWNTOWN3D_FOUNDATION = Object.freeze({
     followHeight: 1.35,
     followSharpness: 10,
     minBeta: 0.62,
-    maxBeta: 1.28
+    maxBeta: 1.28,
+    fov: Math.PI / 3.25,
+    near: 0.08,
+    far: 220
   }),
 
   render: Object.freeze({
     fogStart: 62,
     fogEnd: 150,
     mobileTargetPixelRatio: 1.35,
-    desktopTargetPixelRatio: 1.7,
-    mobileShadowMapSize: 512,
-    desktopShadowMapSize: 1024
+    desktopTargetPixelRatio: 1.7
   })
 });

@@ -965,3 +965,19 @@ RiftCity's player-facing City route now starts the district-by-district 3D rebui
 - Babylon loads only when the City route is opened; non-City screens do not pay the 3D engine cost.
 
 Next intended milestone: lock road/sidewalk/player/camera proportions on iPhone, then add exactly one Downtown building to the reserved frontage.
+
+## H1.40 — Rift Engine 0.1 raw WebGL2 foundation
+
+The H1.39 Downtown scale test no longer depends on Babylon.js. The active City route now renders the same empty 120 m Commerce Avenue foundation through RiftCity's own small WebGL2 renderer.
+
+- Added `public/rift-engine.js` as the first Rift Engine rendering core: WebGL2 context ownership, shader compilation, GPU geometry buffers, materials/colors, fog, directional lighting, draw submission, camera projection/view matrices and pixel-ratio-aware resizing.
+- Added `public/rift-engine-math.js` for the engine-owned camera/matrix/vector math and `public/rift-engine-geometry.js` for reusable box, low-poly cylinder and low-poly sphere meshes.
+- Rebuilt `public/downtown3d-foundation.js` on the Rift Engine API. There is no Babylon CDN request, no global `BABYLON`, no Three.js import and no external 3D-engine startup dependency on the active City route.
+- Preserved the H1.39 master city scale: 120 m street, 14 m road, 4 m sidewalks, curbs, buildable frontage and a 1.75 m scale player.
+- Preserved camera-relative WASD/arrow + joystick movement, run input, third-person orbit, pinch/wheel zoom, smooth camera follow, camera reset and fullscreen behavior.
+- Replaced general-engine shadow/material systems with one intentionally narrow RiftCity shader path. The first renderer uses directional/ambient lighting, distance fog and cheap world-position surface noise; the player uses a lightweight ground shadow rather than a shadow-map pass.
+- Static road geometry shares a few reusable GPU meshes instead of creating a unique mesh buffer for every road marking. The live HUD reports FPS and current draw count for device testing.
+- The pure-JavaScript guard now rejects Babylon.js/Three.js references inside the active Rift Engine boundary so the custom renderer cannot silently drift back onto a third-party 3D engine.
+- Existing older/inactive 3D experiment files remain in the repository as reference/rollback material, but `public/views/city.js` continues to enter only the new Downtown foundation.
+
+Next milestone remains intentionally small: validate road/sidewalk/player/camera scale and FPS on the target iPhone, then add exactly one building using Rift Engine geometry/assets.
