@@ -37,6 +37,21 @@ export function mat4Perspective(out, fovY, aspect, near, far) {
   return out;
 }
 
+export function mat4Orthographic(out, left, right, bottom, top, near, far) {
+  const lr = 1 / (left - right);
+  const bt = 1 / (bottom - top);
+  const nf = 1 / (near - far);
+  out.fill(0);
+  out[0] = -2 * lr;
+  out[5] = -2 * bt;
+  out[10] = 2 * nf;
+  out[12] = (left + right) * lr;
+  out[13] = (top + bottom) * bt;
+  out[14] = (far + near) * nf;
+  out[15] = 1;
+  return out;
+}
+
 export function mat4LookAt(out, eye, center, up = [0, 1, 0]) {
   let zx = eye[0] - center[0];
   let zy = eye[1] - center[1];

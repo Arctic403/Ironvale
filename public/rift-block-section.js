@@ -44,6 +44,36 @@ function appendSectionFace(buffer, worldX, worldY, worldZ, face, color = [1, 1, 
   buffer.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
+function sectionVisibilityLayerBuffer(layerBuffers, key) {
+  const layerKey = String(key || 'base');
+  let buffer = layerBuffers.get(layerKey);
+  if (!buffer) {
+    buffer = { vertices: [], indices: [], faces: 0 };
+    layerBuffers.set(layerKey, buffer);
+  }
+  return buffer;
+}
+
+function finalizeSectionVisibilityLayers(layerBuffers) {
+  if (!(layerBuffers instanceof Map) || layerBuffers.size === 0) return [];
+  return [...layerBuffers.entries()].map(([key, buffer]) => {
+    const vertexCount = buffer.vertices.length / RIFT_SECTION_VERTEX_STRIDE;
+    const IndexArray = vertexCount > 65535 ? Uint32Array : Uint16Array;
+    return {
+      key,
+      geometry: {
+        vertices: new Float32Array(buffer.vertices),
+        vertexStride: RIFT_SECTION_VERTEX_STRIDE,
+        indices: new IndexArray(buffer.indices),
+        visibleFaces: buffer.faces,
+        quads: buffer.faces,
+        vertexCount,
+        triangles: buffer.faces * 2
+      }
+    };
+  }).filter(layer => layer.geometry.indices.length > 0);
+}
+
 export class RiftBlockSection {
   constructor({ sx = 0, sy = 0, sz = 0, states = null } = {}) {
     this.sx = Math.trunc(sx);
@@ -149,7 +179,7 @@ export class RiftBlockSection {
     return count;
   }
 
-  buildGeometry({ getOutsideBlock = null, getBlockColor = null } = {}) {
+  buildGeometry({ getOutsideBlock = null, getBlockColor = null, classifyBlockFace = null } = {}) {
     const origin = this.origin();
 
     // H1.56 shape-aware path. Legacy material-only states still use the proven
@@ -194,7 +224,16 @@ export class RiftBlockSection {
               localZ: info.worldZ - origin.z,
               section: this
             })
-          : [1, 1, 1]
+          : [1, 1, 1],
+        classifyFace: typeof classifyBlockFace === 'function'
+          ? info => classifyBlockFace({
+              ...info,
+              localX: info.worldX - origin.x,
+              localY: info.worldY - origin.y,
+              localZ: info.worldZ - origin.z,
+              section: this
+            })
+          : null
       });
 
       this.meshRevision = this.revision;
@@ -211,6 +250,7 @@ export class RiftBlockSection {
     }
 
     const buffer = { vertices: [], indices: [] };
+    const layerBuffers = typeof classifyBlockFace === 'function' ? new Map() : null;
     let blocks = 0;
     let visibleFaces = 0;
     let culledFaces = 0;
@@ -269,6 +309,24 @@ export class RiftBlockSection {
               face,
               color
             );
+            if (layerBuffers) {
+              const layerKey = classifyBlockFace({
+                state,
+                shape: 0,
+                rotation: 0,
+                face,
+                worldX,
+                worldY,
+                worldZ,
+                localX: x,
+                localY: y,
+                localZ: z,
+                section: this
+              }) || 'base';
+              const layerBuffer = sectionVisibilityLayerBuffer(layerBuffers, layerKey);
+              appendSectionFace(layerBuffer, worldX, worldY, worldZ, face, color);
+              layerBuffer.faces += 1;
+            }
             visibleFaces += 1;
           }
         }
@@ -292,7 +350,8 @@ export class RiftBlockSection {
       vertexCount,
       triangles: visibleFaces * 2,
       revision: this.revision,
-      stateBytes: this.states.byteLength
+      stateBytes: this.states.byteLength,
+      visibilityLayers: finalizeSectionVisibilityLayers(layerBuffers)
     };
   }
 }
@@ -416,11 +475,12 @@ export class RiftSectionGrid {
     return this.setBlockWorld(worldX, worldY, worldZ, RIFT_SECTION_AIR);
   }
 
-  buildGeometryForSection(section, { getBlockColor = null } = {}) {
+  buildGeometryForSection(section, { getBlockColor = null, classifyBlockFace = null } = {}) {
     if (!(section instanceof RiftBlockSection)) throw new Error('Expected a RiftBlockSection.');
     return section.buildGeometry({
       getOutsideBlock: (worldX, worldY, worldZ) => this.getBlockWorld(worldX, worldY, worldZ),
-      getBlockColor
+      getBlockColor,
+      classifyBlockFace
     });
   }
 }

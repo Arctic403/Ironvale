@@ -133,6 +133,36 @@ function appendQuad(buffer, corners, normal, color) {
   buffer.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
+function visibilityLayerBuffer(layerBuffers, key) {
+  const layerKey = String(key || 'base');
+  let buffer = layerBuffers.get(layerKey);
+  if (!buffer) {
+    buffer = { vertices: [], indices: [], quads: 0 };
+    layerBuffers.set(layerKey, buffer);
+  }
+  return buffer;
+}
+
+function finalizeVisibilityLayers(layerBuffers) {
+  if (!(layerBuffers instanceof Map) || layerBuffers.size === 0) return [];
+  return [...layerBuffers.entries()].map(([key, buffer]) => {
+    const vertexCount = buffer.vertices.length / VERTEX_STRIDE;
+    const IndexArray = vertexCount > 65535 ? Uint32Array : Uint16Array;
+    return {
+      key,
+      geometry: {
+        vertices: new Float32Array(buffer.vertices),
+        vertexStride: VERTEX_STRIDE,
+        indices: new IndexArray(buffer.indices),
+        visibleFaces: buffer.quads,
+        quads: buffer.quads,
+        vertexCount,
+        triangles: buffer.quads * 2
+      }
+    };
+  }).filter(layer => layer.geometry.indices.length > 0);
+}
+
 function appendAxisRect(buffer, cellX, cellY, cellZ, face, plane, u0, v0, u1, v1, color) {
   const p = plane * 0.5;
   const a = u0 * 0.5;
@@ -235,7 +265,8 @@ function mergeTileGrid(tileKeys) {
 export function buildRiftPartialShapeGeometry({
   cells = [],
   getStateAt = null,
-  getBlockColor = null
+  getBlockColor = null,
+  classifyFace = null
 } = {}) {
   const normalized = [];
   const localStates = new Map();
@@ -259,6 +290,7 @@ export function buildRiftPartialShapeGeometry({
   };
 
   const buffer = { vertices: [], indices: [] };
+  const layerBuffers = typeof classifyFace === 'function' ? new Map() : null;
   let blocks = 0;
   let occupiedMicrovoxels = 0;
   let visibleMicroFaces = 0;
@@ -330,6 +362,33 @@ export function buildRiftPartialShapeGeometry({
           rect.v1,
           color
         );
+        if (layerBuffers) {
+          const layerKey = classifyFace({
+            state: cell.state,
+            materialId: decoded.material,
+            shape: decoded.shape,
+            rotation: decoded.rotation,
+            face: group.face,
+            worldX: cell.x,
+            worldY: cell.y,
+            worldZ: cell.z
+          }) || 'base';
+          const layerBuffer = visibilityLayerBuffer(layerBuffers, layerKey);
+          appendAxisRect(
+            layerBuffer,
+            cell.x,
+            cell.y,
+            cell.z,
+            group.face,
+            group.plane,
+            rect.u0,
+            rect.v0,
+            rect.u1,
+            rect.v1,
+            color
+          );
+          layerBuffer.quads += 1;
+        }
         quads += 1;
       }
     }
@@ -349,7 +408,8 @@ export function buildRiftPartialShapeGeometry({
     visibleFaces: quads,
     quads,
     vertexCount,
-    triangles: quads * 2
+    triangles: quads * 2,
+    visibilityLayers: finalizeVisibilityLayers(layerBuffers)
   };
 }
 

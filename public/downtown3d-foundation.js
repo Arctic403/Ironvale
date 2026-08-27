@@ -4,6 +4,10 @@ import { validateRiftBlockSectionStorage } from './rift-block-section.js';
 import { validateRiftBlockShapes } from './rift-block-shapes.js';
 import { compileRiftCityBlock, validateRiftCityBlockImporter } from './rift-city-block-importer.js';
 import { assertMeterScale } from './rift-world-scale.js';
+import { createRiftPlayer, createRiftPlayerController } from './rift-player.js';
+import { createRiftCreativeMode } from './rift-creative-mode.js';
+import { resolveRiftBuildingVisibility } from './rift-building-visibility.js';
+import { createRiftSmartCamera } from './rift-smart-camera.js';
 
 let activeFoundation = null;
 const DEFAULT_BLOCK_URL = new URL('./riftcity-blocks/downtown-block-001.json', import.meta.url);
@@ -26,17 +30,18 @@ export async function renderDowntown3D(root) {
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title rift-import-title">
-        <span class="eyebrow">RIFT BLOCK ENGINE · H1.59 BLUEPRINT COMPOSER</span>
+        <span class="eyebrow">RIFT BLOCK ENGINE · H1.67 SMART OUTDOOR CAMERA</span>
         <strong id="rift-import-name">LOADING COMMERCE BLOCK 01…</strong>
-        <small id="rift-import-description">Nested Blueprint prefabs, curb-aware roads, validated anchors and groups expand into normal 1m RiftSections, slabs and stairs at import time.</small>
+        <small id="rift-import-description">Outdoor follow now pans first and automatically chooses the clearest of four stable 2.5D camera directions; interiors keep the structured roof/wall cutaway and shape-aware movement.</small>
       </div>
 
       <div class="world3d-top-right downtown3d-actions rift-import-actions">
+        <button id="rift-creative-toggle" class="world3d-hud-button rift-creative-toggle" type="button">BUILD MODE</button>
+        <button id="rift-creative-open-panel" class="world3d-hud-button rift-creative-panel-button" type="button">TOOLS</button>
         <button id="rift-import-json" class="world3d-hud-button" type="button">IMPORT JSON</button>
         <button id="rift-import-reset" class="world3d-hud-button" type="button">RESET DEFAULT</button>
-        <button id="rift-import-spin" class="world3d-hud-button" type="button">SPIN</button>
         <button id="rift-import-cull" class="world3d-hud-button active" type="button">CULL ON</button>
-        <button id="rift-import-top" class="world3d-hud-button" type="button">TOP VIEW</button>
+        <button id="rift-import-top" class="world3d-hud-button" type="button">CITY OVERVIEW</button>
         <button id="rift-import-view" class="world3d-hud-button" type="button">RESET VIEW</button>
         <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
         <input id="rift-import-file" class="rift-import-file" type="file" accept=".json,application/json" aria-label="Choose a RiftCity city block JSON file">
@@ -47,7 +52,38 @@ export async function renderDowntown3D(root) {
         <span>Re-running block winding, section storage, full/slab/stair and importer validation before rendering the first authored city block.</span>
       </div>
 
+
+
+      <div class="rift-player-touch" aria-label="RiftPlayer controls">
+        <div class="rift-player-pad" data-rift-player-pad><span></span></div>
+        <div class="rift-player-actions">
+          <button type="button" data-rift-player-jump>JUMP</button>
+          <button type="button" data-rift-player-run>RUN</button>
+        </div>
+      </div>
+
+      <aside id="rift-creative-panel" class="rift-creative-panel" aria-label="RiftCity overhead build tools">
+        <header><div><span>RIFTCITY BUILD MODE</span><strong>OVERHEAD CITY BUILDER</strong></div><button id="rift-creative-close" type="button">HIDE</button></header>
+        <div class="rift-creative-block-actions"><button data-rift-block-action="break" class="active">BREAK CELL</button><button data-rift-block-action="place">PLACE CELL</button></div>
+        <label>BLOCK<select id="rift-creative-block-state"></select></label>
+        <button id="rift-creative-stair-rotate" type="button">ROTATE STAIR ↷</button>
+        <p id="rift-creative-status">Enter Build Mode, then tap/click the exact RiftBlock cell you want to edit from above.</p>
+        <details><summary>BLUEPRINT OBJECT TOOLS</summary>
+          <label>OBJECT<select id="rift-creative-object"></select></label>
+          <div class="rift-creative-readout"><div><span>SELECTED</span><b id="rift-creative-selected">NONE</b></div><div><span>POSITION</span><b id="rift-creative-pos">--</b></div><div><span>ROTATION</span><b id="rift-creative-rot">--</b></div></div>
+          <div class="rift-creative-nudge">
+            <button data-rift-nudge="0,0,-1">N</button><button data-rift-nudge="0,1,0">+Y</button><button data-rift-nudge="0,0,1">S</button>
+            <button data-rift-nudge="-1,0,0">W</button><button data-rift-nudge="0,-1,0">-Y</button><button data-rift-nudge="1,0,0">E</button>
+          </div>
+          <div class="rift-creative-actions"><button id="rift-creative-rotate-left">↶ ROTATE</button><button id="rift-creative-rotate-right">ROTATE ↷</button><button id="rift-creative-duplicate">DUPLICATE</button><button id="rift-creative-delete" class="danger">DELETE</button></div>
+        </details>
+        <div class="rift-creative-actions"><button id="rift-creative-undo">UNDO</button><button id="rift-creative-redo">REDO</button></div>
+        <button id="rift-creative-export" class="primary" type="button">EXPORT WORLD JSON</button>
+        <small>BUILD MODE: keep walking normally · tap/click cells directly · BREAK/PLACE · B swaps tools · R rotates stairs/prefabs · pinch/wheel zoom · Ctrl/Cmd+Z undo</small>
+      </aside>
+
       <div class="downtown3d-meter rift-import-meter" aria-live="polite">
+        <span id="rift-mode-label">PLAY</span>
         <span id="rift-import-source">ACTIVE DEFAULT</span>
         <span id="rift-import-ops">OPS --</span>
         <span id="rift-import-cells">CELLS --</span>
@@ -70,7 +106,7 @@ export async function renderDowntown3D(root) {
     await foundation.loadActiveBlock();
     return foundation;
   } catch (error) {
-    console.error('RiftCity H1.57 JSON block importer failed to start', error);
+    console.error('RiftCity H1.67 overhead block world failed to start', error);
     if (status) {
       status.classList.add('error');
       status.innerHTML = `<strong>JSON BLOCK IMPORTER FAILED</strong><span>${escapeText(error?.message || 'The importer could not initialize.')}</span>`;
@@ -102,17 +138,24 @@ function createBlockImporterLab({ root, canvas, status }) {
     fogStart: 105,
     fogEnd: 220
   });
+  const OVERHEAD_ALPHA = -0.72;
+  const OVERHEAD_BETA = 0.66;
+  const OVERHEAD_ORTHO_SIZE = 24;
   const camera = new RiftCamera({
-    alpha: -0.72,
-    beta: 0.78,
-    radius: 88,
-    minRadius: 12,
-    maxRadius: 190,
-    minBeta: 0.10,
-    maxBeta: 1.48,
+    projection: 'orthographic',
+    alpha: OVERHEAD_ALPHA,
+    beta: OVERHEAD_BETA,
+    radius: 38,
+    minRadius: 20,
+    maxRadius: 110,
+    orthoSize: OVERHEAD_ORTHO_SIZE,
+    minOrthoSize: 12,
+    maxOrthoSize: 88,
+    minBeta: 0.08,
+    maxBeta: 1.15,
     fov: Math.PI / 3.05,
     near: 0.05,
-    far: 280
+    far: 300
   });
 
   const meshOptions = {
@@ -155,29 +198,45 @@ function createBlockImporterLab({ root, canvas, status }) {
   const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
   const fileInput = root.querySelector('#rift-import-file');
 
+  const player = createRiftPlayer(engine, { position: [32, 2, 32] });
+  player.setVisible(true);
+  const playerController = createRiftPlayerController({
+    canvas, camera, player, touchRoot: root,
+    getGrid: () => imported?.grid || null,
+    getWorldBounds: () => imported?.worldBounds || null
+  });
+  let creative = null;
+  let smartCamera = null;
+
+  const resetPlayerCamera = () => {
+    const p = player.position;
+    camera.setProjection('orthographic');
+    camera.alpha = OVERHEAD_ALPHA;
+    camera.beta = OVERHEAD_BETA;
+    camera.orthoSize = OVERHEAD_ORTHO_SIZE;
+    if (smartCamera) smartCamera.reset({ immediate: true });
+    else camera.setTarget(p[0], p[1] + 0.82, p[2]);
+    topView = false;
+    topButton?.classList.remove('active');
+    if (topButton) topButton.textContent = 'CITY OVERVIEW';
+  };
+
+  const updateOverheadCamera = dt => {
+    if (topView) return;
+    smartCamera?.update(dt);
+  };
+
   const calculateCamera = () => {
-    if (!imported) return { target: [32, 5, 32], radius: 88 };
+    if (!imported) return { target: [32, 4, 32], orthoSize: 76 };
     const min = imported.worldBounds.min;
     const max = imported.worldBounds.max;
     const width = max[0] - min[0] + 1;
     const depth = max[2] - min[2] + 1;
     const height = max[1] - min[1] + 1;
     return {
-      target: [imported.center[0], min[1] + Math.min(6, height * 0.34), imported.center[2]],
-      radius: Math.max(34, Math.min(150, Math.max(width, depth) * 1.18 + height * 0.7))
+      target: [imported.center[0], min[1] + Math.min(5, height * 0.28), imported.center[2]],
+      orthoSize: Math.max(28, Math.min(88, Math.max(width, depth) * 1.18 + height * 0.35))
     };
-  };
-
-  const resetCamera = () => {
-    const view = calculateCamera();
-    camera.setTarget(...view.target);
-    camera.alpha = -0.72;
-    camera.beta = 0.78;
-    camera.radius = view.radius;
-    camera.updatePosition();
-    topView = false;
-    topButton?.classList.remove('active');
-    if (topButton) topButton.textContent = 'TOP VIEW';
   };
 
   const updateHud = () => {
@@ -186,8 +245,8 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (nameLabel) nameLabel.textContent = imported.name.toUpperCase();
     if (descriptionLabel) {
       descriptionLabel.textContent = stats.blueprintObjects
-        ? `${imported.id} · ${stats.blueprintObjects} blueprint objects · ${stats.instances} prefab instances (${stats.nestedInstances} nested) · ${stats.anchors} named anchors · ${stats.sections} RiftSections.`
-        : `${imported.id} · ${stats.sections} RiftSections · legacy compact ops expanded into the proven full/slab/stair block vocabulary.`;
+        ? `${imported.id} · ${stats.blueprintObjects} blueprint objects · ${stats.instances} prefab instances (${stats.nestedInstances} nested) · ${stats.anchors} named anchors · ${stats.visibilityStructures || 0} visibility shells · ${stats.sections} RiftSections.`
+        : `${imported.id} · ${stats.sections} RiftSections · ${stats.visibilityStructures || 0} structured building shells · legacy compact ops expanded into the proven full/slab/stair block vocabulary.`;
     }
     if (sourceMetric) sourceMetric.textContent = `ACTIVE ${imported.id.toUpperCase()} · ${persistenceLabel}`;
     if (opsMetric) opsMetric.textContent = stats.blueprintObjects ? `OPS ${stats.operations} · OBJ ${stats.blueprintObjects}` : `OPS ${stats.operations}`;
@@ -218,9 +277,20 @@ function createBlockImporterLab({ root, canvas, status }) {
     const nextDrawables = [];
     try {
       for (const mesh of compiled.meshes) {
-        const drawable = engine.addMesh(mesh.geometry, meshOptions);
-        drawable.doubleSided = !culling;
-        nextDrawables.push(drawable);
+        const visibilityLayers = Array.isArray(mesh.visibilityLayers) ? mesh.visibilityLayers : [];
+        if (visibilityLayers.length) {
+          for (const layer of visibilityLayers) {
+            const drawable = engine.addMesh(layer.geometry, meshOptions);
+            drawable.doubleSided = !culling;
+            drawable.riftVisibilityLayer = String(layer.key || 'base');
+            nextDrawables.push(drawable);
+          }
+        } else {
+          const drawable = engine.addMesh(mesh.geometry, meshOptions);
+          drawable.doubleSided = !culling;
+          drawable.riftVisibilityLayer = 'base';
+          nextDrawables.push(drawable);
+        }
       }
     } catch (error) {
       engine.removeDrawables(nextDrawables);
@@ -249,7 +319,19 @@ function createBlockImporterLab({ root, canvas, status }) {
     }
 
     updateHud();
-    resetCamera();
+    if (!options.preservePlayer) {
+      const preferredAnchor = compiled.blueprint?.anchors?.find(anchor => anchor.tags?.includes?.('public') || anchor.tags?.includes?.('entrance'));
+      const preferred = preferredAnchor?.at || [compiled.center[0], compiled.worldBounds.min[1] + 2, compiled.center[2]];
+      playerController.teleport(preferred);
+    } else {
+      // Build Mode and live Blueprint recompiles replace the authoritative grid
+      // underneath an already-positioned player. Revalidate immediately so a
+      // newly solid cell cannot embed the body and a removed support becomes a
+      // controlled fall/recovery rather than stale collision state.
+      playerController.revalidateWorld({ allowFall: true });
+    }
+    if (!options.preserveCamera) resetPlayerCamera(true);
+    creative?.onDocumentLoaded?.();
     if (!(options.persist && persistenceLabel === 'UNSAVED')) showReady();
     return compiled;
   };
@@ -366,26 +448,40 @@ function createBlockImporterLab({ root, canvas, status }) {
   const onTop = () => {
     if (!imported) return;
     topView = !topView;
-    const view = calculateCamera();
-    camera.setTarget(imported.center[0], imported.worldBounds.min[1], imported.center[2]);
     if (topView) {
+      const view = calculateCamera();
+      camera.setProjection('orthographic');
       camera.alpha = -Math.PI / 2;
-      camera.beta = 0.11;
-      camera.radius = Math.max(72, view.radius * 1.05);
-    } else {
-      camera.alpha = -0.72;
-      camera.beta = 0.78;
-      camera.radius = view.radius;
+      camera.beta = 0.10;
+      camera.orthoSize = view.orthoSize;
       camera.setTarget(...view.target);
+    } else {
+      resetPlayerCamera();
     }
     camera.updatePosition();
     topButton?.classList.toggle('active', topView);
-    if (topButton) topButton.textContent = topView ? 'ANGLE VIEW' : 'TOP VIEW';
+    if (topButton) topButton.textContent = topView ? 'FOLLOW PLAYER' : 'CITY OVERVIEW';
   };
   topButton?.addEventListener('click', onTop);
-  viewButton?.addEventListener('click', resetCamera);
+  const onResetView = () => resetPlayerCamera();
+  viewButton?.addEventListener('click', onResetView);
 
-  const orbit = setupDiagnosticOrbit(canvas, camera);
+  const orbit = setupOverheadCameraControls(canvas, camera);
+  creative = createRiftCreativeMode({
+    root, canvas, engine, camera, player, playerController,
+    getImported: () => imported,
+    loadDocument
+  });
+  smartCamera = createRiftSmartCamera({
+    camera,
+    getStructures: () => imported?.visibility?.structures || [],
+    getPlayerPosition: () => player.position,
+    getPlayerFacing: () => player.facing,
+    isOverview: () => topView,
+    isLocked: () => !!creative?.active,
+    baseAlpha: OVERHEAD_ALPHA,
+    beta: OVERHEAD_BETA
+  });
   const resize = () => {
     const target = coarsePointer ? 1.35 : 1.75;
     const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
@@ -433,6 +529,22 @@ function createBlockImporterLab({ root, canvas, status }) {
   window.visualViewport?.addEventListener('resize', resize);
   resize();
 
+  const updateStructuredBuildingVisibility = () => {
+    const structures = imported?.visibility?.structures || [];
+    const result = resolveRiftBuildingVisibility({
+      structures,
+      playerPosition: player.position,
+      cameraPosition: camera.position,
+      overview: topView
+    });
+    const hidden = result.hiddenLayers;
+    for (const drawable of blockDrawables) {
+      const layer = drawable.riftVisibilityLayer || 'base';
+      drawable.visible = layer === 'base' || !hidden.has(layer);
+    }
+    return result;
+  };
+
   let raf = 0;
   let fpsTimer = performance.now();
   let frames = 0;
@@ -441,7 +553,10 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (destroyed) return;
     const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
     lastFrame = now;
-    if (spinning) camera.orbit(dt * 0.34, 0);
+    playerController.update(dt);
+    updateOverheadCamera(dt);
+    if (creative?.active) creative.update(dt);
+    updateStructuredBuildingVisibility();
     engine.render(camera);
     const renderStats = engine.getStats();
     if (drawsMetric) drawsMetric.textContent = `DRAWS ${renderStats.draws}`;
@@ -478,7 +593,7 @@ function createBlockImporterLab({ root, canvas, status }) {
       spinButton?.removeEventListener('click', onSpin);
       cullButton?.removeEventListener('click', onCull);
       topButton?.removeEventListener('click', onTop);
-      viewButton?.removeEventListener('click', resetCamera);
+      viewButton?.removeEventListener('click', onResetView);
       fullscreenButton?.removeEventListener('click', onFullscreenButton);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
@@ -486,6 +601,9 @@ function createBlockImporterLab({ root, canvas, status }) {
       window.removeEventListener('orientationchange', resize);
       window.visualViewport?.removeEventListener('resize', resize);
       document.body.classList.remove('world3d-game-mode');
+      creative?.destroy?.();
+      playerController.destroy();
+      player.destroy();
       engine.dispose();
     }
   };
@@ -566,7 +684,7 @@ function clearPersistedBlock() {
   }
 }
 
-function setupDiagnosticOrbit(canvas, camera) {
+function setupOverheadCameraControls(canvas, camera) {
   const pointers = new Map();
   let lastPinch = null;
 
@@ -593,12 +711,9 @@ function setupDiagnosticOrbit(canvas, camera) {
 
     if (pointers.size >= 2) {
       const pinch = pinchDistance();
-      if (pinch != null && lastPinch != null) camera.zoom((lastPinch - pinch) * 0.075);
+      if (pinch != null && lastPinch != null) camera.zoom((lastPinch - pinch) * 0.055);
       lastPinch = pinch;
-      return;
     }
-
-    camera.orbit((next.x - previous.x) * 0.006, (next.y - previous.y) * 0.005);
   };
 
   const onPointerUp = event => {
@@ -609,7 +724,7 @@ function setupDiagnosticOrbit(canvas, camera) {
 
   const onWheel = event => {
     event.preventDefault();
-    camera.zoom(event.deltaY * 0.025);
+    camera.zoom(event.deltaY * 0.012);
   };
 
   canvas.addEventListener('pointerdown', onPointerDown, { passive: false });

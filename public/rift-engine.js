@@ -1,4 +1,4 @@
-import { mat4FromTRS, mat4LookAt, mat4Perspective, normalize3 } from './rift-engine-math.js';
+import { mat4FromTRS, mat4LookAt, mat4Orthographic, mat4Perspective, normalize3 } from './rift-engine-math.js';
 import { createBoxGeometry, createCylinderGeometry, createSphereGeometry } from './rift-engine-geometry.js';
 
 const VERTEX_SHADER = `#version 300 es
@@ -193,6 +193,10 @@ export class RiftCamera {
     this.fov = options.fov ?? Math.PI / 3.25;
     this.near = options.near ?? 0.08;
     this.far = options.far ?? 220;
+    this.projection = options.projection === 'orthographic' ? 'orthographic' : 'perspective';
+    this.orthoSize = options.orthoSize ?? 24;
+    this.minOrthoSize = options.minOrthoSize ?? 10;
+    this.maxOrthoSize = options.maxOrthoSize ?? 80;
     this.updatePosition();
   }
 
@@ -215,7 +219,16 @@ export class RiftCamera {
   }
 
   zoom(delta) {
+    if (this.projection === 'orthographic') {
+      this.orthoSize = Math.max(this.minOrthoSize, Math.min(this.maxOrthoSize, this.orthoSize + delta));
+      return;
+    }
     this.radius = Math.max(this.minRadius, Math.min(this.maxRadius, this.radius + delta));
+    this.updatePosition();
+  }
+
+  setProjection(mode) {
+    this.projection = mode === 'orthographic' ? 'orthographic' : 'perspective';
     this.updatePosition();
   }
 
@@ -402,7 +415,13 @@ export class RiftEngine {
     const gl = this.gl;
     const aspect = Math.max(0.01, this.canvas.width / Math.max(1, this.canvas.height));
     camera.updatePosition();
-    mat4Perspective(this.projection, camera.fov, aspect, camera.near, camera.far);
+    if (camera.projection === 'orthographic') {
+      const halfHeight = Math.max(0.01, camera.orthoSize * 0.5);
+      const halfWidth = halfHeight * aspect;
+      mat4Orthographic(this.projection, -halfWidth, halfWidth, -halfHeight, halfHeight, camera.near, camera.far);
+    } else {
+      mat4Perspective(this.projection, camera.fov, aspect, camera.near, camera.far);
+    }
     mat4LookAt(this.view, camera.position, camera.target);
 
     gl.clearColor(this.clearColor[0], this.clearColor[1], this.clearColor[2], 1);

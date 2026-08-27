@@ -1534,3 +1534,161 @@ Next intended authoring step: generate the first production-style Downtown distr
 - Preserved H1.58 road/intersection sidewalk + curb authoring and the existing RiftSection/full/slab/stair renderer pipeline.
 - Added `public/riftcity-blocks/blueprint-example-downtown-cross.json` as a reusable nested-prefab authoring example.
 - Added a build-time Blueprint regression check covering nested expansion, rotations, anchors, references, overlap rejection, cycle rejection and legacy importer compatibility.
+
+
+## H1.60 — RiftPlayer + Blueprint Creative Mode
+
+- Added RiftPlayer v1: a RiftCity-owned 1.8 m block-humanoid built from lightweight Rift Engine box drawables. Head, torso, arms, legs and feet share the master meter scale instead of introducing a separate character renderer.
+- Player movement is camera-relative with WASD/arrows, touch joystick, walk/run, jump, simple block-character motion, world-bound clamping and collision/ground resolution against the currently compiled RiftSection grid.
+- The third-person camera follows the player in Play Mode while retaining orbit/pinch/wheel control.
+- Added Creative Mode for version-2 Blueprint JSON documents. Entering Creative freezes player control and turns the current camera into a freecam; exiting snaps control/camera back to the existing player position.
+- Creative freecam supports WASD/arrows, Q/E vertical travel and Shift boost.
+- Blueprint layout objects can be selected and live-edited without touching raw RiftSections: 1 m X/Y/Z nudges, cardinal prefab rotation, duplicate, delete, undo/redo and Blueprint JSON export.
+- Every accepted edit recompiles through the existing H1.59 Blueprint → raw ops → RiftSection/full/slab/stair pipeline, so validation failures block the edit instead of corrupting the live preview.
+- Creative Mode currently targets Blueprint `layout` objects (instances/prefabs, roads and intersections). Fine-grained individual RiftBlock painting remains a separate future Detail Mode.
+- `npm run build` passes with the Pure-JS guard, syntax checks and Blueprint regression suite.
+
+## H1.61 — voxel RiftPlayer + player-driven Creative block editing
+
+- Rebuilt RiftPlayer as six independently animated voxel-mesh body parts: head, torso, left/right arms and left/right legs. There are no separate feet; each larger body part is visibly composed from many small voxel cubes while remaining one draw call per limb/body part.
+- Corrected the camera-relative horizontal movement basis so right input moves screen-right and left input moves screen-left in both normal Window mode and Fullscreen, including touch joystick input.
+- Creative Mode no longer disables the player or becomes a freecam. The player keeps walking/running with the normal third-person camera while Creative tools are layered onto gameplay.
+- Tap/click a rendered RiftBlock to break it, or switch to PLACE and tap/click a block face to add the selected palette state in the adjacent cell. Full blocks, slabs and stairs use the same existing palette/state/importer pipeline.
+- Stair placement can be rotated through north/east/south/west; missing directional palette variants are generated into the working JSON automatically.
+- Creative edits are appended as raw override/detail ops after Blueprint expansion, so a reusable building/district prefab is preserved while individual blocks can be corrected by hand.
+- The selected target cell is outlined in-world, undo/redo covers block and Blueprint edits, and the edited world can be exported back to JSON.
+- Creative flight keeps the player/camera: F or the FLY button toggles flight, Space/JUMP moves up and Q/DOWN moves down. Run/Shift boosts movement.
+- Existing Blueprint object move/rotate/duplicate/delete tools remain available in a collapsed advanced section.
+
+## H1.62 — first-person reticle + shape-aware stairs
+
+- Player gameplay now uses a true first-person eye camera with one fixed center-screen reticle in Window and Fullscreen modes.
+- Creative break/place targeting is driven only by that reticle. A tap/click acts on the block under the center aim ray; placement uses the adjacent cell on the struck face.
+- RiftPlayer presentation is six clean cuboids (head, torso, two arms, two legs) instead of subdividing each body part into hundreds of visible micro-cubes. The local avatar is hidden from its own first-person camera while the rig remains available for future third-person/remote-player rendering.
+- Player ground/collision now decodes full, bottom-slab, top-slab and directional stair states. Stairs expose a continuous 0.5m-to-1.0m support ramp by facing direction and grounded movement adheres to changing support height instead of assuming every occupied block is 1m tall.
+- Stair step-up is capped at 0.62m, descending ground adhesion is smoothed, and body obstruction probes use actual partial-shape occupancy rather than raw nonzero cell checks.
+- Existing Blueprint authoring, raw detail overrides, Creative flight, undo/redo and the RiftSection/full-slab-stair render pipeline remain unchanged.
+
+
+## H1.63 — 2.5D overhead RiftBlock city pivot
+
+RiftCity keeps the useful block-built world technology from H1.51–H1.62 but stops treating the player-facing City as a first-person voxel sandbox. The active Rift Engine city view is now a locked, elevated **2.5D overhead** presentation designed around RiftCity's crime-MMO gameplay and district-scale world rather than Minecraft-style first-person play.
+
+- The 1 m `RiftBlock` grid remains the physical authoring foundation. Full blocks, bottom/top half slabs and directional stairs still compile through the same `RiftSectionGrid`, compact block state and shape-aware mesher.
+- Blueprint JSON remains the high-level construction language for buildings, roads, intersections, anchors, groups and future district generation. No Blueprint or importer fork was introduced.
+- Rift Engine now supports an orthographic camera projection in addition to the existing perspective path. The City uses orthographic projection with a fixed diagonal overhead angle, preserving real 3D height while reading like a 2.5D city diorama.
+- The six-cuboid RiftPlayer is visible again. Movement remains camera-relative and continues to use the shape-aware full/slab/stair support-height solver, so stairs and half slabs are still real traversal geometry.
+- The overhead camera softly follows the player's actual world position with a small facing look-ahead instead of replacing the player's movement with a first-person camera transform.
+- **CITY OVERVIEW** temporarily frames the authored block from above; returning to **FOLLOW PLAYER** restores the normal 2.5D tracking camera. Pinch/wheel adjusts orthographic zoom without rotating the gameplay view.
+- The old center-reticle editing flow is removed from the active City. **BUILD MODE** edits the exact visible cell that is tapped/clicked from overhead, while the existing Blueprint object move/rotate/duplicate/delete tools remain available for large-scale authoring.
+- Manual block edits still append detail override operations after Blueprint expansion, so a generated police station or district can be refined cell-by-cell without destroying its reusable Blueprint source.
+
+This keeps the engine work that helps RiftCity scale—meter-consistent construction, reusable prefabs, block/slab/stair geometry and compact section meshes—while moving the player experience back toward an overhead living-city RPG. Future city scaling should build on streamed district/chunk ownership and floor/interior visibility rather than first-person voxel mechanics.
+
+## H1.64 — 2.5D cutaway visibility + deterministic stair/ledge movement
+
+RiftCity keeps the H1.63 overhead orthographic presentation and the same RiftBlock/full-slab-stair construction language, but this pass fixes the two problems that make an overhead city difficult to play inside.
+
+### Camera/player cutaway
+
+- Rift Engine drawables can now opt into a player-visibility cutaway shader.
+- Imported RiftSection meshes enable that cutaway; the player, editor helpers and non-world drawables do not.
+- In normal follow-player play, block fragments above the player's floor are removed inside a small local bubble and inside the camera-to-player corridor.
+- This reveals the player and nearby interior floor/furnishings when roofs, upper walls or camera-facing building geometry would otherwise cover them.
+- Collision and authored block state are untouched; this is render-only visibility.
+- City Overview disables the player cutaway so the full authored block can still be inspected.
+
+### Ground/support solver
+
+- Player support is sampled from the center of the player's footprint instead of taking the highest of several corner probes. This removes the old stair-hover effect where the uphill edge of the collision radius forced the whole character upward.
+- A missing center support returns `null`; it is no longer replaced with the world minimum floor. Walking beyond a ledge therefore releases the grounded state immediately and gravity takes over.
+- Legal rises up to `0.58 m` auto-step at walking speed. Sprinting no longer changes whether a normal Rift stair can be climbed.
+- Ground movement is sub-stepped at a fixed spatial resolution, so collision/step behavior is independent of frame rate and walk/run distance per frame.
+- Directional stair support remains continuous from `0.5 m` to `1.0 m`, giving smooth ascent/descent while preserving the block-built stair mesh.
+- Low body-collision probes ignore only geometry that is within the legal step height, preventing the supporting stair from becoming an invisible wall while still blocking full-height walls.
+- Ground snap is limited to nearby legitimate steps/slopes; larger downward gaps become falls instead of sticky ledges.
+
+`npm run build` now includes `scripts/check-rift-player-physics.js`, which locks the slab/stair support heights, normal-speed half-meter step behavior and immediate no-support ledge classification.
+
+
+## H1.65 — structured 2.5D building visibility
+
+H1.64's player cutaway experiment is replaced rather than tuned. The circular/camera-corridor fragment discard could slice any geometry in its path, which made stairs/slabs flicker and exposed the clear buffer as a black ring around the player. H1.65 moves visibility decisions out of the fragment shader and into semantic whole-piece render layers.
+
+- Removed the H1.64 `discard`-based cutaway uniforms/shader path from Rift Engine. World geometry is never punched out pixel-by-pixel around the player.
+- `hollow_box` operations now produce lightweight visibility-shell metadata at compile time. Existing Commerce Block 01 automatically resolves into four building shells; Blueprint prefab `hollow_box` operations use the same path after expansion/rotation.
+- RiftSection geometry remains one-meter/full-slab-stair authored geometry, but visible faces are additionally partitioned into render layers: global base, per-structure floor/base, interior, whole partial-shape, directional wall and roof layers. The partition exactly covers the original mesh triangles; it does not alter collision or block state.
+- Partial shapes are never fragment-clipped. Stairs and half slabs remain whole render pieces, so H1.64's fixed traversal geometry no longer develops circular holes or black wedges.
+- When the player is inside a shell, that shell's roof and the two camera-facing upper wall sides are hidden as complete authored layers. A one-meter wall stub remains so room boundaries still read from the overhead camera.
+- When a building lies between the overhead camera and the player, the same directional roof/wall rule reveals the player without deleting unrelated ground or nearby geometry.
+- Stacked floor shells are floor-aware. If the player is inside a lower shell, overlapping shells above it are suppressed as complete layers (floor, interior contents, partial pieces, walls and roof), preventing an upper office floor/furniture from covering the active ground floor. The current floor's geometry remains visible.
+- **CITY OVERVIEW** restores every building layer so the complete authored city can still be inspected.
+- The H1.64 support/step/ledge solver is unchanged: normal walking still climbs legal stairs/slabs, descent follows support height and unsupported ledges immediately become falls.
+
+`npm run build` now includes `verify:building-visibility`, which checks semantic shell extraction, triangle-complete render-layer partitioning, intact whole-piece stair/slab classification, directional inside cutaways, stacked-floor suppression and full overview restoration.
+
+## H1.66 — correct interior/exterior 2.5D cutaway ownership
+
+H1.65 proved that semantic whole-piece visibility layers are the correct replacement for fragment-level circular cutouts, but its resolver still treated two different situations as the same event: **the player being inside a structure** and **a structure merely blocking the overhead camera**. That made exterior camera blockers hide their roof even when the player was outside, while the actual blocking wall could remain in view.
+
+H1.66 separates those paths:
+
+- **Inside a structure:** hide that structure's roof, roof-owned attachments and only the camera-facing upper wall layers. Floors, active-floor interior geometry, stairs and slabs remain intact.
+- **Outside but occluded:** keep the blocker roof visible and remove only the exact wall face where the camera-to-player line enters that building. Unrelated/nearby building roofs are never hidden by that exterior test.
+- Exterior blocking now requires a real 3D camera-to-player segment intersection with the authored building prism instead of a footprint-only proximity-style decision.
+- The wall cutaway uses the segment's 2D entry side, so a west-facing blocker removes its west wall rather than simply hiding every wall broadly facing the camera.
+- Rooftop `set` / `fill_box` geometry that physically sits above a detected roof and does not belong to another authored floor is assigned to that roof's visibility layer. Utility boxes, vents, signs and similar roof pieces now disappear with the roof when the player is actually inside.
+- Stacked-floor suppression from H1.65 is preserved. Geometry already inside an upper authored shell is not misclassified as a lower roof attachment.
+- City Overview continues to restore every semantic layer.
+
+The regression suite now locks the two Commerce Block rooftop utility boxes to their owning roofs and explicitly verifies that an exterior blocker hides its camera-entry wall **without** hiding its roof or any unrelated nearby roof.
+
+
+## H1.67 — smart outdoor 2.5D camera
+
+The overhead city camera now helps preserve player visibility outdoors before asking the structured cutaway system to hide geometry.
+
+- Outdoor gameplay uses four stable isometric-style camera directions, spaced by exact 90° quarter turns around the player. The camera does not free-orbit or constantly chase a mathematically perfect angle.
+- The current camera direction is preferred. When the camera-to-player line is blocked, RiftCity first tests small screen-space follow offsets so a simple framing adjustment can keep the current direction.
+- If the player remains blocked for a short grace period and panning cannot clear the view, the camera scores all four stable directions against the same authored building-visibility volumes used by H1.66 and smoothly rotates only when another direction is meaningfully clearer.
+- Direction changes use hysteresis/cooldown. Once a clear direction is chosen, open streets do not immediately rotate the camera back, preventing left/right camera oscillation between nearby buildings.
+- The H1.66 exterior wall cutaway remains a fallback while a rotation is in progress or when every stable view still has an occluder. Roofs still remain visible for exterior occlusion.
+- Interior containment disables automatic outdoor rotation. When the player is actually inside a building, the current camera direction stays stable and the semantic roof/camera-facing-wall cutaway owns visibility.
+- Build Mode also locks automatic rotation so the world cannot move underneath a touch/mouse selection gesture.
+- City Overview remains explicit and bypasses all smart follow decisions. Reset View returns to the canonical default overhead direction.
+- Player movement remains screen-relative because the controller derives forward/right from the live RiftCamera every frame. If the smart camera changes quadrant, joystick/WASD directions continue to mean the same directions on screen.
+- `resolveRiftBuildingVisibility()` now exposes a lightweight `blockingScore` based on the actual 3D camera/player intersections. This gives the camera a better comparison than a simple blocked/not-blocked boolean without changing which semantic layers H1.66 hides.
+
+`npm run build` now includes `verify:smart-camera`, covering pan-first framing, persistent-occlusion rotation, four-way camera spacing, hysteresis, interior lock, Build Mode lock and City Overview bypass.
+
+## H1.68 — loaded-world containment + fall-through recovery
+
+A full audit of the H1.67 player/world collision path found that the bundled Commerce block itself has a complete 64 × 64 ground plate; the intermittent fall-through was caused by the controller being allowed to leave the currently loaded RiftBlock document. Outside the declared X/Z bounds, `getBlockWorld()` correctly returns AIR, but ordinary Play movement previously had no loaded-world footprint constraint and no recovery path once the player fell below the lowest authored layer.
+
+H1.68 hardens the player physics boundary without changing the smart camera, building cutaway or Blueprint systems:
+
+- Ordinary grounded and airborne horizontal movement keeps the player's full collision radius inside the currently loaded document footprint. Until neighboring blocks are actually streamed, the edge of the loaded block behaves as a world boundary rather than an unmarked cliff into unloaded AIR.
+- Surface sampling now explicitly rejects X/Z coordinates outside the declared block bounds instead of relying only on the grid's AIR response.
+- The controller remembers a continuously revalidated **last safe grounded position**. Safe state is updated only when the player is genuinely supported, inside the loaded footprint and not embedded in collision geometry.
+- Added a kill plane below the document's lowest authored Y. Falling below it restores the player to the last still-valid safe grounded position; if that position no longer exists after a world edit/import, the normal safe-spawn search is used instead.
+- Falling uses a previous-Y → candidate-Y swept support crossing test. Combined with a semi-fixed maximum physics step of `1/120 s`, low or irregular frame times cannot skip through a floor merely because one render frame moved the player from above the surface to below it.
+- Play physics is sub-stepped independently from character animation. Existing spatial horizontal substeps remain, while vertical gravity/landing now receives bounded temporal steps as well.
+- Live Blueprint/Build Mode recompiles immediately revalidate the preserved player against the newly authoritative grid. Newly solid geometry cannot leave the body embedded, and removed support becomes a controlled fall rather than stale grounded state.
+- Leaving Creative flight also revalidates the player before normal grounded movement resumes.
+
+`verify:player-physics` now covers all four loaded-world edges, full-radius containment, support rejection outside the document, the real controller pushing into a 64 × 64 boundary for multiple simulated seconds, tall falls under frame-time jitter, swept floor landing and kill-plane recovery. The existing stair/slab/ledge regressions remain in the same suite.
+
+## H1.69 — stacked-surface edge landing repair
+
+H1.68 fixed leaving the loaded world and added kill-plane recovery, but a second fall-through path remained around stacked block edges. When the player slowly walked off or landed near the edge of an upper block, the player's horizontal body radius could still overlap the side of that upper block while the feet crossed a valid lower floor. The landing path evaluated only one support and then rejected the lower landing as body-blocked, allowing gravity to continue through the floor.
+
+H1.69 hardens the local landing manifold without changing the H1.67 smart camera, H1.66 building visibility or H1.68 loaded-world safety:
+
+- surface sampling can retain every stacked support height at one X/Z point instead of collapsing immediately to one highest value;
+- descending landing checks evaluate the support surfaces actually crossed by the feet from highest to lowest, so a surface already above the feet cannot mask the next valid floor below;
+- the previous-feet tolerance is tightened for downward crossing tests so a block top that the player has already dropped below is not treated as a new landing;
+- if a legitimate lower landing still overlaps the side/corner of the block just left, the controller performs a bounded player-radius horizontal depenetration onto the same nearby support instead of rejecting the floor and continuing to fall;
+- air/ground movement may move out of an existing overlap when the new position reduces penetration, preventing an edge contact from trapping the player in place;
+- the landing depenetration follows slab/stair support height changes rather than assuming every lower surface is flat.
+
+The player regression suite now reproduces the original slow-walk edge failure at multiple sub-block offsets, plus full→full, full→bottom-slab, full→stair and diagonal-corner landings. Those cases must settle on the first valid surface without invoking kill-plane recovery.
