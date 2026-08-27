@@ -6,8 +6,7 @@ import { compileRiftCityBlock, validateRiftCityBlockImporter } from './rift-city
 import { assertMeterScale } from './rift-world-scale.js';
 import { createRiftPlayer, createRiftPlayerController } from './rift-player.js';
 import { createRiftCreativeMode } from './rift-creative-mode.js';
-import { resolveRiftBuildingVisibility } from './rift-building-visibility.js';
-import { createRiftSmartCamera } from './rift-smart-camera.js';
+import { createRiftThirdPersonCamera } from './rift-third-person-camera.js';
 
 let activeFoundation = null;
 const DEFAULT_BLOCK_URL = new URL('./riftcity-blocks/downtown-block-001.json', import.meta.url);
@@ -30,9 +29,9 @@ export async function renderDowntown3D(root) {
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title rift-import-title">
-        <span class="eyebrow">RIFT BLOCK ENGINE · H1.67 SMART OUTDOOR CAMERA</span>
+        <span class="eyebrow">RIFT BLOCK ENGINE · H1.74 THIRD-PERSON · NO CUTAWAYS</span>
         <strong id="rift-import-name">LOADING COMMERCE BLOCK 01…</strong>
-        <small id="rift-import-description">Outdoor follow now pans first and automatically chooses the clearest of four stable 2.5D camera directions; interiors keep the structured roof/wall cutaway and shape-aware movement.</small>
+        <small id="rift-import-description">Third-person camera collision keeps the view inside playable space; roofs, walls and upper floors always render normally with no camera-driven cutaway behavior.</small>
       </div>
 
       <div class="world3d-top-right downtown3d-actions rift-import-actions">
@@ -106,7 +105,7 @@ export async function renderDowntown3D(root) {
     await foundation.loadActiveBlock();
     return foundation;
   } catch (error) {
-    console.error('RiftCity H1.67 overhead block world failed to start', error);
+    console.error('RiftCity H1.74 third-person block world failed to start', error);
     if (status) {
       status.classList.add('error');
       status.innerHTML = `<strong>JSON BLOCK IMPORTER FAILED</strong><span>${escapeText(error?.message || 'The importer could not initialize.')}</span>`;
@@ -138,16 +137,17 @@ function createBlockImporterLab({ root, canvas, status }) {
     fogStart: 105,
     fogEnd: 220
   });
-  const OVERHEAD_ALPHA = -0.72;
-  const OVERHEAD_BETA = 0.66;
+  const THIRD_PERSON_ALPHA = -Math.PI / 2;
+  const THIRD_PERSON_BETA = 1.02;
+  const THIRD_PERSON_DISTANCE = 8.5;
   const OVERHEAD_ORTHO_SIZE = 24;
   const camera = new RiftCamera({
-    projection: 'orthographic',
-    alpha: OVERHEAD_ALPHA,
-    beta: OVERHEAD_BETA,
-    radius: 38,
-    minRadius: 20,
-    maxRadius: 110,
+    projection: 'perspective',
+    alpha: THIRD_PERSON_ALPHA,
+    beta: THIRD_PERSON_BETA,
+    radius: THIRD_PERSON_DISTANCE,
+    minRadius: 2.2,
+    maxRadius: 14,
     orthoSize: OVERHEAD_ORTHO_SIZE,
     minOrthoSize: 12,
     maxOrthoSize: 88,
@@ -206,24 +206,26 @@ function createBlockImporterLab({ root, canvas, status }) {
     getWorldBounds: () => imported?.worldBounds || null
   });
   let creative = null;
-  let smartCamera = null;
+  let thirdPersonCamera = null;
 
   const resetPlayerCamera = () => {
-    const p = player.position;
-    camera.setProjection('orthographic');
-    camera.alpha = OVERHEAD_ALPHA;
-    camera.beta = OVERHEAD_BETA;
-    camera.orthoSize = OVERHEAD_ORTHO_SIZE;
-    if (smartCamera) smartCamera.reset({ immediate: true });
-    else camera.setTarget(p[0], p[1] + 0.82, p[2]);
     topView = false;
     topButton?.classList.remove('active');
     if (topButton) topButton.textContent = 'CITY OVERVIEW';
+    if (thirdPersonCamera) thirdPersonCamera.reset({ immediate: true });
+    else {
+      const p = player.position;
+      camera.setProjection('perspective');
+      camera.alpha = THIRD_PERSON_ALPHA;
+      camera.beta = THIRD_PERSON_BETA;
+      camera.radius = THIRD_PERSON_DISTANCE;
+      camera.setTarget(p[0], p[1] + 1.15, p[2]);
+    }
   };
 
-  const updateOverheadCamera = dt => {
+  const updatePlayerCamera = dt => {
     if (topView) return;
-    smartCamera?.update(dt);
+    thirdPersonCamera?.update(dt);
   };
 
   const calculateCamera = () => {
@@ -245,8 +247,8 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (nameLabel) nameLabel.textContent = imported.name.toUpperCase();
     if (descriptionLabel) {
       descriptionLabel.textContent = stats.blueprintObjects
-        ? `${imported.id} · ${stats.blueprintObjects} blueprint objects · ${stats.instances} prefab instances (${stats.nestedInstances} nested) · ${stats.anchors} named anchors · ${stats.visibilityStructures || 0} visibility shells · ${stats.sections} RiftSections.`
-        : `${imported.id} · ${stats.sections} RiftSections · ${stats.visibilityStructures || 0} structured building shells · legacy compact ops expanded into the proven full/slab/stair block vocabulary.`;
+        ? `${imported.id} · ${stats.blueprintObjects} blueprint objects · ${stats.instances} prefab instances (${stats.nestedInstances} nested) · ${stats.anchors} named anchors · ${stats.visibilityStructures || 0} building metadata shells · ${stats.sections} RiftSections.`
+        : `${imported.id} · ${stats.sections} RiftSections · ${stats.visibilityStructures || 0} building metadata shells · legacy compact ops expanded into the proven full/slab/stair block vocabulary.`;
     }
     if (sourceMetric) sourceMetric.textContent = `ACTIVE ${imported.id.toUpperCase()} · ${persistenceLabel}`;
     if (opsMetric) opsMetric.textContent = stats.blueprintObjects ? `OPS ${stats.operations} · OBJ ${stats.blueprintObjects}` : `OPS ${stats.operations}`;
@@ -277,20 +279,13 @@ function createBlockImporterLab({ root, canvas, status }) {
     const nextDrawables = [];
     try {
       for (const mesh of compiled.meshes) {
-        const visibilityLayers = Array.isArray(mesh.visibilityLayers) ? mesh.visibilityLayers : [];
-        if (visibilityLayers.length) {
-          for (const layer of visibilityLayers) {
-            const drawable = engine.addMesh(layer.geometry, meshOptions);
-            drawable.doubleSided = !culling;
-            drawable.riftVisibilityLayer = String(layer.key || 'base');
-            nextDrawables.push(drawable);
-          }
-        } else {
-          const drawable = engine.addMesh(mesh.geometry, meshOptions);
-          drawable.doubleSided = !culling;
-          drawable.riftVisibilityLayer = 'base';
-          nextDrawables.push(drawable);
-        }
+        // H1.74: third-person camera collision owns visibility. Render each compiled
+        // RiftSection as one complete mesh; camera position must never hide authored
+        // roof, wall, floor, slab or stair geometry.
+        const drawable = engine.addMesh(mesh.geometry, meshOptions);
+        drawable.doubleSided = !culling;
+        drawable.visible = true;
+        nextDrawables.push(drawable);
       }
     } catch (error) {
       engine.removeDrawables(nextDrawables);
@@ -466,21 +461,21 @@ function createBlockImporterLab({ root, canvas, status }) {
   const onResetView = () => resetPlayerCamera();
   viewButton?.addEventListener('click', onResetView);
 
-  const orbit = setupOverheadCameraControls(canvas, camera);
+  const orbit = setupThirdPersonCameraControls(canvas, camera, {
+    isLocked: () => !!creative?.active,
+    getController: () => thirdPersonCamera
+  });
   creative = createRiftCreativeMode({
     root, canvas, engine, camera, player, playerController,
     getImported: () => imported,
     loadDocument
   });
-  smartCamera = createRiftSmartCamera({
+  thirdPersonCamera = createRiftThirdPersonCamera({
     camera,
-    getStructures: () => imported?.visibility?.structures || [],
     getPlayerPosition: () => player.position,
     getPlayerFacing: () => player.facing,
-    isOverview: () => topView,
-    isLocked: () => !!creative?.active,
-    baseAlpha: OVERHEAD_ALPHA,
-    beta: OVERHEAD_BETA
+    getGrid: () => imported?.grid || null,
+    isOverview: () => topView
   });
   const resize = () => {
     const target = coarsePointer ? 1.35 : 1.75;
@@ -529,22 +524,6 @@ function createBlockImporterLab({ root, canvas, status }) {
   window.visualViewport?.addEventListener('resize', resize);
   resize();
 
-  const updateStructuredBuildingVisibility = () => {
-    const structures = imported?.visibility?.structures || [];
-    const result = resolveRiftBuildingVisibility({
-      structures,
-      playerPosition: player.position,
-      cameraPosition: camera.position,
-      overview: topView
-    });
-    const hidden = result.hiddenLayers;
-    for (const drawable of blockDrawables) {
-      const layer = drawable.riftVisibilityLayer || 'base';
-      drawable.visible = layer === 'base' || !hidden.has(layer);
-    }
-    return result;
-  };
-
   let raf = 0;
   let fpsTimer = performance.now();
   let frames = 0;
@@ -554,9 +533,8 @@ function createBlockImporterLab({ root, canvas, status }) {
     const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
     lastFrame = now;
     playerController.update(dt);
-    updateOverheadCamera(dt);
+    updatePlayerCamera(dt);
     if (creative?.active) creative.update(dt);
-    updateStructuredBuildingVisibility();
     engine.render(camera);
     const renderStats = engine.getStats();
     if (drawsMetric) drawsMetric.textContent = `DRAWS ${renderStats.draws}`;
@@ -684,7 +662,7 @@ function clearPersistedBlock() {
   }
 }
 
-function setupOverheadCameraControls(canvas, camera) {
+function setupThirdPersonCameraControls(canvas, camera, { isLocked = () => false, getController = () => null } = {}) {
   const pointers = new Map();
   let lastPinch = null;
 
@@ -696,6 +674,7 @@ function setupOverheadCameraControls(canvas, camera) {
 
   const onPointerDown = event => {
     if (event.button != null && event.button !== 0) return;
+    if (isLocked()) return;
     event.preventDefault();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
@@ -704,15 +683,17 @@ function setupOverheadCameraControls(canvas, camera) {
 
   const onPointerMove = event => {
     const previous = pointers.get(event.pointerId);
-    if (!previous) return;
+    if (!previous || isLocked()) return;
     event.preventDefault();
     const next = { x: event.clientX, y: event.clientY };
     pointers.set(event.pointerId, next);
-
+    const controller = getController();
     if (pointers.size >= 2) {
       const pinch = pinchDistance();
-      if (pinch != null && lastPinch != null) camera.zoom((lastPinch - pinch) * 0.055);
+      if (pinch != null && lastPinch != null) controller?.zoom?.((lastPinch - pinch) * 0.018);
       lastPinch = pinch;
+    } else {
+      controller?.orbit?.((next.x - previous.x) * -0.008, (next.y - previous.y) * 0.006);
     }
   };
 
@@ -723,8 +704,9 @@ function setupOverheadCameraControls(canvas, camera) {
   };
 
   const onWheel = event => {
+    if (isLocked()) return;
     event.preventDefault();
-    camera.zoom(event.deltaY * 0.012);
+    getController()?.zoom?.(event.deltaY * 0.012);
   };
 
   canvas.addEventListener('pointerdown', onPointerDown, { passive: false });

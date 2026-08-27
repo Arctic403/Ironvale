@@ -6,7 +6,7 @@ import {
   riftWorldCellToSection
 } from './rift-block-section.js';
 import { expandRiftCityBlueprintLayer } from './rift-city-blueprints.js';
-import { buildRiftVisibilityStructures, classifyRiftVisibilityFace } from './rift-building-visibility.js';
+import { buildRiftVisibilityStructures } from './rift-building-visibility.js';
 import {
   RIFT_BLOCK_ROTATIONS,
   RIFT_BLOCK_SHAPES,
@@ -184,24 +184,22 @@ function countSectionCells(grid) {
   return { cells, partialCells };
 }
 
-function compileSectionMeshes(grid, resolveColor, visibilityStructures = []) {
+function compileSectionMeshes(grid, resolveColor) {
   const meshes = [];
   const totals = { quads: 0, vertices: 0, triangles: 0, shapeAwareSections: 0, visibilityLayers: 0 };
-  const classifyBlockFace = visibilityStructures.length
-    ? info => classifyRiftVisibilityFace({ structures: visibilityStructures, ...info })
-    : null;
   const sections = [...grid.sections.values()].sort((a, b) => a.sy - b.sy || a.sz - b.sz || a.sx - b.sx);
   for (const section of sections) {
     if (!section.countSolid()) continue;
-    const geometry = grid.buildGeometryForSection(section, { getBlockColor: resolveColor, classifyBlockFace });
+    // H1.74 deliberately compiles one complete render mesh per RiftSection. Building
+    // shell metadata is still collected for future gameplay/streaming uses, but it
+    // no longer partitions faces into hideable camera-visibility layers.
+    const geometry = grid.buildGeometryForSection(section, { getBlockColor: resolveColor });
     if (geometry.vertexStride !== 9) throw new Error(`Section ${section.sx},${section.sy},${section.sz} lost the 9-float vertex contract.`);
     if (geometry.shapeAware) totals.shapeAwareSections += 1;
     totals.quads += geometry.visibleFaces;
     totals.vertices += geometry.vertexCount;
     totals.triangles += geometry.triangles;
-    const visibilityLayers = Array.isArray(geometry.visibilityLayers) ? geometry.visibilityLayers : [];
-    totals.visibilityLayers += visibilityLayers.length;
-    meshes.push({ section: [section.sx, section.sy, section.sz], geometry, visibilityLayers });
+    meshes.push({ section: [section.sx, section.sy, section.sz], geometry, visibilityLayers: [] });
   }
   return { meshes, totals };
 }
@@ -304,7 +302,7 @@ export function compileRiftCityBlock(input) {
   const resolveColor = ({ state = 0 } = {}) => parsed.stateColors.get(state) || [1, 1, 1];
   const { cells, partialCells } = countSectionCells(grid);
   const visibilityStructures = buildRiftVisibilityStructures(parsed.ops, { origin: parsed.origin });
-  const { meshes, totals } = compileSectionMeshes(grid, resolveColor, visibilityStructures);
+  const { meshes, totals } = compileSectionMeshes(grid, resolveColor);
   const worldMin = addOrigin(parsed.bounds.min, parsed.origin);
   const worldMax = addOrigin(parsed.bounds.max, parsed.origin);
   const center = [
@@ -388,7 +386,7 @@ export function compileRiftCityBlock(input) {
       warnings: parsed.blueprint.warnings
     },
     visibility: {
-      mode: 'structured-building-layers',
+      mode: 'metadata-only-no-cutaway',
       structures: visibilityStructures
     },
     worldBounds: { min: worldMin, max: worldMax },

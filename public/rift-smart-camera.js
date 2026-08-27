@@ -231,8 +231,8 @@ export function createRiftSmartCamera({
     let bestAtCurrentAngle = null;
 
     if (inside || locked) {
-      // Indoors the semantic roof/wall cutaway owns visibility. Build Mode is also
-      // intentionally camera-stable so a selection gesture cannot rotate the world.
+      // Indoors the legacy smart camera remains stable. H1.74 never hides geometry;
+      // Build Mode is also camera-stable so a selection gesture cannot rotate the world.
       desiredAlpha = camera.alpha;
       desiredPan = [0, 0];
       occludedFor = 0;
@@ -322,7 +322,7 @@ export function createRiftSmartCamera({
       radius: camera.radius
     });
     lastState = {
-      mode: inside ? 'interior-cutaway' : locked ? 'locked' : postView.score > EPSILON ? 'occluded-backup-cutaway' : Math.hypot(pan[0], pan[1]) > 0.05 ? 'pan' : 'follow',
+      mode: inside ? 'interior-lock' : locked ? 'locked' : postView.score > EPSILON ? 'occluded' : Math.hypot(pan[0], pan[1]) > 0.05 ? 'pan' : 'follow',
       score: postView.score,
       blockingStructures: [...postView.visibility.blockingStructures],
       insideStructures: [...postView.visibility.insideStructures],

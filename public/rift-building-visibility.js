@@ -408,82 +408,44 @@ export function resolveRiftBuildingVisibility({
   structures = [],
   playerPosition = [0, 0, 0],
   cameraPosition = [0, 0, 0],
-  overview = false
+  overview = false,
+  exteriorOcclusion = true
 } = {}) {
+  // H1.74: this function is metadata-only. Third-person camera collision owns
+  // visibility, so no camera/player state is allowed to hide authored geometry.
+  // We retain containment and line-of-sight records because they are useful for
+  // diagnostics, gameplay triggers and the legacy smart-camera regression.
   const hiddenLayers = new Set();
-  const activeStructures = [];
-  if (overview) {
-    return {
-      hiddenLayers,
-      activeStructures,
-      insideStructures: [],
-      blockingStructures: [],
-      blockingWallSides: {},
-      suppressedStructures: [],
-      blockingScore: 0
-    };
-  }
-
   const insideStructures = [];
   const blockingStructures = [];
   const blockingWallSides = {};
   let blockingScore = 0;
-  const insideRecords = [];
 
-  for (const structure of structures || []) {
-    const inside = pointInsideStructure(structure, playerPosition);
-    if (inside) {
-      insideStructures.push(structure.id);
-      insideRecords.push(structure);
-      activeStructures.push(structure.id);
-
-      // Interior cutaway: the player's own roof (and every attachment assigned to that
-      // roof layer) disappears, along with only the upper walls facing the camera.
-      hiddenLayers.add(structure.layers.roof);
-      for (const side of cameraFacingSides(structure, cameraPosition)) {
-        hiddenLayers.add(structure.layers.walls[side]);
+  if (!overview) {
+    for (const structure of structures || []) {
+      if (pointInsideStructure(structure, playerPosition)) {
+        insideStructures.push(structure.id);
+        continue;
       }
-      continue;
-    }
-
-    const occlusion = structureOcclusion(structure, playerPosition, cameraPosition);
-    if (!occlusion) continue;
-
-    blockingStructures.push(structure.id);
-    blockingWallSides[structure.id] = [...occlusion.wallSides];
-    blockingScore += 1 + Math.max(0, occlusion.tExit - occlusion.tEnter) * 2 + Math.max(0, occlusion.wallSides.length - 1) * 0.08;
-    activeStructures.push(structure.id);
-
-    // Exterior occlusion is intentionally different from being inside. A building that
-    // merely sits between the overhead camera and the player keeps its roof. Only the
-    // exact camera-entry wall face(s) are removed so unrelated/nearby roofs never pop out.
-    for (const side of occlusion.wallSides) {
-      hiddenLayers.add(structure.layers.walls[side]);
-    }
-  }
-
-  // If the player is on a lower authored floor, complete overlapping shells above that
-  // floor are suppressed. This prevents an upper office floor, its furniture and wall
-  // stub from covering the active lower floor.
-  const suppressedStructures = [];
-  for (const current of insideRecords) {
-    for (const candidate of structures || []) {
-      if (candidate.id === current.id) continue;
-      if (candidate.floorY < current.roofY + 1) continue;
-      if (!structureFootprintOverlap(current, candidate)) continue;
-      if (!suppressedStructures.includes(candidate.id)) suppressedStructures.push(candidate.id);
-      for (const key of allStructureLayerKeys(candidate)) hiddenLayers.add(key);
+      if (!exteriorOcclusion) continue;
+      const occlusion = structureOcclusion(structure, playerPosition, cameraPosition);
+      if (!occlusion) continue;
+      blockingStructures.push(structure.id);
+      blockingWallSides[structure.id] = [...occlusion.wallSides];
+      blockingScore += 1
+        + Math.max(0, occlusion.tExit - occlusion.tEnter) * 2
+        + Math.max(0, occlusion.wallSides.length - 1) * 0.08;
     }
   }
 
   return {
     hiddenLayers,
-    activeStructures,
+    activeStructures: [...new Set([...insideStructures, ...blockingStructures])],
     insideStructures,
     blockingStructures,
     blockingWallSides,
     blockingScore,
-    suppressedStructures
+    suppressedStructures: []
   };
 }
 
@@ -498,41 +460,21 @@ export function validateRiftBuildingVisibility() {
     { op: 'fill_box', name: 'test rooftop HVAC', min: [4, 7, 4], max: [5, 8, 5], state: 'roof' }
   ]);
   const structure = structures[0];
-  if (!structure) failures.push('hollow_box did not produce a visibility structure');
+  if (!structure) failures.push('hollow_box did not produce building metadata');
   if (structure) {
-    const stairLayer = classifyRiftVisibilityFace({ structures, worldX: 2, worldY: 4, worldZ: 4, shape: RIFT_BLOCK_SHAPES.stair, face: { id: 'west' } });
-    if (stairLayer !== structure.layers.partial) failures.push('stairs inside a structure must stay a whole-piece partial layer');
-    const slabLayer = classifyRiftVisibilityFace({ structures, worldX: 2, worldY: 4, worldZ: 4, shape: RIFT_BLOCK_SHAPES.bottomSlab, face: { id: 'west' } });
-    if (slabLayer !== structure.layers.partial) failures.push('slabs inside a structure must stay a whole-piece partial layer');
-    const floorLayer = classifyRiftVisibilityFace({ structures, worldX: 5, worldY: 1, worldZ: 5, shape: RIFT_BLOCK_SHAPES.full, face: { id: 'top' } });
-    if (floorLayer !== structure.layers.base) failures.push('structure floor must remain in its non-cutaway base layer');
-    const roofLayer = classifyRiftVisibilityFace({ structures, worldX: 5, worldY: 6, worldZ: 5, shape: RIFT_BLOCK_SHAPES.full, face: { id: 'top' } });
-    if (roofLayer !== structure.layers.roof) failures.push('roof did not classify into its structure roof layer');
-
-    if (!structure.roofAttachments.length) failures.push('rooftop attachment was not assigned to its supporting structure');
-    const attachmentLayer = classifyRiftVisibilityFace({ structures, worldX: 4, worldY: 7, worldZ: 4, shape: RIFT_BLOCK_SHAPES.full, face: { id: 'top' } });
-    if (attachmentLayer !== structure.layers.roof) failures.push('rooftop attachment did not inherit the roof visibility layer');
-
-    const westWall = classifyRiftVisibilityFace({ structures, worldX: 2, worldY: 4, worldZ: 5, shape: RIFT_BLOCK_SHAPES.full, face: { id: 'east' } });
-    if (westWall !== structure.layers.walls.west) failures.push('west wall did not classify into a directional wall layer');
+    if (!structure.roofAttachments.length) failures.push('rooftop attachment metadata was not assigned to its supporting structure');
 
     const inside = resolveRiftBuildingVisibility({ structures, playerPosition: [5.5, 2, 5.5], cameraPosition: [-20, 20, -20] });
-    if (!inside.hiddenLayers.has(structure.layers.roof)) failures.push('inside player did not hide roof');
-    if (!inside.hiddenLayers.has(structure.layers.walls.west) || !inside.hiddenLayers.has(structure.layers.walls.north)) {
-      failures.push('inside player did not hide camera-facing walls');
-    }
-    if (inside.hiddenLayers.has(structure.layers.walls.east) || inside.hiddenLayers.has(structure.layers.walls.south)) {
-      failures.push('inside player hid back-facing walls');
-    }
+    if (!inside.insideStructures.includes(structure.id)) failures.push('inside containment metadata was lost');
+    if (inside.hiddenLayers.size) failures.push('inside third-person view attempted to hide building geometry');
+    if (inside.suppressedStructures.length) failures.push('inside third-person view attempted upper-floor suppression');
 
     const exterior = resolveRiftBuildingVisibility({ structures, playerPosition: [14, 2, 5.5], cameraPosition: [-20, 20, 5.5] });
-    if (!exterior.blockingStructures.includes(structure.id)) failures.push('camera-blocking exterior structure was not detected');
-    if (exterior.hiddenLayers.has(structure.layers.roof)) failures.push('exterior camera blocker incorrectly hid its roof');
-    if (!exterior.hiddenLayers.has(structure.layers.walls.west)) failures.push('exterior blocker did not hide the camera-entry west wall');
-    if (exterior.hiddenLayers.has(structure.layers.walls.east)) failures.push('exterior blocker hid the far wall instead of only the occluding wall');
+    if (!exterior.blockingStructures.includes(structure.id)) failures.push('camera-blocking structure metadata was not detected');
+    if (exterior.hiddenLayers.size) failures.push('exterior third-person view attempted to hide building geometry');
 
     const overview = resolveRiftBuildingVisibility({ structures, playerPosition: [5.5, 2, 5.5], cameraPosition: [-20, 20, -20], overview: true });
-    if (overview.hiddenLayers.size !== 0) failures.push('overview must restore every structure layer');
+    if (overview.hiddenLayers.size) failures.push('overview attempted to hide building geometry');
 
     const stacked = buildRiftVisibilityStructures([
       { op: 'hollow_box', name: 'ground', min: [0, 0, 0], max: [8, 4, 8], wall_thickness: 1 },
@@ -540,33 +482,9 @@ export function validateRiftBuildingVisibility() {
       { op: 'fill_box', name: 'upper desk', min: [2, 6, 2], max: [3, 6, 3], state: 'wood' }
     ]);
     const lower = stacked.find(entry => entry.name === 'ground');
-    const upper = stacked.find(entry => entry.name === 'upper');
     if (lower?.roofAttachments?.length) failures.push('upper-floor interior geometry was incorrectly assigned as a lower roof attachment');
-    const floorCut = resolveRiftBuildingVisibility({ structures: stacked, playerPosition: [4.5, 1.5, 4.5], cameraPosition: [-20, 20, -20] });
-    if (!floorCut.suppressedStructures.includes(upper.id)) failures.push('upper overlapping floor was not suppressed for a lower-floor player');
-    if (!floorCut.hiddenLayers.has(upper.layers.base) || !floorCut.hiddenLayers.has(upper.layers.interior) || !floorCut.hiddenLayers.has(upper.layers.partial)) {
-      failures.push('upper floor suppression did not hide its floor/interior/partial whole-piece layers');
-    }
-    if (floorCut.hiddenLayers.has(lower.layers.base) || floorCut.hiddenLayers.has(lower.layers.interior) || floorCut.hiddenLayers.has(lower.layers.partial)) {
-      failures.push('active floor base/interior/partial layers were hidden');
-    }
-
-    const twoBuildings = buildRiftVisibilityStructures([
-      { op: 'hollow_box', name: 'blocker', min: [2, 1, 2], max: [9, 6, 9], wall_thickness: 1 },
-      { op: 'hollow_box', name: 'nearby', min: [2, 1, 14], max: [9, 6, 21], wall_thickness: 1 }
-    ]);
-    const blocker = twoBuildings.find(entry => entry.name === 'blocker');
-    const nearby = twoBuildings.find(entry => entry.name === 'nearby');
-    const selective = resolveRiftBuildingVisibility({
-      structures: twoBuildings,
-      playerPosition: [14, 2, 5.5],
-      cameraPosition: [-20, 20, 5.5]
-    });
-    if (!selective.hiddenLayers.has(blocker.layers.walls.west)) failures.push('actual blocking building wall was not cut away');
-    if (selective.hiddenLayers.has(blocker.layers.roof)) failures.push('actual blocking building roof was hidden while player was outside');
-    if (selective.hiddenLayers.has(nearby.layers.roof) || Object.values(nearby.layers.walls).some(key => selective.hiddenLayers.has(key))) {
-      failures.push('nearby non-blocking building was modified by exterior occlusion');
-    }
+    const floorView = resolveRiftBuildingVisibility({ structures: stacked, playerPosition: [4.5, 1.5, 4.5], cameraPosition: [-20, 20, -20] });
+    if (floorView.hiddenLayers.size || floorView.suppressedStructures.length) failures.push('stacked floors were camera-suppressed in no-cutaway mode');
   }
   return { ok: failures.length === 0, failures };
 }

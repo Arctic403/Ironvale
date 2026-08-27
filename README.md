@@ -1692,3 +1692,59 @@ H1.69 hardens the local landing manifold without changing the H1.67 smart camera
 - the landing depenetration follows slab/stair support height changes rather than assuming every lower surface is flat.
 
 The player regression suite now reproduces the original slow-walk edge failure at multiple sub-block offsets, plus full→full, full→bottom-slab, full→stair and diagonal-corner landings. Those cases must settle on the first valid surface without invoking kill-plane recovery.
+
+## H1.70 — zero-penetration RiftPlayer hardening
+
+H1.70 hardens the H1.68/H1.69 player controller so collision correction happens before a player transform is committed to the renderer. The remaining playtest failure was not missing support data: the lower body probes started too high and a generic stepable-obstacle exception could briefly treat the side of a full block as legal while the player's feet were already inside solid geometry.
+
+- Added a small collision skin and near-feet probes so full-block penetration is detected immediately instead of after roughly a quarter meter of sinking.
+- Removed the generic low-body step exemption for full blocks. Only the small height variation across the same authored stair is allowed near the feet.
+- Descending edge motion clears residual side overlap before lowering the player's feet, so creeping off a stacked block cannot render an embedded frame before H1.69's lower-surface landing resolves.
+- Upward/jump motion uses the same pre-contact collision sweep, preventing the player from entering a full block side while jumping onto it and providing a conservative ceiling-contact path.
+- Every non-flying physics substep now enforces a final invariant: a transform that still intersects solid RiftBlock volume is corrected horizontally, rolled back to the previous safe substep, or recovered to validated safe ground before rendering.
+- The H1.69 stacked-support selection, H1.68 loaded-world bounds/kill-plane recovery, stair/slab support heights, Build Mode revalidation, structured building visibility and smart outdoor camera remain unchanged.
+- Player regression coverage now records every committed transform during jump-on-block and slow-edge-drop torture cases and fails if any rendered position penetrates the upper full block.
+
+## H1.71 — partial-shape transitions + invisible stair ramps
+
+H1.70 made full-block collision deliberately strict, which removed visible penetration but also exposed a transition-order bug: the body sweep could see a legal half slab or stair approach as a wall before the support solver had raised/lowered the player's feet onto the partial shape.
+
+H1.71 keeps the zero-penetration invariant while making partial shapes first-class movement surfaces:
+
+- Ground → bottom slab and slab → full transitions resolve the legal vertical step before committing horizontal overlap, so normal walking no longer sticks on the 0.5 m riser.
+- Full → slab transitions keep horizontal escape legal at the departing height, then use the existing swept fall/support manifold to settle cleanly onto the 0.5 m lower surface.
+- Stair rendering is unchanged: authored stairs still look like two chunky RiftBlock steps.
+- Stair player collision/support is now a separate invisible continuous ramp from 0 m at the low edge to 1 m at the high edge. North/East/South/West rotations all map their local travel axis onto the same ramp height field.
+- The strict full-block side rule from H1.70 remains. Partial-shape movement is solved by finding a real walkable support height first, not by reintroducing a generic collision exemption.
+- A short-lived step-assist retains the newly reached slab/ramp support while the player's radius crosses the riser boundary, preventing the controller from snapping down during the few centimeters before the center enters the next cell.
+- Descending stairs follow the same continuous support plane, while H1.69 stacked-surface landing and H1.68 bounds/recovery remain active as safety layers.
+
+`verify:player-physics` now covers ground↔slab and full↔slab transitions, four-way stair ascent with continuous in-ramp height samples, and full→stair→ground descent. The tests fail if a stair collapses back to two collision treads, if a legal partial-shape transition sticks, or if any of those transitions requires kill-plane recovery.
+
+## H1.72 — stable edge support + partial-foot landing ownership
+
+H1.72 fixes the final support-ownership jitter exposed by H1.71. Center-only ground selection could switch to a lower block as soon as the player's center crossed an edge even though a meaningful part of the circular foot was still resting on the upper top. The zero-penetration safety layer then correctly resolved the resulting side overlap, but visually that looked like the game shoved the player off the ledge.
+
+- Ground support now has a small persistent contact manifold sampled across the circular player footprint instead of treating the center sample as the sole owner of flat support.
+- A flat upper block/slab keeps support ownership while a meaningful set of foot contacts still touches that same top surface. Lower center samples cannot steal ownership early.
+- The support hold is deliberately hysteretic rather than magnetic: once meaningful upper contact disappears, the controller releases normally and H1.69's stacked-surface fall/landing logic takes over.
+- Descending stair ramps still follow their center ramp height continuously. Non-center stair samples are excluded from the flat support manifold so H1.71's invisible 0→1 m stair slope does not become a sticky ledge.
+- Falling landing checks now gather crossed support contacts across the footprint. The highest valid contacted flat surface can own a landing even when the player's center is already just outside that block.
+- Partial-foot jump landings no longer get depenetrated sideways onto a lower floor simply because center support points lower; if the upper top has a real support manifold, the player lands and remains there.
+- H1.70's zero-penetration invariant remains unchanged: retaining edge support never permits the player body to occupy solid RiftBlock volume.
+
+`verify:player-physics` now includes one-foot-on/one-foot-off idle standing, deliberate full walk-off after support loss, and a jump landing with the player's center outside the upper block while the foot still overlaps it. The suite also keeps all H1.68–H1.71 bounds, stacked-surface, zero-penetration, slab-transition and four-way invisible stair-ramp regressions.
+
+## H1.74 — third-person no-cutaway cleanup
+
+RiftCity's active City view now treats building geometry as authoritative at all times. The third-person camera solves obstruction by retracting toward the player instead of modifying the world render.
+
+- Removed the active per-frame structured building cutaway call from `downtown3d-foundation.js`. Player position, camera position, interior containment and City Overview no longer toggle drawable visibility.
+- RiftSections are rendered as complete meshes again. The importer no longer partitions section faces into hideable roof/wall/interior camera layers, reducing the active draw path and eliminating roof/wall pop-out behavior by construction.
+- Building shell/roof-attachment metadata is retained as metadata only for future gameplay, streaming, location and diagnostic uses. `resolveRiftBuildingVisibility()` may still report containment and camera-line blockers, but its `hiddenLayers` set is always empty and it never suppresses stacked floors.
+- Third-person camera collision/retraction remains the only gameplay visibility response. Outdoor walls/roofs, indoor roofs/ceilings and upper floors all remain rendered normally.
+- City Overview also renders the exact same complete building geometry.
+- The old smart-camera module remains diagnostic/legacy code only; its state labels no longer reference cutaway behavior and it cannot hide geometry through the metadata resolver.
+
+`verify:building-visibility` and `verify:third-person-camera` now fail if any inside, outside or overview camera state produces hidden/suppressed building layers, or if the importer recreates camera-hideable render partitions.
+

@@ -7,6 +7,7 @@ export const RIFT_PLAYER_EYE_HEIGHT = 1.62;
 export const RIFT_PLAYER_RADIUS = 0.28;
 export const RIFT_PLAYER_PHYSICS_MAX_STEP = 1 / 120;
 export const RIFT_PLAYER_KILL_MARGIN = 8;
+export const RIFT_PLAYER_COLLISION_SKIN = 0.012;
 const RIFT_PLAYER_WORLD_EPSILON = 0.002;
 
 export function getRiftPlayerWorldFootprint(bounds, radius = RIFT_PLAYER_RADIUS) {
@@ -116,7 +117,11 @@ export function riftPlayerStairTop(decoded, localX, localZ) {
     case RIFT_BLOCK_ROTATIONS.west: t = 1 - localX; break;
     default: t = 0;
   }
-  return 0.5 + clamp(t, 0, 1) * 0.5;
+  // H1.71: rendering keeps the authored two-step stair mesh, but player
+  // collision/support rides an invisible full-cell ramp. That makes a stair
+  // connect continuously from the floor at its low edge (0 m) to the next
+  // full-block level at its high edge (1 m), independent of the visual treads.
+  return clamp(t, 0, 1);
 }
 
 export function riftPlayerShapeTopAt(state, worldX, worldZ) {
@@ -211,6 +216,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   let enabled = true, creative = false, flying = false, jumpVelocity = 0, grounded = true, targetFacing = player.facing;
   let lastSafeGroundedPosition = null;
   let recoveryCount = 0;
+  let stepAssist = null;
   const touch = { x: 0, z: 0, run: false, jump: false, down: false };
 
   const getState = (x, y, z) => getGrid?.()?.getBlockWorld(Math.floor(x), Math.floor(y), Math.floor(z)) || 0;
@@ -227,64 +233,284 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     });
   }
 
-  function bodyBlocked(x, floorY, z) {
+  const bodyProbes = (() => {
     const r = player.radius;
-    const probes = [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0]];
-    // Start above the maximum height variation that can occur across the player's
-    // footprint on one legal 0.5 m stair ramp. This prevents the support stair
-    // itself from becoming an invisible knee-high wall.
-    const heights = [0.24, 0.72, 1.28, player.height - 0.08];
+    return [
+      [-r, -r], [r, -r], [-r, r], [r, r], [0, 0],
+      [-r, 0], [r, 0], [0, -r], [0, r]
+    ];
+  })();
+  // H1.72: support ownership is sampled over the circular foot instead of only
+  // at its center. These probes are intentionally denser than body collision
+  // probes: a character may stand/land with part of the foot over a ledge, but a
+  // single numerical point touching a corner must not create an infinite ledge
+  // magnet. Flat surfaces need a small manifold of contacts to own support.
+  const supportFootprintProbes = (() => {
+    const points = [[0, 0]];
+    for (const [fraction, count] of [[0.44, 8], [0.74, 12], [0.96, 16]]) {
+      const radius = player.radius * fraction;
+      for (let i = 0; i < count; i += 1) {
+        const angle = i / count * Math.PI * 2;
+        points.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+      }
+    }
+    return points;
+  })();
+  const stableSupportMinContacts = Math.max(4, Math.ceil(supportFootprintProbes.length * 0.12));
+  const bodyProbeHeights = [
+    RIFT_PLAYER_COLLISION_SKIN,
+    0.18,
+    0.46,
+    0.82,
+    1.24,
+    player.height - RIFT_PLAYER_COLLISION_SKIN
+  ];
+  // A vertical cylinder riding a slope has uphill footprint probes above the
+  // center support plane. Ignore only that predictable near-feet ramp wedge;
+  // the high vertical face of a stair still blocks when approached backward.
+  const stairFootClearance = Math.max(0.32, player.radius + 0.04);
 
-    for (const [dx, dz] of probes) {
-      for (const h of heights) {
+  function stairSupportContext(x, floorY, z) {
+    // The visible stair is still two treads, but the controller stands on a
+    // virtual ramp. A vertical cylinder with a perfectly flat bottom would
+    // intersect the uphill terrain under its own radius, so collision needs a
+    // small slope-foot context while the CENTER is genuinely supported by a
+    // stair. This is intentionally unavailable beside ordinary full blocks.
+    const supportCellY = Math.floor(floorY - RIFT_PLAYER_COLLISION_SKIN);
+    const state = getState(x, supportCellY, z);
+    if (!state) return null;
+    const decoded = decodeRiftBlockState(state);
+    if (decoded.shape !== RIFT_BLOCK_SHAPES.stair) return null;
+    const supportY = supportCellY + riftPlayerShapeTopAt(state, x, z);
+    if (Math.abs(supportY - floorY) > 0.07) return null;
+    return { x, z, rotation: decoded.rotation };
+  }
+
+  function stairUphillDistance(context, px, pz) {
+    if (!context) return 0;
+    switch (context.rotation) {
+      case RIFT_BLOCK_ROTATIONS.north: return Math.max(0, context.z - pz);
+      case RIFT_BLOCK_ROTATIONS.east: return Math.max(0, px - context.x);
+      case RIFT_BLOCK_ROTATIONS.south: return Math.max(0, pz - context.z);
+      case RIFT_BLOCK_ROTATIONS.west: return Math.max(0, context.x - px);
+      default: return 0;
+    }
+  }
+
+  function probeIsBlocking(px, py, pz, floorY, h, stairContext = null) {
+    if (!surfaces.pointSolidAt(px, py, pz)) return false;
+    const cy = Math.floor(py);
+    const state = getState(px, cy, pz);
+    if (!state) return false;
+    const decoded = decodeRiftBlockState(state);
+    const obstacleTop = cy + riftPlayerShapeTopAt(state, px, pz);
+
+    // While the center rides an authored stair ramp, allow only the predictable
+    // terrain wedge under the uphill portion of the body footprint. This also
+    // covers the final centimeters where the uphill probe has entered the full
+    // block/platform connected to the high edge of the ramp. It is NOT a generic
+    // full-block step exemption: without a validated stair under the center this
+    // branch cannot run, preserving H1.70's zero-penetration wall rule.
+    if (stairContext) {
+      const uphill = stairUphillDistance(stairContext, px, pz);
+      const allowedRise = Math.min(stairFootClearance, uphill + 0.045);
+      if (allowedRise > 0 && h <= allowedRise + RIFT_PLAYER_COLLISION_SKIN && obstacleTop <= floorY + allowedRise + 0.01) {
+        return false;
+      }
+    }
+
+    // Same-ramp probes need the equivalent allowance even before the footprint
+    // crosses into the neighboring high platform.
+    if (decoded.shape === RIFT_BLOCK_SHAPES.stair && h <= 0.24) {
+      if (obstacleTop <= floorY + stairFootClearance) return false;
+    }
+    return true;
+  }
+
+  function bodyBlocked(x, floorY, z) {
+    const stairContext = stairSupportContext(x, floorY, z);
+    for (const [dx, dz] of bodyProbes) {
+      for (const h of bodyProbeHeights) {
         const px = x + dx, pz = z + dz, py = floorY + h;
-        if (!surfaces.pointSolidAt(px, py, pz)) continue;
-
-        if (h < RIFT_PLAYER_STEP_UP + 0.04) {
-          const cy = Math.floor(py);
-          const state = getState(px, cy, pz);
-          if (state) {
-            const obstacleTop = cy + riftPlayerShapeTopAt(state, px, pz);
-            if (obstacleTop <= floorY + RIFT_PLAYER_STEP_UP + 0.025) continue;
-          }
-        }
-        return true;
+        if (probeIsBlocking(px, py, pz, floorY, h, stairContext)) return true;
       }
     }
     return false;
   }
 
   function bodyBlockScore(x, floorY, z) {
-    const r = player.radius;
-    const probes = [[-r, -r], [r, -r], [-r, r], [r, r], [0, 0], [-r, 0], [r, 0], [0, -r], [0, r]];
-    const heights = [0.24, 0.72, 1.28, player.height - 0.08];
+    const stairContext = stairSupportContext(x, floorY, z);
     let score = 0;
-    for (const [dx, dz] of probes) {
-      for (const h of heights) {
+    for (const [dx, dz] of bodyProbes) {
+      for (const h of bodyProbeHeights) {
         const px = x + dx, pz = z + dz, py = floorY + h;
-        if (!surfaces.pointSolidAt(px, py, pz)) continue;
-        if (h < RIFT_PLAYER_STEP_UP + 0.04) {
-          const cy = Math.floor(py);
-          const state = getState(px, cy, pz);
-          if (state) {
-            const obstacleTop = cy + riftPlayerShapeTopAt(state, px, pz);
-            if (obstacleTop <= floorY + RIFT_PLAYER_STEP_UP + 0.025) continue;
-          }
-        }
-        score += 1;
+        if (probeIsBlocking(px, py, pz, floorY, h, stairContext)) score += 1;
       }
     }
     return score;
   }
 
+
+  function hasSupportAtHeightUnderFootprint(x, z, supportY, tolerance = 0.065) {
+    if (!Number.isFinite(supportY)) return false;
+    const points = [[0, 0], ...bodyProbes];
+    for (const [dx, dz] of points) {
+      const sampled = surfaces.supportAtPoint(x + dx, z + dz, supportY + 0.04, {
+        maxRise: 0.08,
+        maxDrop: 0.14
+      });
+      if (sampled != null && Math.abs(sampled - supportY) <= tolerance) return true;
+    }
+    return false;
+  }
+
+  function flatSupportContactAtHeight(x, z, supportY, tolerance = 0.045) {
+    if (!Number.isFinite(supportY)) return { count: 0, total: supportFootprintProbes.length, fraction: 0 };
+    let count = 0;
+    for (const [dx, dz] of supportFootprintProbes) {
+      const px = x + dx, pz = z + dz;
+      const candidates = surfaces.supportCandidatesAtPoint(px, pz, supportY + 0.025, {
+        maxRise: 0.055,
+        maxDrop: 0.08
+      });
+      const matched = candidates.find(value => Math.abs(value - supportY) <= tolerance);
+      if (matched == null) continue;
+      const cellY = Math.floor(matched - RIFT_PLAYER_COLLISION_SKIN);
+      const state = getState(px, cellY, pz);
+      if (!state) continue;
+      if (decodeRiftBlockState(state).shape === RIFT_BLOCK_SHAPES.stair) continue;
+      count += 1;
+    }
+    return { count, total: supportFootprintProbes.length, fraction: count / supportFootprintProbes.length };
+  }
+
+  function hasStableFlatSupportAtHeight(x, z, supportY, tolerance = 0.045) {
+    return flatSupportContactAtHeight(x, z, supportY, tolerance).count >= stableSupportMinContacts;
+  }
+
+  function landingCandidatesUnderFootprint(x, z, previousY, candidateY, options = {}) {
+    const groups = [];
+    const groupTolerance = Math.max(0.018, Number(options.groupTolerance) || 0.028);
+    for (let probeIndex = 0; probeIndex < supportFootprintProbes.length; probeIndex += 1) {
+      const [dx, dz] = supportFootprintProbes[probeIndex];
+      const px = x + dx, pz = z + dz;
+      const crossings = surfaces.supportCrossings(px, pz, previousY, candidateY, options);
+      for (const supportY of crossings) {
+        const cellY = Math.floor(supportY - RIFT_PLAYER_COLLISION_SKIN);
+        const state = getState(px, cellY, pz);
+        const shape = state ? decodeRiftBlockState(state).shape : null;
+        // Non-center stair samples have intentionally different ramp heights. Do
+        // not combine those into a fake flat landing plane; the center probe owns
+        // continuous stair/ramp landings. Flat block/slab surfaces form a real
+        // multi-contact manifold and may own support even when center is over air
+        // or a lower floor.
+        if (probeIndex !== 0 && shape === RIFT_BLOCK_SHAPES.stair) continue;
+        let group = groups.find(item => Math.abs(item.y - supportY) <= groupTolerance);
+        if (!group) {
+          group = { y: supportY, contacts: 0, center: false };
+          groups.push(group);
+        }
+        group.contacts += 1;
+        if (probeIndex === 0) group.center = true;
+      }
+    }
+    return groups
+      .filter(group => group.center || group.contacts >= stableSupportMinContacts)
+      .sort((a, b) => b.y - a.y);
+  }
+
+  function findWalkableStepUpY(current, targetX, targetZ) {
+    // A strict zero-penetration sweep sees a half slab (or the final high edge
+    // of a ramp) before the player's center has crossed into that cell. Rather
+    // than exempting the obstacle side from collision, find the real top/support
+    // under the target footprint and move vertically FIRST. Full-block walls are
+    // still hard blockers unless their top is genuinely within STEP_UP.
+    const maxY = current.y + RIFT_PLAYER_STEP_UP + 0.02;
+    const moveX = targetX - current.x;
+    const moveZ = targetZ - current.z;
+    const moveLength = Math.hypot(moveX, moveZ);
+    const dirX = moveLength > 1e-8 ? moveX / moveLength : 0;
+    const dirZ = moveLength > 1e-8 ? moveZ / moveLength : 0;
+    let stepY = null;
+    for (const [dx, dz] of bodyProbes) {
+      // Only inspect the leading half of the footprint. A higher surface behind
+      // the player is the ledge being LEFT, not a step we should climb back onto.
+      if (moveLength > 1e-8 && dx * dirX + dz * dirZ < -0.001) continue;
+      const sampled = surfaces.supportAtPoint(targetX + dx, targetZ + dz, current.y, {
+        maxRise: RIFT_PLAYER_STEP_UP + 0.02,
+        maxDrop: 0.04
+      });
+      if (sampled == null || sampled <= current.y + RIFT_PLAYER_COLLISION_SKIN || sampled > maxY) continue;
+      if (stepY == null || sampled > stepY) stepY = sampled;
+    }
+    if (stepY == null) return null;
+    if (!hasSupportAtHeightUnderFootprint(targetX, targetZ, stepY)) return null;
+    if (bodyBlocked(targetX, stepY, targetZ)) return null;
+    return stepY;
+  }
+
+  function resolveNonPenetratingHorizontal(x, floorY, z, preferX = 0, preferZ = 0, maxResolve = player.radius + 0.06) {
+    const constrainedBase = constrainHorizontal(x, z);
+    const baseX = constrainedBase.x, baseZ = constrainedBase.z;
+    if (!bodyBlocked(baseX, floorY, baseZ)) {
+      return { x: baseX, y: floorY, z: baseZ, adjusted: constrainedBase.constrained };
+    }
+
+    const preferLength = Math.hypot(preferX, preferZ);
+    const dirX = preferLength > 1e-7 ? preferX / preferLength : 0;
+    const dirZ = preferLength > 1e-7 ? preferZ / preferLength : 0;
+    let best = null;
+
+    // Search from tiny corrections outward. Prefer the current motion direction
+    // so slowly leaving a ledge clears the old block instead of popping backward.
+    for (let radius = 0.005; radius <= maxResolve + 1e-9; radius += 0.005) {
+      const candidates = [];
+      if (preferLength > 1e-7) candidates.push([dirX * radius, dirZ * radius]);
+      for (let i = 0; i < 32; i += 1) {
+        const angle = i / 32 * Math.PI * 2;
+        candidates.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+      }
+      for (const [ox, oz] of candidates) {
+        const constrained = constrainHorizontal(baseX + ox, baseZ + oz);
+        const cx = constrained.x, cz = constrained.z;
+        if (bodyBlocked(cx, floorY, cz)) continue;
+        const alignment = preferLength > 1e-7 ? (ox * dirX + oz * dirZ) / Math.max(radius, 1e-7) : 0;
+        const score = Math.hypot(cx - baseX, cz - baseZ) - alignment * 0.002;
+        if (!best || score < best.score) best = { x: cx, y: floorY, z: cz, adjusted: true, score };
+      }
+      if (best) break;
+    }
+    return best ? { x: best.x, y: best.y, z: best.z, adjusted: true } : null;
+  }
+
+  function sweepVerticalToNonPenetrating(x, previousY, candidateY, z) {
+    if (!bodyBlocked(x, candidateY, z)) return candidateY;
+    if (bodyBlocked(x, previousY, z)) return previousY;
+    let safe = previousY;
+    let blocked = candidateY;
+    // Binary-search the first contact plane. This is intentionally conservative:
+    // we stay one skin-width outside the solid instead of rendering one frame
+    // embedded and correcting afterward.
+    for (let i = 0; i < 14; i += 1) {
+      const mid = (safe + blocked) * 0.5;
+      if (bodyBlocked(x, mid, z)) blocked = mid; else safe = mid;
+    }
+    return safe;
+  }
+
   function resolveLandingPlacement(x, z, landingY, preferX = 0, preferZ = 0) {
     const constrainedBase = constrainHorizontal(x, z);
     const baseX = constrainedBase.x, baseZ = constrainedBase.z;
+    const landingSlopeTolerance = Math.max(0.24, player.radius + 0.08);
     const validAt = (px, pz) => {
-      const support = findGroundY(px, pz, landingY + 0.22, { maxRise: 0.24, maxDrop: 0.28 });
-      if (support == null || Math.abs(support - landingY) > 0.24) return null;
-      if (bodyBlocked(px, support, pz)) return null;
-      return support;
+      const support = findGroundY(px, pz, landingY + 0.22, { maxRise: 0.24, maxDrop: 0.22 + landingSlopeTolerance });
+      if (support != null && Math.abs(support - landingY) <= landingSlopeTolerance && !bodyBlocked(px, support, pz)) return support;
+      // H1.72 partial-foot landing: the center may already be over a lower block
+      // while a meaningful part of the circular foot has crossed the higher flat
+      // top. That higher manifold is a valid landing and must not be discarded or
+      // "corrected" sideways onto the lower floor.
+      if (hasStableFlatSupportAtHeight(px, pz, landingY) && !bodyBlocked(px, landingY, pz)) return landingY;
+      return null;
     };
     const baseSupport = validAt(baseX, baseZ);
     if (baseSupport != null) return { x: baseX, y: baseSupport, z: baseZ, adjusted: constrainedBase.constrained };
@@ -364,6 +590,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     player.setPosition(...target);
     jumpVelocity = 0;
     grounded = true;
+    stepAssist = null;
     recoveryCount += 1;
     rememberSafeGrounded(...target);
     return { position: [...target], reason, recoveryCount };
@@ -374,6 +601,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     player.setPosition(...spawn);
     jumpVelocity = 0;
     grounded = true;
+    stepAssist = null;
     rememberSafeGrounded(...spawn);
     return spawn;
   }
@@ -418,6 +646,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
       if (code === 'Space' && !flying && grounded) {
         jumpVelocity = 5.1;
         grounded = false;
+        stepAssist = null;
       }
       event.preventDefault();
     }
@@ -477,6 +706,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     if (!flying && grounded) {
       jumpVelocity = 5.1;
       grounded = false;
+      stepAssist = null;
     }
     event.preventDefault();
   });
@@ -496,26 +726,82 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     targetX = constrained.x;
     targetZ = constrained.z;
     if (Math.abs(targetX - current.x) < 1e-8 && Math.abs(targetZ - current.z) < 1e-8) return { moved: false, ...current };
+
     const support = findGroundY(targetX, targetZ, current.y, {
       maxRise: RIFT_PLAYER_STEP_UP + 0.02,
       maxDrop: 4
     });
+
+    // If a previous strict step-up happened before the player's center crossed
+    // the riser, keep the player on that real top surface while any part of the
+    // footprint is still supported by it. This avoids immediately snapping back
+    // down for the few centimeters between first contact and center crossing.
+    if (stepAssist && Math.abs(current.y - stepAssist.y) <= 0.08) {
+      if (support != null && Math.abs(support - stepAssist.y) <= 0.08) {
+        stepAssist = null;
+      } else if (hasSupportAtHeightUnderFootprint(targetX, targetZ, stepAssist.y) && !bodyBlocked(targetX, stepAssist.y, targetZ)) {
+        return { moved: true, x: targetX, y: stepAssist.y, z: targetZ, grounded: true };
+      } else {
+        stepAssist = null;
+      }
+    }
+
+    // H1.72 support hysteresis: a lower CENTER sample cannot steal support from
+    // a flat upper surface while a meaningful part of the foot still rests on
+    // that surface. This is what makes "one foot on / one foot off" stable. A
+    // small center-height change (notably a stair ramp) still follows the center
+    // immediately, and legal upward steps retain H1.71 precedence.
+    const supportDelta = support == null ? -Infinity : support - current.y;
+    const keepCurrentFlatSupport = supportDelta <= -0.08
+      && hasStableFlatSupportAtHeight(targetX, targetZ, current.y)
+      && !bodyBlocked(targetX, current.y, targetZ);
+    if (keepCurrentFlatSupport) {
+      stepAssist = null;
+      return { moved: true, x: targetX, y: current.y, z: targetZ, grounded: true };
+    }
+
     const classification = classifyRiftPlayerGroundStep(current.y, support);
 
     if (classification === 'grounded') {
       if (bodyBlocked(targetX, support, targetZ)) {
+        const stepY = findWalkableStepUpY(current, targetX, targetZ);
+        if (stepY != null) {
+          stepAssist = { y: stepY };
+          return { moved: true, x: targetX, y: stepY, z: targetZ, grounded: true };
+        }
+
+        // A lower center support can be perfectly valid while the player's body
+        // radius still overlaps the SIDE of the higher block being left. Do not
+        // snap down into that side and do not stop horizontal motion: move clear
+        // at the current height, release grounded state, then let the swept fall
+        // land on the lower slab/ramp/floor once the cylinder has cleared.
+        if (support < current.y - 0.001 && !bodyBlocked(targetX, current.y, targetZ)) {
+          stepAssist = null;
+          return { moved: true, x: targetX, y: current.y, z: targetZ, grounded: false };
+        }
+
         const currentScore = bodyBlockScore(current.x, current.y, current.z);
         const targetScore = bodyBlockScore(targetX, support, targetZ);
         if (!(currentScore > 0 && targetScore < currentScore)) return { moved: false, ...current };
       }
+      if (stepAssist && Math.abs(support - stepAssist.y) <= 0.08) stepAssist = null;
       return { moved: true, x: targetX, y: support, z: targetZ, grounded: true };
     }
 
     if (classification === 'drop') {
       // Losing the support under the player's CENTER immediately releases the
       // player into gravity. We never replace "no ground" with the world minimum,
-      // which was the source of the old ledge magnet/stick.
-      if (bodyBlocked(targetX, current.y, targetZ)) return { moved: false, ...current };
+      // which was the source of the old ledge magnet/stick. A legal low obstacle
+      // may still be stepped onto, but only by moving vertically first.
+      if (bodyBlocked(targetX, current.y, targetZ)) {
+        const stepY = findWalkableStepUpY(current, targetX, targetZ);
+        if (stepY != null) {
+          stepAssist = { y: stepY };
+          return { moved: true, x: targetX, y: stepY, z: targetZ, grounded: true };
+        }
+        return { moved: false, ...current };
+      }
+      stepAssist = null;
       return { moved: true, x: targetX, y: current.y, z: targetZ, grounded: false };
     }
 
@@ -523,6 +809,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   }
 
   function tryAirMove(current, targetX, targetZ) {
+    stepAssist = null;
     const constrained = constrainHorizontal(targetX, targetZ);
     targetX = constrained.x;
     targetZ = constrained.z;
@@ -582,6 +869,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
       }
       grounded = false;
       jumpVelocity = 0;
+      stepAssist = null;
     } else {
       if (Math.hypot(vx, vz) > .01) {
         targetFacing = Math.atan2(vx, vz);
@@ -601,13 +889,14 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
           // while crossing a lower floor. Never let that upper/side contact mask
           // the valid surface below: evaluate every crossed support from high to
           // low and resolve a tiny horizontal depenetration when necessary.
-          const landings = surfaces.supportCrossings(nextX, nextZ, previousY, candidateY, {
+          const landings = landingCandidatesUnderFootprint(nextX, nextZ, previousY, candidateY, {
             extraDrop: 0.2,
             tolerance: 0.035,
             previousTolerance: 0.015
           });
           let resolvedLanding = null;
-          for (const landing of landings) {
+          for (const landingCandidate of landings) {
+            const landing = landingCandidate.y;
             const placement = resolveLandingPlacement(nextX, nextZ, landing, vx, vz);
             if (!placement) continue;
             resolvedLanding = { landing: placement.y ?? landing, ...placement };
@@ -620,22 +909,63 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
             jumpVelocity = 0;
             grounded = true;
           } else {
-            nextY = candidateY;
+            // If the falling cylinder is still brushing the SIDE of the block it
+            // just left, clear that overlap before lowering the feet. H1.69 only
+            // corrected this at the eventual landing, which still allowed a
+            // visible frame or two inside the upper block.
+            const cleared = resolveNonPenetratingHorizontal(nextX, candidateY, nextZ, vx, vz);
+            if (cleared) {
+              nextX = cleared.x;
+              nextZ = cleared.z;
+              nextY = candidateY;
+            } else {
+              nextY = sweepVerticalToNonPenetrating(nextX, previousY, candidateY, nextZ);
+              if (nextY > candidateY + 1e-5) jumpVelocity = Math.min(0, jumpVelocity);
+            }
           }
         } else {
-          nextY = candidateY;
+          // Upward motion gets the same pre-contact sweep. This prevents feet or
+          // the body entering a full block side while jumping onto it, and also
+          // prevents head/ceiling tunnelling.
+          const upwardPlacement = resolveNonPenetratingHorizontal(nextX, candidateY, nextZ, vx, vz, 0.08);
+          if (upwardPlacement) {
+            nextX = upwardPlacement.x;
+            nextZ = upwardPlacement.z;
+            nextY = candidateY;
+          } else {
+            nextY = sweepVerticalToNonPenetrating(nextX, previousY, candidateY, nextZ);
+            jumpVelocity = 0;
+          }
         }
       } else {
         const support = findGroundY(nextX, nextZ, nextY, {
           maxRise: RIFT_PLAYER_STEP_UP + 0.02,
           maxDrop: RIFT_PLAYER_GROUND_SNAP_DOWN + 0.04
         });
-        const classification = classifyRiftPlayerGroundStep(nextY, support);
-        if (classification === 'grounded') {
-          nextY = support;
-        } else if (classification === 'drop') {
-          grounded = false;
-          jumpVelocity = 0;
+        if (stepAssist && Math.abs(nextY - stepAssist.y) <= 0.08 && support != null && Math.abs(support - stepAssist.y) <= 0.08) {
+          stepAssist = null;
+        }
+        if (stepAssist && Math.abs(nextY - stepAssist.y) <= 0.08 && hasSupportAtHeightUnderFootprint(nextX, nextZ, stepAssist.y) && !bodyBlocked(nextX, stepAssist.y, nextZ)) {
+          nextY = stepAssist.y;
+          grounded = true;
+        } else {
+          if (stepAssist) stepAssist = null;
+          const supportDelta = support == null ? -Infinity : support - nextY;
+          if (supportDelta <= -0.08 && hasStableFlatSupportAtHeight(nextX, nextZ, nextY) && !bodyBlocked(nextX, nextY, nextZ)) {
+            // Keep the current flat support owner while the foot manifold still
+            // has meaningful contact. Do not let the lower center sample snap the
+            // player down between input frames or immediately after a partial
+            // jump landing.
+            grounded = true;
+          } else {
+            const classification = classifyRiftPlayerGroundStep(nextY, support);
+            if (classification === 'grounded') {
+              nextY = support;
+            } else if (classification === 'drop') {
+              grounded = false;
+              jumpVelocity = 0;
+            }
+          }
         }
       }
     }
@@ -644,6 +974,25 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     const dy = Math.cos(targetFacing - player.facing);
     if (Math.hypot(vx, vz) > .01) {
       player.setFacingRadians(player.facing + Math.atan2(dx, dy) * Math.min(1, dt * 10));
+    }
+
+    if (!(creative && flying) && bodyBlocked(nextX, nextY, nextZ)) {
+      // Final invariant before rendering: never commit a player transform that
+      // intersects solid RiftBlock volume. Prefer a tiny horizontal correction;
+      // otherwise roll back to the start of this physics substep.
+      const corrected = resolveNonPenetratingHorizontal(nextX, nextY, nextZ, vx, vz);
+      if (corrected) {
+        nextX = corrected.x;
+        nextZ = corrected.z;
+      } else if (!bodyBlocked(pos[0], pos[1], pos[2])) {
+        nextX = pos[0];
+        nextY = pos[1];
+        nextZ = pos[2];
+        jumpVelocity = Math.min(0, jumpVelocity);
+      } else {
+        recoverToSafeGround('solid-penetration-invariant');
+        return;
+      }
     }
 
     player.setPosition(nextX, nextY, nextZ);
@@ -702,6 +1051,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
       creative = !!next;
       if (!creative) {
         flying = false;
+        stepAssist = null;
         revalidateWorld({ allowFall: true });
       }
       jumpVelocity = 0;
@@ -712,6 +1062,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
       flying = creative && !!next;
       jumpVelocity = 0;
       grounded = !flying;
+      stepAssist = null;
       if (wasFlying && !flying) revalidateWorld({ allowFall: true });
     },
     toggleFlying() {
@@ -720,6 +1071,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
         flying = !flying;
         jumpVelocity = 0;
         grounded = !flying;
+        stepAssist = null;
         if (wasFlying && !flying) revalidateWorld({ allowFall: true });
       }
       return flying;

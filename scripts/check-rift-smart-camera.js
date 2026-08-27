@@ -110,7 +110,7 @@ structures = buildRiftVisibilityStructures([
 position = [0, 2, 0];
 const beforeInterior = camera.alpha;
 for (let i = 0; i < 20; i += 1) smart.update(0.05);
-assert(smart.state.mode === 'interior-cutaway', 'player containment must switch camera decisions to interior-cutaway mode');
+assert(smart.state.mode === 'interior-lock', 'player containment must switch legacy smart-camera decisions to interior-lock mode');
 assert(Math.abs(shortestRiftCameraAngleDelta(beforeInterior, camera.alpha)) < 0.02,
   'smart camera must not orbit around the player while they are inside a building');
 
@@ -133,4 +133,4 @@ assert(smart.state.mode === 'overview', 'City Overview must bypass smart follow 
 assert(Math.abs(shortestRiftCameraAngleDelta(beforeOverview, camera.alpha)) < 1e-6,
   'City Overview must retain the explicit overview camera orientation');
 
-console.log('[smart-camera-check] pan-first framing, four-way occlusion rotation, hysteresis, interior lock, Build Mode lock and overview bypass: PASS');
+console.log('[smart-camera-check] legacy pan/rotation scoring remains diagnostic-only with no geometry cutaway: PASS');
