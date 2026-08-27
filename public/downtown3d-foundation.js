@@ -1,10 +1,14 @@
-import { DOWNTOWN3D_FOUNDATION as CONFIG } from './downtown3d-config.js';
-import { createDowntownBlockWorldSource } from './downtown-block-world.js';
 import { RiftCamera, RiftEngine } from './rift-engine.js';
-import { clamp, lerpAngle, rotateXZ } from './rift-engine-math.js';
-import { RiftBlockWorld } from './rift-block-world.js';
-import { mountRiftWorldEditor } from './rift-world-editor.js';
-import { RIFT_WORLD_SCALE as WORLD_SCALE, assertMeterScale } from './rift-world-scale.js';
+import { validateRiftBlockFaceWinding } from './rift-block-world.js';
+import { RiftBlockSection, validateRiftBlockSectionStorage } from './rift-block-section.js';
+import {
+  RIFT_BLOCK_SHAPE_LAB_SCENES,
+  buildRiftPartialShapeGeometry,
+  getRiftBlockShapeLabScene,
+  resolveRiftShapeLabColor,
+  validateRiftBlockShapes
+} from './rift-block-shapes.js';
+import { assertMeterScale } from './rift-world-scale.js';
 
 let activeFoundation = null;
 
@@ -17,48 +21,47 @@ export function destroyDowntown3D() {
 export async function renderDowntown3D(root) {
   destroyDowntown3D();
 
+  const tabs = RIFT_BLOCK_SHAPE_LAB_SCENES.map((scene, index) =>
+    `<button class="rift-shape-tab${index === 0 ? ' active' : ''}" data-rift-shape-scene="${scene.id}" type="button">${scene.label}</button>`
+  ).join('');
+
   root.innerHTML = `
-    <section class="world3d-shell downtown3d-foundation" aria-label="Playable Rift Engine Downtown foundation">
-      <canvas id="riftcity-3d-canvas" aria-label="RiftCity Downtown Rift Engine viewport"></canvas>
+    <section class="world3d-shell downtown3d-foundation rift-shape-lab" aria-label="RiftCity RiftBlock Shape Lab">
+      <canvas id="riftcity-3d-canvas" aria-label="RiftBlock full block, slab and stair shape validation lab"></canvas>
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title">
-        <span class="eyebrow">RIFT BLOCK ENGINE 0.1 · DOWNTOWN</span>
-        <strong>Commerce Avenue</strong>
-        <small>Raw WebGL2 · visible 1m blocks · streamed 32m chunks</small>
+        <span class="eyebrow">RIFT BLOCK ENGINE · H1.56 SHAPE LAB</span>
+        <strong id="rift-shape-title">ALL SHAPES</strong>
+        <small id="rift-shape-description">Full blocks, half slabs, directional stairs and partial occlusion in one switchable validation build.</small>
       </div>
 
-      <div class="world3d-top-right downtown3d-actions">
-        <button id="rift-world-editor-button" class="world3d-hud-button rift-world-editor-button" type="button">WORLD EDITOR</button>
-        <button id="downtown3d-reset-camera" class="world3d-hud-button" type="button">CAMERA</button>
+      <div class="world3d-top-right downtown3d-actions rift-shape-actions">
+        <button id="rift-shape-spin" class="world3d-hud-button" type="button">SPIN</button>
+        <button id="rift-shape-cull" class="world3d-hud-button active" type="button">CULL ON</button>
+        <button id="rift-shape-top" class="world3d-hud-button" type="button">TOP VIEW</button>
+        <button id="rift-shape-reset" class="world3d-hud-button" type="button">RESET VIEW</button>
         <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
       </div>
 
+      <div class="rift-shape-tabs" aria-label="RiftBlock shape tests">${tabs}</div>
+
       <div id="downtown3d-status" class="downtown3d-status" role="status">
-        <strong>STARTING RIFT ENGINE…</strong>
-        <span>Preparing the custom WebGL2 Downtown renderer.</span>
+        <strong>BUILDING RIFTBLOCK SHAPE LAB…</strong>
+        <span>Validating full blocks, top/bottom slabs, four stair rotations, stacked stairs and partial shared-face occlusion.</span>
       </div>
 
-      <div class="downtown3d-meter" aria-live="polite">
-        <span id="downtown3d-fps">FPS --</span>
+      <div class="downtown3d-meter rift-shape-meter" aria-live="polite">
+        <span id="rift-shape-scene">SCENE ALL</span>
+        <span id="rift-shape-cells">CELLS --</span>
+        <span id="rift-shape-micro">HALF-CELLS --</span>
+        <span id="rift-shape-surface">SURFACE TILES --</span>
+        <span id="rift-shape-hidden">HIDDEN TILES --</span>
+        <span id="rift-shape-quads">MERGED QUADS --</span>
+        <span id="rift-shape-tris">TRIS --</span>
         <span id="downtown3d-draws">DRAWS --</span>
+        <span id="downtown3d-fps">FPS --</span>
         <span id="downtown3d-aa">MSAA --</span>
-        <span>WEBGL2</span>
-        <span>1 UNIT = 1M</span>
-        <span>PLAYER ${CONFIG.player.height}M</span>
-        <span>BLOCK 1×1×1M</span>
-        <span>CHUNK ${WORLD_SCALE.block.chunkSize}×${WORLD_SCALE.block.chunkSize}M</span>
-        <span>WORLD ${CONFIG.world.width}×${CONFIG.world.depth}M</span>
-      </div>
-
-      <div class="world3d-touch">
-        <div id="world3d-joystick" class="world3d-joystick" aria-label="Movement joystick">
-          <div class="world3d-joystick-ring"><div id="world3d-joystick-knob" class="world3d-joystick-knob"></div></div>
-          <span>MOVE</span>
-        </div>
-        <div class="world3d-action-pad downtown3d-action-pad">
-          <button id="downtown3d-run" class="world3d-action" type="button">RUN</button>
-        </div>
       </div>
     </section>`;
 
@@ -67,97 +70,276 @@ export async function renderDowntown3D(root) {
 
   try {
     if (!root.isConnected || !canvas?.isConnected) return null;
-    activeFoundation = createFoundation({ root, canvas, status });
+    activeFoundation = createShapeLab({ root, canvas, status });
     return activeFoundation;
   } catch (error) {
-    console.error('Rift Engine Downtown foundation failed to start', error);
+    console.error('RiftCity H1.56 Shape Lab failed to start', error);
     if (status) {
       status.classList.add('error');
-      status.innerHTML = `<strong>RIFT ENGINE FAILED TO START</strong><span>${escapeText(error?.message || 'WebGL2 could not initialize.')}</span>`;
+      status.innerHTML = `<strong>SHAPE LAB FAILED</strong><span>${escapeText(error?.message || 'WebGL2 could not initialize.')}</span>`;
     }
     return null;
   }
 }
 
-function createFoundation({ root, canvas, status }) {
+function createSectionForScene(scene) {
+  const section = new RiftBlockSection({ sx: 0, sy: 0, sz: 0 });
+  for (const cell of scene.cells) {
+    section.setBlock(cell.x, cell.y, cell.z, cell.state);
+  }
+  return section;
+}
+
+function calculateSceneBounds(scene) {
+  if (!scene.cells.length) return { center: [8, 1, 8], span: 8 };
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const cell of scene.cells) {
+    minX = Math.min(minX, cell.x); minY = Math.min(minY, cell.y); minZ = Math.min(minZ, cell.z);
+    maxX = Math.max(maxX, cell.x + 1); maxY = Math.max(maxY, cell.y + 1); maxZ = Math.max(maxZ, cell.z + 1);
+  }
+  return {
+    center: [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2],
+    span: Math.max(maxX - minX, maxZ - minZ, (maxY - minY) * 1.4, 4)
+  };
+}
+
+function createShapeLab({ root, canvas, status }) {
   assertMeterScale();
+
+  const faceValidation = validateRiftBlockFaceWinding();
+  if (!faceValidation.ok) throw new Error(`Invalid block face winding: ${faceValidation.failures.join(', ')}`);
+
+  const storageValidation = validateRiftBlockSectionStorage();
+  if (!storageValidation.ok) throw new Error(`RiftSection storage failed: ${storageValidation.failures.join('; ')}`);
+
+  const shapeValidation = validateRiftBlockShapes();
+  if (!shapeValidation.ok) throw new Error(`RiftBlock shapes failed: ${shapeValidation.failures.join('; ')}`);
+
   const shell = root.querySelector('.world3d-shell');
   const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
   const engine = new RiftEngine(canvas, {
     antialias: true,
-    clearColor: [0.105, 0.135, 0.17],
-    fogColor: [0.105, 0.135, 0.17],
-    fogStart: CONFIG.render.fogStart,
-    fogEnd: CONFIG.render.fogEnd
+    clearColor: [0.045, 0.055, 0.065],
+    fogColor: [0.045, 0.055, 0.065],
+    fogStart: 34,
+    fogEnd: 72
   });
 
   const camera = new RiftCamera({
-    alpha: CONFIG.camera.alpha,
-    beta: CONFIG.camera.beta,
-    radius: CONFIG.camera.radius,
-    minRadius: CONFIG.camera.minRadius,
-    maxRadius: CONFIG.camera.maxRadius,
-    minBeta: CONFIG.camera.minBeta,
-    maxBeta: CONFIG.camera.maxBeta,
-    fov: CONFIG.camera.fov,
-    near: CONFIG.camera.near,
-    far: CONFIG.camera.far
+    alpha: Math.PI * 0.23,
+    beta: 0.92,
+    radius: 18,
+    minRadius: 6,
+    maxRadius: 36,
+    minBeta: 0.16,
+    maxBeta: 1.48,
+    fov: Math.PI / 3.05,
+    near: 0.035,
+    far: 96
   });
-  camera.setTarget(CONFIG.player.spawn.x, CONFIG.camera.followHeight, CONFIG.player.spawn.z);
 
-  const blockSource = createDowntownBlockWorldSource();
-  const blockWorld = new RiftBlockWorld(engine, blockSource, { renderRadiusChunks: WORLD_SCALE.block.visibleRadiusChunks });
-  const foundation = buildWorldFoundation(blockWorld);
-  const scaleReference = createScaleReferenceKit(engine);
-  const player = createScalePlayer(engine);
-  player.position.x = CONFIG.player.spawn.x;
-  player.position.z = CONFIG.player.spawn.z;
-  updatePlayerVisual(engine, player, 0);
-  blockWorld.setViewCenter(player.position.x, player.position.z);
+  const floor = engine.addBox({
+    position: [8, -0.11, 8],
+    scale: [16, 0.18, 16],
+    color: '#232a2d',
+    noise: 0,
+    blockGrid: 0.16,
+    blockFaceShade: 1,
+    blockElevationCue: 0,
+    doubleSided: false
+  });
 
-  const input = { x: 0, y: 0, run: false };
-  const keys = new Set();
-  const joystick = setupJoystick(root, input);
-  let worldEditor = null;
-  const orbit = setupCameraOrbit(canvas, camera, () => !worldEditor?.isOpen?.() || worldEditor?.getTool?.() === 'camera');
-  const runButton = root.querySelector('#downtown3d-run');
-  const resetCameraButton = root.querySelector('#downtown3d-reset-camera');
-  const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
-  const fpsLabel = root.querySelector('#downtown3d-fps');
+  const meshOptions = {
+    color: '#ffffff',
+    noise: 0,
+    blockGrid: 0.22,
+    blockFaceShade: 1,
+    blockElevationCue: 0.028,
+    blockElevationBase: 0,
+    doubleSided: false
+  };
+
+  let shapeDrawable = null;
+  let activeScene = getRiftBlockShapeLabScene('all');
+  let currentSection = null;
+  let currentGeometry = null;
+  let currentOracle = null;
+  let spinning = false;
+  let culling = true;
+  let topView = false;
+  let gameMode = false;
+
+  const title = root.querySelector('#rift-shape-title');
+  const description = root.querySelector('#rift-shape-description');
+  const sceneLabel = root.querySelector('#rift-shape-scene');
+  const cellsLabel = root.querySelector('#rift-shape-cells');
+  const microLabel = root.querySelector('#rift-shape-micro');
+  const surfaceLabel = root.querySelector('#rift-shape-surface');
+  const hiddenLabel = root.querySelector('#rift-shape-hidden');
+  const quadsLabel = root.querySelector('#rift-shape-quads');
+  const trisLabel = root.querySelector('#rift-shape-tris');
   const drawsLabel = root.querySelector('#downtown3d-draws');
+  const fpsLabel = root.querySelector('#downtown3d-fps');
   const aaLabel = root.querySelector('#downtown3d-aa');
-  let gameplayCameraState = null;
+  const spinButton = root.querySelector('#rift-shape-spin');
+  const cullButton = root.querySelector('#rift-shape-cull');
+  const topButton = root.querySelector('#rift-shape-top');
+  const resetButton = root.querySelector('#rift-shape-reset');
+  const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
+  const tabButtons = [...root.querySelectorAll('[data-rift-shape-scene]')];
+
+  const setCameraForScene = (scene, { keepAngle = false } = {}) => {
+    const bounds = calculateSceneBounds(scene);
+    camera.setTarget(...bounds.center);
+    camera.radius = Math.max(9, Math.min(26, bounds.span * 1.45 + 6));
+    if (!keepAngle) {
+      camera.alpha = Math.PI * 0.23;
+      camera.beta = 0.92;
+      topView = false;
+      topButton?.classList.remove('active');
+      if (topButton) topButton.textContent = 'TOP VIEW';
+    }
+    camera.updatePosition();
+  };
+
+  const verifyGeometry = (scene, sectionGeometry, oracle) => {
+    const expected = scene.expected;
+    if (oracle.blocks !== expected.blocks || oracle.occupiedMicrovoxels !== expected.occupiedMicrovoxels ||
+        oracle.visibleMicroFaces !== expected.visibleMicroFaces || oracle.culledMicroFaces !== expected.culledMicroFaces ||
+        oracle.quads !== expected.quads || oracle.vertexCount !== expected.vertexCount || oracle.triangles !== expected.triangles) {
+      throw new Error(`${scene.label} shape oracle changed from locked expected totals.`);
+    }
+
+    if (sectionGeometry.blocks !== expected.blocks || sectionGeometry.vertexCount !== expected.vertexCount || sectionGeometry.triangles !== expected.triangles) {
+      throw new Error(`${scene.label} RiftSection mesh ${sectionGeometry.blocks}/${sectionGeometry.vertexCount}/${sectionGeometry.triangles} != ${expected.blocks}/${expected.vertexCount}/${expected.triangles}.`);
+    }
+
+    if (scene.id === 'full') {
+      if (sectionGeometry.visibleFaces !== 10 || sectionGeometry.culledFaces !== 2) {
+        throw new Error(`Legacy full-block fast path changed: ${sectionGeometry.visibleFaces}/${sectionGeometry.culledFaces} != 10/2.`);
+      }
+    } else {
+      if (!sectionGeometry.shapeAware || sectionGeometry.visibleMicroFaces !== expected.visibleMicroFaces ||
+          sectionGeometry.culledMicroFaces !== expected.culledMicroFaces || sectionGeometry.quads !== expected.quads) {
+        throw new Error(`${scene.label} shape-aware RiftSection totals do not match the shape oracle.`);
+      }
+    }
+    if (sectionGeometry.vertexStride !== 9 || sectionGeometry.vertices.length !== sectionGeometry.vertexCount * 9) {
+      throw new Error(`${scene.label} lost its position/normal/color vertex contract.`);
+    }
+  };
+
+  const showStatus = (scene) => {
+    if (!status) return;
+    status.classList.add('ready');
+    status.classList.remove('error', 'settled');
+    status.innerHTML = `<strong>${escapeText(scene.title)} · PASS</strong><span>${escapeText(scene.description)} ${scene.expected.visibleMicroFaces} exposed 0.5 m surface tiles merge to ${scene.expected.quads} GPU quads / ${scene.expected.triangles} triangles.</span>`;
+    window.setTimeout(() => status.classList.add('settled'), 1750);
+  };
+
+  const loadScene = (sceneId, { announce = true } = {}) => {
+    const scene = getRiftBlockShapeLabScene(sceneId);
+    const section = createSectionForScene(scene);
+    const sectionGeometry = section.buildGeometry({ getBlockColor: resolveRiftShapeLabColor });
+    const oracle = buildRiftPartialShapeGeometry({ cells: scene.cells, getBlockColor: resolveRiftShapeLabColor });
+    verifyGeometry(scene, sectionGeometry, oracle);
+
+    if (shapeDrawable) {
+      engine.updateMesh(shapeDrawable, sectionGeometry);
+    } else {
+      shapeDrawable = engine.addMesh(sectionGeometry, meshOptions);
+    }
+    shapeDrawable.visible = true;
+    shapeDrawable.doubleSided = !culling;
+
+    activeScene = scene;
+    currentSection = section;
+    currentGeometry = sectionGeometry;
+    currentOracle = oracle;
+
+    if (title) title.textContent = scene.title;
+    if (description) description.textContent = scene.description;
+    if (sceneLabel) sceneLabel.textContent = `SCENE ${scene.label}`;
+    if (cellsLabel) cellsLabel.textContent = `CELLS ${oracle.blocks}`;
+    if (microLabel) microLabel.textContent = `HALF-CELLS ${oracle.occupiedMicrovoxels}`;
+    if (surfaceLabel) surfaceLabel.textContent = `SURFACE ${oracle.visibleMicroFaces}`;
+    if (hiddenLabel) hiddenLabel.textContent = `HIDDEN ${oracle.culledMicroFaces}`;
+    if (quadsLabel) quadsLabel.textContent = `QUADS ${oracle.quads}`;
+    if (trisLabel) trisLabel.textContent = `TRIS ${oracle.triangles}`;
+
+    for (const button of tabButtons) button.classList.toggle('active', button.dataset.riftShapeScene === scene.id);
+    setCameraForScene(scene);
+    if (announce) showStatus(scene);
+  };
+
+  loadScene('all', { announce: false });
+
+  if (status) {
+    status.classList.add('ready');
+    status.innerHTML = `<strong>RIFTBLOCK SHAPE LAB · ALL CORE TESTS PASS</strong><span>FULL, bottom/top slabs, four stair rotations, a six-step staircase, mixed contacts and partial occlusion are live. Switch tabs and orbit from every angle; each scene is one shape mesh plus the reference floor.</span>`;
+    window.setTimeout(() => status.classList.add('settled'), 2400);
+  }
+
+  const tabHandlers = new Map();
+  for (const button of tabButtons) {
+    const handler = () => loadScene(button.dataset.riftShapeScene);
+    tabHandlers.set(button, handler);
+    button.addEventListener('click', handler);
+  }
+
+  const onSpin = () => {
+    spinning = !spinning;
+    spinButton?.classList.toggle('active', spinning);
+    if (spinButton) spinButton.textContent = spinning ? 'SPIN ON' : 'SPIN';
+  };
+  spinButton?.addEventListener('click', onSpin);
+
+  const onCull = () => {
+    culling = !culling;
+    if (shapeDrawable) shapeDrawable.doubleSided = !culling;
+    floor.doubleSided = !culling;
+    cullButton?.classList.toggle('active', culling);
+    if (cullButton) cullButton.textContent = culling ? 'CULL ON' : 'CULL OFF';
+  };
+  cullButton?.addEventListener('click', onCull);
+
+  const onTop = () => {
+    topView = !topView;
+    const bounds = calculateSceneBounds(activeScene);
+    camera.setTarget(...bounds.center);
+    if (topView) {
+      camera.alpha = -Math.PI / 2;
+      camera.beta = 0.18;
+      camera.radius = Math.max(10, Math.min(28, bounds.span * 1.5 + 7));
+    } else {
+      camera.alpha = Math.PI * 0.23;
+      camera.beta = 0.92;
+      camera.radius = Math.max(9, Math.min(26, bounds.span * 1.45 + 6));
+    }
+    camera.updatePosition();
+    topButton?.classList.toggle('active', topView);
+    if (topButton) topButton.textContent = topView ? 'ANGLE VIEW' : 'TOP VIEW';
+  };
+  topButton?.addEventListener('click', onTop);
+
+  const resetCamera = () => setCameraForScene(activeScene);
+  resetButton?.addEventListener('click', resetCamera);
 
   const onKeyDown = event => {
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-    keys.add(event.code);
+    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+    const key = String(event.key || '').toLowerCase();
+    const number = Number(key);
+    if (Number.isInteger(number) && number >= 1 && number <= RIFT_BLOCK_SHAPE_LAB_SCENES.length) {
+      event.preventDefault();
+      loadScene(RIFT_BLOCK_SHAPE_LAB_SCENES[number - 1].id);
+    }
   };
-  const onKeyUp = event => keys.delete(event.code);
   window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
 
-  const setRun = enabled => {
-    input.run = enabled;
-    runButton?.classList.toggle('active', enabled);
-  };
-  const runStart = event => { event.preventDefault(); setRun(true); };
-  const runStop = event => { event.preventDefault(); setRun(false); };
-  runButton?.addEventListener('pointerdown', runStart);
-  runButton?.addEventListener('pointerup', runStop);
-  runButton?.addEventListener('pointercancel', runStop);
-  runButton?.addEventListener('pointerleave', runStop);
-
-  const resetCamera = () => {
-    camera.alpha = CONFIG.camera.alpha;
-    camera.beta = CONFIG.camera.beta;
-    camera.radius = CONFIG.camera.radius;
-    camera.setTarget(player.position.x, CONFIG.camera.followHeight, player.position.z);
-  };
-  resetCameraButton?.addEventListener('click', resetCamera);
-
-  let gameMode = false;
+  const orbit = setupDiagnosticOrbit(canvas, camera);
   const resize = () => {
-    const target = coarsePointer ? CONFIG.render.mobileTargetPixelRatio : CONFIG.render.desktopTargetPixelRatio;
+    const target = coarsePointer ? 1.45 : 1.8;
     const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
     engine.resize(Math.min(deviceRatio, target));
   };
@@ -167,7 +349,6 @@ function createFoundation({ root, canvas, status }) {
     document.body.classList.toggle('world3d-game-mode', enabled);
     fullscreenButton?.classList.toggle('active', enabled);
     if (fullscreenButton) fullscreenButton.textContent = enabled ? 'WINDOW' : 'FULLSCREEN';
-
     if (enabled) {
       try {
         const request = shell?.requestFullscreen || shell?.webkitRequestFullscreen;
@@ -183,7 +364,8 @@ function createFoundation({ root, canvas, status }) {
     }
     requestAnimationFrame(resize);
   };
-  fullscreenButton?.addEventListener('click', () => setGameMode(!gameMode));
+  const onFullscreenButton = () => setGameMode(!gameMode);
+  fullscreenButton?.addEventListener('click', onFullscreenButton);
 
   const onFullscreenChange = () => {
     const nativeActive = document.fullscreenElement === shell || document.webkitFullscreenElement === shell;
@@ -195,471 +377,142 @@ function createFoundation({ root, canvas, status }) {
     }
     requestAnimationFrame(resize);
   };
+
   document.addEventListener('fullscreenchange', onFullscreenChange);
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', resize);
   window.visualViewport?.addEventListener('resize', resize);
+  resize();
 
-  worldEditor = mountRiftWorldEditor({
-    root,
-    canvas,
-    engine,
-    camera,
-    blockWorld,
-    worldBounds: foundation.bounds,
-    onModeChange(enabled) {
-      input.x = 0;
-      input.y = 0;
-      setRun(false);
-      joystick?.reset?.();
-
-      if (enabled) {
-        gameplayCameraState = {
-          alpha: camera.alpha,
-          beta: camera.beta,
-          radius: camera.radius
-        };
-        camera.alpha = CONFIG.camera.alpha;
-        camera.beta = Math.min(CONFIG.camera.maxBeta, Math.max(CONFIG.camera.minBeta, 0.82));
-        camera.radius = Math.min(CONFIG.camera.maxRadius, Math.max(17, CONFIG.camera.radius * 1.35));
-        camera.setTarget(player.position.x, 0.45, player.position.z);
-      } else {
-        scaleReference.setVisible(false);
-        if (gameplayCameraState) {
-          camera.alpha = gameplayCameraState.alpha;
-          camera.beta = gameplayCameraState.beta;
-          camera.radius = gameplayCameraState.radius;
-        }
-        gameplayCameraState = null;
-        camera.setTarget(player.position.x, CONFIG.camera.followHeight, player.position.z);
-      }
-    },
-    onReferenceChange(enabled) {
-      if (enabled) scaleReference.placeAt(camera.target[0] + 9, camera.target[2] + 7);
-      scaleReference.setVisible(enabled);
-    }
-  });
-
-  if (aaLabel) aaLabel.textContent = engine.getStats().antialias ? 'MSAA ON' : 'MSAA OFF';
+  const initialStats = engine.getStats();
+  if (aaLabel) aaLabel.textContent = `MSAA ${initialStats.antialias ? 'ON' : 'OFF'}`;
 
   let destroyed = false;
-  let frameId = 0;
-  let previousTime = performance.now();
-  let fpsFrames = 0;
-  let fpsTimer = 0;
-  let fpsAverage = 0;
+  let raf = 0;
+  let fpsTimer = performance.now();
+  let frames = 0;
+  let lastFrame = performance.now();
 
   const tick = now => {
     if (destroyed) return;
-    const dt = clamp((now - previousTime) / 1000, 0, 0.05);
-    previousTime = now;
-    const editing = worldEditor?.isOpen?.() || false;
+    const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
+    lastFrame = now;
+    if (spinning) camera.orbit(dt * 0.45, 0);
 
-    if (!editing) {
-      let inputX = input.x;
-      let inputY = input.y;
-      if (keys.has('KeyA') || keys.has('ArrowLeft')) inputX -= 1;
-      if (keys.has('KeyD') || keys.has('ArrowRight')) inputX += 1;
-      if (keys.has('KeyW') || keys.has('ArrowUp')) inputY -= 1;
-      if (keys.has('KeyS') || keys.has('ArrowDown')) inputY += 1;
-      const magnitude = Math.hypot(inputX, inputY);
-      if (magnitude > 1) { inputX /= magnitude; inputY /= magnitude; }
-
-      const moving = Math.hypot(inputX, inputY) > 0.05;
-      if (moving) {
-        const forward = camera.flatForward();
-        const right = [-forward[2], 0, forward[0]];
-        let dx = right[0] * inputX + forward[0] * -inputY;
-        let dz = right[2] * inputX + forward[2] * -inputY;
-        const directionLength = Math.hypot(dx, dz) || 1;
-        dx /= directionLength; dz /= directionLength;
-
-        const running = input.run || keys.has('ShiftLeft') || keys.has('ShiftRight');
-        const speed = running ? CONFIG.player.runSpeed : CONFIG.player.walkSpeed;
-        const nextX = clamp(player.position.x + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
-        const nextZ = clamp(player.position.z + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
-        if (blockWorld.canOccupyCircle(nextX, player.position.z, CONFIG.player.radius, CONFIG.player.height)) player.position.x = nextX;
-        if (blockWorld.canOccupyCircle(player.position.x, nextZ, CONFIG.player.radius, CONFIG.player.height)) player.position.z = nextZ;
-        const targetYaw = Math.atan2(dx, dz);
-        player.yaw = lerpAngle(player.yaw, targetYaw, Math.min(1, dt * 12));
-        player.walkPhase += dt * (running ? 11 : 7.5);
-        player.bob = Math.sin(player.walkPhase) * (running ? 0.035 : 0.02);
-      } else {
-        player.bob += (0 - player.bob) * Math.min(1, dt * 10);
-      }
-
-      const followT = 1 - Math.exp(-CONFIG.camera.followSharpness * dt);
-      camera.target[0] += (player.position.x - camera.target[0]) * followT;
-      camera.target[1] += (CONFIG.camera.followHeight - camera.target[1]) * followT;
-      camera.target[2] += (player.position.z - camera.target[2]) * followT;
-      camera.updatePosition();
-      blockWorld.setViewCenter(player.position.x, player.position.z);
-    } else {
-      player.bob += (0 - player.bob) * Math.min(1, dt * 10);
-
-      // Edit Mode owns a detached free camera. WASD/arrows pan the editor focus across
-      // the ground plane; Shift accelerates. The player remains frozen in world space.
-      let freeX = 0;
-      let freeY = 0;
-      if (keys.has('KeyA') || keys.has('ArrowLeft')) freeX -= 1;
-      if (keys.has('KeyD') || keys.has('ArrowRight')) freeX += 1;
-      if (keys.has('KeyW') || keys.has('ArrowUp')) freeY -= 1;
-      if (keys.has('KeyS') || keys.has('ArrowDown')) freeY += 1;
-      const freeMagnitude = Math.hypot(freeX, freeY);
-      if (freeMagnitude > 0.01) {
-        freeX /= Math.max(1, freeMagnitude);
-        freeY /= Math.max(1, freeMagnitude);
-        const forward = camera.flatForward();
-        const right = [-forward[2], 0, forward[0]];
-        const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight')) ? 28 : 14;
-        const dx = right[0] * freeX + forward[0] * -freeY;
-        const dz = right[2] * freeX + forward[2] * -freeY;
-        camera.target[0] = clamp(camera.target[0] + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
-        camera.target[2] = clamp(camera.target[2] + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
-        camera.updatePosition();
-      }
-      blockWorld.setViewCenter(camera.target[0], camera.target[2]);
-    }
-
-    updatePlayerVisual(engine, player, player.bob);
     engine.render(camera);
+    const renderStats = engine.getStats();
+    if (drawsLabel) drawsLabel.textContent = `DRAWS ${renderStats.draws}`;
 
-    fpsFrames += 1;
-    fpsTimer += dt;
-    if (fpsTimer >= 0.5) {
-      const instant = fpsFrames / fpsTimer;
-      fpsAverage = fpsAverage ? fpsAverage * 0.6 + instant * 0.4 : instant;
-      const stats = engine.getStats();
-      if (fpsLabel) fpsLabel.textContent = `FPS ${Math.round(fpsAverage)}`;
-      if (drawsLabel) drawsLabel.textContent = `DRAWS ${stats.draws}`;
-      fpsTimer = 0;
-      fpsFrames = 0;
+    frames += 1;
+    if (now - fpsTimer >= 500) {
+      const fps = Math.round(frames * 1000 / Math.max(1, now - fpsTimer));
+      if (fpsLabel) fpsLabel.textContent = `FPS ${fps}`;
+      fpsTimer = now;
+      frames = 0;
     }
-
-    frameId = requestAnimationFrame(tick);
+    raf = requestAnimationFrame(tick);
   };
-
-  resize();
-  frameId = requestAnimationFrame(tick);
-
-  if (status) {
-    status.classList.add('ready');
-    status.innerHTML = '<strong>RIFT BLOCK ENGINE ONLINE</strong><span>Downtown is now authored from visible 1m blocks · 32m chunk streaming · freecam Block Editor.</span>';
-    setTimeout(() => status?.classList.add('settled'), 2600);
-  }
+  raf = requestAnimationFrame(tick);
 
   return {
     engine,
     camera,
-    blockWorld,
-    worldEditor,
+    shapeValidation,
+    get activeScene() { return activeScene; },
+    get currentSection() { return currentSection; },
+    get currentGeometry() { return currentGeometry; },
+    get currentOracle() { return currentOracle; },
     destroy() {
+      if (destroyed) return;
       destroyed = true;
-      cancelAnimationFrame(frameId);
-      worldEditor?.destroy?.();
-      scaleReference?.dispose?.();
-      blockWorld?.dispose?.();
-      joystick?.destroy?.();
-      orbit?.destroy?.();
-      setRun(false);
+      cancelAnimationFrame(raf);
+      orbit.destroy();
+      for (const [button, handler] of tabHandlers) button.removeEventListener('click', handler);
+      spinButton?.removeEventListener('click', onSpin);
+      cullButton?.removeEventListener('click', onCull);
+      topButton?.removeEventListener('click', onTop);
+      resetButton?.removeEventListener('click', resetCamera);
+      fullscreenButton?.removeEventListener('click', onFullscreenButton);
       window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
       window.removeEventListener('resize', resize);
       window.removeEventListener('orientationchange', resize);
       window.visualViewport?.removeEventListener('resize', resize);
-      runButton?.removeEventListener('pointerdown', runStart);
-      runButton?.removeEventListener('pointerup', runStop);
-      runButton?.removeEventListener('pointercancel', runStop);
-      runButton?.removeEventListener('pointerleave', runStop);
-      resetCameraButton?.removeEventListener('click', resetCamera);
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-      if (document.fullscreenElement === shell || document.webkitFullscreenElement === shell) {
-        try { document.exitFullscreen?.() || document.webkitExitFullscreen?.(); } catch (_) {}
-      }
       document.body.classList.remove('world3d-game-mode');
       engine.dispose();
-      root.style.height = '';
     }
   };
 }
 
-function buildWorldFoundation(blockWorld) {
-  const b = blockWorld.data.bounds;
-  return {
-    bounds: {
-      minX: b.minX + CONFIG.player.radius,
-      maxX: b.maxX + 1 - CONFIG.player.radius,
-      minZ: b.minZ + CONFIG.player.radius,
-      maxZ: b.maxZ + 1 - CONFIG.player.radius
-    }
-  };
-}
-
-function createScaleReferenceKit(engine) {
-  const ref = WORLD_SCALE.reference;
-  const parts = [];
-  let originX = 0;
-  let originZ = 0;
-  let visible = false;
-
-  const add = (kind, local, scale, color, rotationY = 0) => {
-    const options = { position: [0, -20, 0], scale, color, rotationY, dynamic: true, visible: false };
-    const mesh = kind === 'sphere' ? engine.addSphere(options)
-      : kind === 'cylinder' ? engine.addCylinder(options)
-      : engine.addBox(options);
-    parts.push({ mesh, local, scale, rotationY });
-    return mesh;
-  };
-
-  // 1 m calibration cube.
-  add('box', [-4.2, ref.calibrationCube * 0.5, -2.4], [ref.calibrationCube, ref.calibrationCube, ref.calibrationCube], '#f0b84c');
-
-  // 1.75 m block-person reference silhouette.
-  add('box', [-1.9, 1.03, -2.4], [0.48, 0.92, 0.34], '#4a9fd8');
-  add('box', [-1.9, ref.humanHeight - 0.18, -2.4], [0.36, 0.36, 0.36], '#b88768');
-  add('box', [-2.06, 0.36, -2.4], [0.17, 0.72, 0.22], '#28323a');
-  add('box', [-1.74, 0.36, -2.4], [0.17, 0.72, 0.22], '#28323a');
-
-  // Standard 0.9 m × 2.05 m doorway opening.
-  const doorPost = 0.09;
-  const doorDepth = 0.14;
-  const doorOuterWidth = ref.doorWidth + doorPost * 2;
-  add('box', [0.35 - doorOuterWidth * 0.5 + doorPost * 0.5, ref.doorHeight * 0.5, -2.4], [doorPost, ref.doorHeight, doorDepth], '#d7d2c8');
-  add('box', [0.35 + doorOuterWidth * 0.5 - doorPost * 0.5, ref.doorHeight * 0.5, -2.4], [doorPost, ref.doorHeight, doorDepth], '#d7d2c8');
-  add('box', [0.35, ref.doorHeight + doorPost * 0.5, -2.4], [doorOuterWidth, doorPost, doorDepth], '#d7d2c8');
-
-  // Typical car inside a correctly sized parking stall.
-  const carCenterX = 3.5;
-  const carCenterZ = 0.7;
-  add('box', [carCenterX, 0.42, carCenterZ], [ref.carWidth, 0.68, ref.carLength], '#6b737a');
-  add('box', [carCenterX, 0.93, carCenterZ + 0.05], [ref.carWidth * 0.78, 0.48, ref.carLength * 0.48], '#39444c');
-  const line = 0.055;
-  const stallHalfW = ref.parkingWidth * 0.5;
-  const stallHalfL = ref.parkingLength * 0.5;
-  add('box', [carCenterX - stallHalfW, 0.035, carCenterZ], [line, 0.018, ref.parkingLength], '#e8e4d8');
-  add('box', [carCenterX + stallHalfW, 0.035, carCenterZ], [line, 0.018, ref.parkingLength], '#e8e4d8');
-  add('box', [carCenterX, 0.035, carCenterZ - stallHalfL], [ref.parkingWidth, 0.018, line], '#e8e4d8');
-  add('box', [carCenterX, 0.035, carCenterZ + stallHalfL], [ref.parkingWidth, 0.018, line], '#e8e4d8');
-
-  // One typical building-floor height post.
-  add('box', [-4.2, ref.buildingFloorHeight * 0.5, 1.0], [0.11, ref.buildingFloorHeight, 0.11], '#67d39b');
-  add('box', [-4.2, ref.buildingFloorHeight, 1.0], [1.0, 0.06, 0.11], '#67d39b');
-
-  const apply = () => {
-    for (const part of parts) {
-      part.mesh.visible = visible;
-      engine.setTransform(
-        part.mesh,
-        [originX + part.local[0], part.local[1], originZ + part.local[2]],
-        part.rotationY,
-        part.scale
-      );
-    }
-  };
-
-  return {
-    placeAt(x, z) {
-      originX = Number.isFinite(x) ? x : originX;
-      originZ = Number.isFinite(z) ? z : originZ;
-      apply();
-    },
-    setVisible(next) {
-      visible = !!next;
-      apply();
-    },
-    isVisible: () => visible,
-    dispose() {
-      engine.removeDrawables(parts.map(part => part.mesh));
-      parts.length = 0;
-    }
-  };
-}
-
-function createScalePlayer(engine) {
-  const scale = CONFIG.player.height / 1.88;
-  return {
-    position: { x: 0, z: 0 },
-    yaw: 0,
-    bob: 0,
-    walkPhase: 0,
-    parts: [
-      { mesh: engine.addBox({ scale: [0.56 * scale, 0.92 * scale, 0.38 * scale], color: '#c98635', dynamic: true }), local: [0, 1.06 * scale, 0], scale: [0.56 * scale, 0.92 * scale, 0.38 * scale] },
-      { mesh: engine.addBox({ scale: [0.38 * scale, 0.38 * scale, 0.38 * scale], color: '#a8785e', dynamic: true }), local: [0, 1.68 * scale, 0], scale: [0.38 * scale, 0.38 * scale, 0.38 * scale] },
-      { mesh: engine.addBox({ scale: [0.18 * scale, 0.72 * scale, 0.22 * scale], color: '#1e2228', dynamic: true }), local: [-0.16 * scale, 0.46 * scale, 0], scale: [0.18 * scale, 0.72 * scale, 0.22 * scale] },
-      { mesh: engine.addBox({ scale: [0.18 * scale, 0.72 * scale, 0.22 * scale], color: '#1e2228', dynamic: true }), local: [0.16 * scale, 0.46 * scale, 0], scale: [0.18 * scale, 0.72 * scale, 0.22 * scale] },
-      { mesh: engine.addCylinder({ scale: [0.85 * scale, 0.02, 0.85 * scale], color: '#111315', dynamic: true }), local: [0, 0.018, 0], scale: [0.85 * scale, 0.02, 0.85 * scale], shadow: true }
-    ]
-  };
-}
-
-function updatePlayerVisual(engine, player, bob) {
-  for (const part of player.parts) {
-    const rotated = rotateXZ(part.local[0], part.local[2], player.yaw);
-    const y = part.shadow ? part.local[1] : part.local[1] + bob;
-    engine.setTransform(
-      part.mesh,
-      [player.position.x + rotated[0], y, player.position.z + rotated[1]],
-      part.shadow ? 0 : player.yaw,
-      part.scale
-    );
-  }
-}
-
-function setupCameraOrbit(canvas, camera, canOrbit = () => true) {
+function setupDiagnosticOrbit(canvas, camera) {
   const pointers = new Map();
-  let lastDistance = 0;
-  let dragPointer = null;
-  let lastX = 0;
-  let lastY = 0;
+  let lastPinch = null;
 
-  const resetPointers = () => {
-    pointers.clear();
-    lastDistance = 0;
-    dragPointer = null;
+  const pinchDistance = () => {
+    if (pointers.size < 2) return null;
+    const [a, b] = [...pointers.values()].slice(0, 2);
+    return Math.hypot(a.x - b.x, a.y - b.y);
   };
 
-  const pointerDown = event => {
-    if (!canOrbit()) return;
+  const onPointerDown = event => {
+    if (event.button != null && event.button !== 0) return;
     event.preventDefault();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    try { canvas.setPointerCapture?.(event.pointerId); } catch (_) {}
-    if (pointers.size === 1) {
-      dragPointer = event.pointerId;
-      lastX = event.clientX;
-      lastY = event.clientY;
-    } else if (pointers.size === 2) {
-      const pts = [...pointers.values()];
-      lastDistance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-    }
+    try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
+    lastPinch = pinchDistance();
   };
 
-  const pointerMove = event => {
-    if (!canOrbit()) { resetPointers(); return; }
-    if (!pointers.has(event.pointerId)) return;
+  const onPointerMove = event => {
+    const previous = pointers.get(event.pointerId);
+    if (!previous) return;
     event.preventDefault();
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (pointers.size === 2) {
-      const pts = [...pointers.values()];
-      const distance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      if (lastDistance > 0) camera.zoom((lastDistance - distance) * 0.018);
-      lastDistance = distance;
+    const next = { x: event.clientX, y: event.clientY };
+    pointers.set(event.pointerId, next);
+    if (pointers.size >= 2) {
+      const distance = pinchDistance();
+      if (lastPinch != null && distance != null) camera.zoom((lastPinch - distance) * 0.018);
+      lastPinch = distance;
       return;
     }
-    if (event.pointerId === dragPointer) {
-      const dx = event.clientX - lastX;
-      const dy = event.clientY - lastY;
-      lastX = event.clientX;
-      lastY = event.clientY;
-      camera.orbit(-dx * 0.006, -dy * 0.0045);
-    }
+    camera.orbit((previous.x - next.x) * 0.009, (next.y - previous.y) * 0.009);
   };
 
-  const pointerEnd = event => {
+  const release = event => {
     pointers.delete(event.pointerId);
-    try { canvas.releasePointerCapture?.(event.pointerId); } catch (_) {}
-    if (dragPointer === event.pointerId) dragPointer = null;
-    if (pointers.size < 2) lastDistance = 0;
-    if (pointers.size === 1) {
-      const [id, point] = pointers.entries().next().value;
-      dragPointer = id;
-      lastX = point.x;
-      lastY = point.y;
-    }
+    lastPinch = pinchDistance();
+    try { canvas.releasePointerCapture(event.pointerId); } catch (_) {}
   };
 
-  const wheel = event => {
-    if (!canOrbit()) return;
+  const onWheel = event => {
     event.preventDefault();
-    camera.zoom(Math.sign(event.deltaY) * Math.min(1.4, Math.abs(event.deltaY) * 0.008));
+    camera.zoom(event.deltaY * 0.012);
   };
 
-  canvas.addEventListener('pointerdown', pointerDown);
-  canvas.addEventListener('pointermove', pointerMove);
-  canvas.addEventListener('pointerup', pointerEnd);
-  canvas.addEventListener('pointercancel', pointerEnd);
-  canvas.addEventListener('wheel', wheel, { passive: false });
+  canvas.style.touchAction = 'none';
+  canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
+  canvas.addEventListener('pointermove', onPointerMove, { passive: false });
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
 
   return {
     destroy() {
-      canvas.removeEventListener('pointerdown', pointerDown);
-      canvas.removeEventListener('pointermove', pointerMove);
-      canvas.removeEventListener('pointerup', pointerEnd);
-      canvas.removeEventListener('pointercancel', pointerEnd);
-      canvas.removeEventListener('wheel', wheel);
-      resetPointers();
-    }
-  };
-}
-
-function setupJoystick(root, input) {
-  const zone = root.querySelector('#world3d-joystick');
-  const ring = zone?.querySelector('.world3d-joystick-ring');
-  const knob = root.querySelector('#world3d-joystick-knob');
-  if (!zone || !ring || !knob) return null;
-
-  let pointerId = null;
-  const max = 38;
-
-  const update = event => {
-    if (event.pointerId !== pointerId) return;
-    event.preventDefault();
-    const rect = ring.getBoundingClientRect();
-    let dx = event.clientX - (rect.left + rect.width / 2);
-    let dy = event.clientY - (rect.top + rect.height / 2);
-    const distance = Math.hypot(dx, dy);
-    if (distance > max) {
-      const scale = max / distance;
-      dx *= scale;
-      dy *= scale;
-    }
-    input.x = dx / max;
-    input.y = dy / max;
-    knob.style.transform = `translate(${dx}px,${dy}px)`;
-  };
-
-  const start = event => {
-    event.preventDefault();
-    pointerId = event.pointerId;
-    zone.classList.add('active');
-    try { zone.setPointerCapture?.(event.pointerId); } catch (_) {}
-    update(event);
-  };
-
-  const reset = event => {
-    if (event && pointerId !== null && event.pointerId !== pointerId) return;
-    if (event) event.preventDefault();
-    try { if (event && pointerId !== null) zone.releasePointerCapture?.(pointerId); } catch (_) {}
-    pointerId = null;
-    input.x = 0;
-    input.y = 0;
-    knob.style.transform = 'translate(0,0)';
-    zone.classList.remove('active');
-  };
-
-  zone.addEventListener('pointerdown', start);
-  zone.addEventListener('pointermove', update);
-  zone.addEventListener('pointerup', reset);
-  zone.addEventListener('pointercancel', reset);
-
-  return {
-    reset: () => reset(),
-    destroy() {
-      reset();
-      zone.removeEventListener('pointerdown', start);
-      zone.removeEventListener('pointermove', update);
-      zone.removeEventListener('pointerup', reset);
-      zone.removeEventListener('pointercancel', reset);
+      pointers.clear();
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', release);
+      canvas.removeEventListener('pointercancel', release);
+      canvas.removeEventListener('wheel', onWheel);
     }
   };
 }
 
 function escapeText(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }

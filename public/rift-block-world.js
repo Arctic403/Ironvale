@@ -1,11 +1,87 @@
-const FACE_DEFS = Object.freeze([
-  Object.freeze({ d: [1, 0, 0], n: [1, 0, 0], corners: [[1,0,0],[1,0,1],[1,1,1],[1,1,0]] }),
-  Object.freeze({ d: [-1, 0, 0], n: [-1, 0, 0], corners: [[0,0,1],[0,0,0],[0,1,0],[0,1,1]] }),
-  Object.freeze({ d: [0, 1, 0], n: [0, 1, 0], corners: [[0,1,0],[1,1,0],[1,1,1],[0,1,1]] }),
-  Object.freeze({ d: [0, -1, 0], n: [0, -1, 0], corners: [[0,0,1],[1,0,1],[1,0,0],[0,0,0]] }),
-  Object.freeze({ d: [0, 0, 1], n: [0, 0, 1], corners: [[1,0,1],[0,0,1],[0,1,1],[1,1,1]] }),
-  Object.freeze({ d: [0, 0, -1], n: [0, 0, -1], corners: [[0,0,0],[1,0,0],[1,1,0],[0,1,0]] })
+export const RIFT_BLOCK_FACE_DEFS = Object.freeze([
+  Object.freeze({ id: 'east', label: 'EAST +X', d: [1, 0, 0], n: [1, 0, 0], corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] }),
+  Object.freeze({ id: 'west', label: 'WEST -X', d: [-1, 0, 0], n: [-1, 0, 0], corners: [[0,0,1],[0,1,1],[0,1,0],[0,0,0]] }),
+  Object.freeze({ id: 'top', label: 'TOP +Y', d: [0, 1, 0], n: [0, 1, 0], corners: [[0,1,0],[0,1,1],[1,1,1],[1,1,0]] }),
+  Object.freeze({ id: 'bottom', label: 'BOTTOM -Y', d: [0, -1, 0], n: [0, -1, 0], corners: [[0,0,1],[0,0,0],[1,0,0],[1,0,1]] }),
+  Object.freeze({ id: 'south', label: 'SOUTH +Z', d: [0, 0, 1], n: [0, 0, 1], corners: [[1,0,1],[1,1,1],[0,1,1],[0,0,1]] }),
+  Object.freeze({ id: 'north', label: 'NORTH -Z', d: [0, 0, -1], n: [0, 0, -1], corners: [[0,0,0],[0,1,0],[1,1,0],[1,0,0]] })
 ]);
+
+function appendBlockFace(buffer, x, y, z, face) {
+  const base = buffer.vertices.length / 6;
+  for (const corner of face.corners) {
+    buffer.vertices.push(x + corner[0], y + corner[1], z + corner[2], ...face.n);
+  }
+  buffer.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+}
+
+export function validateRiftBlockFaceWinding() {
+  const failures = [];
+  for (const face of RIFT_BLOCK_FACE_DEFS) {
+    const a = face.corners[0];
+    const b = face.corners[1];
+    const c = face.corners[2];
+    const ab = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+    const ac = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+    const cross = [
+      ab[1]*ac[2] - ab[2]*ac[1],
+      ab[2]*ac[0] - ab[0]*ac[2],
+      ab[0]*ac[1] - ab[1]*ac[0]
+    ];
+    const dot = cross[0]*face.n[0] + cross[1]*face.n[1] + cross[2]*face.n[2];
+    if (!(dot > 0)) failures.push(face.label);
+  }
+  return { ok: failures.length === 0, failures, faces: RIFT_BLOCK_FACE_DEFS.length };
+}
+
+export function createRiftBlockGeometry(x = 0, y = 0, z = 0) {
+  const buffer = { vertices: [], indices: [] };
+  for (const face of RIFT_BLOCK_FACE_DEFS) appendBlockFace(buffer, x, y, z, face);
+  return {
+    vertices: new Float32Array(buffer.vertices),
+    indices: new Uint16Array(buffer.indices)
+  };
+}
+
+export function createRiftBlockSetGeometry(cells = []) {
+  const occupied = new Set();
+  const normalized = [];
+
+  for (const cell of cells || []) {
+    const x = Math.trunc(Number(cell?.x) || 0);
+    const y = Math.trunc(Number(cell?.y) || 0);
+    const z = Math.trunc(Number(cell?.z) || 0);
+    const key = key3(x, y, z);
+    if (occupied.has(key)) continue;
+    occupied.add(key);
+    normalized.push({ x, y, z });
+  }
+
+  const buffer = { vertices: [], indices: [] };
+  let visibleFaces = 0;
+  for (const cell of normalized) {
+    for (const face of RIFT_BLOCK_FACE_DEFS) {
+      const neighborKey = key3(
+        cell.x + face.d[0],
+        cell.y + face.d[1],
+        cell.z + face.d[2]
+      );
+      if (occupied.has(neighborKey)) continue;
+      appendBlockFace(buffer, cell.x, cell.y, cell.z, face);
+      visibleFaces += 1;
+    }
+  }
+
+  const IndexArray = buffer.vertices.length / 6 > 65535 ? Uint32Array : Uint16Array;
+  return {
+    vertices: new Float32Array(buffer.vertices),
+    indices: new IndexArray(buffer.indices),
+    blocks: normalized.length,
+    visibleFaces,
+    triangles: visibleFaces * 2,
+    vertexCount: visibleFaces * 4
+  };
+}
 
 const DEFAULT_MATERIALS = Object.freeze({
   ground: Object.freeze({ id: 'ground', label: 'Ground', color: '#425044', noise: 0.045 }),
@@ -434,16 +510,12 @@ export class RiftBlockWorld {
     };
 
     for (const cell of cells) {
-      for (const face of FACE_DEFS) {
+      for (const face of RIFT_BLOCK_FACE_DEFS) {
         if (cell.y === this.data.base.y && face.d[1] < 0) continue;
         const neighbor = this.getBlock(cell.x + face.d[0], cell.y + face.d[1], cell.z + face.d[2]);
         if (neighbor) continue;
         const buffer = getBuffer(cell.material);
-        const base = buffer.vertices.length / 6;
-        for (const corner of face.corners) {
-          buffer.vertices.push(cell.x + corner[0], cell.y + corner[1], cell.z + corner[2], ...face.n);
-        }
-        buffer.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+        appendBlockFace(buffer, cell.x, cell.y, cell.z, face);
       }
     }
     return buffers;

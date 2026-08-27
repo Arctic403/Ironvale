@@ -5,15 +5,18 @@ const VERTEX_SHADER = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aNormal;
+layout(location=2) in vec3 aVertexColor;
 uniform mat4 uProjection;
 uniform mat4 uView;
 uniform mat4 uModel;
 out vec3 vWorldPosition;
 out vec3 vNormal;
+out vec3 vVertexColor;
 void main(){
   vec4 world = uModel * vec4(aPosition,1.0);
   vWorldPosition = world.xyz;
   vNormal = mat3(uModel) * aNormal;
+  vVertexColor = aVertexColor;
   gl_Position = uProjection * uView * world;
 }`;
 
@@ -21,6 +24,7 @@ const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 in vec3 vWorldPosition;
 in vec3 vNormal;
+in vec3 vVertexColor;
 uniform vec3 uColor;
 uniform vec3 uLightDirection;
 uniform vec3 uFogColor;
@@ -28,6 +32,9 @@ uniform float uFogStart;
 uniform float uFogEnd;
 uniform float uNoise;
 uniform float uBlockGrid;
+uniform float uBlockFaceShade;
+uniform float uBlockElevationCue;
+uniform float uBlockElevationBase;
 uniform vec3 uCameraPosition;
 out vec4 outColor;
 float stableVariation(vec2 p){
@@ -35,11 +42,22 @@ float stableVariation(vec2 p){
   float cross = cos(p.y * 0.23 - p.x * 0.09);
   return broad * 0.62 + cross * 0.38;
 }
+float riftBlockFaceShade(vec3 n){
+  vec3 an = abs(n);
+  if(an.y >= an.x && an.y >= an.z) return n.y >= 0.0 ? 1.00 : 0.52;
+  if(an.x >= an.z) return n.x >= 0.0 ? 0.74 : 0.68;
+  return n.z >= 0.0 ? 0.86 : 0.80;
+}
+float riftBlockElevationShade(vec3 n, float worldY){
+  if(uBlockElevationCue <= 0.001 || n.y <= 0.65) return 1.0;
+  float metersAboveBase = max(worldY - uBlockElevationBase, 0.0);
+  return 1.0 + min(metersAboveBase * uBlockElevationCue, 0.12);
+}
 void main(){
   vec3 normal = normalize(vNormal);
   float diffuse = max(dot(normal, normalize(-uLightDirection)), 0.0);
   float variation = stableVariation(vWorldPosition.xz) * uNoise;
-  vec3 base = clamp(uColor * (1.0 + variation), 0.0, 1.0);
+  vec3 base = clamp(uColor * vVertexColor * (1.0 + variation), 0.0, 1.0);
   if(uBlockGrid > 0.001){
     vec3 an = abs(normal);
     vec2 uv = an.y > 0.65 ? vWorldPosition.xz : (an.x > an.z ? vWorldPosition.zy : vWorldPosition.xy);
@@ -48,7 +66,11 @@ void main(){
     float seam = max(smoothstep(0.46 - width.x, 0.49, cell.x), smoothstep(0.46 - width.y, 0.49, cell.y));
     base *= mix(1.0, 0.72, seam * clamp(uBlockGrid, 0.0, 1.0));
   }
-  vec3 lit = base * (0.59 + diffuse * 0.52);
+  float directionalLight = 0.59 + diffuse * 0.52;
+  float blockFaceLight = riftBlockFaceShade(normal);
+  float faceMix = clamp(uBlockFaceShade, 0.0, 1.0);
+  float elevationLight = mix(1.0, riftBlockElevationShade(normal, vWorldPosition.y), faceMix);
+  vec3 lit = base * mix(directionalLight, blockFaceLight, faceMix) * elevationLight;
   float distanceToCamera = distance(vWorldPosition, uCameraPosition);
   float fog = smoothstep(uFogStart, uFogEnd, distanceToCamera);
   vec3 finalColor = mix(lit, uFogColor, fog);
@@ -86,14 +108,42 @@ function createProgram(gl) {
 
 function normalizeGeometrySource(source) {
   if (!source?.vertices || !source?.indices) throw new Error('Custom geometry requires vertices and indices.');
-  const vertices = source.vertices instanceof Float32Array ? source.vertices : new Float32Array(source.vertices);
+
+  const rawVertices = source.vertices instanceof Float32Array ? source.vertices : new Float32Array(source.vertices);
+  const sourceStride = Math.trunc(Number(source.vertexStride) || 6);
+  if (sourceStride !== 6 && sourceStride !== 9) {
+    throw new Error(`Rift Engine geometry vertexStride ${sourceStride} is unsupported; expected 6 or 9 floats.`);
+  }
+  if (rawVertices.length % sourceStride !== 0) {
+    throw new Error(`Rift Engine geometry vertex data length ${rawVertices.length} is not divisible by stride ${sourceStride}.`);
+  }
+
+  let vertices = rawVertices;
+  if (sourceStride === 6) {
+    const count = rawVertices.length / 6;
+    vertices = new Float32Array(count * 9);
+    for (let i = 0; i < count; i += 1) {
+      const sourceOffset = i * 6;
+      const targetOffset = i * 9;
+      vertices[targetOffset] = rawVertices[sourceOffset];
+      vertices[targetOffset + 1] = rawVertices[sourceOffset + 1];
+      vertices[targetOffset + 2] = rawVertices[sourceOffset + 2];
+      vertices[targetOffset + 3] = rawVertices[sourceOffset + 3];
+      vertices[targetOffset + 4] = rawVertices[sourceOffset + 4];
+      vertices[targetOffset + 5] = rawVertices[sourceOffset + 5];
+      vertices[targetOffset + 6] = 1;
+      vertices[targetOffset + 7] = 1;
+      vertices[targetOffset + 8] = 1;
+    }
+  }
+
   let indices = source.indices;
   if (!(indices instanceof Uint16Array) && !(indices instanceof Uint32Array)) {
     let maxIndex = 0;
     for (const index of indices) maxIndex = Math.max(maxIndex, Number(index) || 0);
     indices = maxIndex > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
   }
-  return { vertices, indices };
+  return { vertices, indices, vertexStride: 9 };
 }
 
 function uploadGeometry(gl, rawSource) {
@@ -107,9 +157,11 @@ function uploadGeometry(gl, rawSource) {
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, source.indices, gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 36, 0);
   gl.enableVertexAttribArray(1);
-  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 36, 12);
+  gl.enableVertexAttribArray(2);
+  gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 36, 24);
   gl.bindVertexArray(null);
   return {
     vao,
@@ -198,6 +250,9 @@ export class RiftEngine {
       fogEnd: gl.getUniformLocation(this.program, 'uFogEnd'),
       noise: gl.getUniformLocation(this.program, 'uNoise'),
       blockGrid: gl.getUniformLocation(this.program, 'uBlockGrid'),
+      blockFaceShade: gl.getUniformLocation(this.program, 'uBlockFaceShade'),
+      blockElevationCue: gl.getUniformLocation(this.program, 'uBlockElevationCue'),
+      blockElevationBase: gl.getUniformLocation(this.program, 'uBlockElevationBase'),
       cameraPosition: gl.getUniformLocation(this.program, 'uCameraPosition')
     };
     this.geometry = {
@@ -239,6 +294,26 @@ export class RiftEngine {
     return drawable;
   }
 
+  updateMesh(drawable, rawSource) {
+    const key = drawable?.ownedGeometry || drawable?.geometry;
+    const mesh = this.geometry[key];
+    if (!mesh) throw new Error('Rift Engine updateMesh requires a live mesh drawable.');
+
+    const source = normalizeGeometrySource(rawSource);
+    const gl = this.gl;
+
+    gl.bindVertexArray(mesh.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, source.vertices, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, source.indices, gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(null);
+
+    mesh.count = source.indices.length;
+    mesh.indexType = source.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
+    return drawable;
+  }
+
   deleteGeometry(key) {
     if (!key || key === 'box' || key === 'cylinder8' || key === 'sphere') return;
     const mesh = this.geometry[key];
@@ -259,6 +334,9 @@ export class RiftEngine {
       color: Array.isArray(options.color) ? [...options.color] : hexToRgb(options.color || '#ffffff'),
       noise: options.noise || 0,
       blockGrid: options.blockGrid || 0,
+      blockFaceShade: options.blockFaceShade || 0,
+      blockElevationCue: Math.max(0, Number(options.blockElevationCue) || 0),
+      blockElevationBase: Number.isFinite(Number(options.blockElevationBase)) ? Number(options.blockElevationBase) : 0,
       visible: options.visible !== false,
       modelMatrix: new Float32Array(16),
       dynamic: !!options.dynamic,
@@ -363,6 +441,9 @@ export class RiftEngine {
       gl.uniform3fv(this.uniforms.color, drawable.color);
       gl.uniform1f(this.uniforms.noise, drawable.noise);
       gl.uniform1f(this.uniforms.blockGrid, drawable.blockGrid || 0);
+      gl.uniform1f(this.uniforms.blockFaceShade, drawable.blockFaceShade || 0);
+      gl.uniform1f(this.uniforms.blockElevationCue, drawable.blockElevationCue || 0);
+      gl.uniform1f(this.uniforms.blockElevationBase, drawable.blockElevationBase || 0);
       gl.drawElements(gl.TRIANGLES, mesh.count, mesh.indexType || gl.UNSIGNED_SHORT, 0);
       draws += 1;
     }

@@ -1072,3 +1072,296 @@ RiftCity's active Downtown foundation is now a literal visible block world rathe
 - Exiting Edit Mode still snaps the camera back to the unchanged player position.
 
 The next architecture layer can now be a block stamp/prefab system and district generator: roads, lots and buildings can be authored as reusable arrangements of the same one-meter cells instead of introducing another geometry system.
+
+
+## H1.45 — single production RiftBlock diagnostic
+
+Before scaling the visible block world beyond one cell, the active City route is intentionally reduced to one exact `1 × 1 × 1 m` RiftBlock. This is a renderer-validation milestone, not a city-content pass.
+
+- The block uses the same six face definitions that `RiftBlockWorld` chunk meshing uses; there is no separate test-only cube implementation.
+- Corrected the block-world face winding so every emitted triangle is CCW when viewed from outside, matching Rift Engine's `gl.frontFace(gl.CCW)` + back-face culling contract.
+- Added a runtime face-winding validator. Startup fails loudly if any of the six production faces points inward.
+- The diagnostic block is exactly 24 vertices / 12 triangles / 6 quads and occupies world coordinates `0..1` on X/Y/Z.
+- The test camera can orbit almost completely over and under the block, zoom close/far, and works with touch, mouse, wheel and pinch.
+- The HUD identifies the dominant viewed face (`±X`, `±Y`, `±Z`) and reports FPS, draw count and MSAA state.
+- Back-face culling is ON by default and can be toggled for comparison; optional auto-spin helps expose angle-dependent defects.
+- Fullscreen remains available for direct iPhone/Safari verification.
+- Roads, buildings, chunk streaming, player movement and the World Editor are intentionally absent from this active test scene until the one-block renderer is visually verified.
+
+Next validation sequence after this block is confirmed clean: two touching blocks → 2×2 floor → tiny wall/room → chunk meshing.
+
+## H1.46 — two touching production RiftBlocks
+
+The active City diagnostic advances by exactly one step: two adjacent `1 × 1 × 1 m` production RiftBlocks and nothing else.
+
+- The pair is authored at `(0,0,0)` and `(1,0,0)`, so the blocks share one complete X-axis face.
+- Added a reusable `createRiftBlockSetGeometry()` helper that compiles arbitrary occupied cells with the same six production face definitions used by the block-world renderer.
+- Neighbor occupancy is checked before face emission. The east face of block 1 and west face of block 2 are therefore not sent to the GPU at all.
+- The diagnostic asserts the exact expected result at startup: **2 blocks → 10 visible faces → 40 vertices → 20 triangles**. A mismatch fails loudly instead of rendering a questionable mesh.
+- Both blocks are uploaded as one custom Rift Engine mesh and one draw call, preserving the production direction of compiling block cells into GPU geometry rather than creating one WebGL object per block.
+- Back-face culling remains ON by default, with the existing culling toggle, full over/under orbit, pinch/wheel zoom, spin, FPS, draw-count and MSAA diagnostics.
+- The camera now targets the center of the two-block pair.
+- Roads, player, chunks, buildings and the editor remain intentionally absent while this neighbor-culling stage is verified visually.
+
+Next validation step after this pair is confirmed clean: `2 × 2` floor → tiny wall/room → chunk section compilation.
+
+## H1.47 — 2 × 2 production RiftBlock floor
+
+The active City diagnostic advances one controlled step beyond the verified touching pair: four production `1 × 1 × 1 m` RiftBlocks arranged as a flat `2 × 2` X/Z floor.
+
+- Cells are authored at `(0,0,0)`, `(1,0,0)`, `(0,0,1)` and `(1,0,1)`.
+- The same `createRiftBlockSetGeometry()` production helper compiles the set; no test-only cube or alternate mesh path is introduced.
+- The layout creates four internal block adjacencies: two along X and two along Z. Neighbor culling must remove both faces for every shared boundary.
+- The diagnostic asserts the exact production result at startup: **4 blocks → 16 visible faces → 64 vertices → 32 triangles**. Any mismatch fails loudly.
+- All four blocks are uploaded as one Rift Engine mesh / one draw object, proving neighbor culling across two horizontal axes while retaining the same deterministic CCW face winding.
+- Back-face culling remains ON by default. Full over/under orbit, pinch/wheel zoom, optional spin, FPS, draw count, MSAA and fullscreen diagnostics remain available.
+- The camera now targets the exact center of the `2 × 2` floor. Roads, player, buildings, editor and chunk streaming remain absent so this test stays isolated.
+
+Next validation step after the `2 × 2` floor is visually confirmed: `2 × 2 × 2` vertical block volume → tiny wall/room → chunk section compilation.
+
+
+
+## H1.48 — 2 × 2 × 2 production RiftBlock volume
+
+The isolated City diagnostic now adds the first vertical block layer: eight production `1 × 1 × 1 m` RiftBlocks arranged as one solid `2 × 2 × 2` volume.
+
+- The bottom layer remains the verified H1.47 `2 × 2` X/Z floor; an identical four-block layer is stacked directly above it at `Y = 1`.
+- Before the full volume is uploaded, startup separately validates a two-block vertical pair: **2 blocks → 10 visible faces → 40 vertices → 20 triangles**. This directly proves that the production neighbor lookup removes a shared `+Y / -Y` face pair.
+- The full volume contains 48 theoretical block faces and 12 shared adjacencies: four along X, four along Y and four along Z.
+- The production mesher must therefore emit exactly **8 blocks → 24 exterior faces → 96 vertices → 48 triangles**. Any mismatch fails loudly before the diagnostic is considered ready.
+- All eight logical blocks still compile into one Rift Engine mesh / one draw object; this is not eight WebGL cube objects.
+- The same deterministic outward normals, CCW winding, back-face culling, over/under orbit, pinch/wheel zoom, optional spin, FPS, draw-count, MSAA and fullscreen diagnostics remain active.
+- The camera target moves to the geometric center of the solid volume at `(1,1,1)` so the top and bottom layers can be inspected evenly from every angle.
+- Roads, player, buildings, editor and chunk streaming remain intentionally absent. This milestone tests vertical-neighbor culling only.
+
+Next validation step after the `2 × 2 × 2` volume is visually confirmed: a tiny hollow room that tests interior-facing surfaces before real chunk-section compilation.
+
+
+## H1.49 — first tiny hollow RiftBlock room
+
+The isolated renderer diagnostic now moves from solid test volumes to the first structure with a real interior cavity. Textures, chunk streaming and gameplay remain deliberately deferred so interior block geometry can be validated on its own.
+
+- The room uses a solid `5 × 5` one-block floor at `Y = 0` and a three-block-high perimeter wall at `Y = 1..3`.
+- A centered south-wall doorway removes exactly two wall cells at `Y = 1` and `Y = 2`, while retaining the floor beneath it and the `Y = 3` lintel block above it.
+- There is intentionally **no roof** in this milestone, making the cavity easy to inspect before fully enclosed-room rendering is tested.
+- The room contains exactly **71 logical 1 m blocks**. The production neighbor-culling mesher must emit **168 exposed faces → 672 vertices → 336 triangles**. Startup fails loudly if those values or the doorway occupancy contract do not match.
+- Interior-facing wall/floor surfaces and exterior-facing surfaces are compiled by the same `createRiftBlockSetGeometry()` path into **one Rift Engine mesh / one draw object**; there is no special interior mesh.
+- Added **VIEW INSIDE / VIEW OUTSIDE** camera presets. The inside preset places the production orbit camera inside the empty cavity with a short near plane so interior wall faces, corners and the doorway can be inspected directly on iPhone/Safari.
+- The outside preset keeps the full over/under orbit used by earlier diagnostics. Back-face culling remains ON by default with the same culling toggle, optional spin, pinch/wheel zoom, FPS, draw-count, MSAA and fullscreen diagnostics.
+- No texture atlas is introduced yet. The room remains a flat diagnostic material until geometry/interior behavior is proven.
+
+Next validation step after the open-roof room is visually confirmed: add a block roof and test a completely enclosed interior before moving on to real chunk-section compilation.
+
+## H1.50 — roofed hollow RiftBlock room
+
+The renderer diagnostic keeps the verified H1.49 room layout and adds only one production block roof so ceiling rendering can be checked before chunk/section work begins.
+
+- The existing `5 × 5` floor remains at `Y = 0`, with the same three-block-high perimeter walls at `Y = 1..3`.
+- The centered south doorway still removes the `Y = 1` and `Y = 2` wall cells and keeps its `Y = 3` lintel.
+- A complete `5 × 5` one-block-thick roof is added at `Y = 4`, creating 25 roof blocks without filling the `3 × 3 × 3` interior air cavity.
+- Startup validates the roof cell-by-cell, confirms the doorway stays open, confirms the cavity center stays empty and re-runs the production face-winding validator.
+- The complete structure is exactly **96 logical blocks → 206 exposed faces → 824 vertices → 412 triangles**.
+- All floor, wall, doorway, ceiling and outside-roof faces are compiled by the existing `createRiftBlockSetGeometry()` production path into **one Rift Engine mesh / one draw object**.
+- **VIEW INSIDE** keeps the orbit camera inside the air cavity and allows both upward ceiling inspection and downward floor inspection with the short `0.02 m` near plane.
+- **VIEW OUTSIDE** keeps full over/under orbit so the roof top, outer walls and doorway can be checked from every side.
+- Back-face culling stays ON by default with the existing toggle, spin, pinch/wheel zoom, FPS, draw-count, MSAA and fullscreen diagnostics.
+- Textures, texture atlases, gameplay, roads, buildings and chunk streaming remain deliberately deferred.
+
+Next validation step after the roofed room is visually confirmed: move from isolated structures to the first production block section/chunk compilation test.
+
+## H1.50.1 — deterministic RiftBlock face-light diagnostic
+
+The verified H1.50 roofed-room geometry is intentionally unchanged. This micro-pass isolates the reported visual case where a roof/ceiling corner could appear smooth from one viewing direction even though the block normals and geometry were valid.
+
+- Rift Engine now has an **optional per-drawable block-face shading mode**. It is disabled by default, so existing non-block rendering and future materials keep the previous directional-light path unless they opt in.
+- The block-face mode uses the already-authored flat face normal to choose deterministic axis brightness: upward faces are brightest, downward faces darkest, X-facing walls medium-dark and Z-facing walls medium-light. This guarantees visible contrast across a 90-degree block corner without beveling or changing geometry.
+- The H1.50 room enables this mode by default and adds **SHADE ON / SHADE OFF** so the same camera angle can be compared immediately against the old directional-only lighting.
+- The room remains exactly **96 logical blocks → 206 exposed faces → 824 vertices → 412 triangles**, compiled into the same one Rift Engine mesh. No blocks, normals, winding, culling rules or camera collision geometry are changed.
+- Back-face culling remains independently toggleable. The new face shading is not a culling workaround and does not make meshes double-sided.
+- Texture work and the one-meter block-grid seam shader remain off. This pass tests only whether hard 90-degree block edges read clearly before section/chunk compilation begins.
+
+If the previously smooth-looking roof/ceiling corner stays visually hard with **SHADE ON** from the same inside angle, the geometry diagnosis is complete and the next milestone can move to the first production block section/chunk test.
+
+
+
+## H1.51 — first production 16×16×16 RiftSection
+
+The isolated geometry tests are now promoted into the first real logical block section. This milestone keeps the visual scene deliberately small while introducing the storage and rebuild boundary the city will scale on later.
+
+- Added `public/rift-block-section.js` with a true **16 × 16 × 16** logical section containing exactly **4096 cells**.
+- Block state is stored in one compact `Uint16Array(4096)`, consuming **8192 bytes (8 KB)** for the complete section instead of allocating one JavaScript object per cell.
+- Section indexing follows `y << 8 | z << 4 | x`, with runtime checks for the first/last cells and all three axes.
+- `RiftBlockSection` owns block reads/writes, AIR/SOLID states, box fills, dirty state, logical revision and mesh revision.
+- Editing a cell marks only the section dirty. Compiling its mesh clears the dirty flag and records the exact logical revision used to produce the GPU geometry.
+- The production section mesher walks logical cells, tests the same six proven RiftBlock face directions and emits a quad only when the neighboring cell is AIR.
+- Neighbor faces between touching solid cells therefore remain logical data but are **not uploaded as GPU geometry**.
+- The controlled base pattern contains an `8 × 8` floor plus a centered `4 × 4 × 4` tower: **128 solid cells → 224 visible faces + 544 hidden touching faces → 896 vertices → 448 triangles**.
+- The **MUTATE** test performs both edit directions: four rooftop cells change AIR→SOLID and one wall cell changes SOLID→AIR. The section must become dirty and rebuild to exactly **131 solid cells → 236 visible faces + 550 hidden faces → 944 vertices → 472 triangles**.
+- The entire section still uploads as **one Rift Engine mesh / one draw object**. Mutation replaces that one compiled mesh rather than creating WebGL objects per block.
+- The deterministic hard block-face shading proven in H1.50.1 remains enabled so 90-degree edges stay readable.
+- Textures, atlas UVs, neighboring sections, section streaming and a full city remain intentionally deferred until this single section's storage/edit/rebuild behavior is visually confirmed.
+
+Next validation after H1.51: prove **neighbor-aware meshing across two adjacent 16³ sections**, especially a solid block pair touching across the section boundary, then introduce section streaming/reuse around the camera.
+
+## H1.52 — neighboring 16×16×16 RiftSections
+
+The first production section is now paired with a second independently stored section so RiftCity can prove that section boundaries do not become visible seams or duplicate hidden geometry.
+
+- Added `RiftSectionGrid`, a lightweight loaded-section registry keyed by section coordinates. It resolves world block coordinates into the correct 16³ section/local cell and supplies neighbor state to the existing section mesher.
+- Two adjacent sections are loaded at `(0,0,0)` and `(1,0,0)`, giving **8192 logical cells** in two independent `Uint16Array(4096)` buffers for **16 KB total block-state storage**.
+- The H1.51 `8 × 8` floor + `4 × 4 × 4` tower is deliberately split across the X boundary: section A ends at local `X=15`, while section B begins at local `X=0` / world `X=16`.
+- Each section still owns and uploads its own GPU mesh. The test therefore renders exactly **two section draw objects**, not one object per block.
+- Neighbor-aware meshing checks the loaded adjacent section whenever a face reaches the local section edge. A solid cell on A's `X=15` touching a solid cell on B's `X=0` suppresses both hidden faces exactly like two blocks inside one section.
+- The base pattern contains **24 solid block pairs touching across the section boundary**. If each section were meshed in isolation it would upload 272 visible faces; neighbor-aware meshing uploads only **224**, proving that **48 hidden cross-section faces are removed**.
+- Exact base totals remain the same continuous shape as H1.51: **128 solid cells → 224 visible faces + 544 hidden faces → 896 vertices → 448 triangles**. Each section contributes exactly 64 blocks / 112 visible faces / 272 hidden faces.
+- `RiftSectionGrid.setBlockWorld()` now invalidates the edited section and any loaded neighboring section whose boundary visibility can change. Interior edits do not unnecessarily dirty unrelated sections.
+- **CUT BOUNDARY** removes the visible world cell `(16,2,6)` from section B's local `X=0` edge. The edit must dirty both B and neighboring A before either mesh is rebuilt.
+- The cut state is exactly **127 solid cells → 228 visible faces + 534 hidden faces → 912 vertices → 456 triangles**. Boundary contacts drop from 24 to 23, and 46 otherwise-hidden cross-section faces remain suppressed.
+- **RESTORE** writes that boundary block back and again invalidates/rebuilds both dependent section meshes, returning to the exact base totals.
+- Grid validation also checks world→local mapping at `X=16`, conservative neighbor invalidation on section load/unload, and that a non-boundary edit dirties only its owning section.
+- Deterministic hard RiftBlock face shading, CCW winding, back-face culling, orbit/pinch controls, fullscreen, FPS and MSAA diagnostics remain unchanged. Textures are still deferred.
+
+Next validation after H1.52: introduce a small camera-centered loaded-section window and prove section load/unload/reuse without changing the logical block or meshing contracts.
+
+## H1.53 — camera-centered 3×3 RiftSection streaming window
+
+The verified cross-section meshing contract now becomes a small loaded-world window around the camera. This milestone proves that RiftCity can keep a fixed amount of logical/GPU section state resident while the camera crosses section boundaries.
+
+- Added `RiftSectionStreamWindow`, a deterministic horizontal loaded-section manager built on the existing `RiftSectionGrid`.
+- The first streaming radius is `1`, so exactly **3 × 3 = 9** horizontal `16 × 16 × 16` sections stay loaded around the current center section.
+- Nine sections represent **36,864 logical block cells** while using only **73,728 bytes (72 KB)** of `Uint16` block-state memory.
+- Each diagnostic section contains a full `16 × 16` one-block floor plus a small interior `2 × 2 × 3` pillar. The pillar quadrant is derived from section coordinates so the streamed world visibly changes while every section keeps the same geometry budget.
+- The loaded 3×3 window contains exactly **2,412 solid blocks → 5,016 visible faces + 9,456 hidden faces → 20,064 vertices → 10,032 triangles**.
+- If those nine sections were meshed independently they would upload 5,400 visible faces. The loaded grid has **192 touching block pairs across section boundaries**, so neighbor-aware meshing removes **384 duplicate hidden cross-section faces**.
+- WEST / EAST / NORTH / SOUTH shift the stream center by exactly one full 16 m section. A one-section move retains six sections, unloads three and loads three.
+- Section add/remove still invalidates only meshes whose loaded-neighbor exposure can change. In this deliberately edge-to-edge floor test, all nine meshes become dirty after a one-section shift because both the old window edge and the new interior/window edge change.
+- Rift Engine now exposes `updateMesh()` so a streamed section can replace vertex/index contents **inside an existing custom mesh buffer/VAO** instead of deleting and creating a new draw object every time.
+- The first nine section drawables become a fixed GPU slot pool. On every one-section shift, the three slots released by unloaded sections are reassigned to the three newly loaded sections while retained dirty sections update their existing buffers.
+- The diagnostic asserts that the engine remains at exactly **9 section draw objects** while the stream moves. GPU slot creation stays at nine; the reuse counter increases by exactly three for every one-section shift.
+- Camera target moves to the center of the active section. Touch orbit/pinch, mouse orbit/wheel, fullscreen and keyboard `WASD`/arrow section stepping remain available.
+- Runtime validation also checks negative world coordinates so crossing west/north of world zero still maps to the correct negative section coordinates.
+- Textures remain deferred. The streamed sections keep the proven hard RiftBlock face shading and exposed-face meshing path.
+
+Next validation after H1.53: introduce a larger logical world/source behind the fixed loaded window, preserve edited section data across unload/reload, and then separate logical-world persistence from the nine resident render sections.
+
+
+## H1.54 — persistent logical world source behind streamed RiftSections
+
+H1.53 proved that RiftCity can keep only a fixed `3 × 3` render window resident. H1.54 separates that resident render state from a larger logical world source so unloading a section no longer means forgetting edits made to it.
+
+- Added `RiftSectionWorldSource`, a deterministic base-world + sparse-override layer independent from `RiftSectionGrid` and the nine resident GPU meshes.
+- Unmodified sections are regenerated from the deterministic section source on demand. Changed cells are stored as sparse `(section, cell index, state)` overrides instead of keeping an 8 KB state buffer for every section ever visited.
+- `RiftSectionStreamWindow` can now be backed by a world source. Loading a section hydrates a fresh `RiftBlockSection` from generated base data plus any stored overrides; unloading removes only the resident section object.
+- World edits can be written even when their target section is currently unloaded. If the section is resident, the same write updates its local state and dirties only the required mesh/neighbor set.
+- Returning a cell to its generated base state removes the sparse override entirely instead of storing redundant data.
+- The diagnostic target is world cell `(8,1,8)` in section `(0,0)`. **PLACE MARKER** changes that generated AIR cell to SOLID and creates exactly one persistent override.
+- With the marker resident, the exact loaded-window geometry becomes **2,413 blocks → 5,020 visible faces → 9,458 hidden faces → 20,080 vertices → 10,040 triangles**.
+- Move two section steps far enough that section `(0,0)` leaves the `3 × 3` window. The resident geometry returns to the unchanged H1.53 baseline, but the logical source still reports the marker as SOLID.
+- Return until section `(0,0)` is loaded again. The runtime requires a **new section object** and verifies that the marker is rehydrated from the logical source before declaring the round trip passed.
+- **CLEAR MARKER** restores generated AIR and deletes the override. The loaded geometry returns exactly to **2,412 blocks / 5,016 visible faces / 9,456 hidden faces / 20,064 vertices / 10,032 triangles**.
+- The loaded render budget remains fixed at **9 sections / 36,864 cells / 72 KB logical state / 9 GPU mesh slots** throughout streaming and persistence tests.
+- Cross-section culling remains unchanged at **192 touching boundary pairs / 384 suppressed GPU faces** for the diagnostic floor.
+- `exportOverrides()` exposes deterministic sparse records for a later save/database layer, but H1.54 persistence is intentionally **runtime logical persistence across section unload/reload**, not yet permanent storage across a browser refresh or server restart.
+- Textures remain deferred; all tests continue using the proven hard RiftBlock face shading and exposed-face meshing path.
+
+Next validation after H1.54: replace the repeated diagnostic section generator with the first actual RiftCity world source/grid (ground, road/sidewalk/buildable block patterns) while keeping the same fixed resident window, sparse edits and GPU-slot reuse contract.
+
+## H1.54.1 — steep-angle RiftBlock face readability
+
+H1.54's persistent 3 × 3 section stream is unchanged. This micro-pass fixes the last diagnostic readability defect found from a near top-down iPhone camera angle: an elevated block's top/rear silhouette could visually merge into the lower +Y ground because both surfaces shared the same flat top-face tone.
+
+- RiftBlock geometry, face winding, culling, section storage, sparse world overrides, streaming and GPU-slot reuse are unchanged.
+- The deterministic block-face shader now distinguishes all four horizontal face directions instead of giving both X directions one value and both Z directions one value. This keeps opposite/rear faces from collapsing to identical tones as the camera rotates.
+- +Y faces get a small opt-in elevation cue: `2.8%` per meter above the configured block-ground reference, capped at `12%`. The H1.54 diagnostic uses a `1 m` top-surface baseline, so the streamed ground remains unchanged while raised pillar tops separate subtly from it.
+- The elevation cue applies only to upward RiftBlock faces and only on drawables that opt in. Non-block Rift Engine drawables and underside faces are unaffected.
+- There are still no bevels, outlines, texture seams or shadow-map costs. The fix is a few scalar operations in the existing fragment shader and does not add draw calls.
+- H1.54's exact resident-state, cross-section culling, persistence round-trip and nine-GPU-slot contracts remain the validation baseline.
+
+Next validation: revisit the steep top-down view that produced the V-shaped silhouette. If the raised block now keeps a readable top/rear edge while H1.54 persistence still passes, proceed to H1.55's first actual RiftCity street/world grid.
+
+## H1.55 — first actual RiftCity block-built street slice
+
+The renderer/section diagnostics now give way to the first authored RiftCity world surface. Commerce Avenue is generated from the same exact `1 m × 1 m × 1 m` logical RiftBlocks, the same `16 × 16 × 16` sections, the same 3 × 3 streaming window and the same sparse logical-world source proven in H1.45–H1.54.1.
+
+### Locked first-slice dimensions
+
+- East/west Commerce Avenue road: **14 m** wide.
+- North/south cross street: **14 m** wide.
+- Intersection: **14 × 14 m**.
+- Sidewalk band on each road edge: **4 m** total.
+- The road-adjacent **1 m** of that sidewalk band is authored as a distinct curb material cell.
+- Service alley opening: **4 m** wide, cut through the north sidewalk into the buildable lot.
+- Everything outside road/sidewalk/alley cells in this slice is a buildable-lot surface.
+
+A physically raised curb is intentionally **not** faked with a full RiftBlock. Because every logical RiftBlock is exactly one meter tall, raising the sidewalk by one cell would create a one-meter curb. H1.55 therefore preserves the exact one-meter voxel contract and represents the curb as a one-cell material band at road height. Fractional slab/micro-geometry can be introduced later without changing these road/sidewalk measurements.
+
+### One streamed mesh per section with temporary material colors
+
+H1.55 adds optional per-vertex RGB to Rift Engine geometry. Old six-float position/normal geometry remains valid and is expanded internally with white vertex color, while RiftSection geometry now emits a nine-float position/normal/color stream.
+
+This lets road, sidewalk, curb, lot and alley states appear as distinct temporary colors **inside the same section mesh**. The 3 × 3 resident window therefore remains:
+
+- **9 loaded sections**
+- **36,864 logical cells**
+- **72 KB resident block-state memory**
+- **9 GPU mesh slots / 9 draw objects**
+- GPU slots are reused when streaming shifts instead of growing over time.
+
+The temporary colors are not the final texture system. The future atlas can replace the color lookup at mesh-build time without changing logical city geometry or section streaming.
+
+### H1.55 geometry contract
+
+Every loaded section in this first slice contains one complete ground layer, regardless of its material state. Across the resident 3 × 3 window that produces:
+
+- **2,304 solid RiftBlocks**
+- **4,800 visible faces**
+- **9,024 hidden/internal faces removed**
+- **19,200 vertices**
+- **9,600 triangles**
+- **192 touching cross-section block pairs**
+- **384 cross-section faces suppressed**
+
+At initial center `0,0`, the visible 48 × 48 m window contains exactly:
+
+- **1,148 road cells**
+- **336 sidewalk cells**
+- **128 curb-band cells**
+- **624 buildable-lot cells**
+- **68 alley cells**
+
+The existing H1.54 persistent-world regression test still runs during startup, and H1.55 adds its own city-world validation for exact dimensions, material classification, per-vertex color stride, cross-section culling, 3/3/6 stream churn and sparse edit unload/reload hydration.
+
+Next milestone: turn the locked street/intersection/alley measurements into reusable city stamps/prefabs so the same authored patterns can generate multiple connected RiftCity blocks without hardcoding every cell.
+
+
+## H1.56 — switchable RiftBlock Shape Lab
+
+RiftCity's block renderer now supports a first-generation partial-shape vocabulary without abandoning the exact 1 m logical cell grid.
+
+- Existing material-only block states remain full `1 × 1 × 1 m` RiftBlocks and keep the original fast six-face meshing path.
+- Added compact shape/rotation bits inside the existing `Uint16` block state:
+  - full block;
+  - bottom half slab (`0.5 m` high);
+  - top half slab (`0.5 m` high);
+  - stair with two `0.5 m` steps;
+  - stair rotation north/east/south/west.
+- Partial shapes use an internal `2 × 2 × 2` half-meter occupancy mask. This is meshing metadata inside one logical 1 m cell, not a change to RiftCity's world grid.
+- Shape-aware meshing evaluates the actual occupied half-meter regions on both sides of a contact. A full block touching a slab therefore culls only the covered half of the shared face instead of deleting the whole face.
+- Exposed half-meter surface tiles are merged back into larger axis-aligned quads inside each logical cell before upload, keeping full faces compact while still supporting stair risers, slab tops and partial neighbor coverage.
+- Sections that contain no slabs/stairs continue to use the proven H1.55 full-block fast path, so the current Commerce Avenue street slice and its exact geometry/performance contract are unchanged underneath the lab.
+
+The active City route is temporarily a switchable validation lab with these scenes:
+
+- **ALL** — representative full block, both slab types, all stair rotations, mixed contacts and a staircase in one shape mesh;
+- **FULL** — two touching legacy full blocks, still exactly 10 visible quads / 20 triangles;
+- **SLABS** — isolated top/bottom slabs, touching bottom slabs and vertically touching top/bottom slabs;
+- **STAIRS** — north/east/south/west stair orientation validation;
+- **STAIRCASE** — three stair cells forming six continuous `0.5 m` steps over a 3 m rise;
+- **MIXED** — full↔slab, full↔stair, slab↔stair and stair↔stair contacts;
+- **OCCLUSION** — focused partial shared-face coverage test.
+
+Every scene has locked expected counts for occupied logical cells, occupied half-cells, exposed/hidden half-meter surface tiles, merged GPU quads, vertices and triangles. The lab can switch scenes without reloading the page and keeps orbit, pinch/wheel zoom, top-view, spin, culling and fullscreen diagnostics.
+
+`npm run build` remains Pure-JavaScript only and now syntax-checks 88 JavaScript files.
+
+Next intended step after visual validation: return the new full/slab/stair vocabulary to the real Commerce Avenue world, then use it for realistic sidewalk/entrance transitions before city stamp/prefab work.
