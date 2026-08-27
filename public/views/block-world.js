@@ -60,7 +60,23 @@ export async function renderBlockWorld(root, options={}){
           <div class="bw-sidewalk bw-sidewalk-south"></div>
           <div class="bw-buildings"></div>
           <div class="bw-props"></div>
-          <div class="bw-player" id="bw-player"><i></i></div>
+          <div class="bw-player" id="bw-player" data-state="idle" data-facing="south" aria-hidden="true">
+            <div class="bw-player-shadow"></div>
+            <div class="bw-player-rig">
+              <div class="bw-player-sprite">
+                <div class="bw-player-feet">
+                  <span class="bw-player-leg bw-player-leg-left"><i class="bw-player-shoe"></i></span>
+                  <span class="bw-player-leg bw-player-leg-right"><i class="bw-player-shoe"></i></span>
+                </div>
+                <div class="bw-player-body">
+                  <span class="bw-player-arm bw-player-arm-left"></span>
+                  <span class="bw-player-arm bw-player-arm-right"></span>
+                  <span class="bw-player-torso"><i class="bw-player-chain"></i></span>
+                  <span class="bw-player-head"><i class="bw-player-neck"></i><i class="bw-player-hair"></i><i class="bw-player-face"></i></span>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="bw-prompt" id="bw-prompt"></div>
           <div class="bw-exit bw-exit-west">← NEXT BLOCK</div>
           <div class="bw-exit bw-exit-east">NEXT BLOCK →</div>
@@ -104,7 +120,7 @@ export async function renderBlockWorld(root, options={}){
         <input id="bw-editor-x"><input id="bw-editor-y"><input id="bw-editor-w"><input id="bw-editor-h">
         <input id="bw-editor-idlabel"><input id="bw-editor-rotation"><input id="bw-editor-zindex">
         <select id="bw-editor-snap"><option value="10" selected>10</option></select>
-        <button id="bw-editor-duplicate"></button><button id="bw-editor-delete"></button>
+        <button id="bw-editor-shape-toggle"></button><button id="bw-editor-add-point"></button><button id="bw-editor-delete-point"></button><button id="bw-editor-duplicate"></button><button id="bw-editor-delete"></button>
         <button id="bw-editor-undo"></button><button id="bw-editor-redo"></button>
         <button id="bw-editor-export"></button><button id="bw-editor-reset"></button>
         <button id="bw-editor-revert-draft"></button><button id="bw-editor-local-export"></button>
@@ -175,6 +191,7 @@ export async function renderBlockWorld(root, options={}){
   const inputRotation=editorQuery('#bw-editor-rotation');
   const inputZIndex=editorQuery('#bw-editor-zindex');
   const snapSelect=editorQuery('#bw-editor-snap');
+  const shapeToggleButton=editorQuery('#bw-editor-shape-toggle'),addPointButton=editorQuery('#bw-editor-add-point'),deletePointButton=editorQuery('#bw-editor-delete-point');
   const duplicateButton=editorQuery('#bw-editor-duplicate'),deleteButton=editorQuery('#bw-editor-delete');
   const lockButton=editorQuery('#bw-editor-lock');
   const undoButton=editorQuery('#bw-editor-undo'),redoButton=editorQuery('#bw-editor-redo');
@@ -200,6 +217,15 @@ export async function renderBlockWorld(root, options={}){
   const editorContextLabel=editorQuery('#bw-editor-context');
   const editorParentSceneButton=editorQuery('#bw-editor-parent-scene');
   const editorSubareaButtons=[...editorScope.querySelectorAll('[data-bw-open-subarea]')];
+  const configCameraZoom=editorQuery('#bw-config-camera-zoom');
+  const configPlayerScale=editorQuery('#bw-config-player-scale');
+  const configLookAhead=editorQuery('#bw-config-lookahead');
+  const configInteractionRadius=editorQuery('#bw-config-interaction-radius');
+  const configWalkSpeed=editorQuery('#bw-config-walk-speed');
+  const configRunSpeed=editorQuery('#bw-config-run-speed');
+  const configDepthMin=editorQuery('#bw-config-depth-min');
+  const configDepthMax=editorQuery('#bw-config-depth-max');
+  const configIntegrityStatus=editorQuery('#bw-config-integrity-status');
 
   const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v3';
   function setupStudioPanels(){
@@ -532,6 +558,46 @@ export async function renderBlockWorld(root, options={}){
   // Published server layout is authoritative in Play Mode. Source layouts remain
   // deterministic fallbacks for both the street and editable room scenes.
   const cloneBlock=value=>JSON.parse(JSON.stringify(value));
+  const DEFAULT_RUNTIME_CONFIG=Object.freeze({
+    schemaVersion:1,
+    camera:Object.freeze({mode:'follow',playScale:.60,minScale:.20,maxScale:1.5,anchorX:.46,anchorY:.76,lookAhead:100,vertical:'follow',positionEase:.17,zoomEase:.13}),
+    player:Object.freeze({baseScale:1,editorScale:1,depthMin:.78,depthMax:1.05}),
+    movement:Object.freeze({walkSpeed:235,runSpeed:390,maxStep:7}),
+    interaction:Object.freeze({radius:100,roomExitRadius:105})
+  });
+
+  function sourceSceneDocument(id){
+    return String(id||'')===BLOCK1.id?BLOCK1:getSubarea(id);
+  }
+
+  function runtimeConfigFor(area=currentArea()){
+    const authored=sourceSceneDocument(area?.id)||{};
+    const authoredRuntime=authored.runtimeConfig||{};
+    const runtime=area?.runtimeConfig||{};
+    return {
+      schemaVersion:Number(runtime.schemaVersion||authoredRuntime.schemaVersion||DEFAULT_RUNTIME_CONFIG.schemaVersion),
+      camera:{...DEFAULT_RUNTIME_CONFIG.camera,...(authored.camera||{}),...(area?.camera||{}),...(authoredRuntime.camera||{}),...(runtime.camera||{})},
+      player:{...DEFAULT_RUNTIME_CONFIG.player,...(authored.character||{}),...(area?.character||{}),...(authoredRuntime.player||{}),...(runtime.player||{})},
+      movement:{...DEFAULT_RUNTIME_CONFIG.movement,...(authoredRuntime.movement||{}),...(runtime.movement||{})},
+      interaction:{...DEFAULT_RUNTIME_CONFIG.interaction,...(authoredRuntime.interaction||{}),...(runtime.interaction||{})}
+    };
+  }
+
+  function ensureWorkingRuntimeConfig(){
+    const resolved=runtimeConfigFor(working);
+    working.runtimeConfig={
+      schemaVersion:1,
+      camera:{...resolved.camera},
+      player:{...resolved.player},
+      movement:{...resolved.movement},
+      interaction:{...resolved.interaction}
+    };
+    // Keep compatibility aliases in exported layouts during the migration.
+    working.camera={...resolved.camera};
+    working.character={...resolved.player};
+    return working.runtimeConfig;
+  }
+
   const normalizeSubareaLayout=(value,id=PRIMARY_SUBAREA_ID)=>{
     const authored=getSubarea(id);
     if(!authored)return null;
@@ -548,6 +614,15 @@ export async function renderBlockWorld(root, options={}){
     next.walkable={...base.walkable,...(raw.walkable||{})};
     next.exit={...base.exit,...(raw.exit||{})};
     next.camera={...base.camera,...(raw.camera||{})};
+    next.character={...base.character,...(raw.character||{})};
+    next.runtimeConfig={
+      ...(base.runtimeConfig||{}),
+      ...(raw.runtimeConfig||{}),
+      camera:{...(base.runtimeConfig?.camera||{}),...(raw.runtimeConfig?.camera||{})},
+      player:{...(base.runtimeConfig?.player||{}),...(raw.runtimeConfig?.player||{})},
+      movement:{...(base.runtimeConfig?.movement||{}),...(raw.runtimeConfig?.movement||{})},
+      interaction:{...(base.runtimeConfig?.interaction||{}),...(raw.runtimeConfig?.interaction||{})}
+    };
     next.buildings=Array.isArray(raw.buildings)?raw.buildings:[];
     next.props=Array.isArray(raw.props)?raw.props:[];
     next.obstacles=Array.isArray(raw.obstacles)?raw.obstacles:cloneBlock(base.obstacles||[]);
@@ -561,7 +636,7 @@ export async function renderBlockWorld(root, options={}){
   if(publishedAlley)publishedSubareas.set(PRIMARY_SUBAREA_ID,publishedAlley);
   const resolveSubarea=id=>publishedSubareas.get(String(id||''))||getSubarea(id);
 
-  let editMode=false, editorCollapsed=false, selectedKey='', drag=null;
+  let editMode=false, editorCollapsed=false, selectedKey='', selectedVertexIndex=-1, addPointMode=false, drag=null;
   let working=cloneBlock(publishedWorking);
   let editorSceneId=BLOCK1.id;
   let editorStreetReturn=null;
@@ -573,6 +648,10 @@ export async function renderBlockWorld(root, options={}){
   const localEditorDrafts=new Map();
   let draftDirty=false,draftSaving=false,draftTimer=null,draftInterval=null;
   let draftRevision=0,publishedRevision=Number(publishedBlockData?.revision||0);
+  const publishedIntegrityByScene=new Map([
+    [BLOCK1.id,publishedBlockData?.integrity||null],
+    [PRIMARY_SUBAREA_ID,publishedAlleyData?.integrity||null]
+  ]);
 
   const editingSubarea=()=>editorSceneId!==BLOCK1.id;
   const editorDocumentId=()=>editorSceneId||BLOCK1.id;
@@ -628,6 +707,9 @@ export async function renderBlockWorld(root, options={}){
 
   async function saveDraftToServer({force=false}={}){
     if(!editMode||draftSaving||(!draftDirty&&!force))return true;
+    // Materialize the resolved per-scene runtime config into every saved draft so
+    // legacy D1 layouts migrate to the versioned config envelope on next publish.
+    ensureWorkingRuntimeConfig();
     draftSaving=true;
     setServerStatus('DRAFT · saving…','saving');
     const result=await api(`/api/admin/blocks/${encodeURIComponent(working.id)}/draft`,{
@@ -666,6 +748,7 @@ export async function renderBlockWorld(root, options={}){
     }
     draftRevision=Number(result.draftRevision||0);
     publishedRevision=Number(result.publishedRevision||0);
+    if(result.integrity)publishedIntegrityByScene.set(id,result.integrity);
     const next=localDraft||result.draft||result.published||publishedFallback||authored;
     setWorkingEditorDocument(next);
     undoStack=[];redoStack=[];draftDirty=!!localDraft;
@@ -694,11 +777,7 @@ export async function renderBlockWorld(root, options={}){
       state.x=Number(working.spawn.x)||state.x;
       state.y=Number(working.spawn.y)||state.y;
     }
-    const walk=working.walkable;
-    if(walk){
-      state.x=Math.max(walk.x,Math.min(walk.x+walk.width,state.x));
-      state.y=Math.max(walk.y,Math.min(walk.y+walk.height,state.y));
-    }
+    if(working.walkable)ensurePlayerInCurrentArea();
 
     renderEditorObjects();
     updatePlayer();
@@ -722,6 +801,7 @@ export async function renderBlockWorld(root, options={}){
     publishedRevision=Number(result.publishedRevision||publishedRevision+1);
     draftRevision=Math.max(draftRevision,publishedRevision);
     draftDirty=false;
+    if(result.integrity)publishedIntegrityByScene.set(editorDocumentId(),result.integrity);
 
     if(editingSubarea()){
       const publishedRoom=normalizeSubareaLayout(result.block,editorSceneId);
@@ -737,7 +817,9 @@ export async function renderBlockWorld(root, options={}){
 
     syncInspector();
     await loadVersionHistory();
-    setServerStatus(`LIVE · r${publishedRevision}`,'published');
+    const integrity=result.integrity;
+    setServerStatus(`LIVE · r${publishedRevision}${integrity?.verified?(String(integrity.algorithm||'').startsWith('hmac')?' · SIGNED':' · SHA256'):''}`,'published');
+    syncSceneConfigControls();
   }
 
   async function revertServerDraft(){
@@ -749,6 +831,7 @@ export async function renderBlockWorld(root, options={}){
       return;
     }
     localEditorDrafts.delete(id);
+    if(result.integrity)publishedIntegrityByScene.set(id,result.integrity);
     setWorkingEditorDocument(result.block||publishedEditorDocument()||authoredEditorDocument());
     draftDirty=false;undoStack=[];redoStack=[];
     renderEditorObjects();syncInspector();syncEditorSceneContext();
@@ -785,6 +868,7 @@ export async function renderBlockWorld(root, options={}){
       return;
     }
     localEditorDrafts.delete(id);
+    if(result.integrity)publishedIntegrityByScene.set(id,result.integrity);
     setWorkingEditorDocument(result.block);
     draftRevision=Number(result.draftRevision||draftRevision);
     draftDirty=false;undoStack=[];redoStack=[];selectedKey='';
@@ -830,11 +914,238 @@ export async function renderBlockWorld(root, options={}){
     }
   }
   function snap(v){const n=Number(snapSelect.value)||1;return Math.round(v/n)*n;}
+  const SHAPE_EDIT_TYPES=new Set(['walkable','obstacle','exit','room-exit']);
+  const PLAYER_RADIUS=18;
+  const PLAYER_SKIN=1.5;
+  const isPolygonGeometry=o=>Array.isArray(o?.points)&&o.points.length>=3;
+  const canShapeEditItem=item=>!!item&&SHAPE_EDIT_TYPES.has(item.type);
+  function geometryBounds(o){
+    if(isPolygonGeometry(o)){
+      const xs=o.points.map(p=>Number(p?.x)||0), ys=o.points.map(p=>Number(p?.y)||0);
+      const minX=Math.min(...xs), maxX=Math.max(...xs), minY=Math.min(...ys), maxY=Math.max(...ys);
+      return {x:minX,y:minY,width:Math.max(0,maxX-minX),height:Math.max(0,maxY-minY)};
+    }
+    return {x:Number(o?.x)||0,y:Number(o?.y)||0,width:Math.max(0,Number(o?.w??o?.width)||0),height:Math.max(0,Number(o?.h??o?.height)||0)};
+  }
+  function syncPolygonBounds(o){
+    if(!isPolygonGeometry(o))return;
+    const b=geometryBounds(o);
+    o.x=snap(b.x); o.y=snap(b.y);
+    if('w' in o)o.w=Math.max(20,snap(b.width)); else o.width=Math.max(20,snap(b.width));
+    if('h' in o)o.h=Math.max(20,snap(b.height)); else o.height=Math.max(20,snap(b.height));
+    o.kind='poly';
+  }
+  function createRectPolygon(o){
+    const b=geometryBounds(o);
+    o.points=[
+      {x:snap(b.x),y:snap(b.y)},
+      {x:snap(b.x+b.width),y:snap(b.y)},
+      {x:snap(b.x+b.width),y:snap(b.y+b.height)},
+      {x:snap(b.x),y:snap(b.y+b.height)}
+    ];
+    o.kind='poly';
+    syncPolygonBounds(o);
+  }
+  function stripPolygon(o){
+    if(!isPolygonGeometry(o))return;
+    const b=geometryBounds(o);
+    delete o.points; delete o.kind;
+    o.x=snap(b.x); o.y=snap(b.y);
+    if('w' in o)o.w=Math.max(20,snap(b.width)); else o.width=Math.max(20,snap(b.width));
+    if('h' in o)o.h=Math.max(20,snap(b.height)); else o.height=Math.max(20,snap(b.height));
+  }
+  function translateGeometry(o,dx,dy){
+    if(isPolygonGeometry(o)){
+      o.points=o.points.map(p=>({x:snap((Number(p?.x)||0)+dx),y:snap((Number(p?.y)||0)+dy)}));
+      syncPolygonBounds(o);
+      return;
+    }
+    o.x=snap((Number(o.x)||0)+dx); o.y=snap((Number(o.y)||0)+dy);
+  }
+  function scaleGeometryToBounds(o,nextBounds,sourceBounds=null){
+    if(isPolygonGeometry(o)){
+      const before=sourceBounds||geometryBounds(o);
+      const sx=(Number(nextBounds.width)||0)/Math.max(1,Number(before.width)||1);
+      const sy=(Number(nextBounds.height)||0)/Math.max(1,Number(before.height)||1);
+      o.points=(o.points||[]).map(p=>({
+        x:snap((Number(nextBounds.x)||0)+((Number(p?.x)||0)-before.x)*sx),
+        y:snap((Number(nextBounds.y)||0)+((Number(p?.y)||0)-before.y)*sy)
+      }));
+      syncPolygonBounds(o);
+      return;
+    }
+    o.x=snap(nextBounds.x); o.y=snap(nextBounds.y);
+    const wk='w' in o?'w':'width', hk='h' in o?'h':'height';
+    o[wk]=Math.max(20,snap(nextBounds.width)); o[hk]=Math.max(20,snap(nextBounds.height));
+  }
+  function polygonPathWithinBounds(o){
+    if(!isPolygonGeometry(o))return '';
+    const b=geometryBounds(o), w=Math.max(1,b.width), h=Math.max(1,b.height);
+    return o.points.map(p=>`${(((Number(p?.x)||0)-b.x)/w*100).toFixed(2)}% ${(((Number(p?.y)||0)-b.y)/h*100).toFixed(2)}%`).join(',');
+  }
+  function polygonSvgPoints(o){
+    if(!isPolygonGeometry(o))return '';
+    const b=geometryBounds(o);
+    return o.points.map(p=>`${(Number(p?.x)||0)-b.x},${(Number(p?.y)||0)-b.y}`).join(' ');
+  }
+  function editorVertexPoints(o){
+    if(isPolygonGeometry(o))return o.points;
+    const b=geometryBounds(o);
+    return [
+      {x:b.x,y:b.y},
+      {x:b.x+b.width,y:b.y},
+      {x:b.x+b.width,y:b.y+b.height},
+      {x:b.x,y:b.y+b.height}
+    ];
+  }
+  function restoreObjectSnapshot(target,source){
+    for(const key of Object.keys(target))delete target[key];
+    Object.assign(target,cloneBlock(source));
+  }
+  function pointInPolygon(x,y,points){
+    if(!Array.isArray(points)||points.length<3)return false;
+    for(let i=0;i<points.length;i++){
+      const a=points[i], b=points[(i+1)%points.length];
+      if(closestPointOnSegment(x,y,Number(a?.x)||0,Number(a?.y)||0,Number(b?.x)||0,Number(b?.y)||0).d<=1)return true;
+    }
+    let inside=false;
+    for(let i=0,j=points.length-1;i<points.length;j=i++){
+      const xi=Number(points[i]?.x)||0, yi=Number(points[i]?.y)||0;
+      const xj=Number(points[j]?.x)||0, yj=Number(points[j]?.y)||0;
+      const intersects=((yi>y)!==(yj>y)) && (x < ((xj-xi)*(y-yi))/((yj-yi)||1e-9)+xi);
+      if(intersects)inside=!inside;
+    }
+    return inside;
+  }
+  function closestPointOnSegment(px,py,ax,ay,bx,by){
+    const abx=bx-ax, aby=by-ay, lensq=abx*abx+aby*aby;
+    if(!lensq)return {x:ax,y:ay,d:Math.hypot(px-ax,py-ay),t:0};
+    const t=Math.max(0,Math.min(1,((px-ax)*abx+(py-ay)*aby)/lensq));
+    const x=ax+abx*t, y=ay+aby*t;
+    return {x,y,d:Math.hypot(px-x,py-y),t};
+  }
+  function geometrySegments(o){
+    if(!o)return [];
+    if(isPolygonGeometry(o)){
+      return o.points.map((point,index)=>{
+        const next=o.points[(index+1)%o.points.length];
+        return {
+          ax:Number(point?.x)||0,
+          ay:Number(point?.y)||0,
+          bx:Number(next?.x)||0,
+          by:Number(next?.y)||0,
+          index
+        };
+      });
+    }
+    const b=geometryBounds(o);
+    return [
+      {ax:b.x,ay:b.y,bx:b.x+b.width,by:b.y,index:0},
+      {ax:b.x+b.width,ay:b.y,bx:b.x+b.width,by:b.y+b.height,index:1},
+      {ax:b.x+b.width,ay:b.y+b.height,bx:b.x,by:b.y+b.height,index:2},
+      {ax:b.x,ay:b.y+b.height,bx:b.x,by:b.y,index:3}
+    ];
+  }
+  function nearestGeometryBoundary(x,y,o){
+    let best=null;
+    for(const segment of geometrySegments(o)){
+      const hit=closestPointOnSegment(x,y,segment.ax,segment.ay,segment.bx,segment.by);
+      if(!best||hit.d<best.d){
+        const dx=segment.bx-segment.ax,dy=segment.by-segment.ay,len=Math.hypot(dx,dy)||1;
+        best={...hit,...segment,tx:dx/len,ty:dy/len};
+      }
+    }
+    return best;
+  }
+  function pointInsideGeometry(x,y,o){
+    if(isPolygonGeometry(o))return pointInPolygon(x,y,o.points);
+    const b=geometryBounds(o);
+    return x>=b.x&&x<=b.x+b.width&&y>=b.y&&y<=b.y+b.height;
+  }
+  function distanceToGeometry(x,y,o){
+    if(!o)return Infinity;
+    if(pointInsideGeometry(x,y,o))return 0;
+    return nearestGeometryBoundary(x,y,o)?.d??Infinity;
+  }
+  function circleInsideGeometry(x,y,radius,o){
+    if(!o)return false;
+    const r=Math.max(0,Number(radius)||0);
+    if(isPolygonGeometry(o)){
+      if(!pointInPolygon(x,y,o.points))return false;
+      const edge=nearestGeometryBoundary(x,y,o);
+      return !!edge&&edge.d>=Math.max(0,r-PLAYER_SKIN);
+    }
+    const b=geometryBounds(o);
+    return x>=b.x+r&&x<=b.x+b.width-r&&y>=b.y+r&&y<=b.y+b.height-r;
+  }
+  function circleIntersectsGeometry(x,y,radius,o){
+    if(!o)return false;
+    const r=Math.max(0,Number(radius)||0);
+    if(pointInsideGeometry(x,y,o))return true;
+    return (nearestGeometryBoundary(x,y,o)?.d??Infinity)<r;
+  }
+  function setAddPointMode(active,{announce=true}={}){
+    const item=currentEditable();
+    addPointMode=!!active&&!!item&&canShapeEditItem(item)&&!isLocked(item);
+    shell.classList.toggle('bw-add-point-mode',addPointMode);
+    if(addPointButton){
+      addPointButton.classList.toggle('active',addPointMode);
+      addPointButton.setAttribute('aria-pressed',String(addPointMode));
+      addPointButton.textContent=addPointMode?'TAP SHAPE…':'ADD POINT';
+    }
+    if(addPointMode&&announce&&editorSelection){
+      editorSelection.textContent='ADD POINT · tap an edge or anywhere inside the selected shape, then drag';
+    }
+  }
+  function updateShapeButtons(){
+    const item=currentEditable();
+    const shapeable=canShapeEditItem(item)&&!isLocked(item);
+    const polygon=shapeable&&isPolygonGeometry(item.o);
+    if(!shapeable&&addPointMode)setAddPointMode(false,{announce:false});
+    if(shapeToggleButton){
+      shapeToggleButton.disabled=!shapeable;
+      shapeToggleButton.textContent=polygon?'MAKE BOX':'TO SHAPE';
+    }
+    if(addPointButton){
+      addPointButton.disabled=!shapeable||(polygon&&(item.o.points||[]).length>=64);
+      addPointButton.classList.toggle('active',addPointMode&&shapeable);
+      addPointButton.setAttribute('aria-pressed',String(addPointMode&&shapeable));
+      addPointButton.textContent=addPointMode&&shapeable?'TAP SHAPE…':'ADD POINT';
+    }
+    if(deletePointButton)deletePointButton.disabled=!polygon||(item.o.points||[]).length<=3||selectedVertexIndex<0;
+  }
+  function screenPointCenter(element){
+    const rect=element.getBoundingClientRect();
+    return {x:rect.left+rect.width/2,y:rect.top+rect.height/2};
+  }
+  function insertionOnNearestScreenEdge(target,item,clientX,clientY){
+    const worldPoints=editorVertexPoints(item.o);
+    if(worldPoints.length<3||worldPoints.length>=64)return null;
+    const handles=[...target.querySelectorAll('[data-vertex-index]')]
+      .sort((a,b)=>Number(a.dataset.vertexIndex||0)-Number(b.dataset.vertexIndex||0));
+    if(handles.length!==worldPoints.length)return null;
+    const screenPoints=handles.map(screenPointCenter);
+    let best=null;
+    for(let i=0;i<screenPoints.length;i++){
+      const a=screenPoints[i], b=screenPoints[(i+1)%screenPoints.length];
+      const hit=closestPointOnSegment(clientX,clientY,a.x,a.y,b.x,b.y);
+      if(!best||hit.d<best.d)best={...hit,edgeIndex:i};
+    }
+    if(!best)return null;
+    const a=worldPoints[best.edgeIndex], b=worldPoints[(best.edgeIndex+1)%worldPoints.length];
+    const t=Math.max(.001,Math.min(.999,Number(best.t)||0));
+    return {
+      insertIndex:best.edgeIndex+1,
+      point:{
+        x:snap((Number(a?.x)||0)+((Number(b?.x)||0)-(Number(a?.x)||0))*t),
+        y:snap((Number(a?.y)||0)+((Number(b?.y)||0)-(Number(a?.y)||0))*t)
+      }
+    };
+  }
   function nudgeSelected(dx,dy){
     const item=currentEditable();if(!item||isLocked(item))return;
     const before=snapshot(),step=Number(snapSelect.value)||1;
-    item.o.x=(Number(item.o.x)||0)+dx*step;
-    item.o.y=(Number(item.o.y)||0)+dy*step;
+    translateGeometry(item.o,dx*step,dy*step);
     if(item.type==='building'){
       item.o.doorX=(Number(item.o.doorX)||0)+dx*step;
       item.o.doorY=item.o.y+item.o.h;
@@ -843,8 +1154,8 @@ export async function renderBlockWorld(root, options={}){
   }
   function focusSelected(){
     const item=currentEditable();if(!item)return;
-    const o=item.o||{},width=Number(o.w??o.width??0);
-    state.x=Math.max(0,Math.min(working.width||BLOCK1.width,(Number(o.x)||0)+width/2));
+    const b=geometryBounds(item.o||{});
+    state.x=Math.max(0,Math.min(working.width||BLOCK1.width,b.x+b.width/2));
   }
   function populateObjectSelect(){
     const current=selectedKey;
@@ -985,7 +1296,51 @@ export async function renderBlockWorld(root, options={}){
     statusExits && (statusExits.textContent=String(editingSubarea()?(working.exit?1:0):(working.exits||[]).length));
     statusProps && (statusProps.textContent=String((working.props||[]).length));
   }
+
+  function syncSceneConfigControls(){
+    if(!editorWorkspace)return;
+    const config=runtimeConfigFor(working);
+    const camera=config.camera, playerConfig=config.player, movement=config.movement, interaction=config.interaction;
+    if(configCameraZoom)configCameraZoom.value=String(Number(editingSubarea()?camera.zoom:camera.playScale)||1);
+    if(configPlayerScale)configPlayerScale.value=String(Number(playerConfig.baseScale)||1);
+    if(configLookAhead)configLookAhead.value=String(Number(camera.lookAhead)||0);
+    if(configInteractionRadius)configInteractionRadius.value=String(Number(editingSubarea()?interaction.roomExitRadius:interaction.radius)||100);
+    if(configWalkSpeed)configWalkSpeed.value=String(Number(movement.walkSpeed)||235);
+    if(configRunSpeed)configRunSpeed.value=String(Number(movement.runSpeed)||390);
+    if(configDepthMin)configDepthMin.value=String(Number(playerConfig.depthMin)||.78);
+    if(configDepthMax)configDepthMax.value=String(Number(playerConfig.depthMax)||1.05);
+    if(configIntegrityStatus){
+      const integrity=publishedIntegrityByScene.get(editorDocumentId());
+      const verified=integrity?.verified===true;
+      const signed=verified&&String(integrity.algorithm||'').startsWith('hmac');
+      configIntegrityStatus.dataset.state=verified?'verified':(integrity?.reason?'error':'warning');
+      configIntegrityStatus.textContent=signed
+        ? `LIVE CONFIG · HMAC VERIFIED · r${publishedRevision}`
+        : verified
+          ? `LIVE CONFIG · SHA-256 VERIFIED · r${publishedRevision}`
+          : integrity?.reason
+            ? `LIVE CONFIG · INTEGRITY FAILED · using source fallback`
+            : 'PUBLISH · Worker validates + SHA-256 protects config';
+    }
+  }
+
+  function setSceneConfigValue(group,key,value,{min=-Infinity,max=Infinity}={}){
+    const number=Number(value);
+    if(!Number.isFinite(number))return;
+    const before=snapshot();
+    const config=ensureWorkingRuntimeConfig();
+    config[group]||(config[group]={});
+    config[group][key]=Math.max(min,Math.min(max,number));
+    if(group==='camera')working.camera={...config.camera};
+    if(group==='player')working.character={...config.player};
+    commit(before);
+    updatePlayer();
+    applyCamera();
+    syncSceneConfigControls();
+  }
+
   function syncInspector(){
+    syncSceneConfigControls();
     const item=currentEditable();
     if(!item){
       inputX.value=inputY.value=inputW.value=inputH.value='';
@@ -1002,19 +1357,20 @@ export async function renderBlockWorld(root, options={}){
       if(propHeight)propHeight.value='';
       if(propZIndex)propZIndex.value='';
       if(lockButton){lockButton.disabled=true;lockButton.textContent='LOCK SELECTED';lockButton.classList.remove('active');}
+      updateShapeButtons();
       syncStudioStatus();
       return;
     }
-    const o=item.o||{};
-    inputX.value=Math.round(o.x||0);inputY.value=Math.round(o.y||0);
-    inputW.value=Math.round(o.w??o.width??0);inputH.value=Math.round(o.h??o.height??0);
+    const o=item.o||{}, bounds=geometryBounds(o);
+    inputX.value=Math.round(bounds.x);inputY.value=Math.round(bounds.y);
+    inputW.value=Math.round(bounds.width);inputH.value=Math.round(bounds.height);
     const pointOnly=item.type==='prop'||item.type==='spawn';
     inputW.disabled=pointOnly;inputH.disabled=pointOnly;
     const label=objectDisplayLabel(item);
     if(inputIdLabel)inputIdLabel.value=label;
     if(inputRotation)inputRotation.value=String(Number(o.rotation||0));
     if(inputZIndex)inputZIndex.value=String(Number(o.zIndex||0));
-    if(propType)propType.value=item.type.replace(/(^|[-_])(\w)/g,(_,a,b)=>`${a?' ':''}${b.toUpperCase()}`);
+    if(propType)propType.value=item.type.replace(/(^|[-_])(\w)/g,(_,a,b)=>`${a?' ':''}${b.toUpperCase()}`)+(isPolygonGeometry(o)?' Shape':'');
     if(propTarget)propTarget.value=objectTarget(item);
     if(propRequires)propRequires.value=String(o.requires||'');
     if(propLabel)propLabel.value=label;
@@ -1040,21 +1396,107 @@ export async function renderBlockWorld(root, options={}){
     if(duplicateButton)duplicateButton.disabled=locked||!['building','prop','obstacle'].includes(item.type);
     if(deleteButton)deleteButton.disabled=locked||item.type==='alley'||!['building','prop','obstacle'].includes(item.type);
     editorScope.querySelectorAll('[data-bw-nudge]').forEach(button=>{button.disabled=locked;});
+    updateShapeButtons();
     syncStudioStatus();
   }
   function editorSurfaceElement(){return editingSubarea()?subareaWorld:scene;}
   function select(key){
+    const changed=(key||'')!==selectedKey;
+    if(changed){selectedVertexIndex=-1;if(addPointMode)setAddPointMode(false,{announce:false});}
     selectedKey=key||'';populateObjectSelect();syncInspector();
     const selected=currentEditable();if(editorSelection)editorSelection.textContent=selected?`${selected.type.toUpperCase()} · ${selected.label}`:'Tap an object in the scene';
     scene.querySelectorAll('.bw-edit-selected').forEach(x=>x.classList.remove('bw-edit-selected'));
     subareaWorld.querySelectorAll('.bw-edit-selected').forEach(x=>x.classList.remove('bw-edit-selected'));
     if(key)editorSurfaceElement().querySelector(`[data-edit-key="${key}"]`)?.classList.add('bw-edit-selected');
+    // Selecting a zone once immediately paints its corner handles. The render
+    // re-enters select() with the same key, so this is intentionally one-shot.
+    if(changed&&editMode&&canShapeEditItem(selected))renderEditorObjects();
     // Selecting/dragging never forces a minimized inspector back open.
     if(editMode&&!editorCollapsed){
       editor.classList.add('show');
       editor.setAttribute('aria-hidden','false');
     }
   }
+  function appendEditorGuide(parent,key,o,kind,label,{point=false}={}){
+    if(!o)return null;
+    const g=document.createElement('div');
+    g.className=`bw-editor-guide bw-guide-${kind}`;
+    g.dataset.editKey=key;
+    g.classList.toggle('bw-edit-locked',!!o.locked);
+    g.dataset.editLocked=o.locked?'true':'false';
+    g.style.zIndex=String(5000+Number(o.zIndex||0));
+    const keyType=String(key||'').split(':')[0];
+    const shapeable=SHAPE_EDIT_TYPES.has(keyType);
+    const bounds=geometryBounds(o);
+
+    if(point){
+      g.classList.add('bw-guide-point');
+      g.style.left=`${Number(o.x)||0}px`;
+      g.style.top=`${Number(o.y)||0}px`;
+    }else{
+      g.style.left=`${bounds.x}px`;
+      g.style.top=`${bounds.y}px`;
+      g.style.width=`${Math.max(1,bounds.width)}px`;
+      g.style.height=`${Math.max(1,bounds.height)}px`;
+      if(isPolygonGeometry(o)){
+        g.classList.add('bw-guide-polygon');
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        svg.classList.add('bw-guide-polygon-svg');
+        svg.setAttribute('viewBox',`0 0 ${Math.max(1,bounds.width)} ${Math.max(1,bounds.height)}`);
+        svg.setAttribute('preserveAspectRatio','none');
+        const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+        poly.setAttribute('points',polygonSvgPoints(o));
+        svg.appendChild(poly);
+        g.appendChild(svg);
+      }
+    }
+    if(Number(o.rotation||0)){
+      g.style.transform=`rotate(${Number(o.rotation)||0}deg)`;
+      g.style.transformOrigin='50% 50%';
+    }
+    const text=document.createElement('span');
+    text.textContent=label;
+    g.appendChild(text);
+
+    // Shapeable zones always expose their corners while selected. Dragging a
+    // corner of a rectangle auto-converts it into a polygon, so diagonal sides
+    // do not require a hidden mode switch first.
+    if(shapeable&&editMode&&selectedKey===key&&!o.locked){
+      const w=Math.max(1,bounds.width), h=Math.max(1,bounds.height);
+      editorVertexPoints(o).forEach((pointObj,index)=>{
+        const handle=document.createElement('button');
+        handle.type='button';
+        handle.className='bw-polygon-vertex';
+        if(index===selectedVertexIndex)handle.classList.add('active');
+        handle.dataset.editKey=key;
+        handle.dataset.vertexIndex=String(index);
+        handle.style.left=`${(((Number(pointObj?.x)||0)-bounds.x)/w*100).toFixed(2)}%`;
+        handle.style.top=`${(((Number(pointObj?.y)||0)-bounds.y)/h*100).toFixed(2)}%`;
+        handle.setAttribute('aria-label',`Shape point ${index+1}`);
+        g.appendChild(handle);
+      });
+    }
+    parent.appendChild(g);
+    return g;
+  }
+
+  function appendResizeGizmos(target,key){
+    if(!target)return;
+    const gizmos=document.createElement('div');
+    gizmos.className='bw-resize-gizmos';
+    gizmos.dataset.editKey=key;
+    for(const edge of ['n','e','s','w','nw','ne','se','sw']){
+      const h=document.createElement('button');
+      h.type='button';
+      h.className=`bw-resize-handle bw-resize-${edge}`;
+      h.dataset.editKey=key;
+      h.dataset.resize=edge;
+      h.setAttribute('aria-label',`Resize ${edge}`);
+      gizmos.appendChild(h);
+    }
+    target.appendChild(gizmos);
+  }
+
   function renderRoomEditorObjects(){
     working=normalizeSubareaLayout(working,editorSceneId);
     activeSubarea=working;
@@ -1064,56 +1506,16 @@ export async function renderBlockWorld(root, options={}){
 
     subareaWorld.querySelectorAll('.bw-editor-guide,.bw-resize-gizmos').forEach(x=>x.remove());
 
-    const addGuide=(key,o,kind,label,point=false)=>{
-      if(!o)return null;
-      const g=document.createElement('div');
-      g.className=`bw-editor-guide bw-guide-${kind}`;
-      g.dataset.editKey=key;
-      g.classList.toggle('bw-edit-locked',!!o.locked);
-      g.dataset.editLocked=o.locked?'true':'false';
-      g.style.left=`${Number(o.x)||0}px`;
-      g.style.top=`${Number(o.y)||0}px`;
-      if(point){
-        g.classList.add('bw-guide-point');
-      }else{
-        g.style.width=`${Number(o.w??o.width)||40}px`;
-        g.style.height=`${Number(o.h??o.height)||40}px`;
-      }
-      g.style.zIndex=String(5000+Number(o.zIndex||0));
-      if(Number(o.rotation||0)){
-        g.style.transform=`rotate(${Number(o.rotation)||0}deg)`;
-        g.style.transformOrigin='50% 50%';
-      }
-      g.innerHTML=`<span>${escapeText(label)}</span>`;
-      subareaWorld.appendChild(g);
-      return g;
-    };
-
-    (working.obstacles||[]).forEach((o,i)=>addGuide(`obstacle:${i}`,o,'obstacle',o.label||o.id||`COLLISION ${i+1}`));
-    (working.props||[]).forEach((o,i)=>addGuide(`prop:${i}`,o,'prop',o.label||o.kind||`PROP ${i+1}`,true));
-    addGuide('room-exit:0',working.exit,'room-exit',working.exit?.label||'STREET EXIT');
-    addGuide('spawn:0',working.spawn,'spawn','SPAWN',true);
-    addGuide('walkable:0',working.walkable,'walkable','WALKABLE');
-    addGuide('scene:0',working.scenePlate,'scene','SCENE');
+    (working.obstacles||[]).forEach((o,i)=>appendEditorGuide(subareaWorld,`obstacle:${i}`,o,'obstacle',o.label||o.id||`COLLISION ${i+1}`));
+    (working.props||[]).forEach((o,i)=>appendEditorGuide(subareaWorld,`prop:${i}`,o,'prop',o.label||o.kind||`PROP ${i+1}`,{point:true}));
+    appendEditorGuide(subareaWorld,'room-exit:0',working.exit,'room-exit',working.exit?.label||'STREET EXIT');
+    appendEditorGuide(subareaWorld,'spawn:0',working.spawn,'spawn','SPAWN',{point:true});
+    appendEditorGuide(subareaWorld,'walkable:0',working.walkable,'walkable','WALKABLE');
+    appendEditorGuide(subareaWorld,'scene:0',working.scenePlate,'scene','SCENE');
 
     const gizmoItem=currentEditable();
-    if(editMode&&gizmoItem&&!isLocked(gizmoItem)&&!['prop','spawn'].includes(gizmoItem.type)){
-      const target=subareaWorld.querySelector(`[data-edit-key="${selectedKey}"]`);
-      if(target){
-        const gizmos=document.createElement('div');
-        gizmos.className='bw-resize-gizmos';
-        gizmos.dataset.editKey=selectedKey;
-        for(const edge of ['n','e','s','w','nw','ne','se','sw']){
-          const h=document.createElement('button');
-          h.type='button';
-          h.className=`bw-resize-handle bw-resize-${edge}`;
-          h.dataset.editKey=selectedKey;
-          h.dataset.resize=edge;
-          h.setAttribute('aria-label',`Resize ${edge}`);
-          gizmos.appendChild(h);
-        }
-        target.appendChild(gizmos);
-      }
+    if(editMode&&gizmoItem&&!isLocked(gizmoItem)&&!['prop','spawn'].includes(gizmoItem.type)&&!canShapeEditItem(gizmoItem)){
+      appendResizeGizmos(subareaWorld.querySelector(`[data-edit-key="${selectedKey}"]`),selectedKey);
     }
 
     renderSubareaDebug();
@@ -1174,40 +1576,15 @@ export async function renderBlockWorld(root, options={}){
     alley.style.width=`${working.alley.width}px`;alley.style.height=`${working.alley.height}px`;
     scene.querySelectorAll('.bw-editor-guide').forEach(x=>x.remove());
     if(editMode){
-      const addGuide=(key,o,kind,label)=>{
-        const g=document.createElement('div');g.className=`bw-editor-guide bw-guide-${kind}`;g.dataset.editKey=key;
-        g.classList.toggle('bw-edit-locked',!!o.locked);g.dataset.editLocked=o.locked?'true':'false';
-        const point=kind==='spawn';
-        g.style.left=`${o.x||0}px`;g.style.top=`${o.y||0}px`;
-        if(!point){g.style.width=`${o.w??o.width??40}px`;g.style.height=`${o.h??o.height??40}px`;}
-        g.style.zIndex=String(5000+Number(o.zIndex||0));
-        if(Number(o.rotation||0)){g.style.transform=`rotate(${Number(o.rotation)||0}deg)`;g.style.transformOrigin='50% 50%';}
-        g.innerHTML=`<span>${label}</span>`;scene.appendChild(g);
-      };
-      addGuide('spawn:0',working.spawn,'spawn','SPAWN');
-      (working.exits||[]).forEach((x,i)=>addGuide(`exit:${i}`,x,'exit',`${x.id.toUpperCase()} EXIT`));
-      if(working.walkable)addGuide('walkable:0',working.walkable,'walkable','WALKABLE');
-      if(working.scenePlate)addGuide('scene:0',working.scenePlate,'scene','SCENE');
+      appendEditorGuide(scene,'spawn:0',working.spawn,'spawn','SPAWN',{point:true});
+      (working.exits||[]).forEach((x,i)=>appendEditorGuide(scene,`exit:${i}`,x,'exit',`${x.id.toUpperCase()} EXIT`));
+      if(working.walkable)appendEditorGuide(scene,'walkable:0',working.walkable,'walkable','WALKABLE');
+      if(working.scenePlate)appendEditorGuide(scene,'scene:0',working.scenePlate,'scene','SCENE');
     }
-    // H1.2: touch/mouse resize gizmos for the selected rectangular editable.
     scene.querySelectorAll('.bw-resize-gizmos').forEach(x=>x.remove());
     const gizmoItem=currentEditable();
-    if(editMode&&gizmoItem&&!isLocked(gizmoItem)&&!['prop','spawn'].includes(gizmoItem.type)){
-      const target=scene.querySelector(`[data-edit-key="${selectedKey}"]`);
-      if(target){
-        const gizmos=document.createElement('div');
-        gizmos.className='bw-resize-gizmos';
-        gizmos.dataset.editKey=selectedKey;
-        const handles=['n','e','s','w','nw','ne','se','sw'];
-        handles.forEach(edge=>{
-          const h=document.createElement('button');
-          h.type='button';h.className=`bw-resize-handle bw-resize-${edge}`;
-          h.dataset.editKey=selectedKey;h.dataset.resize=edge;
-          h.setAttribute('aria-label',`Resize ${edge}`);
-          gizmos.appendChild(h);
-        });
-        target.appendChild(gizmos);
-      }
+    if(editMode&&gizmoItem&&!isLocked(gizmoItem)&&!['prop','spawn'].includes(gizmoItem.type)&&!canShapeEditItem(gizmoItem)){
+      appendResizeGizmos(scene.querySelector(`[data-edit-key="${selectedKey}"]`),selectedKey);
     }
     if(scenePlate&&working.scenePlate&&!activeSubarea){
       scenePlate.src=working.scenePlate.src||'/assets/blocks/commerce-street.svg';
@@ -1266,8 +1643,7 @@ export async function renderBlockWorld(root, options={}){
         if(sceneManager.active)sceneManager.active.scene=activeSubarea;
         else sceneManager.enter(roomId,editorStreetReturn);
         applyAreaVisuals();
-        state.x=Math.max(activeSubarea.walkable.x,Math.min(activeSubarea.walkable.x+activeSubarea.walkable.width,state.x));
-        state.y=Math.max(activeSubarea.walkable.y,Math.min(activeSubarea.walkable.y+activeSubarea.walkable.height,state.y));
+        ensurePlayerInCurrentArea();
         updatePlayer();
         applyCamera();
       }else{
@@ -1344,9 +1720,6 @@ export async function renderBlockWorld(root, options={}){
     const item=currentEditable();if(!item||isLocked(item))return;
     const source=event?.target;
 
-    // The compact transform popup and Properties popup expose a few mirrored
-    // fields. Keep the mirrors synchronized before reading values so changing
-    // W/H, label or z-index in either surface cannot be silently overwritten.
     if(source===propWidth&&inputW)inputW.value=propWidth.value;
     else if(source===inputW&&propWidth)propWidth.value=inputW.value;
     if(source===propHeight&&inputH)inputH.value=propHeight.value;
@@ -1357,8 +1730,19 @@ export async function renderBlockWorld(root, options={}){
     else if(source===inputZIndex&&propZIndex)propZIndex.value=inputZIndex.value;
 
     const before=snapshot(),o=item.o;
-    o.x=snap(inputX.value);o.y=snap(inputY.value);
-    if(item.type!=='prop'&&item.type!=='spawn'){
+    const pointOnly=item.type==='prop'||item.type==='spawn';
+    if(pointOnly){
+      o.x=snap(inputX.value);o.y=snap(inputY.value);
+    }else if(isPolygonGeometry(o)){
+      const current=geometryBounds(o);
+      scaleGeometryToBounds(o,{
+        x:snap(inputX.value),
+        y:snap(inputY.value),
+        width:Math.max(20,snap(inputW.value)),
+        height:Math.max(20,snap(inputH.value))
+      },current);
+    }else{
+      o.x=snap(inputX.value);o.y=snap(inputY.value);
       const wk='w' in o?'w':'width',hk='h' in o?'h':'height';
       o[wk]=Math.max(20,snap(inputW.value));o[hk]=Math.max(20,snap(inputH.value));
     }
@@ -1371,6 +1755,7 @@ export async function renderBlockWorld(root, options={}){
     const target=(propTarget?.value||'').trim();
     if(item.type==='building')o.locationId=target;
     else if(item.type==='exit')o.targetBlock=target;
+    else if(item.type==='room-exit')o.target=target||working.parentBlock||BLOCK1.id;
     else if(target)o.target=target;
     else if('target' in o)delete o.target;
     if(propRequires)o.requires=propRequires.value.trim();
@@ -1381,6 +1766,7 @@ export async function renderBlockWorld(root, options={}){
       o.doorX=Math.max(o.x,Math.min(o.x+o.w,o.doorX));
       o.doorY=o.y+o.h;
     }
+    if(isPolygonGeometry(o))syncPolygonBounds(o);
     commit(before);renderEditorObjects();syncInspector();
   }
   function undo(){if(!undoStack.length)return;redoStack.push(snapshot());working=JSON.parse(undoStack.pop());renderEditorObjects();syncInspector();markDraftDirty();}
@@ -1427,9 +1813,43 @@ export async function renderBlockWorld(root, options={}){
     props.appendChild(el);
   }
 
-  const state={x:working.spawn.x,y:working.spawn.y,vx:0,vy:0,running:false,near:null,last:performance.now()};
+  const state={
+    x:working.spawn.x,y:working.spawn.y,vx:0,vy:0,running:false,near:null,last:performance.now(),
+    facingX:0,facingY:1,action:'idle',actionUntil:0,renderedState:'idle',renderedFacing:'south'
+  };
   const keys=new Set();
   let raf=0, pointerId=null, joyX=0,joyY=0;
+
+  function triggerPlayerAction(action='interact',duration=420){
+    state.action=String(action||'idle');
+    state.actionUntil=performance.now()+Math.max(0,Number(duration)||0);
+  }
+
+  function resolveFacing(x=0,y=1){
+    if(Math.abs(x)>Math.abs(y))return x<0?'west':'east';
+    return y<0?'north':'south';
+  }
+
+  function resolvePlayerVisual(now,inputX=0,inputY=0){
+    const motion=Math.hypot(inputX,inputY);
+    if(motion>.08){
+      state.facingX=inputX/motion;
+      state.facingY=inputY/motion;
+    }
+    if(state.action!=='idle'&&now>=state.actionUntil){
+      state.action='idle';
+      state.actionUntil=0;
+    }
+    const moving=motion>.08;
+    const transient=state.action!=='idle'&&now<state.actionUntil?state.action:'';
+    const nextState=transient||(moving?((state.running||keys.has('shift'))?'run':'walk'):'idle');
+    const nextFacing=resolveFacing(state.facingX,state.facingY);
+    return {moving,state:nextState,facing:nextFacing};
+  }
+
+  root.__bwPlayerAction=(action,duration)=>triggerPlayerAction(action,duration);
+  const onPlayerActionEvent=e=>triggerPlayerAction(e.detail?.action||'interact',e.detail?.duration||420);
+  root.addEventListener('bw-player-action',onPlayerActionEvent);
 
   function setJoystickKnob(x=0,y=0){
     if(!knob)return;
@@ -1443,18 +1863,16 @@ export async function renderBlockWorld(root, options={}){
       name:working.name||'Commerce Street',
       width:working.width||BLOCK1.width,
       height:working.height||BLOCK1.height,
+      spawn:working.spawn,
       walkable:working.walkable||{x:0,y:990,width:working.width||BLOCK1.width,height:(working.height||BLOCK1.height)-990},
-      obstacles:working.buildings||[]
+      obstacles:working.buildings||[],
+      camera:working.camera||BLOCK1.camera||{},
+      character:working.character||BLOCK1.character||{}
     };
   }
 
   function distanceToRect(x,y,rect){
-    const left=Number(rect.x)||0,top=Number(rect.y)||0;
-    const width=Number(rect.width??rect.w)||0,height=Number(rect.height??rect.h)||0;
-    const right=left+width,bottom=top+height;
-    const dx=x<left?left-x:x>right?x-right:0;
-    const dy=y<top?top-y:y>bottom?y-bottom:0;
-    return Math.hypot(dx,dy);
+    return distanceToGeometry(x,y,rect);
   }
 
   function nearestStreetInteraction(){
@@ -1483,59 +1901,167 @@ export async function renderBlockWorld(root, options={}){
       }
     }
 
-    return best&&dist<100?best:null;
+    const radius=Math.max(20,Number(runtimeConfigFor(currentArea()).interaction.radius)||100);
+    return best&&dist<radius?best:null;
   }
 
   function nearestSubareaInteraction(){
     if(!activeSubarea)return null;
     const exit=activeSubarea.exit;
-    if(exit&&distanceToRect(state.x,state.y,exit)<105){
+    const radius=Math.max(20,Number(runtimeConfigFor(activeSubarea).interaction.roomExitRadius)||105);
+    if(exit&&distanceToGeometry(state.x,state.y,exit)<radius){
       return {kind:'subarea-exit',name:exit.label||'Commerce Street',distance:0};
     }
     return null;
   }
 
-  function collidesAt(x,y){
-    const radius=18;
-    const obstacles=activeSubarea?(activeSubarea.obstacles||[]):(working.buildings||[]);
-    return obstacles.some(o=>{
-      const left=Number(o.x)||0,top=Number(o.y)||0;
-      const width=Number(o.width??o.w)||0,height=Number(o.height??o.h)||0;
-      return x>left-radius&&x<left+width+radius&&y>top-radius&&y<top+height+radius;
-    });
+  function areaObstacles(area=currentArea()){
+    return Array.isArray(area?.obstacles)?area.obstacles:[];
+  }
+
+  function collidesAt(x,y,radius=PLAYER_RADIUS,area=currentArea()){
+    return areaObstacles(area).some(o=>circleIntersectsGeometry(x,y,radius,o));
+  }
+
+  function canOccupyPlayerAt(x,y,area=currentArea()){
+    return !!area?.walkable
+      && circleInsideGeometry(x,y,PLAYER_RADIUS,area.walkable)
+      && !collidesAt(x,y,PLAYER_RADIUS,area);
+  }
+
+  function blockingBoundaryHits(x,y,area=currentArea()){
+    const hits=[];
+    if(area?.walkable&&!circleInsideGeometry(x,y,PLAYER_RADIUS,area.walkable)){
+      const hit=nearestGeometryBoundary(x,y,area.walkable);
+      if(hit)hits.push({...hit,kind:'walkable'});
+    }
+    for(const obstacle of areaObstacles(area)){
+      if(!circleIntersectsGeometry(x,y,PLAYER_RADIUS,obstacle))continue;
+      const hit=nearestGeometryBoundary(x,y,obstacle);
+      if(hit)hits.push({...hit,kind:'obstacle'});
+    }
+    return hits.sort((a,b)=>a.d-b.d);
+  }
+
+  function findNearestValidPlayerPoint(x,y,area=currentArea()){
+    if(canOccupyPlayerAt(x,y,area))return {x,y};
+    const walk=area?.walkable;
+    if(!walk)return {x,y};
+    const bounds=geometryBounds(walk);
+    const candidates=[];
+    const add=(cx,cy)=>{
+      if(Number.isFinite(cx)&&Number.isFinite(cy))candidates.push({x:cx,y:cy});
+    };
+
+    // For a box this is the exact inset clamp. For polygons it is still a useful
+    // first candidate before the edge/grid search below.
+    add(
+      Math.max(bounds.x+PLAYER_RADIUS,Math.min(bounds.x+bounds.width-PLAYER_RADIUS,x)),
+      Math.max(bounds.y+PLAYER_RADIUS,Math.min(bounds.y+bounds.height-PLAYER_RADIUS,y))
+    );
+    add(bounds.x+bounds.width/2,bounds.y+bounds.height/2);
+    if(area.spawn)add(Number(area.spawn.x),Number(area.spawn.y));
+
+    // Every boundary segment contributes candidates on both sides. Only the
+    // geometrically valid inward side survives canOccupyPlayerAt().
+    for(const segment of geometrySegments(walk)){
+      const hit=closestPointOnSegment(x,y,segment.ax,segment.ay,segment.bx,segment.by);
+      const dx=segment.bx-segment.ax,dy=segment.by-segment.ay,len=Math.hypot(dx,dy)||1;
+      const nx=-dy/len,ny=dx/len,pad=PLAYER_RADIUS+PLAYER_SKIN+1;
+      add(hit.x+nx*pad,hit.y+ny*pad);
+      add(hit.x-nx*pad,hit.y-ny*pad);
+    }
+
+    let best=null;
+    for(const candidate of candidates){
+      if(!canOccupyPlayerAt(candidate.x,candidate.y,area))continue;
+      const d=Math.hypot(candidate.x-x,candidate.y-y);
+      if(!best||d<best.d)best={...candidate,d};
+    }
+    if(best)return {x:best.x,y:best.y};
+
+    // Concave rooms can make the closest-edge normal land in another wall.
+    // A bounded coarse search finds the nearest actually valid center without
+    // projecting the player onto an unusable polygon edge.
+    const cols=32,rows=20;
+    for(let row=0;row<=rows;row++){
+      const cy=bounds.y+(bounds.height*row/rows);
+      for(let col=0;col<=cols;col++){
+        const cx=bounds.x+(bounds.width*col/cols);
+        if(!canOccupyPlayerAt(cx,cy,area))continue;
+        const d=Math.hypot(cx-x,cy-y);
+        if(!best||d<best.d)best={x:cx,y:cy,d};
+      }
+    }
+    return best?{x:best.x,y:best.y}:{x,y};
+  }
+
+  function ensurePlayerInCurrentArea(){
+    const area=currentArea();
+    if(canOccupyPlayerAt(state.x,state.y,area))return true;
+    const fixed=findNearestValidPlayerPoint(state.x,state.y,area);
+    if(!canOccupyPlayerAt(fixed.x,fixed.y,area))return false;
+    state.x=fixed.x;
+    state.y=fixed.y;
+    return true;
+  }
+
+  function movePlayerBy(deltaX,deltaY){
+    const distance=Math.hypot(deltaX,deltaY);
+    if(!distance)return;
+    const area=currentArea();
+    const maxStep=Math.max(2,Math.min(24,Number(runtimeConfigFor(area).movement.maxStep)||7));
+    const steps=Math.max(1,Math.ceil(distance/maxStep));
+    const stepX=deltaX/steps,stepY=deltaY/steps;
+
+    for(let step=0;step<steps;step++){
+      const candidateX=state.x+stepX,candidateY=state.y+stepY;
+      if(canOccupyPlayerAt(candidateX,candidateY,area)){
+        state.x=candidateX;
+        state.y=candidateY;
+        continue;
+      }
+
+      // Project the attempted movement onto the actual blocking edge tangent.
+      // This is what makes a circular player slide along diagonal/concave polygon
+      // sides instead of hitting the old invisible X/Y rectangle walls.
+      let moved=false;
+      for(const hit of blockingBoundaryHits(candidateX,candidateY,area)){
+        const along=stepX*hit.tx+stepY*hit.ty;
+        if(Math.abs(along)<0.0001)continue;
+        const slideX=hit.tx*along,slideY=hit.ty*along;
+        for(const factor of [1,.7,.4]){
+          const sx=state.x+slideX*factor,sy=state.y+slideY*factor;
+          if(!canOccupyPlayerAt(sx,sy,area))continue;
+          state.x=sx;
+          state.y=sy;
+          moved=true;
+          break;
+        }
+        if(moved)break;
+      }
+    }
   }
 
   function renderSubareaDebug(){
     if(!subareaDebug)return;
     subareaDebug.innerHTML='';
     if(!activeSubarea)return;
-    for(const obstacle of activeSubarea.obstacles||[]){
+    const addDebugShape=(cls,shape)=>{
+      if(!shape)return;
       const el=document.createElement('div');
-      el.className='bw-subarea-collider';
-      el.style.left=`${obstacle.x}px`;
-      el.style.top=`${obstacle.y}px`;
-      el.style.width=`${obstacle.width}px`;
-      el.style.height=`${obstacle.height}px`;
+      const b=geometryBounds(shape);
+      el.className=cls;
+      el.style.left=`${b.x}px`;
+      el.style.top=`${b.y}px`;
+      el.style.width=`${Math.max(1,b.width)}px`;
+      el.style.height=`${Math.max(1,b.height)}px`;
+      if(isPolygonGeometry(shape))el.style.clipPath=`polygon(${polygonPathWithinBounds(shape)})`;
       subareaDebug.appendChild(el);
-    }
-    if(activeSubarea.walkable){
-      const walk=document.createElement('div');
-      walk.className='bw-subarea-walkable';
-      walk.style.left=`${activeSubarea.walkable.x}px`;
-      walk.style.top=`${activeSubarea.walkable.y}px`;
-      walk.style.width=`${activeSubarea.walkable.width}px`;
-      walk.style.height=`${activeSubarea.walkable.height}px`;
-      subareaDebug.appendChild(walk);
-    }
-    if(activeSubarea.exit){
-      const exit=document.createElement('div');
-      exit.className='bw-subarea-exit-guide';
-      exit.style.left=`${activeSubarea.exit.x}px`;
-      exit.style.top=`${activeSubarea.exit.y}px`;
-      exit.style.width=`${activeSubarea.exit.width}px`;
-      exit.style.height=`${activeSubarea.exit.height}px`;
-      subareaDebug.appendChild(exit);
-    }
+    };
+    for(const obstacle of activeSubarea.obstacles||[])addDebugShape('bw-subarea-collider',obstacle);
+    addDebugShape('bw-subarea-walkable',activeSubarea.walkable);
+    addDebugShape('bw-subarea-exit-guide',activeSubarea.exit);
   }
 
   function activeSceneElement(){
@@ -1674,19 +2200,58 @@ export async function renderBlockWorld(root, options={}){
     );
   }
 
-  function updatePlayer(){
+  function updatePlayer(inputX=0,inputY=0,now=performance.now()){
     const area=currentArea();
-    const walk=area.walkable;
+    const walkBounds=geometryBounds(area.walkable);
+    const visual=resolvePlayerVisual(now,inputX,inputY);
+    const character=runtimeConfigFor(area).player;
+    const editorCharacterScale=Number(character.editorScale);
+    const playCharacterScale=Number(character.baseScale);
+    const baseCharacterScale=(editorWorkspace&&editMode)
+      ? (Number.isFinite(editorCharacterScale)&&editorCharacterScale>0?editorCharacterScale:1)
+      : (Number.isFinite(playCharacterScale)&&playCharacterScale>0?playCharacterScale:1);
+    const depthRange=Math.max(1,walkBounds.height-PLAYER_RADIUS*2);
+    const rawDepth=.82+((state.y-(walkBounds.y+PLAYER_RADIUS))/depthRange)*.20;
+    const depthMin=Number.isFinite(Number(character.depthMin))?Number(character.depthMin):.78;
+    const depthMax=Number.isFinite(Number(character.depthMax))?Number(character.depthMax):1.05;
+    const playerDepth=clampCamera(rawDepth,Math.min(depthMin,depthMax),Math.max(depthMin,depthMax));
+    const visualScale=baseCharacterScale*playerDepth;
+
     player.style.left=`${state.x}px`;
     player.style.top=`${state.y}px`;
-    const depthRange=Math.max(1,walk.height-63);
-    const playerDepth=.82+((state.y-(walk.y+18))/depthRange)*.20;
-    player.style.transform=`translate(-50%,-100%) scale(${Math.max(.78,Math.min(1.05,playerDepth))})`;
+    player.style.transform=`translate(-50%,-100%) scale(${visualScale})`;
     player.style.zIndex=String(30+Math.round(state.y));
+    player.dataset.state=visual.state;
+    player.dataset.facing=visual.facing;
+    player.classList.toggle('is-moving',visual.moving);
+    player.classList.toggle('is-running',visual.state==='run');
+    player.classList.toggle('is-interactable',!!state.near&&!sceneTransitionBusy);
+    player.style.setProperty('--bw-player-depth',playerDepth.toFixed(3));
+    player.style.setProperty('--bw-player-base-scale',baseCharacterScale.toFixed(3));
+    player.style.setProperty('--bw-player-look-x',String((state.facingX||0).toFixed(3)));
+    player.style.setProperty('--bw-player-look-y',String((state.facingY||1).toFixed(3)));
   }
 
   function clampCamera(value,min,max){
     return Math.max(min,Math.min(max,value));
+  }
+
+  const cameraState={key:'',x:0,y:0,scale:1};
+  function cameraBlend(key,targetX,targetY,targetScale,{snap=false}={}){
+    if(snap||cameraState.key!==key||!Number.isFinite(cameraState.scale)){
+      cameraState.key=key;
+      cameraState.x=targetX;
+      cameraState.y=targetY;
+      cameraState.scale=targetScale;
+      return {...cameraState};
+    }
+    const cameraConfig=runtimeConfigFor(currentArea()).camera;
+    const positionEase=clampCamera(Number(cameraConfig.positionEase)||.17,.01,1);
+    const zoomEase=clampCamera(Number(cameraConfig.zoomEase)||.13,.01,1);
+    cameraState.x+=(targetX-cameraState.x)*positionEase;
+    cameraState.y+=(targetY-cameraState.y)*positionEase;
+    cameraState.scale+=(targetScale-cameraState.scale)*zoomEase;
+    return {...cameraState};
   }
 
   function applyCamera(){
@@ -1696,67 +2261,81 @@ export async function renderBlockWorld(root, options={}){
     const authoredWidth=Math.max(1,Number(area.width)||1);
     const authoredHeight=Math.max(1,Number(area.height)||1);
     const cameraScene=activeSceneElement();
+    const camera=runtimeConfigFor(area).camera;
+    const editorOverview=editorWorkspace&&editMode&&!activeSubarea;
+    const sceneKey=`${activeSubarea?'room':'street'}:${area.id||BLOCK1.id}:${editorOverview?'edit':'play'}`;
 
     let fitScale=1,cameraX=0,cameraY=0,screenOffsetX=0,screenOffsetY=0;
 
     if(activeSubarea){
-      const camera=area.camera||{};
       const containScale=Math.min(viewportWidth/authoredWidth,viewportHeight/authoredHeight);
       const coverScale=Math.max(viewportWidth/authoredWidth,viewportHeight/authoredHeight);
       const roomMode=camera.mode==='contain'||camera.mode==='room';
-      const requested=roomMode?containScale:coverScale;
+      const zoom=Number.isFinite(Number(camera.zoom))&&Number(camera.zoom)>0?Number(camera.zoom):1;
+      const requested=(roomMode?containScale:coverScale)*zoom;
       const minScale=Number(camera.minScale)||.20;
       const maxScale=Number(camera.maxScale)||1.5;
       fitScale=clampCamera(requested,minScale,maxScale);
 
       if(roomMode){
-        // Small interiors/alleys behave like a self-contained room: show the
-        // whole authored scene and letterbox/center it when aspect ratios differ.
-        // There is no inherited Commerce Street camera position to track.
+        // Room art remains fully framed. Character scale is tuned separately so
+        // close interiors do not require a fake gameplay-camera zoom.
         cameraX=0;
         cameraY=0;
         screenOffsetX=Math.max(0,(viewportWidth-authoredWidth*fitScale)/2);
         screenOffsetY=Math.max(0,(viewportHeight-authoredHeight*fitScale)/2);
+        cameraState.key=sceneKey;
+        cameraState.x=0;cameraState.y=0;cameraState.scale=fitScale;
       }else{
         const visibleWorldWidth=viewportWidth/fitScale;
         const visibleWorldHeight=viewportHeight/fitScale;
         const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.5;
         const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.72;
+        const lookAhead=Number(camera.lookAhead)||0;
         const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
         const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
-
-        cameraX=clampCamera(
-          state.x-visibleWorldWidth*anchorX,
-          0,
-          maxX
-        );
-
-        cameraY=camera.vertical==='ground'
+        const targetX=clampCamera(state.x+(state.facingX||0)*lookAhead-visibleWorldWidth*anchorX,0,maxX);
+        const targetY=camera.vertical==='ground'
           ? maxY
-          : clampCamera(
-              state.y-visibleWorldHeight*anchorY,
-              0,
-              maxY
-            );
+          : clampCamera(state.y-visibleWorldHeight*anchorY,0,maxY);
+        const blended=cameraBlend(sceneKey,targetX,targetY,fitScale);
+        cameraX=blended.x;cameraY=blended.y;fitScale=blended.scale;
       }
-    }else{
+    }else if(editorOverview){
+      // Authoring still fits the complete block, independent of the gameplay camera.
       const editorBaseFit=Math.min(
         1,
         Math.max(.06,viewportHeight/authoredHeight),
         Math.max(.06,viewportWidth/authoredWidth)
       );
-      const baseFitScale=editorWorkspace
-        ? editorBaseFit
-        : Math.max(.20,Math.min(1,viewportHeight/authoredHeight));
-      fitScale=editorWorkspace
-        ? Math.max(.06,Math.min(1.8,baseFitScale*editorZoom))
-        : baseFitScale;
-
+      fitScale=Math.max(.06,Math.min(1.8,editorBaseFit*editorZoom));
       const visibleWorldWidth=viewportWidth/fitScale;
-      cameraX=Math.max(
-        0,
-        Math.min(Math.max(0,authoredWidth-visibleWorldWidth),state.x-visibleWorldWidth*.46)
-      );
+      cameraX=Math.max(0,Math.min(Math.max(0,authoredWidth-visibleWorldWidth),state.x-visibleWorldWidth*.46));
+      cameraState.key=sceneKey;
+      cameraState.x=cameraX;cameraState.y=0;cameraState.scale=fitScale;
+    }else{
+      // Commerce Street play mode is a true following gameplay camera rather
+      // than a panorama fit. The world/collision geometry remains unchanged.
+      const naturalScale=Math.max(.20,Math.min(1,viewportHeight/authoredHeight));
+      const requestedScale=Number.isFinite(Number(camera.playScale))&&Number(camera.playScale)>0
+        ? Number(camera.playScale)
+        : naturalScale;
+      const minScale=Number.isFinite(Number(camera.minScale))?Number(camera.minScale):naturalScale;
+      const maxScale=Number.isFinite(Number(camera.maxScale))?Number(camera.maxScale):1;
+      const targetScale=clampCamera(Math.max(naturalScale,requestedScale),Math.min(minScale,maxScale),Math.max(minScale,maxScale));
+      const visibleWorldWidth=viewportWidth/targetScale;
+      const visibleWorldHeight=viewportHeight/targetScale;
+      const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.46;
+      const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.76;
+      const lookAhead=Number(camera.lookAhead)||0;
+      const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
+      const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
+      const targetX=clampCamera(state.x+(state.facingX||0)*lookAhead-visibleWorldWidth*anchorX,0,maxX);
+      const targetY=camera.vertical==='ground'
+        ? maxY
+        : clampCamera(state.y-visibleWorldHeight*anchorY,0,maxY);
+      const blended=cameraBlend(sceneKey,targetX,targetY,targetScale);
+      cameraX=blended.x;cameraY=blended.y;fitScale=blended.scale;
     }
 
     cameraScene.style.transform=`translate3d(${screenOffsetX-cameraX*fitScale}px,${screenOffsetY-cameraY*fitScale}px,0) scale(${fitScale})`;
@@ -1786,6 +2365,7 @@ export async function renderBlockWorld(root, options={}){
       activeSubarea=result.scene;
       state.x=Number(activeSubarea.spawn?.x)||220;
       state.y=Number(activeSubarea.spawn?.y)||800;
+      ensurePlayerInCurrentArea();
       state.running=false;
       joyX=joyY=0;
       keys.clear();
@@ -1838,6 +2418,7 @@ export async function renderBlockWorld(root, options={}){
 
       state.x=Number(back?.x)||working.spawn.x;
       state.y=Number(back?.y)||working.spawn.y;
+      ensurePlayerInCurrentArea();
       state.near=null;
       state.running=false;
       joyX=joyY=0;
@@ -1883,6 +2464,7 @@ export async function renderBlockWorld(root, options={}){
 
   async function enter(){
     if(sceneTransitionBusy||!state.near)return;
+    triggerPlayerAction(state.near.kind==='location'?'interact':'search',480);
     if(state.near.kind==='subarea'){
       await enterSubarea(state.near.target);
       return;
@@ -1903,20 +2485,21 @@ export async function renderBlockWorld(root, options={}){
     if(keys.has('d')||keys.has('arrowright'))dx+=1;
     if(keys.has('w')||keys.has('arrowup'))dy-=1;
     if(keys.has('s')||keys.has('arrowdown'))dy+=1;
-    const len=Math.hypot(dx,dy)||1; if(Math.hypot(dx,dy)>1){dx/=len;dy/=len;}
-    const speed=(state.running||keys.has('shift'))?390:235;
-    const area=currentArea();
-    const walk=area.walkable;
-    let nx=state.x+dx*speed*dt, ny=state.y+dy*speed*dt;
-    nx=Math.max(45,Math.min(area.width-45,nx));
-    ny=Math.max(walk.y+18,Math.min(walk.y+walk.height-45,ny));
-    nx=Math.max(walk.x+18,Math.min(walk.x+walk.width-45,nx));
+    const inputLength=Math.hypot(dx,dy)||1;
+    if(inputLength>1){dx/=inputLength;dy/=inputLength;}
+    const movement=runtimeConfigFor(currentArea()).movement;
+    const walkSpeed=Math.max(40,Number(movement.walkSpeed)||235);
+    const runSpeed=Math.max(walkSpeed,Number(movement.runSpeed)||390);
+    const speed=(state.running||keys.has('shift'))?runSpeed:walkSpeed;
 
-    // Resolve axes separately so storefronts and sub-area props feel solid
-    // without producing sticky diagonal corners.
-    if(!collidesAt(nx,state.y))state.x=nx;
-    if(!collidesAt(state.x,ny))state.y=ny;
-    updatePlayer();
+    // Editing can reshape the polygon underneath the player marker; do not fight
+    // the authoring gesture by relocating the marker every animation frame. The
+    // position is repaired once when Play Mode resumes.
+    if(!editMode){
+      ensurePlayerInCurrentArea();
+      movePlayerBy(dx*speed*dt,dy*speed*dt);
+    }
+    updatePlayer(dx,dy,now);
 
     applyCamera();
     updatePrompt();
@@ -1938,11 +2521,10 @@ export async function renderBlockWorld(root, options={}){
       const item=currentEditable();
       if(item&&!isLocked(item)&&!typing&&['arrowleft','arrowright','arrowup','arrowdown'].includes(k)){
         const before=snapshot(),step=(Number(snapSelect.value)||1)*(e.shiftKey?5:1);
-        if(k==='arrowleft')item.o.x=(Number(item.o.x)||0)-step;
-        if(k==='arrowright')item.o.x=(Number(item.o.x)||0)+step;
-        if(k==='arrowup')item.o.y=(Number(item.o.y)||0)-step;
-        if(k==='arrowdown')item.o.y=(Number(item.o.y)||0)+step;
-        if(item.type==='building'){item.o.doorX+=k==='arrowleft'?-step:k==='arrowright'?step:0;item.o.doorY=item.o.y+item.o.h;}
+        const moveX=k==='arrowleft'?-step:k==='arrowright'?step:0;
+        const moveY=k==='arrowup'?-step:k==='arrowdown'?step:0;
+        translateGeometry(item.o,moveX,moveY);
+        if(item.type==='building'){item.o.doorX+=moveX;item.o.doorY=item.o.y+item.o.h;}
         commit(before);renderEditorObjects();syncInspector();e.preventDefault();return;
       }
       if(item&&!isLocked(item)&&!typing&&(k==='delete'||k==='backspace')&&['building','prop','obstacle'].includes(item.type)){
@@ -1971,21 +2553,67 @@ export async function renderBlockWorld(root, options={}){
 
   function onEditorPointerDown(e){
     if(!editMode)return;
+    const vertex=e.target.closest('[data-vertex-index]');
     const target=e.target.closest('[data-edit-key]');if(!target)return;
     const item=allEditable().find(x=>x.key===target.dataset.editKey);
     if(!item||isLocked(item))return;
     e.preventDefault();e.stopPropagation();
-    select(target.dataset.editKey);
+
+    const key=target.dataset.editKey;
+    const wasSelected=selectedKey===key;
+    const pointModeGesture=addPointMode&&wasSelected&&canShapeEditItem(item)&&!vertex&&!e.target.closest('[data-resize]');
+    const before=snapshot();
+    select(key);
     const resize=e.target.closest('[data-resize]')?.dataset.resize||'';
+    let vertexDrag=!!vertex&&canShapeEditItem(item);
+    let vertexIndex=vertexDrag?Number(vertex.dataset.vertexIndex||0):-1;
+
+    // ADD POINT is a persistent tap-to-insert mode. The tap is projected onto
+    // the nearest visible edge in SCREEN space, so Window mode, Safari scaling
+    // and rotated/fullscreen transforms all resolve to the same authored edge.
+    // The inserted point is selected and becomes the active drag point in the
+    // same pointer gesture, so the user can tap then immediately pull it inward
+    // or outward without another tap.
+    if(pointModeGesture){
+      const insertion=insertionOnNearestScreenEdge(target,item,e.clientX,e.clientY);
+      if(!insertion){
+        if(editorSelection)editorSelection.textContent=(editorVertexPoints(item.o).length>=64)
+          ?'SHAPE LIMIT · maximum 64 points'
+          :'ADD POINT · could not resolve an edge; tap the selected shape again';
+        return;
+      }
+      if(!isPolygonGeometry(item.o))createRectPolygon(item.o);
+      item.o.points.splice(insertion.insertIndex,0,insertion.point);
+      syncPolygonBounds(item.o);
+      selectedVertexIndex=insertion.insertIndex;
+      vertexDrag=true;
+      vertexIndex=insertion.insertIndex;
+      renderEditorObjects();
+      syncInspector();
+      setAddPointMode(true,{announce:false});
+    }else{
+      // A rectangle becomes a four-point polygon the instant one of its corner
+      // handles is dragged. This keeps diagonal editing direct and discoverable.
+      if(vertexDrag&&!isPolygonGeometry(item.o))createRectPolygon(item.o);
+      if(vertexDrag)selectedVertexIndex=vertexIndex;
+      else if(!resize)selectedVertexIndex=-1;
+    }
+
+    const bounds=geometryBounds(item.o);
     drag={
-      id:e.pointerId,key:selectedKey,mode:resize?'resize':'move',resize,
-      startX:e.clientX,startY:e.clientY,
-      ox:Number(item.o.x)||0,oy:Number(item.o.y)||0,
-      ow:Number(item.o.w??item.o.width??0),oh:Number(item.o.h??item.o.height??0),
-      doorX:item.type==='building'?(Number(item.o.doorX)||0):null,
-      before:snapshot()
+      id:e.pointerId,
+      key,
+      mode:vertexDrag?'vertex':(resize?'resize':'move'),
+      resize,
+      startX:e.clientX,
+      startY:e.clientY,
+      ox:bounds.x,oy:bounds.y,ow:bounds.width,oh:bounds.height,
+      origin:cloneBlock(item.o),
+      vertexIndex,
+      before
     };
     editorSurfaceElement().setPointerCapture?.(e.pointerId);
+    syncInspector();
   }
   function onEditorPointerMove(e){
     if(!drag||e.pointerId!==drag.id)return;
@@ -1995,35 +2623,51 @@ export async function renderBlockWorld(root, options={}){
     const screenDx=e.clientX-drag.startX,screenDy=e.clientY-drag.startY;
     const worldDelta=pointerVectorToWorld(screenDx,screenDy);
     const dx=worldDelta.x/scale,dy=worldDelta.y/scale;
-    if(drag.mode==='resize'){
+
+    // Always rebuild the dragged geometry from its pointer-down snapshot before
+    // applying the total pointer delta. H1.27 applied that total delta to the
+    // already-moved object on every pointermove, causing exponential/runaway
+    // movement that looked like boxes flying off screen.
+    restoreObjectSnapshot(item.o,drag.origin);
+
+    if(drag.mode==='vertex'&&isPolygonGeometry(item.o)){
+      const point=item.o.points[drag.vertexIndex];
+      if(point){
+        point.x=snap((Number(drag.origin.points?.[drag.vertexIndex]?.x)||0)+dx);
+        point.y=snap((Number(drag.origin.points?.[drag.vertexIndex]?.y)||0)+dy);
+      }
+      syncPolygonBounds(item.o);
+      selectedVertexIndex=drag.vertexIndex;
+    }else if(drag.mode==='resize'){
       const edge=drag.resize,min=30;
       let x=drag.ox,y=drag.oy,w=drag.ow,h=drag.oh;
       if(edge.includes('w')){x=snap(drag.ox+dx);w=snap(drag.ow-(x-drag.ox));if(w<min){x=drag.ox+drag.ow-min;w=min;}}
       if(edge.includes('e'))w=Math.max(min,snap(drag.ow+dx));
       if(edge.includes('n')){y=snap(drag.oy+dy);h=snap(drag.oh-(y-drag.oy));if(h<min){y=drag.oy+drag.oh-min;h=min;}}
       if(edge.includes('s'))h=Math.max(min,snap(drag.oh+dy));
-      item.o.x=x;item.o.y=y;
-      if('w' in item.o)item.o.w=w;else item.o.width=w;
-      if('h' in item.o)item.o.h=h;else item.o.height=h;
+      scaleGeometryToBounds(item.o,{x,y,width:w,height:h},{x:drag.ox,y:drag.oy,width:drag.ow,height:drag.oh});
       if(item.type==='building'){
-        // Keep the door in the same relative horizontal position while its building is resized.
-        const ratio=drag.ow?((drag.doorX-drag.ox)/drag.ow):0.5;
-        item.o.doorX=item.o.x+Math.max(0,Math.min(1,ratio))*w;
-        item.o.doorY=item.o.y+h;
+        const ratio=drag.ow?((Number(drag.origin.doorX)||drag.ox)-drag.ox)/drag.ow:0.5;
+        item.o.doorX=geometryBounds(item.o).x+Math.max(0,Math.min(1,ratio))*geometryBounds(item.o).width;
+        item.o.doorY=item.o.y+item.o.h;
       }
     }else{
-      item.o.x=snap(drag.ox+dx);item.o.y=snap(drag.oy+dy);
+      translateGeometry(item.o,dx,dy);
       if(item.type==='building'){
-        item.o.doorX=(drag.doorX??item.o.doorX)+(item.o.x-drag.ox);
+        const movedX=(Number(item.o.x)||0)-drag.ox;
+        item.o.doorX=(Number(drag.origin.doorX)||0)+movedX;
         item.o.doorY=item.o.y+item.o.h;
       }
     }
-    selectedKey=drag.key;renderEditorObjects();syncInspector();
+    selectedKey=drag.key;
+    renderEditorObjects();
+    syncInspector();
   }
   function onEditorPointerUp(e){
     if(!drag||e.pointerId!==drag.id)return;
-    e.preventDefault();e.stopPropagation();commit(drag.before);
-    try{editorSurfaceElement().releasePointerCapture?.(e.pointerId);}catch(_){}
+    e.preventDefault();e.stopPropagation();
+    commit(drag.before);
+    try{editorSurfaceElement().releasePointerCapture?.(e.pointerId);}catch(_){ }
     drag=null;
   }
   assetFile.addEventListener('click',e=>{e.stopPropagation();});
@@ -2046,6 +2690,40 @@ export async function renderBlockWorld(root, options={}){
   propActive?.addEventListener('change',applyInspector);
   propWidth?.addEventListener('change',applyInspector);
   propHeight?.addEventListener('change',applyInspector);
+
+  configCameraZoom?.addEventListener('change',()=>{
+    const value=Math.max(.2,Math.min(2,Number(configCameraZoom.value)||1));
+    const key=editingSubarea()?'zoom':'playScale';
+    const before=snapshot();
+    const config=ensureWorkingRuntimeConfig();
+    config.camera[key]=value;
+    if(value<Number(config.camera.minScale||value))config.camera.minScale=value;
+    if(value>Number(config.camera.maxScale||value))config.camera.maxScale=value;
+    working.camera={...config.camera};
+    commit(before);applyCamera();syncSceneConfigControls();
+  });
+  configPlayerScale?.addEventListener('change',()=>setSceneConfigValue('player','baseScale',configPlayerScale.value,{min:.5,max:3}));
+  configLookAhead?.addEventListener('change',()=>setSceneConfigValue('camera','lookAhead',configLookAhead.value,{min:0,max:1200}));
+  configInteractionRadius?.addEventListener('change',()=>setSceneConfigValue('interaction',editingSubarea()?'roomExitRadius':'radius',configInteractionRadius.value,{min:20,max:500}));
+  configWalkSpeed?.addEventListener('change',()=>setSceneConfigValue('movement','walkSpeed',configWalkSpeed.value,{min:40,max:800}));
+  configRunSpeed?.addEventListener('change',()=>setSceneConfigValue('movement','runSpeed',configRunSpeed.value,{min:60,max:1200}));
+  configDepthMin?.addEventListener('change',()=>{
+    const value=Math.max(.3,Math.min(2,Number(configDepthMin.value)||.78));
+    const before=snapshot(),config=ensureWorkingRuntimeConfig();
+    config.player.depthMin=value;
+    if(Number(config.player.depthMax)<value)config.player.depthMax=value;
+    working.character={...config.player};
+    commit(before);updatePlayer();syncSceneConfigControls();
+  });
+  configDepthMax?.addEventListener('change',()=>{
+    const value=Math.max(.3,Math.min(2.5,Number(configDepthMax.value)||1.05));
+    const before=snapshot(),config=ensureWorkingRuntimeConfig();
+    config.player.depthMax=value;
+    if(Number(config.player.depthMin)>value)config.player.depthMin=value;
+    working.character={...config.player};
+    commit(before);updatePlayer();syncSceneConfigControls();
+  });
+
   let editorZoom=1;
   const setEditorZoom=value=>{editorZoom=Math.max(.55,Math.min(1.8,value));};
   zoomInButton?.addEventListener('click',()=>setEditorZoom(editorZoom+.1));
@@ -2071,6 +2749,38 @@ export async function renderBlockWorld(root, options={}){
     const item=currentEditable();if(!item)return;
     const before=snapshot();
     item.o.locked=!item.o.locked;
+    commit(before);renderEditorObjects();syncInspector();
+  });
+  shapeToggleButton?.addEventListener('click',()=>{
+    const item=currentEditable();if(!item||isLocked(item)||!canShapeEditItem(item))return;
+    setAddPointMode(false,{announce:false});
+    const before=snapshot();
+    if(isPolygonGeometry(item.o)){
+      stripPolygon(item.o);
+      selectedVertexIndex=-1;
+    }else{
+      createRectPolygon(item.o);
+      selectedVertexIndex=0;
+    }
+    commit(before);renderEditorObjects();syncInspector();
+  });
+  addPointButton?.addEventListener('click',()=>{
+    const item=currentEditable();if(!item||isLocked(item)||!canShapeEditItem(item))return;
+    if(isPolygonGeometry(item.o)&&(item.o.points||[]).length>=64){
+      if(editorSelection)editorSelection.textContent='SHAPE LIMIT · maximum 64 points';
+      return;
+    }
+    setAddPointMode(!addPointMode);
+  });
+  deletePointButton?.addEventListener('click',()=>{
+    const item=currentEditable();
+    if(!item||isLocked(item)||!isPolygonGeometry(item.o)||(item.o.points||[]).length<=3||selectedVertexIndex<0)return;
+    const before=snapshot();
+    const pts=item.o.points||[];
+    const removeAt=Math.max(0,Math.min(pts.length-1,selectedVertexIndex));
+    pts.splice(removeAt,1);
+    selectedVertexIndex=Math.min(removeAt,pts.length-1);
+    syncPolygonBounds(item.o);
     commit(before);renderEditorObjects();syncInspector();
   });
   editorScope.querySelectorAll('[data-bw-nudge]').forEach(button=>button.addEventListener('click',()=>{
@@ -2143,7 +2853,7 @@ export async function renderBlockWorld(root, options={}){
       if(nearest){nearest.b.doorX=snap(state.x);nearest.b.doorY=snap(state.y);commit(before);renderEditorObjects();select(`building:${nearest.i}`);}
     }
   }));
-  duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item))return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));copy.x+=40;copy.y+=40;if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){const slug=String(copy.kind||'prop').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'prop';copy.id=`prop-${slug}-${Date.now().toString(36)}-${(++propSerial).toString(36)}`;delete copy.locked;working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}else if(item.type==='obstacle'){copy.id=`${copy.id||'collision'}-copy-${Date.now().toString(36)}`;delete copy.locked;working.obstacles.push(copy);commit(before);renderEditorObjects();select(`obstacle:${working.obstacles.length-1}`);}});
+  duplicateButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item))return;const before=snapshot(),copy=JSON.parse(JSON.stringify(item.o));translateGeometry(copy,40,40);if(item.type==='building'){copy.id=`${copy.id}-copy-${Date.now().toString(36)}`;copy.name+= ' Copy';copy.doorX+=40;copy.doorY+=40;working.buildings.push(copy);commit(before);renderEditorObjects();select(`building:${working.buildings.length-1}`);}else if(item.type==='prop'){const slug=String(copy.kind||'prop').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'prop';copy.id=`prop-${slug}-${Date.now().toString(36)}-${(++propSerial).toString(36)}`;delete copy.locked;working.props.push(copy);commit(before);renderEditorObjects();select(`prop:${working.props.length-1}`);}else if(item.type==='obstacle'){copy.id=`${copy.id||'collision'}-copy-${Date.now().toString(36)}`;delete copy.locked;working.obstacles.push(copy);commit(before);renderEditorObjects();select(`obstacle:${working.obstacles.length-1}`);}});
   deleteButton.addEventListener('click',()=>{const item=currentEditable();if(!item||isLocked(item)||item.type==='alley')return;const before=snapshot();if(item.type==='building')working.buildings.splice(item.i,1);else if(item.type==='prop')working.props.splice(item.i,1);else if(item.type==='obstacle')working.obstacles.splice(item.i,1);else return;commit(before);select('');renderEditorObjects();});
   for(const surface of [scene,subareaWorld]){
     surface.addEventListener('pointerdown',onEditorPointerDown,true);
@@ -2231,6 +2941,8 @@ export async function renderBlockWorld(root, options={}){
   async function exitFullscreen(){
     fullscreenMode=false;
     document.body.classList.remove('bw-fullscreen-mode');
+    root.removeEventListener('bw-player-action',onPlayerActionEvent);
+    try{ delete root.__bwPlayerAction; }catch(_){ root.__bwPlayerAction=undefined; }
     shell.classList.remove('bw-fullscreen-active','bw-editor-chrome-hidden');
     fullscreenButton.textContent='FULLSCREEN';
     try{screen.orientation?.unlock?.();}catch(_){}

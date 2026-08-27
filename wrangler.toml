@@ -12,3 +12,6 @@ database_id = "118e392b-e9d4-4d81-9a4f-ee2a2b3865cc"
 [[r2_buckets]]
 binding = "RIFT_ASSETS"
 bucket_name = "riftcityassets"
+
+# H1.33: do not place CONFIG_SIGNING_SECRET in this file.
+# Configure it with: npx wrangler secret put CONFIG_SIGNING_SECRET

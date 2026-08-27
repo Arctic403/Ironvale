@@ -554,6 +554,32 @@ CREATE TABLE IF NOT EXISTS block_layout_history (
 CREATE INDEX IF NOT EXISTS idx_block_layout_history_block
   ON block_layout_history(block_id, published_at DESC);
 
+-- H1.33 integrity envelopes for published scene/runtime config.
+-- The Worker recalculates SHA-256 on every published read. When
+-- CONFIG_SIGNING_SECRET is configured, it also verifies HMAC-SHA256 so a D1
+-- mutation cannot forge an approved runtime config without the Worker secret.
+CREATE TABLE IF NOT EXISTS block_layout_integrity (
+  block_id TEXT PRIMARY KEY,
+  published_revision INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  signature TEXT,
+  algorithm TEXT NOT NULL,
+  signed_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS block_layout_history_integrity (
+  history_id TEXT PRIMARY KEY,
+  block_id TEXT NOT NULL,
+  revision INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  signature TEXT,
+  algorithm TEXT NOT NULL,
+  signed_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_block_layout_history_integrity_block
+  ON block_layout_history_integrity(block_id, revision DESC);
+
 -- Hybrid H1.18 secure verified asset registry.
 -- Block layouts store only assetId + SHA-256 references; image bytes live in R2.
 CREATE TABLE IF NOT EXISTS approved_assets (

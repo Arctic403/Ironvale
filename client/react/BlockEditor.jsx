@@ -51,6 +51,7 @@ export function BlockEditor() {
         <section className="bw-studio-transform" data-editor-panel="transform">
           <button className="bw-panel-collapse bw-transform-collapse" type="button" data-panel-collapse="transform" aria-label="Close transform panel">×</button>
           <label className="bw-editor-object-row"><span>OBJECT</span><select id="bw-editor-object" aria-label="Selected editor object" /></label>
+          <small className="bw-shape-help">WALK / EXIT / COLLISION: drag corner dots for diagonals. ADD POINT → tap an edge or anywhere inside the selected shape; the new point is selected and draggable immediately.</small>
           <label className="bw-studio-idlabel"><span>ID / LABEL</span><input id="bw-editor-idlabel" type="text" autoComplete="off" /></label>
           <div className="bw-editor-transform-grid" aria-label="Transform">
             <label>X<input id="bw-editor-x" inputMode="numeric" type="number" step="5" /></label>
@@ -144,6 +145,9 @@ export function BlockEditor() {
               <div className="bw-studio-icon-tools">
                 <button className="active" type="button">SELECT</button><button type="button">MOVE</button>
                 <button type="button" disabled>ROTATE</button><button type="button">SCALE</button>
+                <button type="button" id="bw-editor-shape-toggle">TO SHAPE</button>
+                <button type="button" id="bw-editor-add-point">ADD POINT</button>
+                <button type="button" id="bw-editor-delete-point">DELETE POINT</button>
                 <button type="button" id="bw-editor-lock">LOCK SELECTED</button>
                 <button type="button" id="bw-editor-duplicate">DUPLICATE</button><button type="button" id="bw-editor-local-export">EXPORT</button>
               </div>
@@ -154,6 +158,23 @@ export function BlockEditor() {
                 <button type="button" id="bw-view-grid">GRID</button><button type="button" id="bw-view-colliders">COLLIDERS</button>
                 <button type="button" id="bw-view-zones">ZONES</button><button type="button" id="bw-view-labels">LABELS</button>
               </div>
+            </div>
+            <div className="bw-studio-toolgroup bw-studio-scene-config">
+              <small>SCENE CONFIG</small>
+              <details className="bw-scene-config-details">
+                <summary>CAMERA · PLAYER · GAMEPLAY</summary>
+                <div className="bw-scene-config-grid">
+                  <label>CAMERA ZOOM<input id="bw-config-camera-zoom" type="number" inputMode="decimal" min="0.2" max="2" step="0.01" /></label>
+                  <label>PLAYER SCALE<input id="bw-config-player-scale" type="number" inputMode="decimal" min="0.5" max="3" step="0.05" /></label>
+                  <label>LOOK AHEAD<input id="bw-config-lookahead" type="number" inputMode="numeric" min="0" max="1200" step="10" /></label>
+                  <label>INTERACT RADIUS<input id="bw-config-interaction-radius" type="number" inputMode="numeric" min="20" max="500" step="5" /></label>
+                  <label>WALK SPEED<input id="bw-config-walk-speed" type="number" inputMode="numeric" min="40" max="800" step="5" /></label>
+                  <label>RUN SPEED<input id="bw-config-run-speed" type="number" inputMode="numeric" min="60" max="1200" step="5" /></label>
+                  <label>DEPTH MIN<input id="bw-config-depth-min" type="number" inputMode="decimal" min="0.3" max="2" step="0.01" /></label>
+                  <label>DEPTH MAX<input id="bw-config-depth-max" type="number" inputMode="decimal" min="0.3" max="2.5" step="0.01" /></label>
+                </div>
+                <small id="bw-config-integrity-status" className="bw-config-integrity-status">PUBLISH · integrity protected</small>
+              </details>
             </div>
             <div className="bw-studio-toolgroup">
               <small>PRECISION & SETTINGS</small>

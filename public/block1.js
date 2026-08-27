@@ -15,6 +15,49 @@ export const BLOCK1 = Object.freeze({
     height: 1800,
     scale: 1
   },
+
+  // H1.33 scene runtime config. These values are authored/published as data,
+  // not executable code. The Worker validates and integrity-protects the complete
+  // published scene document before Play Mode is allowed to consume it.
+  runtimeConfig: {
+    schemaVersion: 1,
+    camera: {
+      mode: "follow",
+      playScale: 0.60,
+      minScale: 0.50,
+      maxScale: 0.75,
+      anchorX: 0.46,
+      anchorY: 0.76,
+      lookAhead: 120,
+      vertical: "follow",
+      positionEase: 0.17,
+      zoomEase: 0.13
+    },
+    player: {
+      baseScale: 1.42,
+      editorScale: 1,
+      depthMin: 0.82,
+      depthMax: 1.05
+    },
+    movement: {
+      walkSpeed: 235,
+      runSpeed: 390,
+      maxStep: 7
+    },
+    interaction: {
+      radius: 100,
+      roomExitRadius: 105
+    }
+  },
+
+  // Legacy aliases remain during the config migration so old exports and local
+  // test harnesses keep rendering. runtimeConfig wins whenever it is present.
+  camera: {
+    mode: "follow", playScale: 0.60, minScale: 0.50, maxScale: 0.75,
+    anchorX: 0.46, anchorY: 0.76, lookAhead: 120, vertical: "follow",
+    positionEase: 0.17, zoomEase: 0.13
+  },
+  character: { baseScale: 1.42, editorScale: 1, depthMin: 0.82, depthMax: 1.05 },
   spawn: {
     x: 340,
     y: 1320

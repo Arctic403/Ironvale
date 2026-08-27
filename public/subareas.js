@@ -35,10 +35,19 @@ export const SUBAREAS = Object.freeze({
     props:[],
     exit:{id:'street-exit',x:18,y:535,width:250,height:355,label:'Commerce Street'},
 
-    // A compact alley behaves like a self-contained room. The runtime shows
-    // the entire authored scene and centers/letterboxes it if the viewport
-    // aspect ratio differs, rather than inheriting or following the street camera.
-    camera:{mode:'room',anchorX:.50,anchorY:.72,minScale:.18,maxScale:1.35},
+    // All per-scene tuning lives in a versioned runtime config. Camera/player
+    // presentation can be tuned in the private Block Editor without touching JS.
+    runtimeConfig:{
+      schemaVersion:1,
+      camera:{mode:'room',anchorX:.50,anchorY:.72,minScale:.18,maxScale:1.35,zoom:1,lookAhead:0,vertical:'ground',positionEase:.17,zoomEase:.13},
+      player:{baseScale:1.85,editorScale:.92,depthMin:.88,depthMax:1.06},
+      movement:{walkSpeed:235,runSpeed:390,maxStep:7},
+      interaction:{radius:100,roomExitRadius:105}
+    },
+
+    // Legacy aliases remain during the config migration. runtimeConfig wins.
+    camera:{mode:'room',anchorX:.50,anchorY:.72,minScale:.18,maxScale:1.35,zoom:1,lookAhead:0,vertical:'ground',positionEase:.17,zoomEase:.13},
+    character:{baseScale:1.85,editorScale:.92,depthMin:.88,depthMax:1.06},
 
     obstacles:[
       {id:'left-clutter',x:330,y:500,width:245,height:205},

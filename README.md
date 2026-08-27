@@ -854,3 +854,74 @@ H1.26 changes:
 - Alley drafts/publish/history/revert now use `alley-commerce-01` as their own D1 document and do not overwrite `downtown-commercial-01`.
 - Server validation now checks optional room obstacle and exit geometry before a room draft can be stored or published.
 - Local Frontend Test keeps independent in-memory street/alley drafts when server mutations are unavailable, so switching editor scenes does not discard current authoring work.
+
+## Hybrid H1.28 — stable drag math + direct diagonal zone handles
+
+A full audit of the H1.27 workspace was run before this patch.
+
+Audit findings:
+- all 71 JavaScript files pass the repository syntax checker;
+- the JS-only policy passes;
+- the H1.27 runaway drag was confirmed in `onEditorPointerMove()`: pointer deltas were measured from the original pointer-down position but then added to geometry that had already moved on previous pointer events, compounding the movement until objects appeared to fly off-screen;
+- polygon zones still received the legacy rectangular resize gizmos, so the bounding box remained the dominant editing UI;
+- polygon visualization used a clipped rectangular element, which did not give a clear authored diagonal outline;
+- polygon corner handles were only rendered after the scene had already been re-rendered with that object selected, so a first tap could select a zone without immediately exposing shape controls.
+
+H1.28 repairs:
+- every drag frame restores the exact pointer-down object snapshot and applies the total pointer delta once, eliminating cumulative/runaway movement in Window and Fullscreen modes;
+- Walkable, Exit, Room Exit and Collision zones no longer receive rectangular resize gizmos;
+- selecting one of those zones immediately shows four large touch-friendly corner handles even while it is still a rectangle;
+- dragging any rectangle corner automatically converts that zone into a four-point polygon and moves only that vertex, producing diagonal sides directly;
+- polygon outlines are rendered with a real SVG `<polygon>` so diagonal edges are visually explicit rather than appearing as a box;
+- ADD POINT and DELETE POINT remain available for more complex concave/angled shapes, while MAKE BOX resets a polygon to its current bounding rectangle;
+- polygon movement, collision, walkable bounds, exits and D1 validation remain compatible with H1.27 data;
+- block-level `exits[]` now receive the same rectangle/polygon server validation as room exits.
+
+
+## Hybrid H1.29 — free point insertion for authored zones
+
+- Full current-snapshot audit completed before patching: all 71 JavaScript files passed syntax checks, JS-only policy passed, and all source-controlled `/assets/*` references resolved.
+- `ADD POINT` is now a persistent tap-to-insert mode for Walkable, Collision, Block Exit and Room Exit geometry.
+- Tap directly on an edge to insert at that exact edge position (respecting the current SNAP setting).
+- Tap anywhere inside the selected shape to insert on the nearest edge, then continue the same pointer gesture to drag the new point inward/outward immediately.
+- Edge selection is calculated from the visible vertex handles in screen space, so the same gesture works in normal Window mode, scaled editor views and iPhone fullscreen/rotated layouts.
+- Point insertion stays active for rapid multi-point tracing until `TAP SHAPE…` is pressed again or another object is selected.
+- `DELETE POINT` now requires an explicitly selected vertex and never reduces a polygon below three points.
+- Polygon authoring is capped at 64 points, matching the server layout validator.
+
+## Hybrid H1.30 — polygon-true player movement + diagonal boundary sliding
+
+A full audit was run against the current `391b6cf6…` workspace before this patch.
+
+The H1.29 editor polygon itself was valid, but gameplay still mixed polygon geometry with legacy rectangle-style movement rules:
+- walkability only checked the player's anchor/center point instead of the full collision radius;
+- movement resolved X and Y independently, which creates invisible-feeling barriers around diagonal and concave polygon edges;
+- invalid positions were projected directly onto the polygon boundary, leaving the player on a point that could immediately fail the next movement check;
+- depth scaling still read `walkable.x/y/width/height` directly instead of the actual polygon bounds.
+
+H1.30 makes authored polygon zones authoritative for movement:
+- the player uses an 18-unit circular gameplay radius for walkable and obstacle checks;
+- the entire player circle must fit inside the authored walkable polygon;
+- polygon and rectangular obstacles use circle-vs-shape distance rather than bounding-box-only collision;
+- movement is sub-stepped and, when blocked, projected onto the actual nearest polygon edge tangent so the player slides naturally along diagonal walls and concave boundaries;
+- invalid spawn/return positions are repaired to the nearest actually occupiable point instead of being snapped onto the boundary;
+- player depth scaling uses the real walkable geometry bounds, so irregular polygons no longer inherit stale rectangle assumptions.
+
+## Hybrid H1.33 — versioned scene runtime config + D1 integrity envelopes
+
+- Camera/player/gameplay tuning is now stored as per-scene `runtimeConfig` data instead of requiring hardcoded runtime edits for every scene.
+- The private Block Editor exposes scene controls for camera zoom, player visual scale, look-ahead, interaction radius, walk/run speed and player depth min/max. Street and room/sub-area values are independent and publish with that scene's normal D1 document.
+- Commerce Street starts from a less aggressive `0.60` play camera scale and a `1.42` player base scale; Commerce Alley keeps room framing and starts at `1.85` player base scale. These are defaults only and can now be tuned in the editor.
+- Runtime config schema v1 is Worker-validated with strict field/range checks before a draft can publish. Movement speed, camera, player presentation and interaction tuning are data; executable behavior, auth and player-owned state remain server code/state.
+- Published block/scene JSON now has a companion SHA-256 integrity record in D1. Every public published read recalculates and verifies that hash before gameplay receives the config. A failed check returns no D1 block so the client uses the source-controlled fallback.
+- Published revision history receives the same integrity envelope and is verified before a historical revision can be restored to draft.
+- Legacy published rows without integrity metadata are schema/asset-validated once and backfilled so existing authored D1 layouts are not discarded during migration.
+- Optional HMAC-SHA256 authenticity is supported through the Worker secret `CONFIG_SIGNING_SECRET`. When configured, publishing stores an HMAC signature and every read verifies it; existing SHA-only records automatically upgrade to HMAC on their next verified read.
+
+Set the signing secret once for each Cloudflare environment (use a long random value, at least 32 characters):
+
+```sh
+npx wrangler secret put CONFIG_SIGNING_SECRET
+```
+
+The secret is never stored in D1 or sent to the browser. D1 stores only the config JSON, revision, SHA-256, signature and algorithm metadata. Without the secret the system still rejects accidental/corrupt SHA-256 mismatches, but HMAC is required to prevent a party with direct D1 write access from forging a replacement config.

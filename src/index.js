@@ -1111,6 +1111,27 @@ async function ensureBlockEditorTables(env) {
       )
     `),
     env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS block_layout_integrity (
+        block_id TEXT PRIMARY KEY,
+        published_revision INTEGER NOT NULL,
+        sha256 TEXT NOT NULL,
+        signature TEXT,
+        algorithm TEXT NOT NULL,
+        signed_at INTEGER NOT NULL
+      )
+    `),
+    env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS block_layout_history_integrity (
+        history_id TEXT PRIMARY KEY,
+        block_id TEXT NOT NULL,
+        revision INTEGER NOT NULL,
+        sha256 TEXT NOT NULL,
+        signature TEXT,
+        algorithm TEXT NOT NULL,
+        signed_at INTEGER NOT NULL
+      )
+    `),
+    env.DB.prepare(`
       CREATE TABLE IF NOT EXISTS approved_assets (
         asset_id TEXT PRIMARY KEY,
         sha256 TEXT NOT NULL,
@@ -1126,6 +1147,7 @@ async function ensureBlockEditorTables(env) {
       )
     `),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_block_layout_history_block ON block_layout_history(block_id, published_at DESC)`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_block_layout_history_integrity_block ON block_layout_history_integrity(block_id, revision DESC)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_approved_assets_sha256 ON approved_assets(sha256)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_approved_assets_status ON approved_assets(status)`)
   ]);
@@ -1144,6 +1166,108 @@ function normalizeSha256(value) {
 async function sha256Bytes(bytes) {
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return bytesToHex(new Uint8Array(digest));
+}
+
+function constantTimeHexEqual(a, b) {
+  const left = String(a || '').toLowerCase(), right = String(b || '').toLowerCase();
+  if (left.length !== right.length || !left.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return diff === 0;
+}
+
+async function hmacSha256Hex(secret, message) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+  return bytesToHex(new Uint8Array(signature));
+}
+
+function configSigningSecret(env) {
+  const secret = String(env?.CONFIG_SIGNING_SECRET || '').trim();
+  return secret.length >= 32 ? secret : '';
+}
+
+function blockIntegrityPayload(blockId, revision, sha256) {
+  return `riftcity:block-layout:v1:${String(blockId)}:${Number(revision) || 0}:${String(sha256)}`;
+}
+
+async function createBlockIntegrity(env, blockId, revision, jsonText) {
+  const sha256 = await sha256Bytes(new TextEncoder().encode(String(jsonText || '')));
+  const secret = configSigningSecret(env);
+  if (!secret) {
+    return { verified: true, algorithm: 'sha256-v1', sha256, signature: null, signed: false };
+  }
+  const signature = await hmacSha256Hex(secret, blockIntegrityPayload(blockId, revision, sha256));
+  return { verified: true, algorithm: 'hmac-sha256-v1', sha256, signature, signed: true };
+}
+
+async function verifyBlockIntegrity(env, blockId, revision, jsonText, record) {
+  if (!record?.sha256 || !record?.algorithm) return { verified: false, reason: 'missing-integrity-record' };
+  if (Number(record.published_revision ?? record.revision) !== Number(revision)) {
+    return { verified: false, reason: 'revision-mismatch', algorithm: record.algorithm };
+  }
+  const sha256 = await sha256Bytes(new TextEncoder().encode(String(jsonText || '')));
+  if (!constantTimeHexEqual(sha256, record.sha256)) {
+    return { verified: false, reason: 'sha256-mismatch', algorithm: record.algorithm, sha256 };
+  }
+  const algorithm = String(record.algorithm || '');
+  if (algorithm === 'sha256-v1') {
+    return { verified: true, algorithm, sha256, signed: false };
+  }
+  if (algorithm !== 'hmac-sha256-v1') {
+    return { verified: false, reason: 'unsupported-integrity-algorithm', algorithm, sha256 };
+  }
+  const secret = configSigningSecret(env);
+  if (!secret) return { verified: false, reason: 'signing-secret-unavailable', algorithm, sha256 };
+  const expected = await hmacSha256Hex(secret, blockIntegrityPayload(blockId, revision, sha256));
+  if (!constantTimeHexEqual(expected, record.signature)) {
+    return { verified: false, reason: 'signature-mismatch', algorithm, sha256 };
+  }
+  return { verified: true, algorithm, sha256, signed: true };
+}
+
+async function storePublishedIntegrity(env, blockId, revision, jsonText, { historyId = '' } = {}) {
+  const integrity = await createBlockIntegrity(env, blockId, revision, jsonText);
+  const now = Date.now();
+  const statements = [env.DB.prepare(`
+    INSERT INTO block_layout_integrity (block_id, published_revision, sha256, signature, algorithm, signed_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(block_id) DO UPDATE SET
+      published_revision = excluded.published_revision,
+      sha256 = excluded.sha256,
+      signature = excluded.signature,
+      algorithm = excluded.algorithm,
+      signed_at = excluded.signed_at
+  `).bind(blockId, revision, integrity.sha256, integrity.signature, integrity.algorithm, now)];
+  if (historyId) statements.push(env.DB.prepare(`
+    INSERT INTO block_layout_history_integrity (history_id, block_id, revision, sha256, signature, algorithm, signed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(history_id) DO UPDATE SET
+      sha256 = excluded.sha256,
+      signature = excluded.signature,
+      algorithm = excluded.algorithm,
+      signed_at = excluded.signed_at
+  `).bind(historyId, blockId, revision, integrity.sha256, integrity.signature, integrity.algorithm, now));
+  await env.DB.batch(statements);
+  return { ...integrity, signedAt: now };
+}
+
+async function storeHistoryIntegrity(env, historyId, blockId, revision, jsonText) {
+  const integrity = await createBlockIntegrity(env, blockId, revision, jsonText);
+  const now = Date.now();
+  await env.DB.prepare(`
+    INSERT INTO block_layout_history_integrity (history_id, block_id, revision, sha256, signature, algorithm, signed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(history_id) DO UPDATE SET
+      sha256 = excluded.sha256,
+      signature = excluded.signature,
+      algorithm = excluded.algorithm,
+      signed_at = excluded.signed_at
+  `).bind(historyId, blockId, revision, integrity.sha256, integrity.signature, integrity.algorithm, now).run();
+  return { ...integrity, signedAt: now };
 }
 
 function sanitizeAssetMetadata(raw) {
@@ -1434,6 +1558,90 @@ function blockIdFromPath(pathname, suffix='') {
   return /^[a-z0-9][a-z0-9-]{1,80}$/i.test(id) ? id : '';
 }
 
+
+function isFinitePoint(point) {
+  return !!point && Number.isFinite(Number(point.x)) && Number.isFinite(Number(point.y));
+}
+
+function hasValidPolygonPoints(shape) {
+  return Array.isArray(shape?.points)
+    && shape.points.length >= 3
+    && shape.points.length <= 64
+    && shape.points.every(isFinitePoint);
+}
+
+function hasValidRectGeometry(shape) {
+  return !!shape
+    && Number.isFinite(Number(shape.x))
+    && Number.isFinite(Number(shape.y))
+    && Number.isFinite(Number(shape.width ?? shape.w))
+    && Number.isFinite(Number(shape.height ?? shape.h));
+}
+
+function isValidZoneGeometry(shape) {
+  return hasValidPolygonPoints(shape) || hasValidRectGeometry(shape);
+}
+
+function validateFiniteRange(value, min, max) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= min && number <= max;
+}
+
+function validateKnownKeys(object, allowed, label) {
+  if (!object || typeof object !== 'object' || Array.isArray(object)) return `${label} must be an object`;
+  const unknown = Object.keys(object).find(key => !allowed.has(key));
+  return unknown ? `${label} contains unsupported field ${unknown}` : '';
+}
+
+function validateSceneRuntimeConfig(config) {
+  if (config == null) return '';
+  const topError = validateKnownKeys(config, new Set(['schemaVersion','camera','player','movement','interaction']), 'runtimeConfig');
+  if (topError) return topError;
+  if (Number(config.schemaVersion || 1) !== 1) return 'Unsupported runtimeConfig schemaVersion';
+
+  if (config.camera != null) {
+    const error = validateKnownKeys(config.camera, new Set(['mode','playScale','zoom','minScale','maxScale','anchorX','anchorY','lookAhead','vertical','positionEase','zoomEase']), 'runtimeConfig.camera');
+    if (error) return error;
+    const camera = config.camera;
+    if (camera.mode != null && !['follow','room','contain','cover'].includes(String(camera.mode))) return 'Invalid camera mode';
+    if (camera.vertical != null && !['follow','ground'].includes(String(camera.vertical))) return 'Invalid camera vertical mode';
+    for (const key of ['playScale','zoom','minScale','maxScale']) if (camera[key] != null && !validateFiniteRange(camera[key], .05, 3)) return `Invalid camera ${key}`;
+    for (const key of ['anchorX','anchorY']) if (camera[key] != null && !validateFiniteRange(camera[key], 0, 1)) return `Invalid camera ${key}`;
+    if (camera.lookAhead != null && !validateFiniteRange(camera.lookAhead, 0, 1200)) return 'Invalid camera lookAhead';
+    for (const key of ['positionEase','zoomEase']) if (camera[key] != null && !validateFiniteRange(camera[key], .01, 1)) return `Invalid camera ${key}`;
+    if (camera.minScale != null && camera.maxScale != null && Number(camera.minScale) > Number(camera.maxScale)) return 'camera minScale cannot exceed maxScale';
+  }
+
+  if (config.player != null) {
+    const error = validateKnownKeys(config.player, new Set(['baseScale','editorScale','depthMin','depthMax','visualOffsetX','visualOffsetY','shadowScale']), 'runtimeConfig.player');
+    if (error) return error;
+    const player = config.player;
+    for (const key of ['baseScale','editorScale']) if (player[key] != null && !validateFiniteRange(player[key], .3, 4)) return `Invalid player ${key}`;
+    for (const key of ['depthMin','depthMax']) if (player[key] != null && !validateFiniteRange(player[key], .2, 3)) return `Invalid player ${key}`;
+    for (const key of ['visualOffsetX','visualOffsetY']) if (player[key] != null && !validateFiniteRange(player[key], -500, 500)) return `Invalid player ${key}`;
+    if (player.shadowScale != null && !validateFiniteRange(player.shadowScale, .2, 4)) return 'Invalid player shadowScale';
+    if (player.depthMin != null && player.depthMax != null && Number(player.depthMin) > Number(player.depthMax)) return 'player depthMin cannot exceed depthMax';
+  }
+
+  if (config.movement != null) {
+    const error = validateKnownKeys(config.movement, new Set(['walkSpeed','runSpeed','maxStep']), 'runtimeConfig.movement');
+    if (error) return error;
+    const movement = config.movement;
+    if (movement.walkSpeed != null && !validateFiniteRange(movement.walkSpeed, 40, 800)) return 'Invalid movement walkSpeed';
+    if (movement.runSpeed != null && !validateFiniteRange(movement.runSpeed, 60, 1200)) return 'Invalid movement runSpeed';
+    if (movement.maxStep != null && !validateFiniteRange(movement.maxStep, 2, 24)) return 'Invalid movement maxStep';
+    if (movement.walkSpeed != null && movement.runSpeed != null && Number(movement.runSpeed) < Number(movement.walkSpeed)) return 'runSpeed cannot be lower than walkSpeed';
+  }
+
+  if (config.interaction != null) {
+    const error = validateKnownKeys(config.interaction, new Set(['radius','roomExitRadius']), 'runtimeConfig.interaction');
+    if (error) return error;
+    const interaction = config.interaction;
+    for (const key of ['radius','roomExitRadius']) if (interaction[key] != null && !validateFiniteRange(interaction[key], 20, 500)) return `Invalid interaction ${key}`;
+  }
+  return '';
+}
+
 function validateBlockLayout(block, expectedId) {
   if (!block || typeof block !== 'object' || Array.isArray(block)) return 'Block layout must be an object';
   if (String(block.id || '') !== expectedId) return 'Block id does not match the route';
@@ -1443,21 +1651,25 @@ function validateBlockLayout(block, expectedId) {
   if (!Array.isArray(block.buildings) || block.buildings.length > 250) return 'Invalid buildings array';
   if (!Array.isArray(block.props) || block.props.length > 1000) return 'Invalid props array';
   if (!block.spawn || !Number.isFinite(Number(block.spawn.x)) || !Number.isFinite(Number(block.spawn.y))) return 'Invalid spawn';
-  if (!block.walkable || !Number.isFinite(Number(block.walkable.x)) || !Number.isFinite(Number(block.walkable.y))) return 'Invalid walkable area';
+  if (!block.walkable || !isValidZoneGeometry(block.walkable)) return 'Invalid walkable area';
+  const runtimeConfigError = validateSceneRuntimeConfig(block.runtimeConfig);
+  if (runtimeConfigError) return runtimeConfigError;
 
   if (block.obstacles != null) {
     if (!Array.isArray(block.obstacles) || block.obstacles.length > 250) return 'Invalid obstacles array';
     for (const obstacle of block.obstacles) {
-      if (!obstacle || !Number.isFinite(Number(obstacle.x)) || !Number.isFinite(Number(obstacle.y))
-        || !Number.isFinite(Number(obstacle.width ?? obstacle.w)) || !Number.isFinite(Number(obstacle.height ?? obstacle.h))) {
+      if (!isValidZoneGeometry(obstacle)) {
         return 'Invalid obstacle geometry';
       }
     }
   }
-  if (block.exit != null) {
-    if (!block.exit || !Number.isFinite(Number(block.exit.x)) || !Number.isFinite(Number(block.exit.y))
-      || !Number.isFinite(Number(block.exit.width ?? block.exit.w)) || !Number.isFinite(Number(block.exit.height ?? block.exit.h))) {
-      return 'Invalid room exit geometry';
+  if (block.exit != null && !isValidZoneGeometry(block.exit)) {
+    return 'Invalid room exit geometry';
+  }
+  if (block.exits != null) {
+    if (!Array.isArray(block.exits) || block.exits.length > 50) return 'Invalid exits array';
+    for (const exit of block.exits) {
+      if (!isValidZoneGeometry(exit)) return 'Invalid block exit geometry';
     }
   }
 
@@ -1466,6 +1678,68 @@ function validateBlockLayout(block, expectedId) {
     return 'Block layout is too large. Keep image/assets outside the layout JSON.';
   }
   return '';
+}
+
+async function verifyPublishedBlockRecord(env, blockId, row, { allowBackfill = true } = {}) {
+  if (!row?.published_json) return { ok: true, block: null, integrity: null };
+  let block;
+  try { block = canonicalizeBlockAssetReferences(JSON.parse(row.published_json)); }
+  catch { return { ok: false, reason: 'published-json-corrupted' }; }
+
+  const validationError = validateBlockLayout(block, blockId);
+  if (validationError) return { ok: false, reason: `schema:${validationError}` };
+  const assetError = await validateApprovedBlockAssets(env, block);
+  if (assetError) return { ok: false, reason: `asset:${assetError}` };
+
+  let record = await env.DB.prepare(`
+    SELECT published_revision, sha256, signature, algorithm, signed_at
+    FROM block_layout_integrity WHERE block_id = ?
+  `).bind(blockId).first();
+
+  let integrity;
+  if (!record && allowBackfill) {
+    integrity = await storePublishedIntegrity(env, blockId, Number(row.published_revision || 0), row.published_json);
+    integrity.backfilled = true;
+  } else {
+    integrity = await verifyBlockIntegrity(env, blockId, Number(row.published_revision || 0), row.published_json, record);
+  }
+
+  if (integrity?.verified && integrity.algorithm === 'sha256-v1' && configSigningSecret(env)) {
+    integrity = await storePublishedIntegrity(env, blockId, Number(row.published_revision || 0), row.published_json);
+    integrity.upgradedToSignature = true;
+  }
+
+  if (!integrity?.verified) return { ok: false, reason: integrity?.reason || 'integrity-failed', integrity };
+  return { ok: true, block, integrity };
+}
+
+async function verifyHistoryBlockRecord(env, history, blockId) {
+  if (!history?.layout_json || !history?.id) return { ok: false, reason: 'history-missing' };
+  let block;
+  try { block = canonicalizeBlockAssetReferences(JSON.parse(history.layout_json)); }
+  catch { return { ok: false, reason: 'history-json-corrupted' }; }
+  const validationError = validateBlockLayout(block, blockId);
+  if (validationError) return { ok: false, reason: `schema:${validationError}` };
+  const assetError = await validateApprovedBlockAssets(env, block);
+  if (assetError) return { ok: false, reason: `asset:${assetError}` };
+
+  let record = await env.DB.prepare(`
+    SELECT revision, sha256, signature, algorithm, signed_at
+    FROM block_layout_history_integrity WHERE history_id = ?
+  `).bind(history.id).first();
+  let integrity;
+  if (!record) {
+    integrity = await storeHistoryIntegrity(env, history.id, blockId, Number(history.revision || 0), history.layout_json);
+    integrity.backfilled = true;
+  } else {
+    integrity = await verifyBlockIntegrity(env, blockId, Number(history.revision || 0), history.layout_json, record);
+  }
+  if (integrity?.verified && integrity.algorithm === 'sha256-v1' && configSigningSecret(env)) {
+    integrity = await storeHistoryIntegrity(env, history.id, blockId, Number(history.revision || 0), history.layout_json);
+    integrity.upgradedToSignature = true;
+  }
+  if (!integrity?.verified) return { ok: false, reason: integrity?.reason || 'integrity-failed', integrity };
+  return { ok: true, block, integrity };
 }
 
 async function getPublishedBlockLayout(request, env, url) {
@@ -1480,21 +1754,33 @@ async function getPublishedBlockLayout(request, env, url) {
   `).bind(blockId).first();
 
   if (!row?.published_json) {
-    return json({ ok: true, blockId, published: false, revision: 0, block: null });
+    return json({ ok: true, blockId, published: false, revision: 0, block: null, integrity: null });
   }
 
-  try {
+  const verified = await verifyPublishedBlockRecord(env, blockId, row);
+  if (!verified.ok) {
+    console.error('RiftCity rejected published block integrity', { blockId, reason: verified.reason });
     return json({
       ok: true,
       blockId,
-      published: true,
+      published: false,
       revision: Number(row.published_revision || 0),
       publishedAt: row.published_at,
-      block: JSON.parse(row.published_json)
+      block: null,
+      integrity: { verified: false, reason: verified.reason, ...(verified.integrity || {}) },
+      fallbackRequired: true
     });
-  } catch {
-    return json({ ok: false, error: 'Published block layout is corrupted' }, 500);
   }
+
+  return json({
+    ok: true,
+    blockId,
+    published: true,
+    revision: Number(row.published_revision || 0),
+    publishedAt: row.published_at,
+    block: verified.block,
+    integrity: verified.integrity
+  });
 }
 
 async function getBlockEditorState(request, env, url) {
@@ -1509,9 +1795,17 @@ async function getBlockEditorState(request, env, url) {
     FROM block_layouts WHERE block_id = ?
   `).bind(blockId).first();
 
-  let draft = null, published = null;
+  let draft = null, published = null, integrity = null;
   try { if (row?.draft_json) draft = JSON.parse(row.draft_json); } catch {}
-  try { if (row?.published_json) published = JSON.parse(row.published_json); } catch {}
+  if (row?.published_json) {
+    const verified = await verifyPublishedBlockRecord(env, blockId, row);
+    if (verified.ok) {
+      published = verified.block;
+      integrity = verified.integrity;
+    } else {
+      integrity = { verified: false, reason: verified.reason, ...(verified.integrity || {}) };
+    }
+  }
 
   return json({
     ok: true,
@@ -1521,7 +1815,8 @@ async function getBlockEditorState(request, env, url) {
     published,
     publishedRevision: Number(row?.published_revision || 0),
     updatedAt: row?.updated_at || null,
-    publishedAt: row?.published_at || null
+    publishedAt: row?.published_at || null,
+    integrity
   });
 }
 
@@ -1596,8 +1891,11 @@ async function publishBlockDraft(request, env, url, requestId) {
   const nextRevision = Number(row.published_revision || 0) + 1;
   const now = Date.now();
   const historyId = crypto.randomUUID();
+  const integrity = await createBlockIntegrity(env, blockId, nextRevision, canonicalJson);
 
-  // D1 batch is transactional: only canonical assetId+hash references reach published state/history.
+  // One D1 transaction publishes the canonical config, its revision history and
+  // the integrity envelope. If an HMAC secret is configured, D1 never receives
+  // an unsigned live revision; without it SHA-256 corruption detection remains mandatory.
   await env.DB.batch([
     env.DB.prepare(`
       UPDATE block_layouts
@@ -1612,11 +1910,25 @@ async function publishBlockDraft(request, env, url, requestId) {
     env.DB.prepare(`
       INSERT INTO block_layout_history (id, block_id, revision, layout_json, published_by, published_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(historyId, blockId, nextRevision, canonicalJson, gate.auth.user.id, now)
+    `).bind(historyId, blockId, nextRevision, canonicalJson, gate.auth.user.id, now),
+    env.DB.prepare(`
+      INSERT INTO block_layout_integrity (block_id, published_revision, sha256, signature, algorithm, signed_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(block_id) DO UPDATE SET
+        published_revision = excluded.published_revision,
+        sha256 = excluded.sha256,
+        signature = excluded.signature,
+        algorithm = excluded.algorithm,
+        signed_at = excluded.signed_at
+    `).bind(blockId, nextRevision, integrity.sha256, integrity.signature, integrity.algorithm, now),
+    env.DB.prepare(`
+      INSERT INTO block_layout_history_integrity (history_id, block_id, revision, sha256, signature, algorithm, signed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(historyId, blockId, nextRevision, integrity.sha256, integrity.signature, integrity.algorithm, now)
   ]);
 
   await writeAudit(env, gate.auth.user.id, 'block.published', gate.auth.user.id, {
-    blockId, revision: nextRevision
+    blockId, revision: nextRevision, integrity: integrity.algorithm, sha256: integrity.sha256
   });
 
   return json({
@@ -1625,6 +1937,7 @@ async function publishBlockDraft(request, env, url, requestId) {
     publishedRevision: nextRevision,
     publishedAt: now,
     block: parsed,
+    integrity: { ...integrity, signedAt: now },
     requestId
   });
 }
@@ -1637,13 +1950,16 @@ async function revertBlockDraft(request, env, url, requestId) {
   await ensureBlockEditorTables(env);
 
   const row = await env.DB.prepare(`
-    SELECT published_json FROM block_layouts WHERE block_id = ?
+    SELECT published_json, published_revision, published_at FROM block_layouts WHERE block_id = ?
   `).bind(blockId).first();
 
   if (!row?.published_json) {
     await env.DB.prepare(`DELETE FROM block_layouts WHERE block_id = ?`).bind(blockId).run();
-    return json({ ok: true, blockId, revertedTo: 'authored', block: null, requestId });
+    return json({ ok: true, blockId, revertedTo: 'authored', block: null, integrity: null, requestId });
   }
+
+  const verified = await verifyPublishedBlockRecord(env, blockId, row);
+  if (!verified.ok) return json({ ok: false, error: `Published config integrity failed: ${verified.reason}`, integrity: verified.integrity || null }, 409);
 
   const now = Date.now();
   await env.DB.prepare(`
@@ -1659,7 +1975,8 @@ async function revertBlockDraft(request, env, url, requestId) {
     ok: true,
     blockId,
     revertedTo: 'published',
-    block: JSON.parse(row.published_json),
+    block: verified.block,
+    integrity: verified.integrity,
     requestId
   });
 }
@@ -1679,7 +1996,7 @@ async function restoreBlockHistoryToDraft(request, env, url, requestId) {
 
   await ensureBlockEditorTables(env);
   const history = await env.DB.prepare(`
-    SELECT layout_json, published_at
+    SELECT id, block_id, revision, layout_json, published_at
     FROM block_layout_history
     WHERE block_id = ? AND revision = ?
     LIMIT 1
@@ -1689,14 +2006,11 @@ async function restoreBlockHistoryToDraft(request, env, url, requestId) {
     return json({ ok: false, error: 'Published revision not found' }, 404);
   }
 
-  let block;
-  try { block = canonicalizeBlockAssetReferences(JSON.parse(history.layout_json)); }
-  catch { return json({ ok: false, error: 'Stored revision JSON is corrupted' }, 500); }
-
-  const validationError = validateBlockLayout(block, blockId);
-  if (validationError) return json({ ok: false, error: validationError }, 400);
-  const assetError = await validateApprovedBlockAssets(env, block);
-  if (assetError) return json({ ok: false, error: assetError, code: 'ASSET_NOT_APPROVED' }, 400);
+  const verified = await verifyHistoryBlockRecord(env, history, blockId);
+  if (!verified.ok) {
+    return json({ ok: false, error: `Published revision integrity failed: ${verified.reason}`, integrity: verified.integrity || null }, 409);
+  }
+  const block = verified.block;
   const canonicalJson = JSON.stringify(block);
 
   const now = Date.now();
@@ -1726,6 +2040,7 @@ async function restoreBlockHistoryToDraft(request, env, url, requestId) {
     restoredRevision: revision,
     draftRevision: Number(row?.draft_revision || 0),
     block,
+    integrity: verified.integrity,
     requestId
   });
 }
@@ -1738,10 +2053,12 @@ async function getBlockLayoutHistory(request, env, url) {
   await ensureBlockEditorTables(env);
 
   const result = await env.DB.prepare(`
-    SELECT revision, published_by, published_at
-    FROM block_layout_history
-    WHERE block_id = ?
-    ORDER BY revision DESC
+    SELECT h.revision, h.published_by, h.published_at,
+           i.algorithm AS integrity_algorithm, i.sha256 AS integrity_sha256
+    FROM block_layout_history h
+    LEFT JOIN block_layout_history_integrity i ON i.history_id = h.id
+    WHERE h.block_id = ?
+    ORDER BY h.revision DESC
     LIMIT 25
   `).bind(blockId).all();
 
