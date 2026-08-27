@@ -1,8 +1,11 @@
+import { RIFT_WORLD_SCALE as SCALE } from './rift-world-scale.js';
+
 export const DOWNTOWN3D_FOUNDATION = Object.freeze({
-  version: 2,
+  version: 3,
   id: 'downtown-commerce-avenue-foundation-01',
   label: 'Downtown Street Foundation',
-  units: 'meters',
+  units: SCALE.units,
+  metersPerWorldUnit: SCALE.metersPerWorldUnit,
 
   world: Object.freeze({
     width: 260,
@@ -16,7 +19,7 @@ export const DOWNTOWN3D_FOUNDATION = Object.freeze({
     sidewalkWidth: 4,
     buildableDepth: 12,
     curbWidth: 0.28,
-    curbHeight: 0.18,
+    curbHeight: SCALE.reference.curbHeight,
     sidewalkHeight: 0.16,
     centerDashLength: 3.2,
     centerDashGap: 4.8,
@@ -24,7 +27,7 @@ export const DOWNTOWN3D_FOUNDATION = Object.freeze({
   }),
 
   player: Object.freeze({
-    height: 1.75,
+    height: SCALE.reference.humanHeight,
     radius: 0.34,
     walkSpeed: 4.2,
     runSpeed: 6.6,

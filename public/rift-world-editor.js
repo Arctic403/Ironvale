@@ -1,5 +1,6 @@
 import { normalize3 } from './rift-engine-math.js';
 import { simplifyRoadStroke } from './rift-road-network.js';
+import { RIFT_WORLD_SCALE as WORLD_SCALE } from './rift-world-scale.js';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -87,7 +88,8 @@ export function mountRiftWorldEditor({
   camera,
   roadNetwork,
   worldBounds,
-  onModeChange
+  onModeChange,
+  onReferenceChange
 }) {
   const shell = root.querySelector('.world3d-shell');
   const toggle = root.querySelector('#rift-world-editor-button');
@@ -108,7 +110,8 @@ export function mountRiftWorldEditor({
     <div class="rift-world-editor-main-tools" role="group" aria-label="Road editor tools">
       <button type="button" data-road-tool="paint">PAINT</button>
       <button type="button" data-road-tool="erase">ERASE</button>
-      <button type="button" data-road-tool="camera">CAMERA</button>
+      <button type="button" data-road-tool="measure">MEASURE</button>
+      <button type="button" data-road-tool="camera">FREECAM</button>
     </div>
     <div class="rift-world-editor-options">
       <label>ROAD
@@ -121,6 +124,7 @@ export function mountRiftWorldEditor({
         <button type="button" data-road-redo>REDO</button>
         <button type="button" data-road-snap>SNAP 0.5M</button>
         <button type="button" data-road-angle>ANGLE FREE</button>
+        <button type="button" data-road-reference>REFERENCE</button>
         <button type="button" data-road-export>EXPORT JSON</button>
         <button type="button" data-road-reset>RESET SOURCE</button>
       </div>
@@ -136,6 +140,7 @@ export function mountRiftWorldEditor({
   const angleButton = q('[data-road-angle]');
   const undoButton = q('[data-road-undo]');
   const redoButton = q('[data-road-redo]');
+  const referenceButton = q('[data-road-reference]');
 
   let open = false;
   let tool = 'paint';
@@ -148,6 +153,8 @@ export function mountRiftWorldEditor({
   let previewDrawables = [];
   let eraseSnapshot = null;
   let cameraTap = null;
+  let measureStart = null;
+  let referenceVisible = false;
   const undo = [];
   const redo = [];
 
@@ -203,9 +210,11 @@ export function mountRiftWorldEditor({
     stroke = [];
     hoverPoint = null;
     eraseSnapshot = null;
+    measureStart = null;
     if (tool === 'paint') say('PAINT: drag straight or curved roads. Smooth curves, snapping and intersections rebuild automatically.');
     if (tool === 'erase') say('ERASE: swipe across a road segment. Junctions repair themselves when branches disappear.');
-    if (tool === 'camera') say('CAMERA: drag to orbit, pinch/wheel to zoom, or tap the ground to move editor focus.');
+    if (tool === 'measure') say('MEASURE: drag between any two ground points for a true meter distance.');
+    if (tool === 'camera') say('FREECAM: WASD/arrows pan, Shift moves faster, drag orbits, pinch/wheel zooms, tap moves focus.');
   };
 
   const setOpen = next => {
@@ -214,14 +223,23 @@ export function mountRiftWorldEditor({
     panel.classList.toggle('open', open);
     panel.setAttribute('aria-hidden', open ? 'false' : 'true');
     toggle.classList.toggle('active', open);
-    toggle.textContent = open ? 'CLOSE EDITOR' : 'WORLD EDITOR';
-    if (!open) {
+    toggle.textContent = open ? 'PLAY MODE' : 'WORLD EDITOR';
+    if (open) {
+      // Entering Edit Mode always starts detached from the player in navigation/freecam mode.
+      setTool('camera');
+    } else {
       clearPreview();
       activePointer = null;
       stroke = [];
       hoverPoint = null;
       eraseSnapshot = null;
       cameraTap = null;
+      measureStart = null;
+      if (referenceVisible) {
+        referenceVisible = false;
+        referenceButton?.classList.remove('active');
+        onReferenceChange?.(false);
+      }
     }
     onModeChange?.(open);
     updateStats();
@@ -319,6 +337,14 @@ export function mountRiftWorldEditor({
       return;
     }
 
+    if (tool === 'measure') {
+      measureStart = point;
+      hoverPoint = point;
+      drawPreview([point, { x: point.x + 0.01, z: point.z }]);
+      say(`MEASURE START · X ${point.x.toFixed(1)} · Z ${point.z.toFixed(1)}`);
+      return;
+    }
+
     if (tool === 'erase') {
       eraseSnapshot = snapshotText();
       const profile = currentProfile();
@@ -348,6 +374,13 @@ export function mountRiftWorldEditor({
       const last = stroke[stroke.length - 1];
       if (distance(last, point) >= strokeSampleSpacing) stroke.push(point);
       drawPreview([...stroke, point]);
+      return;
+    }
+
+    if (tool === 'measure' && measureStart) {
+      hoverPoint = point;
+      drawPreview([measureStart, point]);
+      say(`MEASURE · ${distance(measureStart, point).toFixed(2)} M`);
       return;
     }
 
@@ -391,6 +424,14 @@ export function mountRiftWorldEditor({
     event.preventDefault();
     event.stopPropagation();
     if (tool === 'paint') finishPaint(event);
+    if (tool === 'measure' && activePointer === event.pointerId && measureStart) {
+      const point = editorPoint(event) || hoverPoint || measureStart;
+      hoverPoint = point;
+      drawPreview([measureStart, point]);
+      const measured = distance(measureStart, point);
+      say(`MEASURED ${measured.toFixed(2)} M · 1 WORLD UNIT = ${WORLD_SCALE.metersPerWorldUnit} M`);
+      measureStart = null;
+    }
     if (activePointer === event.pointerId) {
       try { canvas.releasePointerCapture?.(event.pointerId); } catch (_) {}
       activePointer = null;
@@ -405,6 +446,7 @@ export function mountRiftWorldEditor({
     stroke = [];
     hoverPoint = null;
     eraseSnapshot = null;
+    measureStart = null;
   };
 
   const onToolClick = event => setTool(event.currentTarget.dataset.roadTool);
@@ -437,6 +479,18 @@ export function mountRiftWorldEditor({
     angleSnap = angleSnap ? 0 : 45;
     angleButton.textContent = angleSnap ? 'ANGLE 45°' : 'ANGLE FREE';
     angleButton.classList.toggle('active', !!angleSnap);
+  });
+
+  referenceButton?.addEventListener('click', () => {
+    referenceVisible = !referenceVisible;
+    referenceButton.classList.toggle('active', referenceVisible);
+    onReferenceChange?.(referenceVisible);
+    if (referenceVisible) {
+      const ref = WORLD_SCALE.reference;
+      say(`REFERENCE KIT · 1M CUBE · HUMAN ${ref.humanHeight}M · DOOR ${ref.doorWidth}×${ref.doorHeight}M · CAR ${ref.carLength}M · PARKING ${ref.parkingWidth}×${ref.parkingLength}M`);
+    } else {
+      say('REFERENCE KIT HIDDEN · world scale remains locked at 1 unit = 1 meter.');
+    }
   });
 
   q('[data-road-export]')?.addEventListener('click', () => {

@@ -4,6 +4,7 @@ import { RiftCamera, RiftEngine } from './rift-engine.js';
 import { clamp, lerpAngle, rotateXZ } from './rift-engine-math.js';
 import { RiftRoadNetwork } from './rift-road-network.js';
 import { mountRiftWorldEditor } from './rift-world-editor.js';
+import { RIFT_WORLD_SCALE as WORLD_SCALE, assertMeterScale } from './rift-world-scale.js';
 
 let activeFoundation = null;
 
@@ -22,7 +23,7 @@ export async function renderDowntown3D(root) {
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title">
-        <span class="eyebrow">RIFT ENGINE 0.2 · DOWNTOWN</span>
+        <span class="eyebrow">RIFT ENGINE 0.4 · DOWNTOWN</span>
         <strong>Commerce Avenue</strong>
         <small>Raw WebGL2 · procedural road network · meter-based city scale</small>
       </div>
@@ -43,6 +44,8 @@ export async function renderDowntown3D(root) {
         <span id="downtown3d-draws">DRAWS --</span>
         <span id="downtown3d-aa">MSAA --</span>
         <span>WEBGL2</span>
+        <span>1 UNIT = 1M</span>
+        <span>PLAYER ${CONFIG.player.height}M</span>
         <span>ROAD ${CONFIG.street.roadWidth}M</span>
         <span>WORLD ${CONFIG.world.width}×${CONFIG.world.depth}M</span>
       </div>
@@ -76,6 +79,7 @@ export async function renderDowntown3D(root) {
 }
 
 function createFoundation({ root, canvas, status }) {
+  assertMeterScale();
   const shell = root.querySelector('.world3d-shell');
   const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches ?? false;
   const engine = new RiftEngine(canvas, {
@@ -103,6 +107,7 @@ function createFoundation({ root, canvas, status }) {
   const foundation = buildWorldFoundation(engine);
   const roadNetwork = new RiftRoadNetwork(engine, DOWNTOWN_ROAD_NETWORK, { connectRadius: 1.8 });
   const editorGrid = createEditorGrid(engine);
+  const scaleReference = createScaleReferenceKit(engine);
   const player = createScalePlayer(engine);
   player.position.x = CONFIG.player.spawn.x;
   player.position.z = CONFIG.player.spawn.z;
@@ -119,6 +124,7 @@ function createFoundation({ root, canvas, status }) {
   const fpsLabel = root.querySelector('#downtown3d-fps');
   const drawsLabel = root.querySelector('#downtown3d-draws');
   const aaLabel = root.querySelector('#downtown3d-aa');
+  let gameplayCameraState = null;
 
   const onKeyDown = event => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -206,7 +212,31 @@ function createFoundation({ root, canvas, status }) {
       input.y = 0;
       setRun(false);
       joystick?.reset?.();
-      if (!enabled) camera.setTarget(player.position.x, CONFIG.camera.followHeight, player.position.z);
+
+      if (enabled) {
+        gameplayCameraState = {
+          alpha: camera.alpha,
+          beta: camera.beta,
+          radius: camera.radius
+        };
+        camera.alpha = CONFIG.camera.alpha;
+        camera.beta = Math.min(CONFIG.camera.maxBeta, Math.max(CONFIG.camera.minBeta, 0.82));
+        camera.radius = Math.min(CONFIG.camera.maxRadius, Math.max(17, CONFIG.camera.radius * 1.35));
+        camera.setTarget(player.position.x, 0.45, player.position.z);
+      } else {
+        scaleReference.setVisible(false);
+        if (gameplayCameraState) {
+          camera.alpha = gameplayCameraState.alpha;
+          camera.beta = gameplayCameraState.beta;
+          camera.radius = gameplayCameraState.radius;
+        }
+        gameplayCameraState = null;
+        camera.setTarget(player.position.x, CONFIG.camera.followHeight, player.position.z);
+      }
+    },
+    onReferenceChange(enabled) {
+      if (enabled) scaleReference.placeAt(camera.target[0] + 9, camera.target[2] + 7);
+      scaleReference.setVisible(enabled);
     }
   });
 
@@ -263,6 +293,28 @@ function createFoundation({ root, canvas, status }) {
       camera.updatePosition();
     } else {
       player.bob += (0 - player.bob) * Math.min(1, dt * 10);
+
+      // Edit Mode owns a detached free camera. WASD/arrows pan the editor focus across
+      // the ground plane; Shift accelerates. The player remains frozen in world space.
+      let freeX = 0;
+      let freeY = 0;
+      if (keys.has('KeyA') || keys.has('ArrowLeft')) freeX -= 1;
+      if (keys.has('KeyD') || keys.has('ArrowRight')) freeX += 1;
+      if (keys.has('KeyW') || keys.has('ArrowUp')) freeY -= 1;
+      if (keys.has('KeyS') || keys.has('ArrowDown')) freeY += 1;
+      const freeMagnitude = Math.hypot(freeX, freeY);
+      if (freeMagnitude > 0.01) {
+        freeX /= Math.max(1, freeMagnitude);
+        freeY /= Math.max(1, freeMagnitude);
+        const forward = camera.flatForward();
+        const right = [-forward[2], 0, forward[0]];
+        const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight')) ? 28 : 14;
+        const dx = right[0] * freeX + forward[0] * -freeY;
+        const dz = right[2] * freeX + forward[2] * -freeY;
+        camera.target[0] = clamp(camera.target[0] + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
+        camera.target[2] = clamp(camera.target[2] + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
+        camera.updatePosition();
+      }
     }
 
     updatePlayerVisual(engine, player, player.bob);
@@ -288,7 +340,7 @@ function createFoundation({ root, canvas, status }) {
 
   if (status) {
     status.classList.add('ready');
-    status.innerHTML = '<strong>RIFT ENGINE 0.3 ONLINE</strong><span>Continuous curve meshes + repaired semantic junctions. Paint straight or curved roads directly on the ground.</span>';
+    status.innerHTML = '<strong>RIFT ENGINE 0.4 ONLINE</strong><span>Locked 1:1 meter scale · welded road geometry · automatic editor freecam + scale reference kit.</span>';
     setTimeout(() => status?.classList.add('settled'), 2600);
   }
 
@@ -301,6 +353,7 @@ function createFoundation({ root, canvas, status }) {
       destroyed = true;
       cancelAnimationFrame(frameId);
       worldEditor?.destroy?.();
+      scaleReference?.dispose?.();
       roadNetwork?.dispose?.();
       joystick?.destroy?.();
       orbit?.destroy?.();
@@ -360,6 +413,87 @@ function createEditorGrid(engine) {
     drawables.push(line);
   }
   return drawables;
+}
+
+function createScaleReferenceKit(engine) {
+  const ref = WORLD_SCALE.reference;
+  const parts = [];
+  let originX = 0;
+  let originZ = 0;
+  let visible = false;
+
+  const add = (kind, local, scale, color, rotationY = 0) => {
+    const options = { position: [0, -20, 0], scale, color, rotationY, dynamic: true, visible: false };
+    const mesh = kind === 'sphere' ? engine.addSphere(options)
+      : kind === 'cylinder' ? engine.addCylinder(options)
+      : engine.addBox(options);
+    parts.push({ mesh, local, scale, rotationY });
+    return mesh;
+  };
+
+  // 1 m calibration cube.
+  add('box', [-4.2, ref.calibrationCube * 0.5, -2.4], [ref.calibrationCube, ref.calibrationCube, ref.calibrationCube], '#f0b84c');
+
+  // 1.75 m human reference silhouette.
+  const bodyHeight = ref.humanHeight * 0.58;
+  add('cylinder', [-1.9, bodyHeight * 0.5 + 0.36, -2.4], [0.46, bodyHeight, 0.46], '#4a9fd8');
+  add('sphere', [-1.9, ref.humanHeight - 0.17, -2.4], [0.34, 0.34, 0.34], '#b88768');
+  add('box', [-2.06, 0.36, -2.4], [0.17, 0.72, 0.22], '#28323a');
+  add('box', [-1.74, 0.36, -2.4], [0.17, 0.72, 0.22], '#28323a');
+
+  // Standard 0.9 m × 2.05 m doorway opening.
+  const doorPost = 0.09;
+  const doorDepth = 0.14;
+  const doorOuterWidth = ref.doorWidth + doorPost * 2;
+  add('box', [0.35 - doorOuterWidth * 0.5 + doorPost * 0.5, ref.doorHeight * 0.5, -2.4], [doorPost, ref.doorHeight, doorDepth], '#d7d2c8');
+  add('box', [0.35 + doorOuterWidth * 0.5 - doorPost * 0.5, ref.doorHeight * 0.5, -2.4], [doorPost, ref.doorHeight, doorDepth], '#d7d2c8');
+  add('box', [0.35, ref.doorHeight + doorPost * 0.5, -2.4], [doorOuterWidth, doorPost, doorDepth], '#d7d2c8');
+
+  // Typical car inside a correctly sized parking stall.
+  const carCenterX = 3.5;
+  const carCenterZ = 0.7;
+  add('box', [carCenterX, 0.42, carCenterZ], [ref.carWidth, 0.68, ref.carLength], '#6b737a');
+  add('box', [carCenterX, 0.93, carCenterZ + 0.05], [ref.carWidth * 0.78, 0.48, ref.carLength * 0.48], '#39444c');
+  const line = 0.055;
+  const stallHalfW = ref.parkingWidth * 0.5;
+  const stallHalfL = ref.parkingLength * 0.5;
+  add('box', [carCenterX - stallHalfW, 0.035, carCenterZ], [line, 0.018, ref.parkingLength], '#e8e4d8');
+  add('box', [carCenterX + stallHalfW, 0.035, carCenterZ], [line, 0.018, ref.parkingLength], '#e8e4d8');
+  add('box', [carCenterX, 0.035, carCenterZ - stallHalfL], [ref.parkingWidth, 0.018, line], '#e8e4d8');
+  add('box', [carCenterX, 0.035, carCenterZ + stallHalfL], [ref.parkingWidth, 0.018, line], '#e8e4d8');
+
+  // One typical building-floor height post.
+  add('box', [-4.2, ref.buildingFloorHeight * 0.5, 1.0], [0.11, ref.buildingFloorHeight, 0.11], '#67d39b');
+  add('box', [-4.2, ref.buildingFloorHeight, 1.0], [1.0, 0.06, 0.11], '#67d39b');
+
+  const apply = () => {
+    for (const part of parts) {
+      part.mesh.visible = visible;
+      engine.setTransform(
+        part.mesh,
+        [originX + part.local[0], part.local[1], originZ + part.local[2]],
+        part.rotationY,
+        part.scale
+      );
+    }
+  };
+
+  return {
+    placeAt(x, z) {
+      originX = Number.isFinite(x) ? x : originX;
+      originZ = Number.isFinite(z) ? z : originZ;
+      apply();
+    },
+    setVisible(next) {
+      visible = !!next;
+      apply();
+    },
+    isVisible: () => visible,
+    dispose() {
+      engine.removeDrawables(parts.map(part => part.mesh));
+      parts.length = 0;
+    }
+  };
 }
 
 function createScalePlayer(engine) {

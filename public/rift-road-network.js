@@ -166,7 +166,22 @@ function smoothPolyline(points, options = {}) {
   return output;
 }
 
-function offsetPolyline(points, offset, miterLimit = 3.5) {
+function resamplePolyline(points, spacing = 0.55) {
+  if (!Array.isArray(points) || points.length < 2) return (points || []).map(point => ({ ...point }));
+  const total = polylineLength(points);
+  if (total <= spacing) return [{ ...points[0] }, { ...points[points.length - 1] }];
+  const output = [{ ...points[0] }];
+  const step = Math.max(0.25, spacing);
+  for (let along = step; along < total - 0.05; along += step) {
+    const sample = samplePolyline(points, along);
+    if (sample && distance(output[output.length - 1], sample.point) > 0.02) output.push(sample.point);
+  }
+  const last = points[points.length - 1];
+  if (distance(output[output.length - 1], last) > 0.02) output.push({ ...last });
+  return output;
+}
+
+function offsetPolyline(points, offset, miterLimit = 2.15) {
   if (!Array.isArray(points) || points.length < 2) return [];
   const normals = [];
   for (let i = 0; i < points.length - 1; i++) {
@@ -181,12 +196,19 @@ function offsetPolyline(points, offset, miterLimit = 3.5) {
     }
     const before = normals[index - 1];
     const after = normals[index];
-    const sum = normalize2(before.x + after.x, before.z + after.z);
-    const denominator = sum.x * after.x + sum.z * after.z;
-    if (Math.abs(denominator) < 0.18) {
+    const sumX = before.x + after.x;
+    const sumZ = before.z + after.z;
+    const sumLength = Math.hypot(sumX, sumZ);
+    if (sumLength < 0.2) {
       return { x: point.x + after.x * offset, z: point.z + after.z * offset };
     }
-    const scale = clamp(offset / denominator, -Math.abs(offset) * miterLimit, Math.abs(offset) * miterLimit);
+    const sum = { x: sumX / sumLength, z: sumZ / sumLength };
+    const denominator = sum.x * after.x + sum.z * after.z;
+    if (Math.abs(denominator) < 0.3) {
+      return { x: point.x + after.x * offset, z: point.z + after.z * offset };
+    }
+    const maxMiter = Math.abs(offset) * miterLimit;
+    const scale = clamp(offset / denominator, -maxMiter, maxMiter);
     return { x: point.x + sum.x * scale, z: point.z + sum.z * scale };
   });
 }
@@ -211,22 +233,39 @@ function addStrip(builder, points, minOffset, maxOffset, y) {
   if (!Array.isArray(points) || points.length < 2) return;
   const low = offsetPolyline(points, minOffset);
   const high = offsetPolyline(points, maxOffset);
+  if (low.length !== points.length || high.length !== points.length) return;
+
+  // One shared vertex pair per path sample. Adjacent triangles therefore share the exact
+  // same edge instead of relying on two independently emitted quads landing on it.
+  const base = builder.vertices.length / 6;
+  for (let i = 0; i < points.length; i++) {
+    builder.vertices.push(low[i].x, y, low[i].z, 0, 1, 0);
+    builder.vertices.push(high[i].x, y, high[i].z, 0, 1, 0);
+  }
   for (let i = 0; i < points.length - 1; i++) {
-    // low is the left side of the path, high is the right side. This winding faces upward.
-    addTopQuad(builder, low[i], low[i + 1], high[i + 1], high[i], y);
+    const lowA = base + i * 2;
+    const highA = lowA + 1;
+    const lowB = lowA + 2;
+    const highB = lowA + 3;
+    builder.indices.push(lowA, lowB, highB, lowA, highB, highA);
   }
 }
 
 function addPolygon(builder, points, y) {
   if (!Array.isArray(points) || points.length < 3) return;
   const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, z: sum.z + point.z / points.length }), { x: 0, z: 0 });
+  const centerIndex = addVertex(builder, center, y, [0, 1, 0]);
   for (let i = 0; i < points.length; i++) {
     const next = (i + 1) % points.length;
     const a = points[i];
     const b = points[next];
+    if (distance(a, b) < 0.002) continue;
+    const aIndex = addVertex(builder, a, y, [0, 1, 0]);
+    const bIndex = addVertex(builder, b, y, [0, 1, 0]);
     const cross = (a.x - center.x) * (b.z - center.z) - (a.z - center.z) * (b.x - center.x);
-    if (cross > 0) addTopQuad(builder, center, b, a, center, y);
-    else addTopQuad(builder, center, a, b, center, y);
+    if (Math.abs(cross) < 1e-8) continue;
+    if (cross > 0) builder.indices.push(centerIndex, bIndex, aIndex);
+    else builder.indices.push(centerIndex, aIndex, bIndex);
   }
 }
 
@@ -515,10 +554,41 @@ export class RiftRoadNetwork {
 
   cleanup() {
     this.data.nodes = uniqueById(this.data.nodes.filter(node => Number.isFinite(node.x) && Number.isFinite(node.z)));
+
+    // Weld near-identical graph nodes first. Tiny duplicate nodes are a common source of
+    // hairline seams, microscopic road pieces and unstable intersection degree counts.
+    let welded = true;
+    let weldGuard = 0;
+    while (welded && weldGuard++ < 500) {
+      welded = false;
+      outer: for (let i = 0; i < this.data.nodes.length; i++) {
+        for (let j = i + 1; j < this.data.nodes.length; j++) {
+          const keep = this.data.nodes[i];
+          const remove = this.data.nodes[j];
+          if (distance(keep, remove) > this.nodeEpsilon) continue;
+          for (const segment of this.data.segments) {
+            if (segment.a === remove.id) segment.a = keep.id;
+            if (segment.b === remove.id) segment.b = keep.id;
+          }
+          this.data.nodes.splice(j, 1);
+          welded = true;
+          break outer;
+        }
+      }
+    }
+
     const validNodes = new Set(this.data.nodes.map(node => node.id));
-    this.data.segments = uniqueById(this.data.segments.filter(segment =>
-      validNodes.has(segment.a) && validNodes.has(segment.b) && segment.a !== segment.b && this.profile(segment.profile)
-    ));
+    const edgeKeys = new Set();
+    this.data.segments = uniqueById(this.data.segments).filter(segment => {
+      if (!validNodes.has(segment.a) || !validNodes.has(segment.b) || segment.a === segment.b || !this.profile(segment.profile)) return false;
+      const a = this.node(segment.a);
+      const b = this.node(segment.b);
+      if (!a || !b || distance(a, b) < 0.35) return false;
+      const key = segment.a < segment.b ? `${segment.a}|${segment.b}` : `${segment.b}|${segment.a}`;
+      if (edgeKeys.has(key)) return false;
+      edgeKeys.add(key);
+      return true;
+    });
 
     let changed = true;
     let guard = 0;
@@ -561,6 +631,27 @@ export class RiftRoadNetwork {
         break;
       }
     }
+
+    const liveNodeIds = new Set(this.data.nodes.map(node => node.id));
+    const finalEdges = new Set();
+    this.data.segments = this.data.segments.filter(segment => {
+      if (!liveNodeIds.has(segment.a) || !liveNodeIds.has(segment.b) || segment.a === segment.b) return false;
+      const a = this.node(segment.a);
+      const b = this.node(segment.b);
+      if (!a || !b || distance(a, b) < 0.35) return false;
+      const key = segment.a < segment.b ? `${segment.a}|${segment.b}` : `${segment.b}|${segment.a}`;
+      if (finalEdges.has(key)) return false;
+      finalEdges.add(key);
+      return true;
+    });
+  }
+
+  repair() {
+    const before = this.stats();
+    this.cleanup();
+    this.rebuildGeometry();
+    const after = this.stats();
+    return { before, after };
   }
 
   clearGeometry() {
@@ -660,7 +751,7 @@ export class RiftRoadNetwork {
       if (!profile || chain.nodeIds.length < 2) continue;
       const rawPoints = chain.nodeIds.map(id => this.node(id)).filter(Boolean).map(node => ({ x: node.x, z: node.z }));
       if (rawPoints.length < 2) continue;
-      const path = smoothPolyline(rawPoints, { spacing: 0.72, maxTurnDegrees: 58 });
+      const path = resamplePolyline(smoothPolyline(rawPoints, { spacing: 0.62, maxTurnDegrees: 58 }), 0.52);
       const totalLength = polylineLength(path);
       if (totalLength < 0.35) continue;
       const roadHalf = profile.roadWidth * 0.5;
@@ -669,8 +760,13 @@ export class RiftRoadNetwork {
       const trimStart = (degrees.get(startNodeId) || 0) >= 3 ? Math.min(roadHalf + 0.55, totalLength * 0.42) : 0;
       const trimEnd = (degrees.get(endNodeId) || 0) >= 3 ? Math.min(roadHalf + 0.55, totalLength * 0.42) : 0;
       const detailPath = slicePolyline(path, trimStart, totalLength - trimEnd);
+      const roadPath = slicePolyline(
+        path,
+        Math.max(0, trimStart - 0.16),
+        Math.min(totalLength, totalLength - trimEnd + 0.16)
+      );
 
-      addStrip(builderFor(roadBuilders, chain.profileId), path, -roadHalf, roadHalf, this.worldY + 0.031);
+      if (roadPath.length >= 2) addStrip(builderFor(roadBuilders, chain.profileId), roadPath, -roadHalf, roadHalf, this.worldY + 0.032);
 
       if (detailPath.length >= 2) {
         const sidewalkBuilder = builderFor(sidewalkBuilders, chain.profileId);
@@ -691,7 +787,7 @@ export class RiftRoadNetwork {
         for (let start = profile.centerDashGap * 0.25; start < detailLength - 0.15; start += dashStep) {
           const end = Math.min(detailLength, start + profile.centerDashLength);
           const dashPath = slicePolyline(detailPath, start, end);
-          if (dashPath.length >= 2) addStrip(centerBuilder, dashPath, -0.075, 0.075, this.worldY + 0.062);
+          if (dashPath.length >= 2) addStrip(centerBuilder, dashPath, -0.075, 0.075, this.worldY + 0.054);
         }
 
         const edgeBuilder = builderFor(edgeBuilders, chain.profileId);
@@ -705,7 +801,7 @@ export class RiftRoadNetwork {
               x: sample.point.x + normal.x * edgeOffset * side,
               z: sample.point.z + normal.z * edgeOffset * side
             };
-            addOrientedRect(edgeBuilder, center, sample.tangent, 0.035, 0.95, this.worldY + 0.059);
+            addOrientedRect(edgeBuilder, center, sample.tangent, 0.035, 0.95, this.worldY + 0.052);
           }
         }
       }
@@ -746,7 +842,7 @@ export class RiftRoadNetwork {
       }
       const roadHull = convexHull(junctionRoadPoints);
       if (roadHull.length >= 3) {
-        addPolygon(builderFor(roadBuilders, branches[0].segment.profile), roadHull, this.worldY + 0.035);
+        addPolygon(builderFor(roadBuilders, branches[0].segment.profile), roadHull, this.worldY + 0.0335);
       }
 
       for (let i = 0; i < branches.length; i++) {

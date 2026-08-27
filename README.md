@@ -1034,3 +1034,20 @@ The Road Painter renderer now treats authored centerline chains as continuous pr
 - Existing saved `riftcity-road-network` drafts remain schema-compatible and are rebuilt with the new geometry automatically.
 
 The network is still semantic nodes + segments; the patch changes how that compact graph is converted into GPU geometry. Curved roads therefore remain editable, splittable at crossings, erasable, undoable and exportable rather than becoming baked meshes.
+
+
+## H1.43 — locked meter scale + road weld pass + automatic editor freecam
+
+This pass locks the physical world contract before larger district generation starts and gives the current Road Painter one more reliability pass.
+
+- Added `public/rift-world-scale.js` as the canonical physical-scale contract: **1 Rift world unit = 1 meter**. The reference catalog includes a 1 m cube, 1.75 m human, 0.9 × 2.05 m doorway, 4.5 m reference car, 2.5 × 5.5 m parking stall, 3.25 m traffic lane, 0.15 m curb and 3.4 m building-floor height.
+- Downtown config now consumes the shared scale contract instead of independently hardcoding player/curb measurements. The live HUD shows the 1:1 unit rule and player reference height.
+- World Editor adds a **REFERENCE** kit that can be spawned beside the current editor focus with the calibration cube, human, doorway, car/parking stall and floor-height marker.
+- World Editor adds a **MEASURE** tool; ground-to-ground measurements report true meters using the same 1:1 world scale.
+- Entering World Editor now starts in **FREECAM** automatically. The player freezes in place; WASD/arrows pan the detached editor camera, Shift accelerates, and orbit/pinch/wheel/tap-focus remain available. Returning to **PLAY MODE** restores the gameplay camera onto the unchanged player position.
+- Road cleanup now welds near-identical nodes, removes microscopic/duplicate edges and runs the same repair path after imports, drawing and erasing.
+- Curved road paths are uniformly resampled before mesh generation, sharp offset miters are clamped more aggressively, and road/sidewalk/curb strips use shared indexed vertex pairs so adjacent triangles physically share the same edge.
+- Junction asphalt now owns the intersection center while branch ribbons are trimmed back with only a very small overlap, reducing the raised/overlapping artifacts that remained after H1.42.
+- Existing `riftcity-road-network` JSON remains compatible.
+
+This is still the pre-district-generator foundation: scale, roads and editor navigation are being made deterministic before chunk/block generation is layered on top.
