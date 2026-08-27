@@ -26,9 +26,9 @@ export async function renderDowntown3D(root) {
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title rift-import-title">
-        <span class="eyebrow">RIFT BLOCK ENGINE · H1.57.1 ACTIVE JSON IMPORTER</span>
+        <span class="eyebrow">RIFT BLOCK ENGINE · H1.59 BLUEPRINT COMPOSER</span>
         <strong id="rift-import-name">LOADING COMMERCE BLOCK 01…</strong>
-        <small id="rift-import-description">A compact JSON city-block asset expands into normal 1m RiftSections, slabs and stairs at import time.</small>
+        <small id="rift-import-description">Nested Blueprint prefabs, curb-aware roads, validated anchors and groups expand into normal 1m RiftSections, slabs and stairs at import time.</small>
       </div>
 
       <div class="world3d-top-right downtown3d-actions rift-import-actions">
@@ -185,10 +185,12 @@ function createBlockImporterLab({ root, canvas, status }) {
     const stats = imported.stats;
     if (nameLabel) nameLabel.textContent = imported.name.toUpperCase();
     if (descriptionLabel) {
-      descriptionLabel.textContent = `${imported.id} · ${stats.sections} RiftSections · one compact JSON asset expanded into the proven full/slab/stair block vocabulary.`;
+      descriptionLabel.textContent = stats.blueprintObjects
+        ? `${imported.id} · ${stats.blueprintObjects} blueprint objects · ${stats.instances} prefab instances (${stats.nestedInstances} nested) · ${stats.anchors} named anchors · ${stats.sections} RiftSections.`
+        : `${imported.id} · ${stats.sections} RiftSections · legacy compact ops expanded into the proven full/slab/stair block vocabulary.`;
     }
     if (sourceMetric) sourceMetric.textContent = `ACTIVE ${imported.id.toUpperCase()} · ${persistenceLabel}`;
-    if (opsMetric) opsMetric.textContent = `OPS ${stats.operations}`;
+    if (opsMetric) opsMetric.textContent = stats.blueprintObjects ? `OPS ${stats.operations} · OBJ ${stats.blueprintObjects}` : `OPS ${stats.operations}`;
     if (cellsMetric) cellsMetric.textContent = `CELLS ${stats.cells.toLocaleString()}`;
     if (partialMetric) partialMetric.textContent = `PARTIAL ${stats.partialCells}`;
     if (sectionsMetric) sectionsMetric.textContent = `SECTIONS ${stats.sections}`;
@@ -201,7 +203,11 @@ function createBlockImporterLab({ root, canvas, status }) {
     const stats = imported.stats;
     status.classList.add('ready');
     status.classList.remove('error', 'settled');
-    status.innerHTML = `<strong>${escapeText(imported.name)} · IMPORT PASS</strong><span>${stats.operations} compact JSON operations expanded to ${stats.cells.toLocaleString()} occupied cells across ${stats.sections} RiftSections. ${stats.partialCells} slab/stair cells use shape-aware partial occlusion; ${stats.triangles.toLocaleString()} triangles are live.</span>`;
+    const blueprintSummary = stats.blueprintObjects
+      ? `${stats.blueprintObjects} blueprint objects (${stats.instances} prefab instances, ${stats.nestedInstances} nested, ${stats.roads} roads, ${stats.intersections} intersections) expanded into ${stats.operations} block operations. ${stats.anchors} anchors, ${stats.groups} groups and ${stats.connections} validated connections are available.`
+      : `${stats.operations} compact JSON operations were accepted.`;
+    const warningSummary = stats.warnings ? ` ${stats.warnings} non-fatal blueprint overlap warning${stats.warnings === 1 ? '' : 's'} reported.` : '';
+    status.innerHTML = `<strong>${escapeText(imported.name)} · IMPORT PASS</strong><span>${blueprintSummary} ${stats.cells.toLocaleString()} occupied cells across ${stats.sections} RiftSections; ${stats.triangles.toLocaleString()} triangles are live.${warningSummary}</span>`;
     window.setTimeout(() => status.classList.add('settled'), 2400);
   };
 

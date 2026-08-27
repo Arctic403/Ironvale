@@ -17,7 +17,23 @@ initPwaSupport();
 $('#login-form').addEventListener('submit', event=>{event.preventDefault();submitAuth('/api/auth/login',event.currentTarget);});
 $('#register-form').addEventListener('submit', event=>{event.preventDefault();submitAuth('/api/auth/register',event.currentTarget);});
 window.addEventListener('hashchange', route);
-window.addEventListener('focus', ()=>state.authenticated && route(false));
+let focusSessionRefreshPending=false;
+window.addEventListener('focus', async ()=>{
+  if (!state.authenticated || focusSessionRefreshPending) return;
+  focusSessionRefreshPending=true;
+  try {
+    // Do not rebuild the active route on focus. Native file pickers blur/refocus
+    // the page; rerendering here used to destroy the City JSON import input
+    // before Safari/iOS delivered its change event, making Block 001 appear
+    // permanently hardcoded. Session/HUD state can refresh without replacing
+    // the current renderer/UI tree.
+    await refreshSession({navigate:false});
+  } catch (error) {
+    console.warn('RiftCity focus session refresh failed', error);
+  } finally {
+    focusSessionRefreshPending=false;
+  }
+});
 
 async function boot() {
   const authed=await refreshSession();

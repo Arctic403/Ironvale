@@ -1432,3 +1432,105 @@ The JSON importer now treats an accepted local block as the active test asset in
 - rejected imports leave the current block rendered and now say which active block was preserved.
 
 The saved JSON remains capped at 2 MB so a generated test asset cannot consume an excessive amount of iPhone browser storage. This persistence is intentionally local to the browser/editor-preview origin; it is not server/D1 world persistence.
+
+### H1.57.2 — JSON file-picker lifecycle fix
+
+The city-block importer pipeline was traced end to end after imported Block 002 appeared to leave Commerce Block 01 on screen. Block 001 is intentionally hardcoded only as the bundled startup/fallback asset (`public/riftcity-blocks/downtown-block-001.json`); a successful local import does replace the active compiled meshes.
+
+The actual failure was the app-wide window-focus handler. Opening a native JSON file picker blurs the page, and Safari/iOS can fire `focus` again before the hidden file input delivers its `change` event. The old focus handler called the full route renderer, which destroyed the City/importer DOM and re-created it from the bundled/saved startup source before the selected JSON reached `compileRiftCityBlock()`.
+
+Focus now refreshes only authentication/player HUD state with `refreshSession({ navigate:false })`; it no longer destroys/rebuilds the active route. This keeps the file input alive through native picker return, lets the selected JSON reach parse/compile/GPU replacement/persistence, and also avoids wiping other temporary City UI state whenever the browser returns from a system dialog.
+
+
+## H1.58 — RiftCity Blueprint JSON authoring layer
+
+The working H1.57 JSON importer now has a higher-level blueprint layer so whole Downtown districts can be authored by named city objects instead of manually tracking hundreds of absolute `fill_box` / `cut_box` coordinates.
+
+### Backward compatibility
+
+- Existing `riftcity-city-block` **version 1** assets remain valid and compile through the original raw-op path unchanged. Commerce Block 01 and the previously generated Block 002 keep their locked geometry totals.
+- New blueprint assets use the same `format: "riftcity-city-block"` with **version 2** and `blueprint_version: 1`.
+- The blueprint layer expands first; the resulting operations then enter the exact same 1 m `RiftSectionGrid`, compact `Uint16` block state, full/slab/stair shape system and section mesher. No renderer fork was introduced.
+
+### Prefabs + placement
+
+Version 2 adds a top-level `prefabs` object. A prefab owns local bounds, local raw block operations, optional tags/group metadata and named anchors. `layout` can then place that prefab repeatedly:
+
+```json
+{
+  "type": "instance",
+  "id": "bank-01",
+  "prefab": "stone-bank",
+  "origin": [82, 1, 12],
+  "rotation": "east",
+  "group": "buildings",
+  "tags": ["bank", "commercial", "enterable"]
+}
+```
+
+- `origin` is the minimum corner of the **rotated** prefab footprint in document-local coordinates.
+- Rotation is limited to the block-safe cardinal set `north`, `east`, `south`, `west` (numeric 0/90/180/270 is also accepted).
+- Every local `set`, `fill_box`, `cut_box` and `hollow_box` is rotated/translated automatically.
+- Directional stair states rotate with the prefab, so a north-facing stair in a reusable entrance prefab becomes east/south/west when the instance rotates.
+- Prefab instance bounds must remain inside the document bounds. Unknown prefab references, duplicate object IDs and invalid rotations are rejected before the active city is replaced.
+
+### Named anchors
+
+Prefabs can expose semantic points such as `main_entrance`, `loading_dock`, `roof_access`, `alley_exit` or future gameplay interaction points:
+
+```json
+"anchors": {
+  "main_entrance": {
+    "at": [10, 1, 0],
+    "facing": "south",
+    "tags": ["entrance", "public"]
+  }
+}
+```
+
+Placed anchors inherit prefab/instance tags, rotate with the instance and are returned by the compiler as world-space coordinates. The original document-local coordinate is retained as `localAt`. Anchor IDs are namespaced by instance (for example `bank-01.main_entrance`) so later gameplay systems can reference one exact doorway without reverse-engineering geometry.
+
+Top-level district anchors are also supported for things like spawn points, district exits or mission staging locations.
+
+### First-class roads and intersections
+
+`layout` also understands block-native `road` and `intersection` objects. Roads are axis-aligned, use integer widths and can generate sidewalk and curb bands from one compact declaration:
+
+```json
+{
+  "type": "road",
+  "id": "commerce-ave",
+  "from": [0, 0, 80],
+  "to": [161, 0, 80],
+  "width": 14,
+  "state": "asphalt",
+  "sidewalk": { "width": 4, "state": "sidewalk" },
+  "curb": { "width": 1, "state": "curb" }
+}
+```
+
+Intersections use a center + integer 2D size and can generate the surrounding sidewalk/curb square. Roads/intersections intentionally allow one another to overlap because connected street surfaces need that behavior; authored prefab-instance volume overlaps are reported as non-fatal validation warnings unless an instance explicitly uses `allow_overlap: true`.
+
+### Groups, tags and diagnostics
+
+Blueprint objects preserve `group`, `tags`, prefab kind, placed bounds and rotation as compiler metadata. The importer now reports blueprint object, instance, road, intersection, anchor and warning counts alongside the normal occupied-cell/section/triangle totals. Generated-operation errors include their source blueprint object ID, so a bad district no longer fails with only an anonymous absolute operation index.
+
+Safety limits remain in place for world volume, touched cells and imported JSON size, with additional limits on prefab count, prefab operations, layout objects, expanded operations and anchors. Raw top-level `ops` are still allowed in version 2 and execute after the blueprint layout, providing a deliberate final override/detail layer when a one-off block edit is easier than creating another prefab.
+
+`npm run build` remains Pure-JavaScript only and now syntax-checks 90 JavaScript files.
+
+Next intended authoring step: generate the first production-style Downtown district as a version-2 blueprint asset using reusable storefront/building prefabs, named entrances/loading points and first-class street/intersection objects, then iterate the JSON rather than patching the engine for visual layout changes.
+
+
+## H1.59 — composable Blueprint JSON + cell-accurate validation
+
+- Extended the existing H1.58 `riftcity-city-block` v2 Blueprint layer instead of introducing a competing map format.
+- Prefabs can now contain nested prefab instances, allowing district → block → building → entrance composition with inherited N/E/S/W rotation.
+- Nested stair states and named-anchor facings inherit the full parent rotation chain automatically.
+- Recursive prefab cycles and excessive nesting are rejected before block import.
+- Added explicit Blueprint `groups` with object/anchor member reference validation.
+- Added anchor-to-anchor `connections` with missing-reference checks, optional meter tolerance and optional opposite-facing validation.
+- Replaced bounding-box-only prefab overlap warnings with cell-accurate validation over the actual expanded full/slab/stair operations. Conflicting states can error/warn/allow by policy while internal nested composition and road/intersection joins remain intentional.
+- Preserved H1.58 road/intersection sidewalk + curb authoring and the existing RiftSection/full/slab/stair renderer pipeline.
+- Added `public/riftcity-blocks/blueprint-example-downtown-cross.json` as a reusable nested-prefab authoring example.
+- Added a build-time Blueprint regression check covering nested expansion, rotations, anchors, references, overlap rejection, cycle rejection and legacy importer compatibility.

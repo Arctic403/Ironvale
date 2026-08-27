@@ -5,6 +5,7 @@ import {
   RIFT_SECTION_SIZE,
   riftWorldCellToSection
 } from './rift-block-section.js';
+import { expandRiftCityBlueprintLayer } from './rift-city-blueprints.js';
 import {
   RIFT_BLOCK_ROTATIONS,
   RIFT_BLOCK_SHAPES,
@@ -13,7 +14,8 @@ import {
 } from './rift-block-shapes.js';
 
 export const RIFT_CITY_BLOCK_FORMAT = 'riftcity-city-block';
-export const RIFT_CITY_BLOCK_VERSION = 1;
+export const RIFT_CITY_BLOCK_VERSION = 2;
+export const RIFT_CITY_BLOCK_LEGACY_VERSION = 1;
 export const RIFT_CITY_BLOCK_MAX_VOLUME = 2_000_000;
 export const RIFT_CITY_BLOCK_MAX_OP_TOUCHES = 3_000_000;
 
@@ -123,11 +125,19 @@ function addOrigin(point, origin) {
   return [point[0] + origin[0], point[1] + origin[1], point[2] + origin[2]];
 }
 
-function resolveState(palette, key, label) {
+function resolveState(parsed, key, label, rotationTurns = 0) {
   const name = String(key || '');
-  const entry = palette.get(name);
+  const entry = parsed.palette.get(name);
   if (!entry) throw new Error(`${label} references unknown palette state '${name}'.`);
-  return entry.state;
+  const turns = ((Number(rotationTurns) || 0) % 4 + 4) % 4;
+  if (!turns || entry.shape !== 'stair') return entry.state;
+
+  const baseRotation = ROTATION_NAMES[entry.rotation];
+  const rotation = (baseRotation + turns) % 4;
+  const state = encodeRiftBlockState({ material: entry.materialId, shape: RIFT_BLOCK_SHAPES.stair, rotation });
+  if (!parsed.stateColors.has(state)) parsed.stateColors.set(state, entry.color);
+  if (!parsed.stateLabels.has(state)) parsed.stateLabels.set(state, `${name}@${['north', 'east', 'south', 'west'][rotation]}`);
+  return state;
 }
 
 function createSectionAt(grid, worldX, worldY, worldZ) {
@@ -194,7 +204,10 @@ export function parseRiftCityBlockJson(input) {
   const document = typeof input === 'string' ? JSON.parse(input) : input;
   if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('RiftCity block JSON must be an object.');
   if (document.format !== RIFT_CITY_BLOCK_FORMAT) throw new Error(`Expected format '${RIFT_CITY_BLOCK_FORMAT}'.`);
-  if (Number(document.version) !== RIFT_CITY_BLOCK_VERSION) throw new Error(`Unsupported RiftCity block version ${document.version}.`);
+  const version = Number(document.version);
+  if (version !== RIFT_CITY_BLOCK_LEGACY_VERSION && version !== RIFT_CITY_BLOCK_VERSION) {
+    throw new Error(`Unsupported RiftCity block version ${document.version}; expected ${RIFT_CITY_BLOCK_LEGACY_VERSION} or ${RIFT_CITY_BLOCK_VERSION}.`);
+  }
   if (String(document.units || '').toLowerCase() !== 'meters') throw new Error("units must be 'meters'.");
   if (Number(document.grid?.cell_size) !== 1) throw new Error('grid.cell_size must remain exactly 1 meter.');
   if (Number(document.grid?.shape_increment) !== 0.5) throw new Error('grid.shape_increment must be 0.5 for the current full/slab/stair vocabulary.');
@@ -202,17 +215,22 @@ export function parseRiftCityBlockJson(input) {
   const origin = asVec3(document.origin || [0, 0, 0], 'origin');
   const bounds = normalizeBounds(document.bounds);
   const paletteInfo = normalizePalette(document.palette);
-  const ops = Array.isArray(document.ops) ? document.ops : [];
-  if (!ops.length) throw new Error('ops must contain at least one operation.');
-  if (ops.length > 10_000) throw new Error('ops exceeds the 10,000 operation safety limit.');
+  const blueprint = expandRiftCityBlueprintLayer(document, { bounds });
+  const ops = blueprint.ops;
+  if (!ops.length) throw new Error(version === 1
+    ? 'ops must contain at least one operation.'
+    : 'RiftCity block v2 requires at least one layout object or raw op.');
+  if (ops.length > 20_000) throw new Error('Expanded ops exceeds the 20,000 operation safety limit.');
 
   return {
     document,
+    version,
     id: String(document.id || 'unnamed-block'),
     name: String(document.name || document.id || 'Unnamed RiftCity Block'),
     origin,
     bounds,
     ops,
+    blueprint,
     ...paletteInfo
   };
 }
@@ -237,13 +255,15 @@ export function compileRiftCityBlock(input) {
   };
 
   parsed.ops.forEach((op, index) => {
-    const label = `ops[${index}]`;
+    const label = op?._blueprintObjectId
+      ? `blueprint '${String(op._blueprintObjectId)}' / ops[${index}]`
+      : `ops[${index}]`;
     const type = String(op?.op || '').toLowerCase();
     if (type === 'set') {
       const at = asVec3(op.at, `${label}.at`);
       if (!localInside(parsed.bounds, at)) throw new Error(`${label}.at is outside declared bounds.`);
       touch(1);
-      writeLocal(at[0], at[1], at[2], resolveState(parsed.palette, op.state, `${label}.state`));
+      writeLocal(at[0], at[1], at[2], resolveState(parsed, op.state, `${label}.state`, op._stateRotationTurns));
       return;
     }
 
@@ -253,13 +273,13 @@ export function compileRiftCityBlock(input) {
       touch(box.volume);
 
       if (type === 'fill_box' || type === 'cut_box') {
-        const state = type === 'cut_box' ? RIFT_SECTION_AIR : resolveState(parsed.palette, op.state, `${label}.state`);
+        const state = type === 'cut_box' ? RIFT_SECTION_AIR : resolveState(parsed, op.state, `${label}.state`, op._stateRotationTurns);
         forEachBoxCell(box, (x, y, z) => writeLocal(x, y, z, state));
         return;
       }
 
-      const wallState = resolveState(parsed.palette, op.state, `${label}.state`);
-      const roofState = op.roof_state ? resolveState(parsed.palette, op.roof_state, `${label}.roof_state`) : wallState;
+      const wallState = resolveState(parsed, op.state, `${label}.state`, op._stateRotationTurns);
+      const roofState = op.roof_state ? resolveState(parsed, op.roof_state, `${label}.roof_state`, op._stateRotationTurns) : wallState;
       const thickness = Math.max(1, Math.min(8, asInt(op.wall_thickness ?? 1, `${label}.wall_thickness`)));
       const floor = op.floor !== false;
       forEachBoxCell(box, (x, y, z) => {
@@ -288,6 +308,19 @@ export function compileRiftCityBlock(input) {
 
   const stats = {
     operations: parsed.ops.length,
+    sourceOperations: parsed.blueprint.sourceOperations,
+    blueprintObjects: parsed.blueprint.objects.length,
+    prefabCount: parsed.blueprint.prefabCount,
+    instances: parsed.blueprint.instanceCount,
+    nestedInstances: parsed.blueprint.nestedInstanceCount || 0,
+    roads: parsed.blueprint.roadCount,
+    intersections: parsed.blueprint.intersectionCount,
+    anchors: parsed.blueprint.anchors.length,
+    groups: Object.keys(parsed.blueprint.groups || {}).length,
+    connections: parsed.blueprint.connections?.length || 0,
+    overlaps: parsed.blueprint.validation?.overlaps?.length || 0,
+    validationCells: parsed.blueprint.validation?.checkedCells || 0,
+    warnings: parsed.blueprint.warnings.length,
     writes,
     cells,
     partialCells,
@@ -298,6 +331,21 @@ export function compileRiftCityBlock(input) {
     triangles: totals.triangles,
     shapeAwareSections: totals.shapeAwareSections
   };
+
+  const compiledBlueprintObjects = parsed.blueprint.objects.map(object => ({
+    ...object,
+    ...(object.origin ? { localOrigin: object.origin, origin: addOrigin(object.origin, parsed.origin) } : {}),
+    localBounds: object.bounds,
+    bounds: {
+      min: addOrigin(object.bounds.min, parsed.origin),
+      max: addOrigin(object.bounds.max, parsed.origin)
+    }
+  }));
+  const compiledBlueprintAnchors = parsed.blueprint.anchors.map(anchor => ({
+    ...anchor,
+    localAt: anchor.at,
+    at: addOrigin(anchor.at, parsed.origin)
+  }));
 
   const expected = parsed.document.validation?.expected;
   if (expected && typeof expected === 'object') {
@@ -320,6 +368,15 @@ export function compileRiftCityBlock(input) {
     stateColors: parsed.stateColors,
     stateLabels: parsed.stateLabels,
     resolveColor,
+    blueprint: {
+      version: parsed.blueprint.blueprintVersion,
+      objects: compiledBlueprintObjects,
+      anchors: compiledBlueprintAnchors,
+      groups: parsed.blueprint.groups || {},
+      connections: parsed.blueprint.connections || [],
+      validation: parsed.blueprint.validation || null,
+      warnings: parsed.blueprint.warnings
+    },
     worldBounds: { min: worldMin, max: worldMax },
     center,
     stats
@@ -361,6 +418,56 @@ export function validateRiftCityBlockImporter() {
     if (result.stats.triangles <= 0 || result.stats.vertices <= 0) failures.push('self-test produced no render geometry');
   } catch (error) {
     failures.push(error.message);
+  }
+
+  const blueprintSample = {
+    format: RIFT_CITY_BLOCK_FORMAT,
+    version: 2,
+    blueprint_version: 1,
+    id: 'blueprint-self-test',
+    name: 'Blueprint Self Test',
+    units: 'meters',
+    grid: { cell_size: 1, shape_increment: 0.5 },
+    origin: [0, 0, 0],
+    bounds: { min: [0, 0, 0], max: [15, 4, 15] },
+    palette: {
+      air: { material_id: 0, shape: 'air', color: [0, 0, 0] },
+      solid: { material_id: 1, shape: 'full', color: [0.55, 0.5, 0.45] },
+      stair_n: { material_id: 2, shape: 'stair', rotation: 'north', color: [0.72, 0.72, 0.72] }
+    },
+    prefabs: {
+      doorway: {
+        kind: 'building-test',
+        bounds: { min: [0, 0, 0], max: [2, 2, 1] },
+        tags: ['test-structure'],
+        ops: [
+          { op: 'fill_box', state: 'solid', min: [0, 0, 0], max: [2, 0, 1] },
+          { op: 'set', state: 'stair_n', at: [0, 1, 0] }
+        ],
+        anchors: {
+          door: { at: [0, 1, 0], facing: 'north', tags: ['entrance'] }
+        }
+      }
+    },
+    layout: [
+      { type: 'instance', id: 'rotated-entry', prefab: 'doorway', origin: [5, 0, 5], rotation: 'east', group: 'buildings' },
+      { type: 'road', id: 'test-road', from: [0, 0, 10], to: [15, 0, 10], width: 3, state: 'solid' },
+      { type: 'intersection', id: 'test-junction', center: [10, 0, 10], size: [3, 3], state: 'solid' }
+    ]
+  };
+
+  try {
+    const result = compileRiftCityBlock(blueprintSample);
+    const rotatedStair = result.grid.getBlockWorld(6, 1, 5);
+    const expectedStair = encodeRiftBlockState({ material: 2, shape: RIFT_BLOCK_SHAPES.stair, rotation: RIFT_BLOCK_ROTATIONS.east });
+    if (rotatedStair !== expectedStair) failures.push(`blueprint stair rotation ${rotatedStair} != ${expectedStair}`);
+    const door = result.blueprint.anchors.find(anchor => anchor.id === 'rotated-entry.door');
+    if (!door || door.at.join(',') !== '6,1,5' || door.facing !== 'east') failures.push('blueprint named anchor did not rotate with its prefab instance');
+    if (result.stats.instances !== 1 || result.stats.roads !== 1 || result.stats.intersections !== 1) failures.push('blueprint object counts are incorrect');
+    if (result.stats.blueprintObjects !== 3) failures.push(`blueprint object count ${result.stats.blueprintObjects} != 3`);
+    if (result.stats.operations <= 3) failures.push('blueprint objects did not expand into block operations');
+  } catch (error) {
+    failures.push(`blueprint self-test: ${error.message}`);
   }
 
   return { ok: failures.length === 0, failures };
