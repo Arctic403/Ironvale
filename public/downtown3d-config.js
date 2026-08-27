@@ -1,16 +1,23 @@
 import { RIFT_WORLD_SCALE as SCALE } from './rift-world-scale.js';
 
 export const DOWNTOWN3D_FOUNDATION = Object.freeze({
-  version: 3,
-  id: 'downtown-commerce-avenue-foundation-01',
-  label: 'Downtown Street Foundation',
+  version: 4,
+  id: 'downtown-block-world-foundation-01',
+  label: 'Downtown Block World Foundation',
   units: SCALE.units,
   metersPerWorldUnit: SCALE.metersPerWorldUnit,
 
   world: Object.freeze({
-    width: 260,
-    depth: 260,
+    width: 256,
+    depth: 256,
     groundHeight: 0.08
+  }),
+
+  block: Object.freeze({
+    size: SCALE.block.size,
+    chunkSize: SCALE.block.chunkSize,
+    visibleRadiusChunks: SCALE.block.visibleRadiusChunks,
+    maxBuildY: 47
   }),
 
   street: Object.freeze({

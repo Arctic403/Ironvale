@@ -27,6 +27,7 @@ uniform vec3 uFogColor;
 uniform float uFogStart;
 uniform float uFogEnd;
 uniform float uNoise;
+uniform float uBlockGrid;
 uniform vec3 uCameraPosition;
 out vec4 outColor;
 float stableVariation(vec2 p){
@@ -39,6 +40,14 @@ void main(){
   float diffuse = max(dot(normal, normalize(-uLightDirection)), 0.0);
   float variation = stableVariation(vWorldPosition.xz) * uNoise;
   vec3 base = clamp(uColor * (1.0 + variation), 0.0, 1.0);
+  if(uBlockGrid > 0.001){
+    vec3 an = abs(normal);
+    vec2 uv = an.y > 0.65 ? vWorldPosition.xz : (an.x > an.z ? vWorldPosition.zy : vWorldPosition.xy);
+    vec2 cell = abs(fract(uv) - 0.5);
+    vec2 width = max(fwidth(uv) * 1.15, vec2(0.012));
+    float seam = max(smoothstep(0.46 - width.x, 0.49, cell.x), smoothstep(0.46 - width.y, 0.49, cell.y));
+    base *= mix(1.0, 0.72, seam * clamp(uBlockGrid, 0.0, 1.0));
+  }
   vec3 lit = base * (0.59 + diffuse * 0.52);
   float distanceToCamera = distance(vWorldPosition, uCameraPosition);
   float fog = smoothstep(uFogStart, uFogEnd, distanceToCamera);
@@ -188,6 +197,7 @@ export class RiftEngine {
       fogStart: gl.getUniformLocation(this.program, 'uFogStart'),
       fogEnd: gl.getUniformLocation(this.program, 'uFogEnd'),
       noise: gl.getUniformLocation(this.program, 'uNoise'),
+      blockGrid: gl.getUniformLocation(this.program, 'uBlockGrid'),
       cameraPosition: gl.getUniformLocation(this.program, 'uCameraPosition')
     };
     this.geometry = {
@@ -248,6 +258,7 @@ export class RiftEngine {
       rotationY: options.rotationY || 0,
       color: Array.isArray(options.color) ? [...options.color] : hexToRgb(options.color || '#ffffff'),
       noise: options.noise || 0,
+      blockGrid: options.blockGrid || 0,
       visible: options.visible !== false,
       modelMatrix: new Float32Array(16),
       dynamic: !!options.dynamic,
@@ -351,6 +362,7 @@ export class RiftEngine {
       gl.uniformMatrix4fv(this.uniforms.model, false, drawable.modelMatrix);
       gl.uniform3fv(this.uniforms.color, drawable.color);
       gl.uniform1f(this.uniforms.noise, drawable.noise);
+      gl.uniform1f(this.uniforms.blockGrid, drawable.blockGrid || 0);
       gl.drawElements(gl.TRIANGLES, mesh.count, mesh.indexType || gl.UNSIGNED_SHORT, 0);
       draws += 1;
     }

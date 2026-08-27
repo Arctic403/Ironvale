@@ -1,8 +1,8 @@
 import { DOWNTOWN3D_FOUNDATION as CONFIG } from './downtown3d-config.js';
-import { DOWNTOWN_ROAD_NETWORK } from './downtown-road-network.js';
+import { createDowntownBlockWorldSource } from './downtown-block-world.js';
 import { RiftCamera, RiftEngine } from './rift-engine.js';
 import { clamp, lerpAngle, rotateXZ } from './rift-engine-math.js';
-import { RiftRoadNetwork } from './rift-road-network.js';
+import { RiftBlockWorld } from './rift-block-world.js';
 import { mountRiftWorldEditor } from './rift-world-editor.js';
 import { RIFT_WORLD_SCALE as WORLD_SCALE, assertMeterScale } from './rift-world-scale.js';
 
@@ -23,9 +23,9 @@ export async function renderDowntown3D(root) {
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title">
-        <span class="eyebrow">RIFT ENGINE 0.4 · DOWNTOWN</span>
+        <span class="eyebrow">RIFT BLOCK ENGINE 0.1 · DOWNTOWN</span>
         <strong>Commerce Avenue</strong>
-        <small>Raw WebGL2 · procedural road network · meter-based city scale</small>
+        <small>Raw WebGL2 · visible 1m blocks · streamed 32m chunks</small>
       </div>
 
       <div class="world3d-top-right downtown3d-actions">
@@ -46,7 +46,8 @@ export async function renderDowntown3D(root) {
         <span>WEBGL2</span>
         <span>1 UNIT = 1M</span>
         <span>PLAYER ${CONFIG.player.height}M</span>
-        <span>ROAD ${CONFIG.street.roadWidth}M</span>
+        <span>BLOCK 1×1×1M</span>
+        <span>CHUNK ${WORLD_SCALE.block.chunkSize}×${WORLD_SCALE.block.chunkSize}M</span>
         <span>WORLD ${CONFIG.world.width}×${CONFIG.world.depth}M</span>
       </div>
 
@@ -104,14 +105,15 @@ function createFoundation({ root, canvas, status }) {
   });
   camera.setTarget(CONFIG.player.spawn.x, CONFIG.camera.followHeight, CONFIG.player.spawn.z);
 
-  const foundation = buildWorldFoundation(engine);
-  const roadNetwork = new RiftRoadNetwork(engine, DOWNTOWN_ROAD_NETWORK, { connectRadius: 1.8 });
-  const editorGrid = createEditorGrid(engine);
+  const blockSource = createDowntownBlockWorldSource();
+  const blockWorld = new RiftBlockWorld(engine, blockSource, { renderRadiusChunks: WORLD_SCALE.block.visibleRadiusChunks });
+  const foundation = buildWorldFoundation(blockWorld);
   const scaleReference = createScaleReferenceKit(engine);
   const player = createScalePlayer(engine);
   player.position.x = CONFIG.player.spawn.x;
   player.position.z = CONFIG.player.spawn.z;
   updatePlayerVisual(engine, player, 0);
+  blockWorld.setViewCenter(player.position.x, player.position.z);
 
   const input = { x: 0, y: 0, run: false };
   const keys = new Set();
@@ -204,10 +206,9 @@ function createFoundation({ root, canvas, status }) {
     canvas,
     engine,
     camera,
-    roadNetwork,
+    blockWorld,
     worldBounds: foundation.bounds,
     onModeChange(enabled) {
-      for (const line of editorGrid) line.visible = enabled;
       input.x = 0;
       input.y = 0;
       setRun(false);
@@ -276,8 +277,10 @@ function createFoundation({ root, canvas, status }) {
 
         const running = input.run || keys.has('ShiftLeft') || keys.has('ShiftRight');
         const speed = running ? CONFIG.player.runSpeed : CONFIG.player.walkSpeed;
-        player.position.x = clamp(player.position.x + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
-        player.position.z = clamp(player.position.z + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
+        const nextX = clamp(player.position.x + dx * speed * dt, foundation.bounds.minX, foundation.bounds.maxX);
+        const nextZ = clamp(player.position.z + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
+        if (blockWorld.canOccupyCircle(nextX, player.position.z, CONFIG.player.radius, CONFIG.player.height)) player.position.x = nextX;
+        if (blockWorld.canOccupyCircle(player.position.x, nextZ, CONFIG.player.radius, CONFIG.player.height)) player.position.z = nextZ;
         const targetYaw = Math.atan2(dx, dz);
         player.yaw = lerpAngle(player.yaw, targetYaw, Math.min(1, dt * 12));
         player.walkPhase += dt * (running ? 11 : 7.5);
@@ -291,6 +294,7 @@ function createFoundation({ root, canvas, status }) {
       camera.target[1] += (CONFIG.camera.followHeight - camera.target[1]) * followT;
       camera.target[2] += (player.position.z - camera.target[2]) * followT;
       camera.updatePosition();
+      blockWorld.setViewCenter(player.position.x, player.position.z);
     } else {
       player.bob += (0 - player.bob) * Math.min(1, dt * 10);
 
@@ -315,6 +319,7 @@ function createFoundation({ root, canvas, status }) {
         camera.target[2] = clamp(camera.target[2] + dz * speed * dt, foundation.bounds.minZ, foundation.bounds.maxZ);
         camera.updatePosition();
       }
+      blockWorld.setViewCenter(camera.target[0], camera.target[2]);
     }
 
     updatePlayerVisual(engine, player, player.bob);
@@ -340,21 +345,21 @@ function createFoundation({ root, canvas, status }) {
 
   if (status) {
     status.classList.add('ready');
-    status.innerHTML = '<strong>RIFT ENGINE 0.4 ONLINE</strong><span>Locked 1:1 meter scale · welded road geometry · automatic editor freecam + scale reference kit.</span>';
+    status.innerHTML = '<strong>RIFT BLOCK ENGINE ONLINE</strong><span>Downtown is now authored from visible 1m blocks · 32m chunk streaming · freecam Block Editor.</span>';
     setTimeout(() => status?.classList.add('settled'), 2600);
   }
 
   return {
     engine,
     camera,
-    roadNetwork,
+    blockWorld,
     worldEditor,
     destroy() {
       destroyed = true;
       cancelAnimationFrame(frameId);
       worldEditor?.destroy?.();
       scaleReference?.dispose?.();
-      roadNetwork?.dispose?.();
+      blockWorld?.dispose?.();
       joystick?.destroy?.();
       orbit?.destroy?.();
       setRun(false);
@@ -380,39 +385,16 @@ function createFoundation({ root, canvas, status }) {
   };
 }
 
-function buildWorldFoundation(engine) {
-  const halfWidth = CONFIG.world.width * 0.5;
-  const halfDepth = CONFIG.world.depth * 0.5;
-  engine.addBox({
-    position: [0, -CONFIG.world.groundHeight * 0.5, 0],
-    scale: [CONFIG.world.width, CONFIG.world.groundHeight, CONFIG.world.depth],
-    color: '#353a36',
-    noise: 0.012
-  });
+function buildWorldFoundation(blockWorld) {
+  const b = blockWorld.data.bounds;
   return {
     bounds: {
-      minX: -halfWidth + CONFIG.player.radius,
-      maxX: halfWidth - CONFIG.player.radius,
-      minZ: -halfDepth + CONFIG.player.radius,
-      maxZ: halfDepth - CONFIG.player.radius
+      minX: b.minX + CONFIG.player.radius,
+      maxX: b.maxX + 1 - CONFIG.player.radius,
+      minZ: b.minZ + CONFIG.player.radius,
+      maxZ: b.maxZ + 1 - CONFIG.player.radius
     }
   };
-}
-
-function createEditorGrid(engine) {
-  const drawables = [];
-  const halfWidth = CONFIG.world.width * 0.5;
-  const halfDepth = CONFIG.world.depth * 0.5;
-  const step = 20;
-  for (let x = -Math.floor(halfWidth / step) * step; x <= halfWidth; x += step) {
-    const line = engine.addBox({ position: [x, 0.055, 0], scale: [0.035, 0.012, CONFIG.world.depth], color: '#59615c', visible: false });
-    drawables.push(line);
-  }
-  for (let z = -Math.floor(halfDepth / step) * step; z <= halfDepth; z += step) {
-    const line = engine.addBox({ position: [0, 0.056, z], scale: [CONFIG.world.width, 0.012, 0.035], color: '#59615c', visible: false });
-    drawables.push(line);
-  }
-  return drawables;
 }
 
 function createScaleReferenceKit(engine) {
@@ -434,10 +416,9 @@ function createScaleReferenceKit(engine) {
   // 1 m calibration cube.
   add('box', [-4.2, ref.calibrationCube * 0.5, -2.4], [ref.calibrationCube, ref.calibrationCube, ref.calibrationCube], '#f0b84c');
 
-  // 1.75 m human reference silhouette.
-  const bodyHeight = ref.humanHeight * 0.58;
-  add('cylinder', [-1.9, bodyHeight * 0.5 + 0.36, -2.4], [0.46, bodyHeight, 0.46], '#4a9fd8');
-  add('sphere', [-1.9, ref.humanHeight - 0.17, -2.4], [0.34, 0.34, 0.34], '#b88768');
+  // 1.75 m block-person reference silhouette.
+  add('box', [-1.9, 1.03, -2.4], [0.48, 0.92, 0.34], '#4a9fd8');
+  add('box', [-1.9, ref.humanHeight - 0.18, -2.4], [0.36, 0.36, 0.36], '#b88768');
   add('box', [-2.06, 0.36, -2.4], [0.17, 0.72, 0.22], '#28323a');
   add('box', [-1.74, 0.36, -2.4], [0.17, 0.72, 0.22], '#28323a');
 
@@ -504,9 +485,8 @@ function createScalePlayer(engine) {
     bob: 0,
     walkPhase: 0,
     parts: [
-      { mesh: engine.addCylinder({ scale: [0.54 * scale, 0.92 * scale, 0.54 * scale], color: '#1e2228', dynamic: true }), local: [0, 1.08 * scale, 0], scale: [0.54 * scale, 0.92 * scale, 0.54 * scale] },
-      { mesh: engine.addBox({ scale: [0.54 * scale, 0.52 * scale, 0.32 * scale], color: '#c98635', dynamic: true }), local: [0, 1.18 * scale, 0.02 * scale], scale: [0.54 * scale, 0.52 * scale, 0.32 * scale] },
-      { mesh: engine.addSphere({ scale: [0.38 * scale, 0.38 * scale, 0.38 * scale], color: '#a8785e', dynamic: true }), local: [0, 1.69 * scale, 0], scale: [0.38 * scale, 0.38 * scale, 0.38 * scale] },
+      { mesh: engine.addBox({ scale: [0.56 * scale, 0.92 * scale, 0.38 * scale], color: '#c98635', dynamic: true }), local: [0, 1.06 * scale, 0], scale: [0.56 * scale, 0.92 * scale, 0.38 * scale] },
+      { mesh: engine.addBox({ scale: [0.38 * scale, 0.38 * scale, 0.38 * scale], color: '#a8785e', dynamic: true }), local: [0, 1.68 * scale, 0], scale: [0.38 * scale, 0.38 * scale, 0.38 * scale] },
       { mesh: engine.addBox({ scale: [0.18 * scale, 0.72 * scale, 0.22 * scale], color: '#1e2228', dynamic: true }), local: [-0.16 * scale, 0.46 * scale, 0], scale: [0.18 * scale, 0.72 * scale, 0.22 * scale] },
       { mesh: engine.addBox({ scale: [0.18 * scale, 0.72 * scale, 0.22 * scale], color: '#1e2228', dynamic: true }), local: [0.16 * scale, 0.46 * scale, 0], scale: [0.18 * scale, 0.72 * scale, 0.22 * scale] },
       { mesh: engine.addCylinder({ scale: [0.85 * scale, 0.02, 0.85 * scale], color: '#111315', dynamic: true }), local: [0, 0.018, 0], scale: [0.85 * scale, 0.02, 0.85 * scale], shadow: true }

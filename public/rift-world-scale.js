@@ -4,6 +4,12 @@ export const RIFT_WORLD_SCALE = Object.freeze({
   units: 'meters',
   metersPerWorldUnit: 1,
 
+  block: Object.freeze({
+    size: 1,
+    chunkSize: 32,
+    visibleRadiusChunks: 2
+  }),
+
   reference: Object.freeze({
     calibrationCube: 1,
     humanHeight: 1.75,

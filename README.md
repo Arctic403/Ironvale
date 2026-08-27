@@ -1051,3 +1051,24 @@ This pass locks the physical world contract before larger district generation st
 - Existing `riftcity-road-network` JSON remains compatible.
 
 This is still the pre-district-generator foundation: scale, roads and editor navigation are being made deterministic before chunk/block generation is layered on top.
+
+## H1.44 — true 1m visible Block World pivot
+
+RiftCity's active Downtown foundation is now a literal visible block world rather than a smooth procedural-road scene. The previous road graph/renderer files are retained as rollback/reference code, but the active City route no longer depends on them.
+
+- The permanent physical contract is now **1 world unit = 1 meter = one 1 × 1 × 1 m block**.
+- Added `public/rift-block-world.js`, a sparse chunked block-world runtime with one-meter cells, material registry, source snapshots, block collision queries, local editing, chunk rebuilds and streamed chunk visibility.
+- Downtown uses `32 × 32 m` X/Z chunks and loads only a configurable radius around the player or editor freecam instead of keeping the entire district rendered.
+- Chunk geometry culls hidden block faces and groups visible faces by material into custom Rift Engine meshes, so thousands of logical blocks are not thousands of WebGL draw objects.
+- Rift Engine adds an optional world-space one-meter seam shader. Block-world meshes visibly read as individual cubes even when adjacent exposed faces are batched into one GPU mesh.
+- Added `public/downtown-block-world.js` as the first source-controlled block district seed: Commerce Avenue, a cross street, sidewalks, one-meter road-marking cells, parking/service surfaces and four deliberately block-built Downtown structures.
+- The player now collides with structure blocks while preserving camera-relative movement, joystick controls, run input and the 1.75 m physical reference.
+- The temporary player/reference silhouettes are made more block-like so the active foundation visually commits to the new art direction.
+- The old Road Painter UI is replaced on the active Downtown route by **RIFT BLOCK WORLD 0.1 / 1M BLOCK EDITOR**.
+- Editor tools: **BRUSH**, **ERASE**, **LINE**, **RECT**, **MEASURE** and automatic **FREECAM**. Lines intentionally staircase on diagonals instead of generating smooth geometry.
+- Editor Y-level controls author the surface layer (`Y -1`) or stack real building blocks upward. Brush sizes cycle through 1×1, 3×3 and 5×5 cells.
+- Ground-layer erase restores the implicit default ground cell; structure-layer erase removes the block entirely.
+- Undo/redo, local draft restore, scale reference kit and JSON export now operate on the `riftcity-block-world` snapshot instead of road-network JSON.
+- Exiting Edit Mode still snaps the camera back to the unchanged player position.
+
+The next architecture layer can now be a block stamp/prefab system and district generator: roads, lots and buildings can be authored as reusable arrangements of the same one-meter cells instead of introducing another geometry system.

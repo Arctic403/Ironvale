@@ -3371,3 +3371,28 @@ body.dev-block-editor-page{
 @media(max-width:620px){
   .downtown3d-title{max-width:34vw!important}.downtown3d-title .eyebrow{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.downtown3d-actions{max-width:62vw}.rift-world-editor-options{grid-template-columns:110px minmax(0,1fr)}
 }
+
+/* H1.43 — true 1m Block World + chunked mobile editor */
+.rift-block-editor-tools{grid-template-columns:repeat(6,minmax(0,1fr))}
+.rift-block-editor-options{grid-template-columns:minmax(150px,210px) minmax(0,1fr)}
+.rift-block-editor [data-block-layer]{min-width:88px;color:#ffd48a}
+.rift-block-editor [data-block-material]{border-color:rgba(255,180,77,.45)}
+.rift-world-editor-open[data-rift-world-tool="brush"] #riftcity-3d-canvas,
+.rift-world-editor-open[data-rift-world-tool="erase"] #riftcity-3d-canvas,
+.rift-world-editor-open[data-rift-world-tool="line"] #riftcity-3d-canvas,
+.rift-world-editor-open[data-rift-world-tool="rect"] #riftcity-3d-canvas,
+.rift-world-editor-open[data-rift-world-tool="measure"] #riftcity-3d-canvas{cursor:crosshair}
+.rift-world-editor-open[data-rift-world-tool="camera"] #riftcity-3d-canvas{cursor:grab}
+@media(max-width:900px),(pointer:coarse){
+  .rift-block-editor-tools{grid-template-columns:repeat(6,minmax(72px,1fr));overflow-x:auto;scrollbar-width:none}
+  .rift-block-editor-tools::-webkit-scrollbar{display:none}
+  .rift-block-editor-options{grid-template-columns:132px minmax(0,1fr)}
+}
+@media(orientation:landscape) and (pointer:coarse){
+  body.world3d-game-mode .rift-block-editor-tools{min-width:440px}
+  body.world3d-game-mode .rift-block-editor-options{grid-template-columns:132px minmax(0,1fr)}
+}
+@media(max-width:620px){
+  .rift-block-editor-options{grid-template-columns:118px minmax(0,1fr)}
+  .rift-block-editor-tools button{font-size:.5rem}
+}
