@@ -950,3 +950,18 @@ The secret is never stored in D1 or sent to the browser. D1 stores only the conf
 - The private Worker Block Editor page now imports the dedicated editor entry module directly.
 - The static relative import graph is safe to mount under the normal site root or the Editor Local Test `/__riftcity_local__/` prefix, which avoids iOS standalone/Home Screen failures caused by resolving an editor-only lazy module through a different service-worker client context.
 - The pure-JavaScript guard now rejects any future direct `block-editor-ui.js` import from the shared Block World runtime.
+
+## H1.39 — Downtown 3D empty street foundation
+
+RiftCity's player-facing City route now starts the district-by-district 3D rebuild with one deliberately empty Downtown street segment. This milestone establishes the master physical scale before any buildings are added.
+
+- Added a real Babylon/WebGL Downtown foundation with a `120 m` street segment, `14 m` road, `4 m` sidewalks, raised curbs and reserved buildable strips on both sides.
+- World dimensions are authored in meters through `public/downtown3d-config.js`; future buildings, alleys, intersections and props can share the same scale instead of guessing from raster artwork.
+- Asphalt, concrete and lot surfaces are generated as lightweight procedural textures at runtime, so the foundation does not add large scene-image downloads.
+- Added a human-scale placeholder player (`1.75 m`) with camera-relative WASD/arrow and iPhone joystick movement, walk/run speeds, camera orbit/pinch zoom and smooth third-person follow.
+- Added iPhone-friendly CSS fullscreen mode, camera reset and a small live FPS/scale readout so the street can be performance-tested on the target device before adding Building 01.
+- Mobile rendering caps effective pixel density and uses a smaller shadow map to protect GPU budget from the first 3D milestone.
+- The existing 2.5D Block World and private Block Editor are intentionally retained as rollback/reference tools while the 3D city direction is proven. No building meshes are loaded in this phase.
+- Babylon loads only when the City route is opened; non-City screens do not pay the 3D engine cost.
+
+Next intended milestone: lock road/sidewalk/player/camera proportions on iPhone, then add exactly one Downtown building to the reserved frontage.

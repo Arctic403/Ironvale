@@ -1,4 +1,4 @@
-import { renderBlockWorld, destroyBlockWorld } from './block-world.js';
+import { renderDowntown3D, destroyDowntown3D } from '../downtown3d-foundation.js';
 import { api } from '../ui/api.js';
 import { state } from '../ui/state.js';
 import { escapeHtml, panel, empty } from '../ui/helpers.js';
@@ -15,7 +15,7 @@ const ROUTE_BY_TYPE={bank:'bank',education:'education',gym:'gym',jobs:'jobs',pro
 let activeCity2D=null;
 
 export function destroyCity2D(){
-  destroyBlockWorld();
+  destroyDowntown3D();
   activeCity2D?.destroy?.();
   activeCity2D=null;
   document.body.classList.remove('city2d-game-mode');
@@ -433,5 +433,6 @@ export async function renderLocation(root,id) {
 }
 
 
-// Phase 11: active City route uses authored 2.5D Block 01.
-export async function renderCity(root){ return renderBlockWorld(root); }
+// H1.39: active City route starts the district-by-district 3D rebuild with one empty Downtown street foundation.
+// The existing 2.5D Block World remains source-controlled for rollback/private authoring while the new city scale is proven on-device.
+export async function renderCity(root){ return renderDowntown3D(root); }

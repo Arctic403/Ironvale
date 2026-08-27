@@ -2326,6 +2326,54 @@ export async function renderBlockWorld(root, options={}){
     return Math.max(min,Math.min(max,value));
   }
 
+  function cameraContentExtent(area=currentArea()){
+    const authoredWidth=Math.max(1,Number(area?.width)||1);
+    const authoredHeight=Math.max(1,Number(area?.height)||1);
+    const plate=area?.scenePlate||{};
+    const plateScale=Number.isFinite(Number(plate.scale))&&Number(plate.scale)>0?Number(plate.scale):1;
+    const plateRight=(Number(plate.x)||0)+(Math.max(0,Number(plate.width)||0)*plateScale);
+    const plateBottom=(Number(plate.y)||0)+(Math.max(0,Number(plate.height)||0)*plateScale);
+    const walkBounds=area?.walkable?geometryBounds(area.walkable):null;
+    const walkRight=walkBounds?(walkBounds.x+walkBounds.width):0;
+    const walkBottom=walkBounds?(walkBounds.y+walkBounds.height):0;
+
+    // Camera limits follow the complete visible/playable scene, not only the
+    // legacy area.height. Commerce Street intentionally keeps a 1440-unit game
+    // layout while its scene plate extends to 1800 and the walkable polygon can
+    // reach below 1440. Using area.height alone prevented vertical panning and
+    // let the player hug (or cross) the bottom of the viewport.
+    return {
+      width:Math.max(authoredWidth,plateRight,walkRight),
+      height:Math.max(authoredHeight,plateBottom,walkBottom)
+    };
+  }
+
+  function keepPlayerInsideCamera(cameraX,cameraY,scale,viewportWidth,viewportHeight,maxX,maxY){
+    if(!Number.isFinite(scale)||scale<=0)return {x:cameraX,y:cameraY};
+
+    // This is a hard visibility guard layered on top of the normal eased camera.
+    // It only takes over when smoothing would otherwise allow the player to get
+    // too close to an edge, so normal movement still feels soft while the player
+    // can never drift off-screen during gameplay.
+    const marginLeft=Math.min(110,Math.max(42,viewportWidth*.08));
+    const marginRight=Math.min(130,Math.max(48,viewportWidth*.10));
+    const marginTop=Math.min(110,Math.max(50,viewportHeight*.10));
+    const marginBottom=Math.min(150,Math.max(78,viewportHeight*.16));
+    const screenX=(state.x-cameraX)*scale;
+    const screenY=(state.y-cameraY)*scale;
+
+    if(screenX<marginLeft)cameraX-=(marginLeft-screenX)/scale;
+    else if(screenX>viewportWidth-marginRight)cameraX+=(screenX-(viewportWidth-marginRight))/scale;
+
+    if(screenY<marginTop)cameraY-=(marginTop-screenY)/scale;
+    else if(screenY>viewportHeight-marginBottom)cameraY+=(screenY-(viewportHeight-marginBottom))/scale;
+
+    return {
+      x:clampCamera(cameraX,0,maxX),
+      y:clampCamera(cameraY,0,maxY)
+    };
+  }
+
   const cameraState={key:'',x:0,y:0,scale:1};
   function cameraBlend(key,targetX,targetY,targetScale,{snap=false}={}){
     if(snap||cameraState.key!==key||!Number.isFinite(cameraState.scale)){
@@ -2350,6 +2398,9 @@ export async function renderBlockWorld(root, options={}){
     const viewportHeight=Math.max(1,viewport.clientHeight||1);
     const authoredWidth=Math.max(1,Number(area.width)||1);
     const authoredHeight=Math.max(1,Number(area.height)||1);
+    const cameraExtent=cameraContentExtent(area);
+    const cameraWorldWidth=Math.max(authoredWidth,cameraExtent.width);
+    const cameraWorldHeight=Math.max(authoredHeight,cameraExtent.height);
     const cameraScene=activeSceneElement();
     const camera=runtimeConfigFor(area).camera;
     const editorOverview=editorWorkspace&&editMode&&!activeSubarea;
@@ -2382,14 +2433,18 @@ export async function renderBlockWorld(root, options={}){
         const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.5;
         const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.72;
         const lookAhead=Number(camera.lookAhead)||0;
-        const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
-        const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
+        const maxX=Math.max(0,cameraWorldWidth-visibleWorldWidth);
+        const maxY=Math.max(0,cameraWorldHeight-visibleWorldHeight);
         const targetX=clampCamera(state.x+(state.facingX||0)*lookAhead-visibleWorldWidth*anchorX,0,maxX);
         const targetY=camera.vertical==='ground'
           ? maxY
-          : clampCamera(state.y-visibleWorldHeight*anchorY,0,maxY);
+          : clampCamera(state.y+(state.facingY||0)*lookAhead*.55-visibleWorldHeight*anchorY,0,maxY);
         const blended=cameraBlend(sceneKey,targetX,targetY,fitScale);
-        cameraX=blended.x;cameraY=blended.y;fitScale=blended.scale;
+        const blendedMaxX=Math.max(0,cameraWorldWidth-viewportWidth/blended.scale);
+        const blendedMaxY=Math.max(0,cameraWorldHeight-viewportHeight/blended.scale);
+        const safe=keepPlayerInsideCamera(blended.x,blended.y,blended.scale,viewportWidth,viewportHeight,blendedMaxX,blendedMaxY);
+        cameraX=safe.x;cameraY=safe.y;fitScale=blended.scale;
+        cameraState.x=cameraX;cameraState.y=cameraY;
       }
     }else if(editorOverview){
       // Authoring still fits the complete block, independent of the gameplay camera.
@@ -2418,14 +2473,18 @@ export async function renderBlockWorld(root, options={}){
       const anchorX=Number.isFinite(Number(camera.anchorX))?Number(camera.anchorX):.46;
       const anchorY=Number.isFinite(Number(camera.anchorY))?Number(camera.anchorY):.76;
       const lookAhead=Number(camera.lookAhead)||0;
-      const maxX=Math.max(0,authoredWidth-visibleWorldWidth);
-      const maxY=Math.max(0,authoredHeight-visibleWorldHeight);
+      const maxX=Math.max(0,cameraWorldWidth-visibleWorldWidth);
+      const maxY=Math.max(0,cameraWorldHeight-visibleWorldHeight);
       const targetX=clampCamera(state.x+(state.facingX||0)*lookAhead-visibleWorldWidth*anchorX,0,maxX);
       const targetY=camera.vertical==='ground'
         ? maxY
-        : clampCamera(state.y-visibleWorldHeight*anchorY,0,maxY);
+        : clampCamera(state.y+(state.facingY||0)*lookAhead*.55-visibleWorldHeight*anchorY,0,maxY);
       const blended=cameraBlend(sceneKey,targetX,targetY,targetScale);
-      cameraX=blended.x;cameraY=blended.y;fitScale=blended.scale;
+      const blendedMaxX=Math.max(0,cameraWorldWidth-viewportWidth/blended.scale);
+      const blendedMaxY=Math.max(0,cameraWorldHeight-viewportHeight/blended.scale);
+      const safe=keepPlayerInsideCamera(blended.x,blended.y,blended.scale,viewportWidth,viewportHeight,blendedMaxX,blendedMaxY);
+      cameraX=safe.x;cameraY=safe.y;fitScale=blended.scale;
+      cameraState.x=cameraX;cameraState.y=cameraY;
     }
 
     cameraScene.style.transform=`translate3d(${screenOffsetX-cameraX*fitScale}px,${screenOffsetY-cameraY*fitScale}px,0) scale(${fitScale})`;

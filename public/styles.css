@@ -3319,3 +3319,20 @@ body.dev-block-editor-page{
   .dev-block-editor-page .bw-scene-config-grid label{font-size:5px}
   .dev-block-editor-page .bw-scene-config-grid input{height:24px;padding:2px 4px;font-size:8px}
 }
+
+/* H1.39 — Downtown 3D empty street foundation */
+.downtown3d-foundation{background:#171d22}
+.downtown3d-title{pointer-events:none}
+.downtown3d-status{position:absolute;z-index:8;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;gap:5px;min-width:min(360px,82vw);padding:14px 16px;border:1px solid rgba(214,141,53,.5);background:rgba(10,12,14,.9);backdrop-filter:blur(10px);text-align:center;transition:opacity .35s,transform .35s}
+.downtown3d-status strong{font-size:.72rem;letter-spacing:.08em;color:var(--accent2)}
+.downtown3d-status span{font-size:.6rem;color:var(--muted)}
+.downtown3d-status.ready{border-color:rgba(120,158,105,.6)}
+.downtown3d-status.ready strong{color:#a8c99a}
+.downtown3d-status.error{border-color:rgba(189,93,80,.75)}
+.downtown3d-status.error strong{color:#e49b91}
+.downtown3d-status.settled{opacity:0;transform:translate(-50%,-42%);pointer-events:none}
+.downtown3d-meter{position:absolute;z-index:6;left:50%;top:16px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;max-width:min(560px,52vw);overflow-x:auto;scrollbar-width:none;padding:5px;border:1px solid rgba(255,255,255,.1);background:rgba(9,11,13,.64);backdrop-filter:blur(8px)}
+.downtown3d-meter::-webkit-scrollbar{display:none}.downtown3d-meter span{white-space:nowrap;padding:4px 6px;border-right:1px solid rgba(255,255,255,.08);font-size:.48rem;font-weight:900;letter-spacing:.08em;color:#c8c5bd}.downtown3d-meter span:last-child{border-right:0}
+.downtown3d-action-pad{grid-template-columns:72px}
+@media(max-width:900px),(pointer:coarse){.downtown3d-meter{top:auto;bottom:max(8px,env(safe-area-inset-bottom));max-width:46vw}.downtown3d-action-pad{grid-template-columns:62px}.downtown3d-status{top:44%}}
+@media(orientation:landscape) and (pointer:coarse){body.world3d-game-mode .downtown3d-meter{left:50%;top:8px;bottom:auto;max-width:44vw}.downtown3d-action-pad{grid-template-columns:62px}}
