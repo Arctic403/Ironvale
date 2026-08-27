@@ -1,0 +1,705 @@
+{
+  "format": "riftcity-city-block",
+  "version": 1,
+  "id": "downtown-block-001",
+  "name": "Commerce Block 01",
+  "units": "meters",
+  "grid": {
+    "cell_size": 1,
+    "shape_increment": 0.5
+  },
+  "origin": [
+    0,
+    0,
+    0
+  ],
+  "bounds": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      63,
+      15,
+      63
+    ]
+  },
+  "palette": {
+    "air": {
+      "material_id": 0,
+      "shape": "air",
+      "color": [
+        0,
+        0,
+        0
+      ]
+    },
+    "lot": {
+      "material_id": 1,
+      "shape": "full",
+      "color": [
+        0.34,
+        0.31,
+        0.27
+      ]
+    },
+    "concrete": {
+      "material_id": 2,
+      "shape": "full",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    },
+    "brick_dark": {
+      "material_id": 3,
+      "shape": "full",
+      "color": [
+        0.31,
+        0.22,
+        0.18
+      ]
+    },
+    "brick_red": {
+      "material_id": 4,
+      "shape": "full",
+      "color": [
+        0.47,
+        0.24,
+        0.19
+      ]
+    },
+    "stone": {
+      "material_id": 5,
+      "shape": "full",
+      "color": [
+        0.52,
+        0.51,
+        0.48
+      ]
+    },
+    "roof": {
+      "material_id": 6,
+      "shape": "full",
+      "color": [
+        0.18,
+        0.2,
+        0.21
+      ]
+    },
+    "glass_placeholder": {
+      "material_id": 7,
+      "shape": "full",
+      "color": [
+        0.28,
+        0.48,
+        0.58
+      ]
+    },
+    "slab_concrete_bottom": {
+      "material_id": 2,
+      "shape": "slab_bottom",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    },
+    "slab_concrete_top": {
+      "material_id": 2,
+      "shape": "slab_top",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    },
+    "stair_concrete_n": {
+      "material_id": 2,
+      "shape": "stair",
+      "rotation": "north",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    },
+    "stair_concrete_e": {
+      "material_id": 2,
+      "shape": "stair",
+      "rotation": "east",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    },
+    "stair_concrete_s": {
+      "material_id": 2,
+      "shape": "stair",
+      "rotation": "south",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    },
+    "stair_concrete_w": {
+      "material_id": 2,
+      "shape": "stair",
+      "rotation": "west",
+      "color": [
+        0.64,
+        0.63,
+        0.59
+      ]
+    }
+  },
+  "ops": [
+    {
+      "op": "fill_box",
+      "state": "lot",
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        63,
+        0,
+        63
+      ],
+      "name": "64x64m city-block ground plate"
+    },
+    {
+      "op": "hollow_box",
+      "state": "brick_red",
+      "roof_state": "roof",
+      "floor": true,
+      "wall_thickness": 1,
+      "min": [
+        4,
+        1,
+        4
+      ],
+      "max": [
+        25,
+        11,
+        24
+      ],
+      "name": "Mercer Apartments"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        13,
+        1,
+        4
+      ],
+      "max": [
+        14,
+        3,
+        4
+      ],
+      "name": "Mercer main entrance"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        7,
+        3,
+        4
+      ],
+      "max": [
+        9,
+        5,
+        4
+      ],
+      "name": "Mercer front window A"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        7,
+        3,
+        4
+      ],
+      "max": [
+        9,
+        5,
+        4
+      ],
+      "name": "Mercer front window A placeholder"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        18,
+        3,
+        4
+      ],
+      "max": [
+        20,
+        5,
+        4
+      ],
+      "name": "Mercer front window B"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        18,
+        3,
+        4
+      ],
+      "max": [
+        20,
+        5,
+        4
+      ],
+      "name": "Mercer front window B placeholder"
+    },
+    {
+      "op": "fill_box",
+      "state": "slab_concrete_bottom",
+      "min": [
+        12,
+        1,
+        2
+      ],
+      "max": [
+        15,
+        1,
+        3
+      ],
+      "name": "Mercer entrance landing"
+    },
+    {
+      "op": "set",
+      "state": "stair_concrete_s",
+      "at": [
+        13,
+        1,
+        1
+      ],
+      "name": "Mercer entrance stair L"
+    },
+    {
+      "op": "set",
+      "state": "stair_concrete_s",
+      "at": [
+        14,
+        1,
+        1
+      ],
+      "name": "Mercer entrance stair R"
+    },
+    {
+      "op": "fill_box",
+      "state": "roof",
+      "min": [
+        8,
+        12,
+        8
+      ],
+      "max": [
+        12,
+        13,
+        12
+      ],
+      "name": "Mercer rooftop utility box"
+    },
+    {
+      "op": "hollow_box",
+      "state": "brick_dark",
+      "roof_state": "roof",
+      "floor": true,
+      "wall_thickness": 1,
+      "min": [
+        30,
+        1,
+        4
+      ],
+      "max": [
+        59,
+        7,
+        24
+      ],
+      "name": "Commerce Shops"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        31,
+        3,
+        4
+      ],
+      "max": [
+        58,
+        5,
+        4
+      ],
+      "name": "Continuous storefront glazing placeholder"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        34,
+        1,
+        4
+      ],
+      "max": [
+        35,
+        3,
+        4
+      ],
+      "name": "Shop entrance 1"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        44,
+        1,
+        4
+      ],
+      "max": [
+        45,
+        3,
+        4
+      ],
+      "name": "Shop entrance 2"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        54,
+        1,
+        4
+      ],
+      "max": [
+        55,
+        3,
+        4
+      ],
+      "name": "Shop entrance 3"
+    },
+    {
+      "op": "fill_box",
+      "state": "slab_concrete_top",
+      "min": [
+        31,
+        6,
+        3
+      ],
+      "max": [
+        58,
+        6,
+        3
+      ],
+      "name": "Blocky storefront awning"
+    },
+    {
+      "op": "hollow_box",
+      "state": "stone",
+      "roof_state": "roof",
+      "floor": true,
+      "wall_thickness": 1,
+      "min": [
+        4,
+        1,
+        34
+      ],
+      "max": [
+        31,
+        9,
+        59
+      ],
+      "name": "Rift Offices"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        15,
+        1,
+        34
+      ],
+      "max": [
+        17,
+        3,
+        34
+      ],
+      "name": "Rift Offices entrance"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        7,
+        3,
+        34
+      ],
+      "max": [
+        11,
+        5,
+        34
+      ],
+      "name": "Office front window A placeholder"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        21,
+        3,
+        34
+      ],
+      "max": [
+        27,
+        5,
+        34
+      ],
+      "name": "Office front window B placeholder"
+    },
+    {
+      "op": "set",
+      "state": "stair_concrete_n",
+      "at": [
+        15,
+        1,
+        32
+      ],
+      "name": "Office entrance stair L"
+    },
+    {
+      "op": "set",
+      "state": "stair_concrete_n",
+      "at": [
+        16,
+        1,
+        32
+      ],
+      "name": "Office entrance stair C"
+    },
+    {
+      "op": "set",
+      "state": "stair_concrete_n",
+      "at": [
+        17,
+        1,
+        32
+      ],
+      "name": "Office entrance stair R"
+    },
+    {
+      "op": "hollow_box",
+      "state": "brick_dark",
+      "roof_state": "roof",
+      "floor": true,
+      "wall_thickness": 1,
+      "min": [
+        37,
+        1,
+        35
+      ],
+      "max": [
+        59,
+        13,
+        59
+      ],
+      "name": "Warehouse Lofts"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        46,
+        1,
+        35
+      ],
+      "max": [
+        49,
+        4,
+        35
+      ],
+      "name": "Warehouse loading entrance"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        40,
+        4,
+        35
+      ],
+      "max": [
+        43,
+        6,
+        35
+      ],
+      "name": "Warehouse window A placeholder"
+    },
+    {
+      "op": "fill_box",
+      "state": "glass_placeholder",
+      "min": [
+        53,
+        4,
+        35
+      ],
+      "max": [
+        56,
+        6,
+        35
+      ],
+      "name": "Warehouse window B placeholder"
+    },
+    {
+      "op": "fill_box",
+      "state": "roof",
+      "min": [
+        45,
+        14,
+        45
+      ],
+      "max": [
+        50,
+        15,
+        50
+      ],
+      "name": "Warehouse rooftop utility box"
+    },
+    {
+      "op": "fill_box",
+      "state": "concrete",
+      "min": [
+        0,
+        1,
+        28
+      ],
+      "max": [
+        63,
+        1,
+        31
+      ],
+      "name": "4m service alley pavement"
+    },
+    {
+      "op": "fill_box",
+      "state": "slab_concrete_bottom",
+      "min": [
+        0,
+        1,
+        27
+      ],
+      "max": [
+        63,
+        1,
+        27
+      ],
+      "name": "South alley edge"
+    },
+    {
+      "op": "fill_box",
+      "state": "slab_concrete_bottom",
+      "min": [
+        0,
+        1,
+        32
+      ],
+      "max": [
+        63,
+        1,
+        32
+      ],
+      "name": "North alley edge"
+    },
+    {
+      "op": "fill_box",
+      "state": "concrete",
+      "min": [
+        26,
+        1,
+        4
+      ],
+      "max": [
+        29,
+        1,
+        24
+      ],
+      "name": "4m service gap between Mercer and Shops"
+    },
+    {
+      "op": "fill_box",
+      "state": "concrete",
+      "min": [
+        32,
+        1,
+        35
+      ],
+      "max": [
+        35,
+        1,
+        59
+      ],
+      "name": "4m service gap between Offices and Warehouse"
+    }
+  ],
+  "spawn_points": [
+    {
+      "id": "block-preview",
+      "position": [
+        32,
+        20,
+        -18
+      ],
+      "look_at": [
+        32,
+        4,
+        32
+      ]
+    },
+    {
+      "id": "walk-test",
+      "position": [
+        13.5,
+        2,
+        0.5
+      ],
+      "look_at": [
+        13.5,
+        2,
+        8
+      ]
+    }
+  ],
+  "validation": {
+    "must_remain_blocky": true,
+    "allowed_shapes": [
+      "full",
+      "slab_bottom",
+      "slab_top",
+      "stair"
+    ],
+    "forbid": [
+      "curves",
+      "bevels",
+      "arbitrary_scale",
+      "smooth_wedges"
+    ],
+    "expected": {
+      "operations": 34,
+      "cells": 12533,
+      "partialCells": 166,
+      "sections": 16,
+      "stateBytes": 131072,
+      "quads": 19642,
+      "vertices": 78568,
+      "triangles": 39284,
+      "shapeAwareSections": 12
+    }
+  }
+}

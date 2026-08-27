@@ -1365,3 +1365,70 @@ Every scene has locked expected counts for occupied logical cells, occupied half
 `npm run build` remains Pure-JavaScript only and now syntax-checks 88 JavaScript files.
 
 Next intended step after visual validation: return the new full/slab/stair vocabulary to the real Commerce Avenue world, then use it for realistic sidewalk/entrance transitions before city stamp/prefab work.
+
+## H1.57 — JSON city-block importer + Commerce Block 01
+
+H1.56 proved the first-generation full/slab/stair vocabulary. H1.57 stops hardcoding each city test directly into the active renderer and introduces a compact authored JSON asset contract so complete city blocks can be generated, swapped and tested without changing the engine code for every visual iteration.
+
+### Compact block asset contract
+
+- Added `riftcity-city-block` JSON format version 1.
+- The logical world remains exactly **1 m per cell**. The current JSON contract explicitly requires `cell_size: 1` and `shape_increment: 0.5`.
+- Palette entries resolve to the existing compact `Uint16` RiftBlock state: material ID + full/slab/stair shape + stair rotation.
+- Supported authored operations are intentionally small and deterministic:
+  - `set` for one logical cell;
+  - `fill_box` for an inclusive block region;
+  - `cut_box` for an inclusive AIR region;
+  - `hollow_box` for block-built walls/floor/roof with integer wall thickness.
+- A JSON block is expanded into normal `RiftBlockSection` objects, then meshed through the same cross-section neighbor culling and shape-aware partial-occlusion path already proven in H1.51–H1.56.
+- The importer rejects wrong formats/versions, non-meter grids, unsupported shapes/rotations, writes outside declared bounds, oversized imports and operation bombs before touching the active preview.
+- Local `.json` files can be selected from the City preview with **IMPORT JSON**. A failed local import leaves the currently rendered block intact.
+- **BLOCK 001** reloads the bundled authored asset at any time, so generated JSON iterations can be compared without modifying renderer code.
+
+### First authored block: Commerce Block 01
+
+The bundled `public/riftcity-blocks/downtown-block-001.json` is a **64 × 64 m** block with a maximum authored height of 16 m. It intentionally uses only the block shapes already validated in H1.56—full blocks, top/bottom slabs and directional stairs—and keeps the visual language block-built with no curves, bevels, smooth wedges or arbitrary scaled detail.
+
+The first block contains four coarse building masses:
+
+- **Mercer Apartments** — red-brick mid-rise with two front window groups, block entrance landing/stairs and a rooftop utility box.
+- **Commerce Shops** — lower dark-brick storefront row with placeholder glazing, three entrances and a blocky slab awning.
+- **Rift Offices** — stone office shell with front glazing groups and a stair entrance.
+- **Warehouse Lofts** — tallest dark-brick shell with loading entrance, upper windows and rooftop utility mass.
+
+A **4 m service alley** crosses the block between the north/south building pairs, with additional 4 m service/pedestrian gaps separating the east/west buildings.
+
+### Locked Block 001 import totals
+
+The bundled JSON has 34 compact operations and must compile to exactly:
+
+- **12,533 occupied logical cells**
+- **166 partial slab/stair cells**
+- **16 RiftSections**
+- **128 KB logical `Uint16` section state**
+- **19,642 rendered quads**
+- **78,568 vertices**
+- **39,284 triangles**
+- **12 shape-aware sections**
+
+These totals are stored as an optional JSON validation oracle. If the authored asset or importer semantics drift, Block 001 is rejected rather than silently rendering a different city block.
+
+The active City preview now renders the imported block as one mesh per non-empty RiftSection and keeps the proven hard block-face readability, block grid, culling toggle, orbit/pinch zoom, top view, spin and fullscreen controls. H1.56 shape validation still runs during startup before the JSON asset is accepted.
+
+Next step after visual Block 001 validation: iterate the city-block JSON itself (building proportions, frontage, alley, entrances and interior shell layout), then add reusable/stamped street placement around imported blocks before scaling to several connected blocks and the first full district slice.
+
+
+### H1.57.1 — active imported block survives local-preview refresh
+
+The JSON importer now treats an accepted local block as the active test asset instead of a one-frame file-picker preview:
+
+- accepted import JSON is saved under a versioned RiftCity browser-storage key after it compiles and its GPU meshes are created successfully;
+- `localStorage` is preferred, with `sessionStorage` as a fallback when the local editor preview restricts persistent storage;
+- reopening/reloading the City preview restores the saved JSON first instead of unconditionally fetching Commerce Block 01;
+- the HUD explicitly reports `ACTIVE <block-id> · PERSISTED`, `SESSION SAVED`, `PREVIEW ONLY`, or `BUNDLED`;
+- **RESET DEFAULT** clears both storage locations and reloads bundled Block 001;
+- corrupt/stale saved JSON is cleared automatically and falls back to Block 001 with a visible explanation;
+- importing the same filename twice is supported by clearing the hidden file input before each picker open;
+- rejected imports leave the current block rendered and now say which active block was preserved.
+
+The saved JSON remains capped at 2 MB so a generated test asset cannot consume an excessive amount of iPhone browser storage. This persistence is intentionally local to the browser/editor-preview origin; it is not server/D1 world persistence.
