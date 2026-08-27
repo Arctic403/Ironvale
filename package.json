@@ -4,21 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:react && npm run verify:js-only && node scripts/check-js.js",
+    "build": "npm run verify:js-only && node scripts/check-js.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",
     "db:migrate:local": "wrangler d1 execute riftcity-v2 --local --file=./schema.sql",
     "db:migrate:remote": "wrangler d1 execute riftcity-v2 --remote --file=./schema.sql",
-    "verify:js-only": "node scripts/verify-js-only.js",
-    "build:react": "esbuild client/react/index.jsx --bundle --format=esm --platform=browser --target=safari15,chrome100 --outfile=public/react-ui.js --minify"
+    "verify:js-only": "node scripts/verify-js-only.js"
   },
   "devDependencies": {
-    "wrangler": "^4.30.0",
-    "esbuild": "^0.25.0"
-  },
-  "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "wrangler": "^4.30.0"
   }
 }

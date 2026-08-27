@@ -1190,8 +1190,8 @@ body.bw-fullscreen-mode .bw-editor{
 }
 
 
-/* Hybrid H1 — React owns the Block Editor UI shell; world/runtime stays plain JS. */
-.bw-react-editor-host{position:contents}
+/* Block Editor UI shell and world/runtime are plain JavaScript. */
+.bw-editor-ui-host{position:contents}
 
 
 /* Hybrid H1.1 — mobile Block Editor runtime repair */
@@ -1729,8 +1729,8 @@ body.dev-block-editor-page{
   text-decoration:none;font-weight:900;
 }
 
-/* The React editor becomes transparent chrome around the real scene. */
-.dev-block-editor-page .bw-editor-page .bw-react-editor-host{
+/* The editor UI host becomes transparent chrome around the real scene. */
+.dev-block-editor-page .bw-editor-page .bw-editor-ui-host{
   position:absolute!important;inset:0!important;z-index:800!important;pointer-events:none!important;
 }
 .dev-block-editor-page .bw-editor-studio{
@@ -1918,7 +1918,7 @@ body.dev-block-editor-page{
 .dev-block-editor-page .bw-fullscreen-active{
   position:fixed!important;inset:0!important;margin:0!important;border-radius:0!important;
 }
-.dev-block-editor-page .bw-fullscreen-active .bw-react-editor-host{inset:0!important}
+.dev-block-editor-page .bw-fullscreen-active .bw-editor-ui-host{inset:0!important}
 
 /* Smaller iPhones: dock sizes start compact but remain resizable/collapsible. */
 @media (max-width:760px), (max-height:470px){
@@ -2145,8 +2145,8 @@ body.dev-block-editor-page{
 .dev-block-editor-page .blockworld-shell.bw-editor-page.bw-dock-bottom-collapsed{--be-bottom-effective:34px}
 .dev-block-editor-page .blockworld-shell.bw-editor-page.bw-dock-transform-collapsed{--be-transform-effective:34px}
 
-/* React wrappers disappear from layout; their actual children become grid items. */
-.dev-block-editor-page .bw-editor-page .bw-react-editor-host{
+/* Editor UI wrappers disappear from layout; their actual children become grid items. */
+.dev-block-editor-page .bw-editor-page .bw-editor-ui-host{
   display:contents!important;
   position:static!important;
   inset:auto!important;
@@ -2428,17 +2428,68 @@ body.dev-block-editor-page{
   padding:0!important;
 }
 
-/* Bottom dock spans the whole screen width beneath the scene. */
+/* Bottom dock spans the whole screen width beneath the scene. The scroll
+   viewport and the wide content are intentionally separate: H1.33 put the
+   690/710px width on the scroll container itself, so the parent clipped it and
+   iPhone Safari had nothing it could actually scroll. */
+.dev-block-editor-page .bw-studio-bottom-scroll{
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow-x:scroll!important;
+  overflow-y:hidden!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-x:contain!important;
+  touch-action:pan-x!important;
+  scrollbar-width:none!important;
+  padding:7px 7px 15px!important;
+  box-sizing:border-box!important;
+}
+.dev-block-editor-page .bw-studio-bottom-scroll::-webkit-scrollbar{display:none!important}
 .dev-block-editor-page .bw-studio-bottom-body{
   display:grid!important;
   grid-template-columns:minmax(250px,1.5fr) minmax(170px,1fr) minmax(170px,1fr) minmax(100px,.62fr)!important;
   gap:8px!important;
   min-width:710px!important;
-  width:max(100%,710px)!important;
+  width:max-content!important;
   overflow:visible!important;
   align-items:start!important;
 }
-.dev-block-editor-page .bw-studio-bottom .bw-studio-panel-body{overflow-x:auto!important;overflow-y:hidden!important}
+.dev-block-editor-page .bw-studio-bottom-scrollbar{
+  appearance:none!important;
+  -webkit-appearance:none!important;
+  position:absolute!important;
+  left:9px!important;
+  right:9px!important;
+  bottom:3px!important;
+  width:calc(100% - 18px)!important;
+  height:11px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  z-index:45!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.dev-block-editor-page .bw-studio-bottom-scrollbar::-webkit-slider-runnable-track{
+  height:7px!important;
+  border-radius:999px!important;
+  background:#17313a!important;
+  border:1px solid rgba(103,234,166,.42)!important;
+}
+.dev-block-editor-page .bw-studio-bottom-scrollbar::-webkit-slider-thumb{
+  -webkit-appearance:none!important;
+  width:54px!important;
+  height:11px!important;
+  margin-top:-3px!important;
+  border-radius:999px!important;
+  border:1px solid #a9ffd0!important;
+  background:#67eaa6!important;
+  box-shadow:0 0 0 2px rgba(0,0,0,.28)!important;
+}
+.dev-block-editor-page .bw-studio-bottom-scrollbar:disabled{opacity:.25!important}
 .dev-block-editor-page .bw-studio-toolgroup{min-width:0!important;overflow:hidden!important}
 .dev-block-editor-page .bw-studio-icon-tools{overflow-x:auto!important;padding-bottom:2px!important}
 .dev-block-editor-page .bw-studio-icon-tools button{min-width:48px!important;min-height:36px!important}
@@ -2546,12 +2597,19 @@ body.dev-block-editor-page{
   .dev-block-editor-page .bw-studio-viewport-tools{gap:3px!important;padding:3px!important;border-radius:7px!important}
   .dev-block-editor-page .bw-studio-viewport-tools button{height:29px!important;min-height:29px!important;font-size:14px!important}
 
+  .dev-block-editor-page .bw-studio-bottom-scroll{
+    width:100%!important;
+    min-width:0!important;
+    padding:4px 4px 14px!important;
+  }
   .dev-block-editor-page .bw-studio-bottom-body{
     grid-template-columns:245px 170px 165px 90px!important;
     min-width:690px!important;
     width:690px!important;
     gap:5px!important;
   }
+  .dev-block-editor-page .bw-studio-bottom-scrollbar{left:6px!important;right:6px!important;width:calc(100% - 12px)!important;bottom:2px!important}
+  .dev-block-editor-page .bw-studio-bottom-scrollbar::-webkit-slider-thumb{width:46px!important}
   .dev-block-editor-page .bw-studio-toolgroup{gap:2px!important;padding-right:4px!important}
   .dev-block-editor-page .bw-studio-toolgroup>small{font-size:6px!important}
   .dev-block-editor-page .bw-studio-icon-tools{gap:3px!important}

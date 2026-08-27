@@ -4,6 +4,7 @@ import { BLOCK1, BLOCK_EDITOR_SCHEMA_VERSION } from '../block1.js';
 import { BLOCK_ASSETS } from '../block-assets.js';
 import { getSubarea } from '../subareas.js';
 import { SceneManager } from '../scene-manager.js';
+import { loadSceneRuntimeSource, sourceRuntimeConfigFor, mergeSceneRuntimeConfig } from '../scene-runtime-config.js';
 import {
   sha256File,
   dataUrlToBlob,
@@ -18,13 +19,15 @@ export function destroyBlockWorld(){ if(cleanup){cleanup();cleanup=null;} }
 
 export async function renderBlockWorld(root, options={}){
   const editorWorkspace=!!options.editorWorkspace;
+  const mountEditorUi=typeof options.mountEditorUi==='function'?options.mountEditorUi:null;
   destroyBlockWorld();
   const PRIMARY_SUBAREA_ID='alley-commerce-01';
-  const [worldData,playerData,publishedBlockData,publishedAlleyData]=await Promise.all([
+  const [worldData,playerData,publishedBlockData,publishedAlleyData,sceneRuntimeSource]=await Promise.all([
     api('/api/world'),
     api('/api/player'),
     api(`/api/world/blocks/${encodeURIComponent(BLOCK1.id)}`),
-    api(`/api/world/blocks/${encodeURIComponent(PRIMARY_SUBAREA_ID)}`)
+    api(`/api/world/blocks/${encodeURIComponent(PRIMARY_SUBAREA_ID)}`),
+    loadSceneRuntimeSource()
   ]);
   const locations=worldData.locations||[];
   const validLocationIds=new Set(locations.map(x=>x.id));
@@ -95,7 +98,7 @@ export async function renderBlockWorld(root, options={}){
       </div>
       <div class="bw-block-label"><small id="bw-area-kicker">DOWNTOWN / BLOCK 01</small><strong id="bw-area-name">Commerce Street</strong></div>
       ${editorWorkspace
-        ? '<div id="bw-react-editor-root" class="bw-react-editor-host"></div>'
+        ? '<div id="bw-editor-ui-root" class="bw-editor-ui-host"></div>'
         : '<div class="bw-dev-buttons bw-player-only-buttons"><button class="bw-fullscreen" id="bw-fullscreen" type="button" aria-label="Toggle fullscreen">FULLSCREEN</button></div>'}
       <div class="bw-controls">
         <div class="bw-stick" id="bw-stick"><div class="bw-knob" id="bw-knob"></div></div>
@@ -104,12 +107,12 @@ export async function renderBlockWorld(root, options={}){
       </div>
     </section>`;
 
-  let unmountReactEditor=()=>{};
+  let unmountEditorUi=()=>{};
   let editorScope=root;
 
   if(editorWorkspace){
-    const { mountBlockEditor }=await import('../react-ui.js');
-    unmountReactEditor=mountBlockEditor(root.querySelector('#bw-react-editor-root'));
+    if(!mountEditorUi)throw new Error('Block Editor UI mount function is required for editorWorkspace.');
+    unmountEditorUi=mountEditorUi(root.querySelector('#bw-editor-ui-root'));
   }else{
     editorScope=document.createElement('div');
     editorScope.innerHTML=`
@@ -226,6 +229,8 @@ export async function renderBlockWorld(root, options={}){
   const configDepthMin=editorQuery('#bw-config-depth-min');
   const configDepthMax=editorQuery('#bw-config-depth-max');
   const configIntegrityStatus=editorQuery('#bw-config-integrity-status');
+  const toolsScroll=editorQuery('#bw-tools-scroll');
+  const toolsScrollbar=editorQuery('#bw-tools-scrollbar');
 
   const STUDIO_LAYOUT_KEY='riftcity:block-editor:studio-layout:v3';
   function setupStudioPanels(){
@@ -566,8 +571,26 @@ export async function renderBlockWorld(root, options={}){
     interaction:Object.freeze({radius:100,roomExitRadius:105})
   });
 
+  const sourceSceneCache=new Map();
   function sourceSceneDocument(id){
-    return String(id||'')===BLOCK1.id?BLOCK1:getSubarea(id);
+    const sceneId=String(id||'');
+    if(sourceSceneCache.has(sceneId))return sourceSceneCache.get(sceneId);
+    const legacy=sceneId===BLOCK1.id?BLOCK1:getSubarea(sceneId);
+    if(!legacy){
+      sourceSceneCache.set(sceneId,null);
+      return null;
+    }
+    const authored=cloneBlock(legacy);
+    const sourceRuntime=sourceRuntimeConfigFor(sceneRuntimeSource,sceneId);
+    if(sourceRuntime){
+      authored.runtimeConfig=mergeSceneRuntimeConfig(authored.runtimeConfig,sourceRuntime);
+      // Keep legacy aliases coherent for older rendering/editor paths, but the
+      // versioned runtimeConfig is the canonical source-controlled value.
+      authored.camera={...(authored.camera||{}),...(authored.runtimeConfig.camera||{})};
+      authored.character={...(authored.character||{}),...(authored.runtimeConfig.player||{})};
+    }
+    sourceSceneCache.set(sceneId,authored);
+    return authored;
   }
 
   function runtimeConfigFor(area=currentArea()){
@@ -599,7 +622,7 @@ export async function renderBlockWorld(root, options={}){
   }
 
   const normalizeSubareaLayout=(value,id=PRIMARY_SUBAREA_ID)=>{
-    const authored=getSubarea(id);
+    const authored=sourceSceneDocument(id);
     if(!authored)return null;
     const raw=cloneBlock(value||authored);
     const base=cloneBlock(authored);
@@ -630,11 +653,20 @@ export async function renderBlockWorld(root, options={}){
     return next;
   };
 
-  let publishedWorking=cloneBlock(publishedBlockData?.block||BLOCK1);
+  const authoredStreet=sourceSceneDocument(BLOCK1.id)||BLOCK1;
+  let publishedWorking=cloneBlock(publishedBlockData?.block||authoredStreet);
+  // Older D1 revisions may predate runtimeConfig. Fill only the missing config
+  // from the source-controlled scene config; a published D1 runtimeConfig always
+  // remains authoritative over the repo fallback.
+  if(publishedBlockData?.block&&!publishedBlockData.block.runtimeConfig){
+    publishedWorking.runtimeConfig=cloneBlock(authoredStreet.runtimeConfig||{});
+    publishedWorking.camera={...(publishedWorking.camera||{}),...(publishedWorking.runtimeConfig.camera||{})};
+    publishedWorking.character={...(publishedWorking.character||{}),...(publishedWorking.runtimeConfig.player||{})};
+  }
   const publishedSubareas=new Map();
   const publishedAlley=normalizeSubareaLayout(publishedAlleyData?.block,PRIMARY_SUBAREA_ID);
   if(publishedAlley)publishedSubareas.set(PRIMARY_SUBAREA_ID,publishedAlley);
-  const resolveSubarea=id=>publishedSubareas.get(String(id||''))||getSubarea(id);
+  const resolveSubarea=id=>publishedSubareas.get(String(id||''))||sourceSceneDocument(id);
 
   let editMode=false, editorCollapsed=false, selectedKey='', selectedVertexIndex=-1, addPointMode=false, drag=null;
   let working=cloneBlock(publishedWorking);
@@ -656,10 +688,10 @@ export async function renderBlockWorld(root, options={}){
   const editingSubarea=()=>editorSceneId!==BLOCK1.id;
   const editorDocumentId=()=>editorSceneId||BLOCK1.id;
   const authoredEditorDocument=()=>editingSubarea()
-    ? normalizeSubareaLayout(getSubarea(editorSceneId),editorSceneId)
-    : cloneBlock(BLOCK1);
+    ? normalizeSubareaLayout(sourceSceneDocument(editorSceneId),editorSceneId)
+    : cloneBlock(sourceSceneDocument(BLOCK1.id)||BLOCK1);
   const publishedEditorDocument=()=>editingSubarea()
-    ? cloneBlock(publishedSubareas.get(editorSceneId)||normalizeSubareaLayout(getSubarea(editorSceneId),editorSceneId))
+    ? cloneBlock(publishedSubareas.get(editorSceneId)||normalizeSubareaLayout(sourceSceneDocument(editorSceneId),editorSceneId))
     : cloneBlock(publishedWorking);
 
   function setWorkingEditorDocument(value){
@@ -707,6 +739,10 @@ export async function renderBlockWorld(root, options={}){
 
   async function saveDraftToServer({force=false}={}){
     if(!editMode||draftSaving||(!draftDirty&&!force))return true;
+    // iPhone/Safari number fields can still be focused when PUBLISH is tapped.
+    // Read their visible values directly before serializing so a pending keyboard
+    // edit cannot be skipped just because the native change event has not fired yet.
+    syncSceneConfigInputsIntoWorking();
     // Materialize the resolved per-scene runtime config into every saved draft so
     // legacy D1 layouts migrate to the versioned config envelope on next publish.
     ensureWorkingRuntimeConfig();
@@ -1324,6 +1360,52 @@ export async function renderBlockWorld(root, options={}){
     }
   }
 
+  function syncSceneConfigInputsIntoWorking(){
+    if(!editorWorkspace)return false;
+    const config=ensureWorkingRuntimeConfig();
+    let changed=false;
+    const assign=(group,key,input,min,max)=>{
+      if(!input)return;
+      const value=Number(input.value);
+      if(!Number.isFinite(value))return;
+      const clamped=Math.max(min,Math.min(max,value));
+      config[group]||(config[group]={});
+      if(Number(config[group][key])!==clamped){
+        config[group][key]=clamped;
+        changed=true;
+      }
+    };
+
+    const zoomKey=editingSubarea()?'zoom':'playScale';
+    assign('camera',zoomKey,configCameraZoom,.2,2);
+    if(configCameraZoom){
+      const zoom=Number(config.camera[zoomKey]);
+      if(Number.isFinite(zoom)){
+        if(zoom<Number(config.camera.minScale||zoom)){config.camera.minScale=zoom;changed=true;}
+        if(zoom>Number(config.camera.maxScale||zoom)){config.camera.maxScale=zoom;changed=true;}
+      }
+    }
+    assign('player','baseScale',configPlayerScale,.5,3);
+    assign('camera','lookAhead',configLookAhead,0,1200);
+    assign('interaction',editingSubarea()?'roomExitRadius':'radius',configInteractionRadius,20,500);
+    assign('movement','walkSpeed',configWalkSpeed,40,800);
+    assign('movement','runSpeed',configRunSpeed,60,1200);
+    assign('player','depthMin',configDepthMin,.3,2);
+    assign('player','depthMax',configDepthMax,.3,2.5);
+    if(Number(config.player.depthMin)>Number(config.player.depthMax)){
+      config.player.depthMax=config.player.depthMin;
+      changed=true;
+    }
+    if(Number(config.movement.runSpeed)<Number(config.movement.walkSpeed)){
+      config.movement.runSpeed=config.movement.walkSpeed;
+      changed=true;
+    }
+    working.runtimeConfig=config;
+    working.camera={...config.camera};
+    working.character={...config.player};
+    return changed;
+  }
+
   function setSceneConfigValue(group,key,value,{min=-Infinity,max=Infinity}={}){
     const number=Number(value);
     if(!Number.isFinite(number))return;
@@ -1637,7 +1719,7 @@ export async function renderBlockWorld(root, options={}){
       if(wasRoom){
         // Play Mode stays inside the room. Draft-only changes disappear; the
         // verified published room becomes authoritative just like the street.
-        const live=cloneBlock(publishedSubareas.get(roomId)||normalizeSubareaLayout(getSubarea(roomId),roomId));
+        const live=cloneBlock(publishedSubareas.get(roomId)||normalizeSubareaLayout(sourceSceneDocument(roomId),roomId));
         working=cloneBlock(publishedWorking);
         activeSubarea=live;
         if(sceneManager.active)sceneManager.active.scene=activeSubarea;
@@ -1684,7 +1766,7 @@ export async function renderBlockWorld(root, options={}){
       return true;
     }
 
-    const authored=getSubarea(target);
+    const authored=sourceSceneDocument(target);
     if(!authored){
       setServerStatus(`ROOM · unknown ${target}`,'error');
       return false;
@@ -1866,8 +1948,13 @@ export async function renderBlockWorld(root, options={}){
       spawn:working.spawn,
       walkable:working.walkable||{x:0,y:990,width:working.width||BLOCK1.width,height:(working.height||BLOCK1.height)-990},
       obstacles:working.buildings||[],
-      camera:working.camera||BLOCK1.camera||{},
-      character:working.character||BLOCK1.character||{}
+      // Keep the published runtimeConfig attached to the gameplay area. H1.33
+      // accidentally rebuilt the street area without this field, so
+      // runtimeConfigFor() fell back to the source defaults and silently
+      // overrode published camera/player values in Play Mode.
+      runtimeConfig:working.runtimeConfig||authoredStreet.runtimeConfig||BLOCK1.runtimeConfig||{},
+      camera:working.camera||authoredStreet.camera||BLOCK1.camera||{},
+      character:working.character||authoredStreet.character||BLOCK1.character||{}
     };
   }
 
@@ -2207,9 +2294,12 @@ export async function renderBlockWorld(root, options={}){
     const character=runtimeConfigFor(area).player;
     const editorCharacterScale=Number(character.editorScale);
     const playCharacterScale=Number(character.baseScale);
-    const baseCharacterScale=(editorWorkspace&&editMode)
-      ? (Number.isFinite(editorCharacterScale)&&editorCharacterScale>0?editorCharacterScale:1)
-      : (Number.isFinite(playCharacterScale)&&playCharacterScale>0?playCharacterScale:1);
+    const authoredBaseScale=Number.isFinite(playCharacterScale)&&playCharacterScale>0?playCharacterScale:1;
+    // editorScale is only an authoring-view multiplier. Keep baseScale in the
+    // equation so changing PLAYER SCALE gives immediate visual feedback instead
+    // of appearing dead until Play Mode.
+    const editorPreviewScale=Number.isFinite(editorCharacterScale)&&editorCharacterScale>0?editorCharacterScale:1;
+    const baseCharacterScale=authoredBaseScale*((editorWorkspace&&editMode)?editorPreviewScale:1);
     const depthRange=Math.max(1,walkBounds.height-PLAYER_RADIUS*2);
     const rawDepth=.82+((state.y-(walkBounds.y+PLAYER_RADIUS))/depthRange)*.20;
     const depthMin=Number.isFinite(Number(character.depthMin))?Number(character.depthMin):.78;
@@ -2343,7 +2433,7 @@ export async function renderBlockWorld(root, options={}){
 
   async function enterSubarea(targetId){
     if(sceneTransitionBusy)return false;
-    const next=getSubarea(targetId);
+    const next=sourceSceneDocument(targetId);
     if(!next){
       showSceneFailure(`UNKNOWN AREA ${targetId}`);
       return false;
@@ -2670,6 +2760,31 @@ export async function renderBlockWorld(root, options={}){
     try{editorSurfaceElement().releasePointerCapture?.(e.pointerId);}catch(_){ }
     drag=null;
   }
+  let toolsScrollResizeObserver=null;
+  const syncToolsScrollbar=()=>{
+    if(!toolsScroll||!toolsScrollbar)return;
+    const maxScroll=Math.max(0,toolsScroll.scrollWidth-toolsScroll.clientWidth);
+    const ratio=maxScroll>0?Math.max(0,Math.min(1,toolsScroll.scrollLeft/maxScroll)):0;
+    toolsScrollbar.value=String(Math.round(ratio*1000));
+    toolsScrollbar.disabled=maxScroll<2;
+    toolsScrollbar.dataset.scrollable=maxScroll>=2?'true':'false';
+  };
+  const onToolsScroll=()=>syncToolsScrollbar();
+  const onToolsScrollbarInput=()=>{
+    if(!toolsScroll||!toolsScrollbar)return;
+    const maxScroll=Math.max(0,toolsScroll.scrollWidth-toolsScroll.clientWidth);
+    toolsScroll.scrollLeft=maxScroll*(Number(toolsScrollbar.value)||0)/1000;
+  };
+  if(toolsScroll&&toolsScrollbar){
+    toolsScroll.addEventListener('scroll',onToolsScroll,{passive:true});
+    toolsScrollbar.addEventListener('input',onToolsScrollbarInput);
+    toolsScrollResizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(syncToolsScrollbar):null;
+    toolsScrollResizeObserver?.observe(toolsScroll);
+    const content=toolsScroll.querySelector('.bw-studio-bottom-body');
+    if(content)toolsScrollResizeObserver?.observe(content);
+    requestAnimationFrame(syncToolsScrollbar);
+  }
+
   assetFile.addEventListener('click',e=>{e.stopPropagation();});
   assetFile.addEventListener('change',async e=>{
     e.preventDefault();
@@ -2941,8 +3056,6 @@ export async function renderBlockWorld(root, options={}){
   async function exitFullscreen(){
     fullscreenMode=false;
     document.body.classList.remove('bw-fullscreen-mode');
-    root.removeEventListener('bw-player-action',onPlayerActionEvent);
-    try{ delete root.__bwPlayerAction; }catch(_){ root.__bwPlayerAction=undefined; }
     shell.classList.remove('bw-fullscreen-active','bw-editor-chrome-hidden');
     fullscreenButton.textContent='FULLSCREEN';
     try{screen.orientation?.unlock?.();}catch(_){}
@@ -3007,7 +3120,7 @@ export async function renderBlockWorld(root, options={}){
     clearTimeout(draftTimer);
     clearInterval(draftInterval);
     destroyStudioPanels?.();
-    unmountReactEditor?.();
+    unmountEditorUi?.();
     removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);
     stick.removeEventListener('pointerdown',down);stick.removeEventListener('pointermove',move);
     stick.removeEventListener('pointerup',up);stick.removeEventListener('pointercancel',up);
@@ -3015,6 +3128,11 @@ export async function renderBlockWorld(root, options={}){
     document.removeEventListener('fullscreenchange',onFullscreenChange);
     window.removeEventListener('resize',onViewportChange);
     window.visualViewport?.removeEventListener('resize',onViewportChange);
+    toolsScroll?.removeEventListener('scroll',onToolsScroll);
+    toolsScrollbar?.removeEventListener('input',onToolsScrollbarInput);
+    toolsScrollResizeObserver?.disconnect();
+    root.removeEventListener('bw-player-action',onPlayerActionEvent);
+    try{ delete root.__bwPlayerAction; }catch(_){ root.__bwPlayerAction=undefined; }
     document.body.classList.remove('bw-fullscreen-mode');
     shell.classList.remove('bw-fullscreen-active');
     try{screen.orientation?.unlock?.();}catch(_){}

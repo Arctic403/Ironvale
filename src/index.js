@@ -2143,7 +2143,7 @@ a{color:#63e6b1}
     <div class="dev-editor-loading"><strong>BLOCK EDITOR</strong><span>Loading Commerce Street…</span></div>
   </main>
   <script type="module">
-import { renderBlockWorld, destroyBlockWorld } from '/views/block-world.js';
+import { renderDeveloperBlockEditor, destroyBlockWorld } from '/editor/block-editor-entry.js';
 const root=document.querySelector('#dev-block-editor-root');
 async function boot(){
   const response=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
@@ -2153,7 +2153,7 @@ async function boot(){
     return;
   }
   document.documentElement.classList.add('dev-block-editor-document');
-  await renderBlockWorld(root,{editorWorkspace:true});
+  await renderDeveloperBlockEditor(root);
 }
 window.addEventListener('pagehide',()=>destroyBlockWorld(),{once:true});
 boot().catch(error=>{

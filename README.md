@@ -54,16 +54,16 @@ The `player_inventory` D1 table self-creates on the first inventory request. `sc
 
 The backend includes generic `addItemToInventory()` and `removeItemFromInventory()` helpers for future shops, crimes, rewards, drops and admin tools. They are intentionally not exposed as public grant endpoints.
 
-## JavaScript + React hybrid architecture
+## Pure JavaScript architecture
 
-RiftCity remains JavaScript end to end, but the browser UI now uses a deliberate hybrid architecture. React is introduced as UI islands while the timing-sensitive 2.5D runtime remains plain JavaScript:
+RiftCity is JavaScript end to end. The browser UI, private Block Editor and timing-sensitive 2.5D runtime all use plain ES-module JavaScript:
 
 - Cloudflare Worker/API: `src/*.js`
 - Browser game/runtime: plain ES-module JavaScript under `public/`
-- React UI islands: JavaScript/JSX under `client/react/`, bundled to `public/react-ui.js`
+- Private Block Editor UI: plain JavaScript under `public/editor/`, composed through the static `public/editor/block-editor-entry.js` entry with no JSX/bundle step
 - Wrangler entry point: `src/index.js`
 - No TypeScript source files, declaration files, `tsconfig`, TypeScript compiler, `ts-node`, `tsx`, or `@types/*` packages are required.
-- `npm run build` runs a JS-only guard first and fails if TypeScript is introduced later.
+- `npm run build` runs the pure-JavaScript guard first and fails if TypeScript, JSX, or the removed UI framework dependencies are introduced later.
 
 Wrangler still bundles the Worker for Cloudflare deployment, but RiftCity's source code and project configuration remain JavaScript-only.
 
@@ -185,7 +185,7 @@ The browser UI is intentionally not expanded in this backend pass; location/serv
 
 ## Phase 8 — Frontend restoration + full service integration
 
-Phase 8 rebuilds the browser client around the server-authoritative backend instead of reviving the original V1 React/TypeScript/local-simulation architecture.
+Phase 8 rebuilds the browser client around the server-authoritative backend instead of reviving the original V1 framework/TypeScript/local-simulation architecture.
 
 ### Frontend architecture
 
@@ -464,36 +464,34 @@ The temporary Block Editor can now import `riftcity-asset-pack` JSON files expor
 - Touch, mouse/trackpad and keyboard editing remain supported. The inspector X exits edit mode completely.
 
 
-## Hybrid H1 — React UI foundation + Block Editor
+## Hybrid H1 — Block Editor UI foundation
 
-RiftCity now uses a hybrid JavaScript/React frontend rather than planning a full React rewrite.
+RiftCity now uses one plain-JavaScript frontend for both game runtime and editor UI.
 
-- React owns the Block Editor's component/UI shell.
+- Plain JavaScript owns the Block Editor UI shell.
 - The existing plain-JavaScript Block World continues to own movement, camera, collision,
   fullscreen/orientation, touch input, world-space dragging and the animation loop.
 - The first migration deliberately preserves the Block Editor's existing DOM IDs so the
-  proven runtime behavior can attach to React-rendered controls without simultaneously
+  proven runtime behavior can attach to editor-rendered controls without simultaneously
   rewriting game logic.
-- `esbuild` bundles `client/react/index.jsx` to `public/react-ui.js` before the normal JS checks.
+- The Block Editor page loads `public/editor/block-editor-entry.js`, which statically imports both the shared Block World runtime and `public/editor/block-editor-ui.js`; no JSX/browser bundle step or runtime editor `import()` is required.
 - Wrangler still serves `./public`; Cloudflare Worker/D1 architecture is unchanged.
 - TypeScript is not introduced.
-- Future React migration order and hard ownership boundaries live in
-  `docs/HYBRID-REACT-ROADMAP.md`.
+- Current editor/runtime ownership boundaries live in
+  `docs/PURE-JS-EDITOR-ARCHITECTURE.md`.
 
-This is an incremental migration: React takes over UI-heavy surfaces one feature at a time,
-while real-time city/gameplay code stays direct JavaScript.
+The private editor and real-time city/gameplay code now share the same direct-JavaScript model and DOM/event boundary.
 
 
 ## Hybrid H1.1 — mobile Block Editor runtime repair
 
-- Fixed the editor state crash introduced during the H1 React island migration: the runtime now
+- Fixed the editor state crash introduced during the H1 editor-shell migration: the runtime now
   explicitly initializes `editorCollapsed`.
 - Restored reliable EDIT BLOCK open/minimize/reopen/close behavior.
 - Editor guides and boundaries render immediately when edit mode starts.
 - Touch dragging is hardened for iPhone Safari with scene-level pointer capture and gesture suppression.
 - Building geometry, spawn, exits and walkable boundaries remain draggable while the inspector is hidden.
-- The fix preserves the hybrid boundary: React owns the inspector UI; plain JavaScript owns world-space
-  selection, dragging, camera, collision and fullscreen.
+- The fix preserves the editor/runtime boundary: inspector UI, world-space selection, dragging, camera, collision and fullscreen all remain plain JavaScript.
 
 
 ## Hybrid H1.2 — compact mobile editor + resize gizmos
@@ -504,7 +502,7 @@ while real-time city/gameplay code stays direct JavaScript.
 - Edge gizmos resize only that edge; corner gizmos resize two axes; dragging the body still moves the object.
 - Gizmos share one pointer path across iPhone touch, Apple mouse/trackpad and desktop pointers.
 - Building interaction doors remain aligned while building geometry is moved or resized.
-- Plain JavaScript continues to own world-space manipulation; React continues to own the inspector UI.
+- Plain JavaScript owns both world-space manipulation and the inspector UI.
 
 
 ## Hybrid H1.3 — compact iPhone editor toolbar
@@ -531,7 +529,7 @@ large enough hit regions for fingers while allowing pointer/keyboard precision.
 - Landscape/fullscreen uses a single compact toolbar row around 90px tall instead of a large panel.
 - Portrait uses a shallow precision inspector; secondary tools are hidden/collapsed.
 - Resize gizmos keep a 44px touch hit region but use a small visible dot so geometry stays readable.
-- Direct scene dragging/resizing remains plain JavaScript; React owns only the inspector shell.
+- Direct scene dragging/resizing and the inspector shell both remain plain JavaScript.
 
 
 ## Hybrid H1.5 — server-persistent world authoring
@@ -598,15 +596,15 @@ Research-driven state cleanup:
 - Left, right and bottom panels are independently collapsible and resize with touch/mouse drag dividers. Panel sizes/collapse states persist locally on the device.
 - Edit/Play mode, Show/Hide Panel and Fullscreen remain independent controls.
 - The dedicated page starts in Edit Mode and reuses the existing D1 draft autosave, explicit Publish and authoritative block hydration path.
-- Existing touch/mouse/keyboard world manipulation remains plain JavaScript; React owns the studio UI chrome.
+- Existing touch/mouse/keyboard world manipulation and the studio UI chrome remain plain JavaScript.
 - Mobile editor gizmos have larger visible handles and touch targets on the private editor page.
 - Fullscreen uses the entire dynamic viewport and preserves the existing iPhone CSS-rotation fallback when Safari cannot orientation-lock.
 
 
 ## Hybrid H1.11 — private reference studio + player/editor separation
 
-- The normal City / Commerce Street page no longer renders Block Editor UI or mounts the React editor.
-- The editor React bundle is dynamically imported only by the server-gated `/dev/block-editor` workspace.
+- The normal City / Commerce Street page no longer renders or mounts the private Block Editor UI.
+- The editor UI module is dynamically imported only by the server-gated `/dev/block-editor` workspace.
 - Player-facing Commerce Street keeps gameplay controls + Fullscreen only, and keyboard `E` is restored to Enter/interact.
 - `/dev/block-editor` remains restricted to `developer` / `admin` accounts and is the only authoring surface.
 - The private UI now follows the approved reference much more closely: project/status header, Play/Hide/Publish/Fullscreen/Exit controls, Object + ID/Label + X/Y/W/H + Rotation + Z-index + Snap strip, left Add Object palette, right Properties inspector, center zoom controls and bottom Tools/View/Settings/Status tray.
@@ -925,3 +923,30 @@ npx wrangler secret put CONFIG_SIGNING_SECRET
 ```
 
 The secret is never stored in D1 or sent to the browser. D1 stores only the config JSON, revision, SHA-256, signature and algorithm metadata. Without the secret the system still rejects accidental/corrupt SHA-256 mismatches, but HMAC is required to prevent a party with direct D1 write access from forging a replacement config.
+
+## Hybrid H1.35 — source-controlled scene runtime config
+
+- `public/config/scene-runtime.json` is now the canonical source-controlled fallback for per-scene runtime tuning such as camera zoom, player visual scale, movement speeds, depth scaling and interaction radii.
+- Runtime precedence is: verified published D1 scene config → source-controlled `scene-runtime.json` → legacy JS scene defaults → hard runtime defaults.
+- The game loads the source config before constructing Commerce Street or Commerce Alley, so values saved by the Editor's **SAVE PUBLISHED CONFIG TO WORKSPACE** flow survive a normal Local Test rebuild and become the repo fallback after the normal GitHub push.
+- Older D1 scene revisions without `runtimeConfig` inherit the repo source config automatically; newer verified D1 revisions keep authority over the source fallback.
+- The JS `runtimeConfig`, `camera` and `character` values in `block1.js` / `subareas.js` remain compatibility fallbacks during migration, but source tuning should be written to `public/config/scene-runtime.json` going forward.
+
+## H1.36 — pure-JavaScript Block Editor purge
+
+- Removed the old component-framework island and its JSX entry point from RiftCity.
+- Replaced the private Block Editor shell with `public/editor/block-editor-ui.js`, a synchronous plain-ES-module UI mount that preserves every existing control ID, class and data attribute used by the runtime.
+- `public/views/block-world.js` now dynamically imports the plain-JavaScript editor UI only inside the private developer workspace; player-facing Commerce Street does not load editor UI code.
+- Removed the browser UI bundling step and its framework/build dependencies from `package.json`; `npm run build` is now policy verification plus direct JavaScript syntax checks.
+- The pure-JavaScript policy now rejects JSX and the removed framework dependencies if they are accidentally reintroduced.
+- Replaced the old hybrid migration roadmap with `docs/PURE-JS-EDITOR-ARCHITECTURE.md`.
+- Cloudflare Worker/D1/R2 behavior, draft/publish/history APIs, scene config, polygon authoring, movement/collision, camera, fullscreen and Local Test contracts are otherwise unchanged.
+
+
+## H1.37 — deterministic pure-JS Block Editor entry
+
+- Added `public/editor/block-editor-entry.js` as the only composition point between the private Block Editor UI and the shared Block World runtime.
+- Removed the editor-only runtime `import()` from `public/views/block-world.js`; gameplay no longer needs to resolve private editor modules.
+- The private Worker Block Editor page now imports the dedicated editor entry module directly.
+- The static relative import graph is safe to mount under the normal site root or the Editor Local Test `/__riftcity_local__/` prefix, which avoids iOS standalone/Home Screen failures caused by resolving an editor-only lazy module through a different service-worker client context.
+- The pure-JavaScript guard now rejects any future direct `block-editor-ui.js` import from the shared Block World runtime.
