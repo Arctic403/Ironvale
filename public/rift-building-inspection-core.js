@@ -37,7 +37,7 @@ function architecturalColumn(cells,x,z,floorY,ceilingY){
   for(let y=floorY+1;y<ceilingY;y++){
     const cell=cells.get(key(x,y,z));
     if(!cell)continue;
-    if(cell.role==='stair'||cell.role==='interior-wall')return cell.role;
+    if(cell.role==='stair'||cell.role==='interior-wall'||cell.role==='site')return cell.role;
   }
   return null;
 }
@@ -49,13 +49,17 @@ export function measureRiftInteriorClearance(authoring){
   for(const space of interior.spaces||[]){
     const floorMeta=floors.find(item=>item.floor===space.floor);if(!floorMeta)continue;
     const floorY=floorMeta.localY,next=floors.find(item=>item.floor===space.floor+1),ceilingY=next?next.localY:document.bounds.max[1]+1,rect=localRect(space),heights=[];
-    let excludedStairColumns=0,excludedWallColumns=0,unsupportedColumns=0;
+    let excludedStairColumns=0,excludedWallColumns=0,excludedSiteColumns=0,unsupportedColumns=0;
     for(let z=rect.min[1];z<=rect.max[1];z++)for(let x=rect.min[0];x<=rect.max[0];x++){
       const support=cells.get(key(x,floorY,z));
       if(!support||support.role!=='floor'){unsupportedColumns++;continue}
       const architectural=architecturalColumn(cells,x,z,floorY,ceilingY);
       if(architectural==='stair'){excludedStairColumns++;continue}
       if(architectural==='interior-wall'){excludedWallColumns++;continue}
+      // Site ops are fixtures, furniture, forecourt pieces and other additive set dressing.
+      // They remain real rendered/collision geometry, but they are not a ceiling and therefore
+      // must not collapse the architectural floor-to-ceiling measurement to zero.
+      if(architectural==='site'){excludedSiteColumns++;continue}
       let clear=0;
       for(let y=floorY+1;y<ceilingY;y++){if(cells.has(key(x,y,z)))break;clear++}
       heights.push(clear);
@@ -63,7 +67,7 @@ export function measureRiftInteriorClearance(authoring){
     const declared=Number(space.clearHeight||0),pass=heights.filter(v=>v>=declared).length;
     reports.push({
       id:space.id,name:space.name,floor:space.floor,declaredClearHeight:declared,samples:heights.length,
-      excludedStairColumns,excludedWallColumns,unsupportedColumns,
+      excludedStairColumns,excludedWallColumns,excludedSiteColumns,unsupportedColumns,
       minimum:heights.length?Math.min(...heights):0,p10:percentile(heights,.10),median:percentile(heights,.50),p90:percentile(heights,.90),maximum:heights.length?Math.max(...heights):0,
       declaredPassRatio:heights.length?pass/heights.length:0
     });
@@ -99,14 +103,24 @@ export function buildRiftInspectionDocument(authoring,options={}){
 }
 
 export function inspectionFocus(authoring,focusId){
-  if(!focusId)return null;const core=(authoring.semantics?.interior?.verticalCores||[]).find(item=>item.id===focusId);if(!core)return null;
-  const cells=core.openingCellsLocal||[],points=cells.length?cells.map(p=>[p[0],p[1],p[2]]):[core.local||core.at],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]||0),zs=points.map(p=>p[2]??p[1]);
-  return{target:[(Math.min(...xs)+Math.max(...xs)+1)/2,(Math.min(...ys)+Math.max(...ys)+1)/2,(Math.min(...zs)+Math.max(...zs)+1)/2],span:Math.max(12,Number(core.width||2)*2,Number(core.steps||4)*1.3),core};
+  if(!focusId)return null;
+  const interior=authoring.semantics?.interior;
+  const core=(interior?.verticalCores||[]).find(item=>item.id===focusId);
+  if(core){
+    const cells=core.openingCellsLocal||[],points=cells.length?cells.map(p=>[p[0],p[1],p[2]]):[core.local||core.at],xs=points.map(p=>p[0]),ys=points.map(p=>p[1]||0),zs=points.map(p=>p[2]??p[1]);
+    return{target:[(Math.min(...xs)+Math.max(...xs)+1)/2,(Math.min(...ys)+Math.max(...ys)+1)/2,(Math.min(...zs)+Math.max(...zs)+1)/2],span:Math.max(12,Number(core.width||2)*2,Number(core.steps||4)*1.3),core};
+  }
+  const space=(interior?.spaces||[]).find(item=>item.id===focusId);
+  if(space){
+    const rect=localRect(space),floorMeta=(authoring.semantics?.floors||[]).find(item=>item.floor===space.floor),y=Number(floorMeta?.localY||0)+Math.max(1,Number(space.clearHeight||4)/2),width=rect.max[0]-rect.min[0]+1,depth=rect.max[1]-rect.min[1]+1;
+    return{target:[(rect.min[0]+rect.max[0]+1)/2,y,(rect.min[1]+rect.max[1]+1)/2],span:Math.max(12,width,depth),space};
+  }
+  return null;
 }
 
 export function createRiftInspectionReport(authoring){
   const clearance=measureRiftInteriorClearance(authoring),interior=authoring.semantics?.interior;
-  return{version:1,buildingId:authoring.semantics.buildingId,name:authoring.semantics.name,worldBounds:authoring.semantics.worldBounds,
+  return{version:2,buildingId:authoring.semantics.buildingId,name:authoring.semantics.name,worldBounds:authoring.semantics.worldBounds,
     floors:(authoring.semantics.floors||[]).map(item=>({floor:item.floor,localY:item.localY,worldY:item.worldY})),clearance,
     portals:(interior?.portals||[]).map(p=>({id:p.id,floor:p.floor,width:p.width,height:p.height,blocked:!!p.blocked})),
     verticalCores:(interior?.verticalCores||[]).map(c=>({id:c.id,fromFloor:c.fromFloor,toFloor:c.toFloor,width:c.width,steps:c.steps,headClearance:c.headClearance,removedFloorCells:c.removedFloorCells,topLandings:c.topLandings,bottomLandings:c.bottomLandings,blockedHeadroom:!!c.blockedHeadroom,missingStairs:!!c.missingStairs})),
