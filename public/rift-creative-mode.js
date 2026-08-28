@@ -1,3 +1,4 @@
+import { ensureRiftSharedPalette } from './rift-material-library.js';
 const ROTATIONS=['north','east','south','west'];
 const clone=value=>JSON.parse(JSON.stringify(value));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -72,7 +73,7 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
         preserveCamera:true,
         preservePlayer:true
       });
-      draft=clone(getImported().document);selectedId='';refreshPalette();refreshSelect();
+      draft=ensureRiftSharedPalette(clone(getImported().document));selectedId='';refreshPalette();refreshSelect();
       await apiJson(`/api/admin/ai-builder/drafts/${encodeURIComponent(id)}/loaded`,{method:'POST'});
       await refreshAiDrafts();
       setStatus(`Loaded D1 AI draft ${result.draft.name||result.draft.documentId||id}. Review/edit it here before any export or future publish step.`);
@@ -89,7 +90,7 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
     if(!stateSelect||!draft?.palette)return;
     const previous=selectedState;
     const entries=Object.entries(draft.palette).filter(([,entry])=>Number(entry?.material_id)!==0&&String(entry?.shape||'full').toLowerCase()!=='air');
-    stateSelect.innerHTML=entries.map(([name,entry])=>`<option value="${esc(name)}">${esc(name)} · ${esc(entry.shape||'full')}${entry.rotation?` · ${esc(entry.rotation)}`:''}</option>`).join('');
+    stateSelect.innerHTML=entries.map(([name,entry])=>{const label=entry.display_name||entry.displayName||name,kind=entry.kind&&entry.kind!=='solid'?entry.kind:(entry.shape||'full');return `<option value="${esc(name)}">${esc(label)} · ${esc(kind)}${entry.rotation?` · ${esc(entry.rotation)}`:''}</option>`;}).join('');
     selectedState=entries.some(([name])=>name===previous)?previous:(entries[0]?.[0]||'');
     stateSelect.value=selectedState;
     const selected=draft.palette[selectedState]; if(selected?.shape==='stair')stairRotation=String(selected.rotation||'north').toLowerCase();
@@ -141,7 +142,8 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
       const p=[ray.origin[0]+ray.direction[0]*d,ray.origin[1]+ray.direction[1]*d,ray.origin[2]+ray.direction[2]*d],cell=p.map(Math.floor),key=cell.join(',');
       if(key===lastKey)continue;lastKey=key;
       const state=grid.getBlockWorld(cell[0],cell[1],cell[2])||0;
-      if(state)return {hit:cell,place:previous,state,distance:d};
+      const special=getImported?.()?.specialCells?.get?.(`${cell[0]}|${cell[1]}|${cell[2]}`)||null;
+      if(state||special)return {hit:cell,place:previous,state,distance:d,special};
       previous=cell;
     }
     return null;
@@ -204,7 +206,7 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   root.querySelectorAll('[data-rift-nudge]').forEach(button=>button.addEventListener('click',()=>{const [x,y,z]=button.dataset.riftNudge.split(',').map(Number);transform(x,y,z);}));
   root.querySelector('#rift-creative-rotate-left')?.addEventListener('click',()=>rotateSelected(-1));root.querySelector('#rift-creative-rotate-right')?.addEventListener('click',()=>rotateSelected(1));root.querySelector('#rift-creative-duplicate')?.addEventListener('click',duplicateSelected);root.querySelector('#rift-creative-delete')?.addEventListener('click',deleteSelected);root.querySelector('#rift-creative-undo')?.addEventListener('click',undoAction);root.querySelector('#rift-creative-redo')?.addEventListener('click',redoAction);root.querySelector('#rift-creative-export')?.addEventListener('click',exportDraft);root.querySelector('#rift-creative-close')?.addEventListener('click',()=>panel?.classList.remove('open'));root.querySelector('#rift-creative-open-panel')?.addEventListener('click',()=>panel?.classList.toggle('open'));
 
-  function enter(){const imported=getImported?.();if(!imported)return;active=true;draft=clone(imported.document);undo=[];redo=[];playerController.setCreativeMode(true);root.classList.add('rift-creative-active');panel?.classList.add('open');toggle?.classList.add('active');if(toggle)toggle.textContent='PLAY MODE';if(modeLabel)modeLabel.textContent='BUILD';refreshPalette();refreshSelect();setAction('break');setStatus('Build Mode ON. Stay in the overhead world and tap/click exact visible cells or use Blueprint object tools for large edits.');refreshAiDrafts();}
+  function enter(){const imported=getImported?.();if(!imported)return;active=true;draft=ensureRiftSharedPalette(clone(imported.document));undo=[];redo=[];playerController.setCreativeMode(true);root.classList.add('rift-creative-active');panel?.classList.add('open');toggle?.classList.add('active');if(toggle)toggle.textContent='PLAY MODE';if(modeLabel)modeLabel.textContent='BUILD';refreshPalette();refreshSelect();setAction('break');setStatus('Build Mode ON. Stay in the overhead world and tap/click exact visible cells or use Blueprint object tools for large edits.');refreshAiDrafts();}
   function exit(){if(!active){panel?.classList.remove('open');return;}active=false;playerController.setCreativeMode(false);hoverPoint=null;root.classList.remove('rift-creative-active');panel?.classList.remove('open');toggle?.classList.remove('active');if(toggle)toggle.textContent='BUILD MODE';if(modeLabel)modeLabel.textContent='PLAY';setMarkerCell(null);}
   function toggleMode(){active?exit():enter();}toggle?.addEventListener('click',toggleMode);
 
@@ -218,7 +220,7 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
 
   return {
     update(){updateTarget();},get active(){return active;},refreshAiDrafts,loadSelectedAiDraft,
-    onDocumentLoaded(){if(active){draft=clone(getImported().document);refreshPalette();refreshSelect();}},
+    onDocumentLoaded(){if(active){draft=ensureRiftSharedPalette(clone(getImported().document));refreshPalette();refreshSelect();}},
     destroy(){exit();toggle?.removeEventListener('click',toggleMode);window.removeEventListener('keydown',onKeyDown);canvas.removeEventListener('pointerdown',onCanvasPointerDown);canvas.removeEventListener('pointermove',onCanvasPointerMove);canvas.removeEventListener('pointerup',onCanvasPointerUp);engine.removeDrawables(markerEdges);}
   };
 }
