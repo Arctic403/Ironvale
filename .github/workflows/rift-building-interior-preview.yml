@@ -34,7 +34,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - name: Checkout AI branch
         uses: actions/checkout@v4
@@ -75,53 +75,70 @@ jobs:
           cat /tmp/rift-building-static.log
           exit 1
 
-      - name: Render one-level bank exterior interior eye-level and section views
+      - name: Render one-level bank review set
         shell: bash
         run: |
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
           if [ -z "$CHROME" ]; then echo 'No Chrome/Chromium binary found.' >&2; exit 1; fi
-          FLAGS=(--headless=new --no-sandbox --disable-dev-shm-usage --hide-scrollbars --ignore-gpu-blocklist --enable-webgl --use-angle=swiftshader --window-size=1800,1200 --virtual-time-budget=5000)
+          FLAGS=(--headless=new --no-sandbox --disable-dev-shm-usage --hide-scrollbars --ignore-gpu-blocklist --enable-webgl --use-angle=swiftshader --window-size=1800,1200 --virtual-time-budget=2500)
           BASE='http://127.0.0.1:4173/building-3d-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
-          snap(){ "$CHROME" "${FLAGS[@]}" --screenshot="rift-building-previews/full-resolution/$1.png" "$BASE&$2"; test -s "rift-building-previews/full-resolution/$1.png"; }
+          PLAN='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
+          PIDS=()
 
-          snap bank-exterior-top 'mode=full&view=top'
-          snap bank-exterior-iso-nw 'mode=full&view=iso-nw'
-          snap bank-exterior-iso-ne 'mode=full&view=iso-ne'
-          snap bank-exterior-iso-sw 'mode=full&view=iso-sw'
-          snap bank-exterior-iso-se 'mode=full&view=iso-se'
-          snap bank-exterior-north 'mode=full&view=north'
-          snap bank-exterior-east 'mode=full&view=east'
-          snap bank-exterior-south 'mode=full&view=south'
-          snap bank-exterior-west 'mode=full&view=west'
+          flush_shots() {
+            local pid
+            for pid in "${PIDS[@]}"; do wait "$pid"; done
+            PIDS=()
+          }
+
+          shot() {
+            local name="$1" url="$2"
+            (
+              local profile
+              profile="$(mktemp -d)"
+              trap 'rm -rf "$profile"' EXIT
+              "$CHROME" "${FLAGS[@]}" --user-data-dir="$profile" --screenshot="rift-building-previews/full-resolution/$name.png" "$url"
+              test -s "rift-building-previews/full-resolution/$name.png"
+            ) &
+            PIDS+=("$!")
+            if [ "${#PIDS[@]}" -ge 3 ]; then flush_shots; fi
+          }
+
+          shot bank-exterior-top "$BASE&mode=full&view=top"
+          shot bank-exterior-iso-nw "$BASE&mode=full&view=iso-nw"
+          shot bank-exterior-iso-ne "$BASE&mode=full&view=iso-ne"
+          shot bank-exterior-iso-sw "$BASE&mode=full&view=iso-sw"
+          shot bank-exterior-iso-se "$BASE&mode=full&view=iso-se"
+          shot bank-exterior-north "$BASE&mode=full&view=north"
+          shot bank-exterior-east "$BASE&mode=full&view=east"
+          shot bank-exterior-south "$BASE&mode=full&view=south"
+          shot bank-exterior-west "$BASE&mode=full&view=west"
 
           for view in iso-nw iso-ne iso-sw iso-se; do
-            snap "bank-f1-$view" "mode=floor&floor=1&view=$view"
+            shot "bank-f1-$view" "$BASE&mode=floor&floor=1&view=$view"
           done
 
           for direction in north east south west; do
-            snap "bank-vault-eye-$direction" "mode=full&space=main-vault&view=inside-$direction"
-            snap "bank-grand-hall-eye-$direction" "mode=full&space=grand-hall&view=inside-$direction"
+            shot "bank-vault-eye-$direction" "$BASE&mode=full&space=main-vault&view=inside-$direction"
+            shot "bank-grand-hall-eye-$direction" "$BASE&mode=full&space=grand-hall&view=inside-$direction"
           done
 
-          snap bank-teller-eye-north 'mode=full&space=teller-gallery&view=inside-north'
-          snap bank-teller-eye-south 'mode=full&space=teller-gallery&view=inside-south'
-          snap bank-executive-eye-west 'mode=full&space=east-executive-offices&view=inside-west'
-          snap bank-security-eye-west 'mode=full&space=east-security&view=inside-west'
+          shot bank-teller-eye-north "$BASE&mode=full&space=teller-gallery&view=inside-north"
+          shot bank-teller-eye-south "$BASE&mode=full&space=teller-gallery&view=inside-south"
+          shot bank-executive-eye-west "$BASE&mode=full&space=east-executive-offices&view=inside-west"
+          shot bank-security-eye-west "$BASE&mode=full&space=east-security&view=inside-west"
 
-          # True 3m architectural section bands through the monumental one-level shell.
-          snap bank-section-north 'mode=section&sectionAxis=z&sectionDepth=3&view=south'
-          snap bank-section-south 'mode=section&sectionAxis=z&sectionDepth=3&view=north'
-          snap bank-section-west 'mode=section&sectionAxis=x&sectionDepth=3&view=east'
-          snap bank-section-east 'mode=section&sectionAxis=x&sectionDepth=3&view=west'
+          shot bank-section-north "$BASE&mode=section&sectionAxis=z&sectionDepth=3&view=south"
+          shot bank-section-south "$BASE&mode=section&sectionAxis=z&sectionDepth=3&view=north"
+          shot bank-section-west "$BASE&mode=section&sectionAxis=x&sectionDepth=3&view=east"
+          shot bank-section-east "$BASE&mode=section&sectionAxis=x&sectionDepth=3&view=west"
+          shot bank-vault-section-ns "$BASE&mode=section&sectionAxis=z&sectionDepth=3&focus=main-vault&view=south"
+          shot bank-vault-section-ew "$BASE&mode=section&sectionAxis=x&sectionDepth=3&focus=main-vault&view=east"
+          shot bank-teller-section-ns "$BASE&mode=section&sectionAxis=z&sectionDepth=3&focus=teller-gallery&view=south"
 
-          # Focused slices through the new secure core and public transaction hall.
-          snap bank-vault-section-ns 'mode=section&sectionAxis=z&sectionDepth=3&focus=main-vault&view=south'
-          snap bank-vault-section-ew 'mode=section&sectionAxis=x&sectionDepth=3&focus=main-vault&view=east'
-          snap bank-teller-section-ns 'mode=section&sectionAxis=z&sectionDepth=3&focus=teller-gallery&view=south'
-
-          PLAN='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-f1-plan.png "${PLAN}&floor=1"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-xray-plan.png "${PLAN}&floor=1&xray=1"
+          shot bank-f1-plan "$PLAN&floor=1"
+          shot bank-xray-plan "$PLAN&floor=1&xray=1"
+          flush_shots
 
       - name: Package AI review artifact
         run: node scripts/package-rift-inspection-artifact.js rift-building-previews
