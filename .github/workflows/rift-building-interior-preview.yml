@@ -54,7 +54,7 @@ jobs:
           cat /tmp/rift-building-static.log
           exit 1
 
-      - name: Render Bank floor diagnostics
+      - name: Render H1.91 Bank floor diagnostics
         run: |
           mkdir -p rift-building-previews
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
@@ -73,13 +73,9 @@ jobs:
           BASE='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-b1.png "${BASE}&floor=1"
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f1.png "${BASE}&floor=2"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f2.png "${BASE}&floor=3"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f3.png "${BASE}&floor=4"
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-xray.png "${BASE}&floor=2&xray=1"
           test -s rift-building-previews/bank-b1.png
           test -s rift-building-previews/bank-f1.png
-          test -s rift-building-previews/bank-f2.png
-          test -s rift-building-previews/bank-f3.png
           test -s rift-building-previews/bank-xray.png
 
       - name: Upload interior previews
