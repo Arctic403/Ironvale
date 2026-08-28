@@ -4,7 +4,7 @@ const nativeFetch = window.fetch.bind(window);
 const BANK_PROGRAM_URL = new URL('./riftcity-buildings/riftcity-bank-001.json', import.meta.url);
 const DOWNTOWN_SUFFIX = '/riftcity-blocks/downtown-block-001.json';
 const ACTIVE_BLOCK_STORAGE_KEY = 'riftcity:h1.57:active-city-block:v1';
-const BANK_BUNDLE_REVISION = 'h1.96-one-level-grand-bank-v1';
+const BANK_BUNDLE_REVISION = 'h2.01-research-bank-v1';
 const BANK_OVERLAY_ID = 'riftcity-bank-001';
 let bankProgramPromise = null;
 let lastComposition = null;
@@ -97,7 +97,7 @@ window.fetch = async function riftWorldComposedFetch(input, init) {
 };
 
 window.RiftCityWorldComposition = Object.freeze({
-  version: 'H1.96',
+  version: 'H2.01',
   bankRevision: BANK_BUNDLE_REVISION,
   bankProgramUrl: BANK_PROGRAM_URL.href,
   composeDowntown,
