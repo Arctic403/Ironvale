@@ -190,6 +190,25 @@ controller.update(0.05);
 approx(fakePosition[1], 1, 1e-5);
 assert.ok(controller.recoveryCount >= 1, 'Crossing the kill plane must recover to a safe grounded position.');
 assert.ok(controller.lastSafeGroundedPosition, 'Controller must remember a validated safe grounded position.');
+// H1.88: a real basement may lower world minY without lowering street level.
+// The legacy Downtown fallback requested minY+2, which became -3 when the
+// Bank gained a B1 basement. An invalid underground request must recover
+// to actual walkable street support rather than starting a free-fall.
+const undergroundBounds = { min: [0, -5, 0], max: [63, 24, 63] };
+const undergroundController = createRiftPlayerController({
+  canvas: null,
+  camera: { flatForward: () => [0, 0, 1] },
+  getGrid: () => finiteGrid,
+  getWorldBounds: () => undergroundBounds,
+  player: fakePlayer,
+  touchRoot: { querySelector: () => null }
+});
+const undergroundSpawn = undergroundController.teleport([32, -3, 32]);
+approx(undergroundSpawn[1], 1, 1e-5);
+approx(fakePosition[1], 1, 1e-5);
+assert.equal(undergroundController.grounded, true, 'Negative world bounds must not make the default player spawn fall.');
+undergroundController.destroy();
+
 controller.destroy();
 if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow;
 
