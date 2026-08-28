@@ -1,3 +1,4 @@
+import './rift-world-composition-runtime.js';
 import { $, escapeHtml } from './ui/helpers.js';
 import { api } from './ui/api.js';
 import { state } from './ui/state.js';
