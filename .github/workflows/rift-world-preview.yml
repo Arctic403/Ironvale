@@ -5,27 +5,41 @@ on:
     branches: [ai-static-world-builder]
     paths:
       - 'public/riftcity-blocks/**/*.json'
+      - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
       - 'public/rift-world-inspection.js'
+      - 'public/rift-world-composer.js'
+      - 'public/rift-world-composition-runtime.js'
+      - 'public/rift-building-program.js'
+      - 'public/rift-interior-architecture.js'
       - 'public/rift-engine.js'
       - 'public/rift-engine-geometry.js'
       - 'public/rift-engine-math.js'
       - 'public/rift-city-block-importer.js'
       - 'public/rift-city-blueprints.js'
       - 'scripts/check-rift-world-index.js'
+      - 'scripts/check-rift-downtown-composition.js'
+      - 'scripts/check-rift-interior-architecture.js'
       - '.github/workflows/rift-world-preview.yml'
   pull_request:
     branches: [main]
     paths:
       - 'public/riftcity-blocks/**/*.json'
+      - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
       - 'public/rift-world-inspection.js'
+      - 'public/rift-world-composer.js'
+      - 'public/rift-world-composition-runtime.js'
+      - 'public/rift-building-program.js'
+      - 'public/rift-interior-architecture.js'
       - 'public/rift-engine.js'
       - 'public/rift-engine-geometry.js'
       - 'public/rift-engine-math.js'
       - 'public/rift-city-block-importer.js'
       - 'public/rift-city-blueprints.js'
       - 'scripts/check-rift-world-index.js'
+      - 'scripts/check-rift-downtown-composition.js'
+      - 'scripts/check-rift-interior-architecture.js'
       - '.github/workflows/rift-world-preview.yml'
   workflow_dispatch:
 
@@ -35,15 +49,17 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - name: Checkout RiftCity
         uses: actions/checkout@v4
 
-      - name: Validate world JSON
+      - name: Validate composed world + interiors
         run: |
           node scripts/check-rift-world-index.js
           node scripts/check-rift-city-blueprints.js
+          node scripts/check-rift-interior-architecture.js
+          node scripts/check-rift-downtown-composition.js
           node --check public/rift-world-inspection.js
 
       - name: Start static RiftCity server
