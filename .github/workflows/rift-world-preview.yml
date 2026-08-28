@@ -1,0 +1,77 @@
+name: Rift World Preview
+
+on:
+  push:
+    branches: [ai-static-world-builder]
+    paths:
+      - 'public/riftcity-blocks/**/*.json'
+      - 'public/inspection.html'
+      - 'public/rift-world-inspection.js'
+      - 'public/rift-engine.js'
+      - 'public/rift-engine-geometry.js'
+      - 'public/rift-engine-math.js'
+      - 'public/rift-city-block-importer.js'
+      - 'public/rift-city-blueprints.js'
+      - 'scripts/check-rift-world-index.js'
+      - '.github/workflows/rift-world-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout RiftCity
+        uses: actions/checkout@v4
+
+      - name: Validate world JSON
+        run: |
+          node scripts/check-rift-world-index.js
+          node scripts/check-rift-city-blueprints.js
+          node --check public/rift-world-inspection.js
+
+      - name: Start static RiftCity server
+        run: |
+          python3 -m http.server 4173 --directory public > /tmp/riftcity-static.log 2>&1 &
+          echo $! > /tmp/riftcity-static.pid
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/inspection.html >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/riftcity-static.log
+          exit 1
+
+      - name: Render top and birdseye previews
+        run: |
+          mkdir -p rift-world-previews
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo 'No Chrome/Chromium binary found on the GitHub runner.' >&2
+            exit 1
+          fi
+          FLAGS=(
+            --headless=new
+            --no-sandbox
+            --disable-dev-shm-usage
+            --hide-scrollbars
+            --ignore-gpu-blocklist
+            --enable-webgl
+            --use-angle=swiftshader
+            --window-size=1600,1200
+            --virtual-time-budget=5000
+          )
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-world-previews/downtown-top.png 'http://127.0.0.1:4173/inspection.html?view=top'
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-world-previews/downtown-birdseye.png 'http://127.0.0.1:4173/inspection.html?view=birdseye'
+          test -s rift-world-previews/downtown-top.png
+          test -s rift-world-previews/downtown-birdseye.png
+
+      - name: Upload Rift world previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: rift-world-previews
+          path: rift-world-previews/*.png
+          if-no-files-found: error
+          retention-days: 14
