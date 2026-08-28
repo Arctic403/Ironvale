@@ -34,7 +34,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout AI branch
         uses: actions/checkout@v4
@@ -104,12 +104,15 @@ jobs:
             snap "bank-grand-hall-eye-$direction" "mode=full&space=f1-grand-hall&view=inside-$direction"
           done
 
-          snap bank-section-north 'mode=section&sectionAxis=z&sectionSide=low&view=south'
-          snap bank-section-south 'mode=section&sectionAxis=z&sectionSide=high&view=north'
-          snap bank-section-west 'mode=section&sectionAxis=x&sectionSide=low&view=east'
-          snap bank-section-east 'mode=section&sectionAxis=x&sectionSide=high&view=west'
-          snap bank-stair-section-ns 'mode=section&sectionAxis=z&sectionSide=low&focus=grand-stair-b1-f1&view=iso-se'
-          snap bank-stair-section-ew 'mode=section&sectionAxis=x&sectionSide=low&focus=grand-stair-b1-f1&view=iso-ne'
+          # True 3m architectural section bands through the building center.
+          snap bank-section-north 'mode=section&sectionAxis=z&sectionDepth=3&view=south'
+          snap bank-section-south 'mode=section&sectionAxis=z&sectionDepth=3&view=north'
+          snap bank-section-west 'mode=section&sectionAxis=x&sectionDepth=3&view=east'
+          snap bank-section-east 'mode=section&sectionAxis=x&sectionDepth=3&view=west'
+
+          # Tight slices through the semantic grand-stair core: longitudinal and transverse.
+          snap bank-stair-section-ns 'mode=section&sectionAxis=z&sectionDepth=2&focus=grand-stair-b1-f1&view=south'
+          snap bank-stair-section-ew 'mode=section&sectionAxis=x&sectionDepth=3&focus=grand-stair-b1-f1&view=east'
 
           PLAN='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-b1-plan.png "${PLAN}&floor=1"
