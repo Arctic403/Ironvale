@@ -44,7 +44,10 @@ window.fetch = async function riftWorldComposedFetch(input, init) {
   const baseDocument = await response.clone().json();
   const document = await composeDowntown(baseDocument);
   const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.delete('content-encoding');
   headers.set('content-type', 'application/json; charset=utf-8');
+  headers.set('cache-control', 'no-store');
   headers.set('x-rift-world-composed', 'h1.86-bank');
   return new Response(JSON.stringify(document), {
     status: response.status,
