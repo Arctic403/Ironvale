@@ -59,15 +59,15 @@ async function boot(){
   const floor=Math.max(0,Number.parseInt(params.get('floor')||'0',10)||0),focusId=String(params.get('focus')||'').trim(),spaceId=String(params.get('space')||'').trim();
   const focus=roomFocus(authoring,spaceId)||inspectionFocus(authoring,focusId);
   if(view.startsWith('inside-')&&!focus?.space)throw new Error('Eye-level inside views require ?space=<interior-space-id>.');
-  const inspectionDocument=buildRiftInspectionDocument(authoring,{mode,floor,sectionAxis:params.get('sectionAxis'),sectionSide:params.get('sectionSide'),sectionAt:params.get('sectionAt'),focus:focusId});
+  const inspectionDocument=buildRiftInspectionDocument(authoring,{mode,floor,sectionAxis:params.get('sectionAxis'),sectionSide:params.get('sectionSide'),sectionAt:params.get('sectionAt'),sectionDepth:params.get('sectionDepth'),focus:focusId});
   compiled=compileRiftCityBlock(inspectionDocument);
   engine=new RiftEngine(canvas,{antialias:true,clearColor:[.035,.045,.055],fogColor:[.035,.045,.055],fogStart:220,fogEnd:800});
   for(const mesh of compiled.meshes)engine.addMesh(mesh.geometry,{color:'#ffffff',noise:0,blockGrid:.17,blockFaceShade:1,blockElevationCue:.008,blockElevationBase:compiled.worldBounds.min[1],doubleSided:false});
   camera=cameraFor(compiled,view,focus,authoring.semantics?.worldOrigin||[0,0,0]);render();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));render();
-  const section=mode==='section'?` · ${String(params.get('sectionAxis')||'z').toUpperCase()} ${String(params.get('sectionSide')||'low').toUpperCase()}`:'',room=focus?.space?` · ${focus.name}`:'';
+  const sectionInfo=inspectionDocument.metadata?.inspection?.section,section=mode==='section'?` · ${String(sectionInfo?.axis||params.get('sectionAxis')||'z').toUpperCase()} @ ${sectionInfo?.at??'?'}${sectionInfo?.depth?` · ${sectionInfo.depth}m SLICE`:''}`:'',room=focus?.space?` · ${focus.name}`:'';
   setStatus(`${authoring.semantics.name} · ${mode.toUpperCase()}${floor?` F${floor}`:''}${section}${room} · ${view.toUpperCase()} · ${clearanceSummary(floor,spaceId)} · ${compiled.stats.cells.toLocaleString()} cells`);
   document.documentElement.dataset.riftInspectionReady='1';document.title=`READY · ${authoring.semantics.name} · ${mode} · ${view}`;
-  window.RiftCityBuilding3DInspection=Object.freeze({version:3,view,mode,floor,spaceId,report,stats:{...compiled.stats},capturePng(){render();const gl=engine.gl,w=canvas.width,h=canvas.height,pixels=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const out=document.createElement('canvas');out.width=w;out.height=h;const c=out.getContext('2d',{alpha:false}),img=c.createImageData(w,h),stride=w*4;for(let y=0;y<h;y++)img.data.set(pixels.subarray((h-1-y)*stride,(h-y)*stride),y*stride);c.putImageData(img,0,0);return out.toDataURL('image/png')}});
+  window.RiftCityBuilding3DInspection=Object.freeze({version:4,view,mode,floor,spaceId,section:sectionInfo||null,report,stats:{...compiled.stats},capturePng(){render();const gl=engine.gl,w=canvas.width,h=canvas.height,pixels=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const out=document.createElement('canvas');out.width=w;out.height=h;const c=out.getContext('2d',{alpha:false}),img=c.createImageData(w,h),stride=w*4;for(let y=0;y<h;y++)img.data.set(pixels.subarray((h-1-y)*stride,(h-y)*stride),y*stride);c.putImageData(img,0,0);return out.toDataURL('image/png')}});
 }
 window.addEventListener('resize',render);
 boot().catch(error=>{console.error(error);document.documentElement.dataset.riftInspectionError='1';document.title='ERROR · RiftCity Building 3D Inspection';setStatus(error?.message||String(error))});
