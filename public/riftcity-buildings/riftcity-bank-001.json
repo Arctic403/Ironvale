@@ -1,0 +1,121 @@
+{
+  "format": "riftcity-building-program",
+  "version": 1,
+  "id": "riftcity-bank-001",
+  "name": "RiftCity Bank",
+  "units": "meters",
+  "world_origin": [186, 0, 26],
+  "district": "downtown-commerce",
+  "chunk_size": 128,
+  "lot": {
+    "id": "downtown-ne-bank-lot",
+    "bounds": { "min": [0, 0, 0], "max": [43, 24, 43] }
+  },
+  "palette": {
+    "bank_stone": { "material_id": 12, "shape": "full", "color": [0.64, 0.61, 0.54], "texture": "bank_stone" },
+    "concrete": { "material_id": 10, "shape": "full", "color": [0.55, 0.56, 0.57], "texture": "concrete" },
+    "roof": { "material_id": 15, "shape": "full", "color": [0.12, 0.13, 0.14], "texture": "roof" },
+    "glass": { "material_id": 16, "shape": "full", "color": [0.22, 0.48, 0.62], "texture": "glass" },
+    "paver": { "material_id": 4, "shape": "full", "color": [0.42, 0.43, 0.44], "texture": "paver" },
+    "planter": { "material_id": 19, "shape": "full", "color": [0.23, 0.18, 0.13], "texture": "planter" },
+    "leaf": { "material_id": 20, "shape": "full", "color": [0.16, 0.36, 0.16], "texture": "leaf" },
+    "accent": { "material_id": 21, "shape": "full", "color": [0.20, 0.42, 0.66], "texture": "metal" },
+    "bank_stair": { "material_id": 22, "shape": "stair", "rotation": "north", "color": [0.68, 0.65, 0.58], "texture": "bank_stone" },
+    "dark_metal": { "material_id": 23, "shape": "full", "color": [0.10, 0.12, 0.14], "texture": "metal" },
+    "warm_stone": { "material_id": 24, "shape": "full", "color": [0.74, 0.69, 0.58], "texture": "bank_stone" },
+    "interior_floor": { "material_id": 25, "shape": "full", "color": [0.43, 0.44, 0.43], "texture": "polished_concrete" }
+  },
+  "building": {
+    "origin": [4, 0, 6],
+    "rotation": "north",
+    "floors": 3,
+    "floor_height": 4,
+    "wall_state": "bank_stone",
+    "floor_state": "interior_floor",
+    "roof_state": "roof",
+    "tags": ["bank", "landmark", "public", "ai-generated", "semantic", "h1.86"],
+    "masses": [
+      { "id": "main-hall", "origin": [4, 0, 4], "size": [28, 20], "floors": 3 },
+      { "id": "west-wing", "origin": [0, 0, 8], "size": [8, 12], "floors": 2, "wall_state": "warm_stone" },
+      { "id": "east-wing", "origin": [28, 0, 8], "size": [8, 12], "floors": 2, "wall_state": "warm_stone" },
+      { "id": "lobby-tower", "origin": [10, 0, 20], "size": [16, 10], "floors": 4, "wall_state": "warm_stone" },
+      { "id": "rear-vault", "origin": [10, 0, 0], "size": [16, 8], "floors": 2, "wall_state": "concrete", "roof_state": "dark_metal" }
+    ],
+    "window_runs": [
+      { "id": "main-rear", "mass": "main-hall", "side": "north", "floors": [2, 3], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "main-front", "mass": "main-hall", "side": "south", "floors": [2, 3], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "main-west", "mass": "main-hall", "side": "west", "floors": [1, 2, 3], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "main-east", "mass": "main-hall", "side": "east", "floors": [1, 2, 3], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "west-side", "mass": "west-wing", "side": "west", "floors": "all", "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "west-front", "mass": "west-wing", "side": "south", "floors": "all", "offset": 1, "width": 2, "height": 2, "sill": 1, "spacing": 1, "state": "glass" },
+      { "id": "east-side", "mass": "east-wing", "side": "east", "floors": "all", "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "east-front", "mass": "east-wing", "side": "south", "floors": "all", "offset": 1, "width": 2, "height": 2, "sill": 1, "spacing": 1, "state": "glass" },
+      { "id": "tower-front", "mass": "lobby-tower", "side": "south", "floors": [2, 3, 4], "offset": 2, "width": 3, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "tower-west", "mass": "lobby-tower", "side": "west", "floors": [2, 3, 4], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "tower-east", "mass": "lobby-tower", "side": "east", "floors": [2, 3, 4], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "state": "glass" },
+      { "id": "vault-rear", "mass": "rear-vault", "side": "north", "floors": [2], "offset": 2, "width": 2, "height": 2, "sill": 1, "spacing": 2, "count": 3, "state": "glass" }
+    ],
+    "entrances": [
+      { "id": "bank-main-entrance", "mass": "lobby-tower", "side": "south", "offset": 5, "width": 6, "height": 3, "floor": 1, "tags": ["public", "entrance", "front-door", "bank-lobby"] },
+      { "id": "bank-staff-entry", "mass": "east-wing", "side": "east", "offset": 4, "width": 2, "height": 3, "floor": 1, "tags": ["staff", "service"] },
+      { "id": "bank-vault-delivery", "mass": "rear-vault", "side": "north", "offset": 7, "width": 2, "height": 3, "floor": 1, "tags": ["secure", "service", "vault"] }
+    ],
+    "stair_runs": [
+      { "id": "bank-stairs-1-2", "at": [13, 1, 15], "direction": "east", "steps": 4, "state": "bank_stair" },
+      { "id": "bank-stairs-2-3", "at": [18, 5, 15], "direction": "west", "steps": 4, "state": "bank_stair" },
+      { "id": "bank-stairs-3-4", "at": [13, 9, 23], "direction": "east", "steps": 4, "state": "bank_stair" }
+    ],
+    "rooms": [
+      { "id": "bank-lobby", "name": "Grand Banking Lobby", "floor": 1, "min": [10, 19], "max": [25, 29], "tags": ["public", "banking"] },
+      { "id": "teller-hall", "name": "Teller Hall", "floor": 1, "min": [7, 10], "max": [28, 18], "tags": ["public", "banking"] },
+      { "id": "secure-vault", "name": "Secure Vault", "floor": 1, "min": [11, 1], "max": [24, 7], "tags": ["secure", "vault"] },
+      { "id": "west-consult", "name": "Client Consultation", "floor": 1, "min": [1, 9], "max": [7, 18], "tags": ["public", "office"] },
+      { "id": "east-operations", "name": "Bank Operations", "floor": 1, "min": [28, 9], "max": [34, 18], "tags": ["staff", "office"] },
+      { "id": "lending-floor", "name": "Lending Offices", "floor": 2, "min": [6, 5], "max": [16, 15], "tags": ["office"] },
+      { "id": "admin-floor", "name": "Administration", "floor": 2, "min": [17, 5], "max": [28, 15], "tags": ["staff", "office"] },
+      { "id": "records-room", "name": "Records", "floor": 2, "min": [11, 1], "max": [24, 7], "tags": ["secure"] },
+      { "id": "tower-mezzanine", "name": "Lobby Mezzanine", "floor": 2, "min": [11, 21], "max": [24, 28], "tags": ["public"] },
+      { "id": "executive-suite", "name": "Executive Suite", "floor": 3, "min": [6, 6], "max": [15, 15], "tags": ["office"] },
+      { "id": "security-ops", "name": "Security Operations", "floor": 3, "min": [16, 6], "max": [25, 15], "tags": ["secure", "security"] },
+      { "id": "boardroom", "name": "Boardroom", "floor": 3, "min": [11, 21], "max": [24, 28], "tags": ["office"] },
+      { "id": "tower-suite", "name": "Landmark Tower Suite", "floor": 4, "min": [11, 21], "max": [24, 28], "tags": ["office", "landmark"] }
+    ],
+    "anchors": [
+      { "id": "bank-teller-counter", "kind": "gameplay", "at": [17, 1, 17], "facing": "south", "floor": 1, "tags": ["banking", "interaction"] },
+      { "id": "bank-vault-door", "kind": "secure", "at": [17, 1, 7], "facing": "north", "floor": 1, "tags": ["vault", "secure"] },
+      { "id": "bank-atm-zone", "kind": "gameplay", "at": [12, 1, 27], "facing": "south", "floor": 1, "tags": ["atm", "interaction"] },
+      { "id": "bank-security-desk", "kind": "security", "at": [20, 9, 12], "facing": "south", "floor": 3, "tags": ["security"] },
+      { "id": "bank-loading-zone", "kind": "service", "at": [17, 1, 0], "facing": "north", "floor": 1, "tags": ["service", "secure"] },
+      { "id": "bank-roof-service", "kind": "service", "at": [8, 12, 10], "facing": "north", "floor": 3, "tags": ["roof", "hvac"] }
+    ],
+    "asset_instances": [
+      { "id": "bank-monument-sign", "asset": "signage/riftcity-bank-monument-01.glb", "at": [17, 1, 36], "rotation": "south", "scale": 1.0, "collision": "proxy", "tags": ["signage", "landmark"] },
+      { "id": "bank-atm-cluster", "asset": "fixtures/bank-atm-cluster-01.glb", "at": [12, 1, 27], "rotation": "south", "scale": 1.0, "collision": "proxy", "tags": ["atm", "gameplay"] },
+      { "id": "bank-lobby-lights", "asset": "fixtures/bank-pendant-array-01.glb", "at": [17, 7, 24], "rotation": "north", "scale": 1.0, "collision": "none", "tags": ["interior", "lighting"] },
+      { "id": "bank-security-camera-front", "asset": "security/camera-dome-01.glb", "at": [10, 4, 29], "rotation": "south", "scale": 1.0, "collision": "none", "tags": ["security"] },
+      { "id": "bank-security-camera-rear", "asset": "security/camera-dome-01.glb", "at": [25, 4, 0], "rotation": "north", "scale": 1.0, "collision": "none", "tags": ["security"] }
+    ]
+  },
+  "site_ops": [
+    { "op": "fill_box", "state": "paver", "min": [2, 0, 36], "max": [41, 0, 43], "name": "Bank grand forecourt" },
+    { "op": "fill_box", "state": "paver", "min": [38, 0, 14], "max": [41, 0, 35], "name": "Bank east service walk" },
+    { "op": "fill_box", "state": "paver", "min": [13, 0, 0], "max": [28, 0, 5], "name": "Bank secure rear service pad" },
+    { "op": "fill_box", "state": "bank_stone", "min": [14, 1, 36], "max": [15, 7, 37], "name": "Bank west portico pier" },
+    { "op": "fill_box", "state": "bank_stone", "min": [28, 1, 36], "max": [29, 7, 37], "name": "Bank east portico pier" },
+    { "op": "fill_box", "state": "warm_stone", "min": [14, 7, 35], "max": [29, 8, 38], "name": "Bank entrance portico crown" },
+    { "op": "fill_box", "state": "accent", "min": [16, 9, 35], "max": [27, 10, 35], "name": "Bank front signage band" },
+    { "op": "fill_box", "state": "dark_metal", "min": [14, 1, 35], "max": [14, 14, 35], "name": "Bank facade west reveal" },
+    { "op": "fill_box", "state": "dark_metal", "min": [29, 1, 35], "max": [29, 14, 35], "name": "Bank facade east reveal" },
+    { "op": "hollow_box", "state": "dark_metal", "roof_state": "dark_metal", "floor": false, "wall_thickness": 1, "min": [16, 16, 28], "max": [27, 18, 33], "name": "Bank rooftop crown" },
+    { "op": "fill_box", "state": "dark_metal", "min": [9, 12, 14], "max": [12, 13, 17], "name": "Bank HVAC west" },
+    { "op": "fill_box", "state": "dark_metal", "min": [31, 12, 14], "max": [34, 13, 17], "name": "Bank HVAC east" },
+    { "op": "fill_box", "state": "planter", "min": [5, 1, 38], "max": [8, 1, 40], "name": "Bank forecourt planter west" },
+    { "op": "fill_box", "state": "grass_detail", "min": [5, 2, 38], "max": [8, 2, 40], "name": "Bank forecourt grass west" },
+    { "op": "fill_box", "state": "planter", "min": [33, 1, 38], "max": [36, 1, 40], "name": "Bank forecourt planter east" },
+    { "op": "fill_box", "state": "grass_detail", "min": [33, 2, 38], "max": [36, 2, 40], "name": "Bank forecourt grass east" }
+  ],
+  "output": {
+    "id": "riftcity-bank-001-generated",
+    "name": "RiftCity Bank · H1.86 Generated"
+  }
+}
