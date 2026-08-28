@@ -1,7 +1,7 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "building-program-smoke-001-generated",
+  "activeBlockId": "downtown-block-001",
   "blocks": [
     {
       "id": "downtown-block-001",
