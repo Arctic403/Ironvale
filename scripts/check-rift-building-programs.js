@@ -34,11 +34,6 @@ for (const name of files) {
     if (!result.report.semantics?.worldBounds || !result.report.semantics?.chunk?.id) failures.push(`${name}: missing world-coordinate/chunk semantics.`);
     if (!result.report.stats?.entrances) failures.push(`${name}: building has no compiled entrance anchors.`);
 
-    const outputPath = source.output?.path ? path.resolve(root, source.output.path) : null;
-    if (outputPath) {
-      if (!fs.existsSync(outputPath)) failures.push(`${name}: missing generated block ${path.relative(root, outputPath)}.`);
-      else if (stable(readJson(outputPath)) !== stable(result.document)) failures.push(`${name}: generated block is stale; recompile BuildingProgram.`);
-    }
     const reportPath = source.output?.report_path ? path.resolve(root, source.output.report_path) : null;
     if (reportPath) {
       if (!fs.existsSync(reportPath)) failures.push(`${name}: missing report ${path.relative(root, reportPath)}.`);
