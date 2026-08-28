@@ -14,6 +14,19 @@ on:
       - 'public/rift-city-blueprints.js'
       - 'scripts/check-rift-world-index.js'
       - '.github/workflows/rift-world-preview.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/riftcity-blocks/**/*.json'
+      - 'public/inspection.html'
+      - 'public/rift-world-inspection.js'
+      - 'public/rift-engine.js'
+      - 'public/rift-engine-geometry.js'
+      - 'public/rift-engine-math.js'
+      - 'public/rift-city-block-importer.js'
+      - 'public/rift-city-blueprints.js'
+      - 'scripts/check-rift-world-index.js'
+      - '.github/workflows/rift-world-preview.yml'
   workflow_dispatch:
 
 permissions:
