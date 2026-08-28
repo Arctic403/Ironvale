@@ -1,7 +1,7 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "downtown-block-001",
+  "activeBlockId": "nature-water-demo-001",
   "blocks": [
     {
       "id": "downtown-block-001",
