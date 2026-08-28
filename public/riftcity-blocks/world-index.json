@@ -1,14 +1,14 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "riftcity-bank-001-generated",
+  "activeBlockId": "downtown-block-001",
   "blocks": [
     {
       "id": "downtown-block-001",
       "name": "Downtown Commerce District V1",
       "district": "downtown-commerce",
       "path": "./downtown-block-001.json",
-      "tags": ["mmo-scale", "ai-authorable", "single-player"],
+      "tags": ["active", "mmo-scale", "ai-authorable", "single-player"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
@@ -34,7 +34,7 @@
       "district": "downtown-commerce",
       "source_type": "building-program",
       "path": "../riftcity-buildings/riftcity-bank-001.json",
-      "tags": ["active", "bank", "landmark", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
+      "tags": ["bank", "landmark", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     }
   ]
