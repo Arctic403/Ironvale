@@ -65,7 +65,7 @@ jobs:
           cat /tmp/rift-building-static.log
           exit 1
 
-      - name: Render all exterior interior section and stair views
+      - name: Render all exterior interior eye-level section and stair views
         shell: bash
         run: |
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
@@ -87,6 +87,11 @@ jobs:
           for view in iso-nw iso-ne iso-sw iso-se; do
             snap "bank-b1-$view" "mode=floor&floor=1&view=$view"
             snap "bank-f1-$view" "mode=floor&floor=2&view=$view"
+          done
+
+          for direction in north east south west; do
+            snap "bank-vault-eye-$direction" "mode=full&space=b1-vault&view=inside-$direction"
+            snap "bank-grand-hall-eye-$direction" "mode=full&space=f1-grand-hall&view=inside-$direction"
           done
 
           snap bank-section-north 'mode=section&sectionAxis=z&sectionSide=low&view=south'
