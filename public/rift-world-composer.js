@@ -2,6 +2,7 @@ import { compileRiftBuildingProgram } from './rift-building-program.js';
 
 const CITY_FORMAT = 'riftcity-city-block';
 const SUPPORTED_OPS = new Set(['set', 'fill_box', 'cut_box', 'hollow_box']);
+const DEFAULT_MAX_BOUNDS_VOLUME = 2_000_000;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -38,9 +39,29 @@ function transformOp(raw, delta, label) {
   return op;
 }
 
+function opPoints(op) {
+  return op.op === 'set' ? [op.at] : [op.min, op.max];
+}
+
 function opInside(bounds, op) {
-  if (op.op === 'set') return inside(bounds, op.at);
-  return inside(bounds, op.min) && inside(bounds, op.max);
+  return opPoints(op).every(point => inside(bounds, point));
+}
+
+function expandBounds(bounds, ops) {
+  const next = { min: [...bounds.min], max: [...bounds.max] };
+  for (const op of ops) {
+    for (const point of opPoints(op)) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        next.min[axis] = Math.min(next.min[axis], point[axis]);
+        next.max[axis] = Math.max(next.max[axis], point[axis]);
+      }
+    }
+  }
+  return next;
+}
+
+function boundsVolume(bounds) {
+  return bounds.min.reduce((volume, min, axis) => volume * (bounds.max[axis] - min + 1), 1);
 }
 
 function shouldRemove(op, exact, prefixes) {
@@ -54,7 +75,7 @@ export function composeRiftBuildingProgramIntoCityBlock(baseInput, programInput,
   if (!base || base.format !== CITY_FORMAT) throw new Error(`Base document must be '${CITY_FORMAT}'.`);
   if (!Array.isArray(base.ops)) throw new Error('Base city block must contain an ops array.');
   const baseOrigin = vec3(base.origin || [0, 0, 0], 'base.origin');
-  const bounds = {
+  let bounds = {
     min: vec3(base.bounds?.min, 'base.bounds.min'),
     max: vec3(base.bounds?.max, 'base.bounds.max')
   };
@@ -73,10 +94,6 @@ export function composeRiftBuildingProgramIntoCityBlock(baseInput, programInput,
 
   const overlayOps = generated.ops.map((raw, index) => {
     const op = transformOp(raw, delta, `overlay ${overlayId} ops[${index}]`);
-    if (!opInside(bounds, op)) {
-      const where = op.op === 'set' ? op.at : `${op.min.join(',')} -> ${op.max.join(',')}`;
-      throw new Error(`BuildingProgram '${overlayId}' writes outside base district bounds at ${where}.`);
-    }
     if (!op.name) {
       const semantic = String(op._semanticGroup || op._semanticRole || `part-${index + 1}`);
       op.name = `${result.semantics.name} · ${semantic}`;
@@ -85,12 +102,31 @@ export function composeRiftBuildingProgramIntoCityBlock(baseInput, programInput,
     return op;
   });
 
+  if (options.expandBounds) {
+    bounds = expandBounds(bounds, overlayOps);
+    const limit = Number(options.maxBoundsVolume) || DEFAULT_MAX_BOUNDS_VOLUME;
+    const volume = boundsVolume(bounds);
+    if (volume > limit) {
+      throw new Error(`Composed district bounds volume ${volume.toLocaleString()} exceeds ${limit.toLocaleString()} cells.`);
+    }
+    base.bounds = clone(bounds);
+  }
+
+  for (const op of overlayOps) {
+    if (!opInside(bounds, op)) {
+      const where = op.op === 'set' ? op.at : `${op.min.join(',')} -> ${op.max.join(',')}`;
+      throw new Error(`BuildingProgram '${overlayId}' writes outside base district bounds at ${where}.`);
+    }
+  }
+
   base.palette = { ...(base.palette || {}), ...(generated.palette || {}) };
   base.ops = [...kept, ...overlayOps];
   base.metadata = {
     ...(base.metadata || {}),
     world_composition: {
-      version: 1,
+      version: 2,
+      boundsExpanded: !!options.expandBounds,
+      bounds: clone(bounds),
       overlays: [
         ...((base.metadata?.world_composition?.overlays || []).filter(item => item?.id !== overlayId)),
         {
@@ -116,12 +152,15 @@ export function composeRiftBuildingProgramIntoCityBlock(baseInput, programInput,
       baseOperations: baseInput.ops.length,
       removedOperations: removed.length,
       overlayOperations: overlayOps.length,
-      composedOperations: base.ops.length
+      composedOperations: base.ops.length,
+      boundsVolume: boundsVolume(bounds)
     }
   };
 }
 
 export const RIFT_DOWNTOWN_BANK_REPLACEMENT = Object.freeze({
+  expandBounds: true,
+  maxBoundsVolume: DEFAULT_MAX_BOUNDS_VOLUME,
   removeNames: Object.freeze([
     'RiftCity Bank',
     'Bank entrance',
