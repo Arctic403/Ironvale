@@ -1,0 +1,50 @@
+name: AI Building Pipeline Check
+
+on:
+  push:
+    branches:
+      - ai-static-world-builder
+    paths:
+      - 'public/rift-building-program.js'
+      - 'public/rift-building-authoring.js'
+      - 'public/rift-building-inspection.js'
+      - 'public/building-inspection.html'
+      - 'public/rift-world-coordinates.js'
+      - 'public/rift-world-inspection.js'
+      - 'public/riftcity-buildings/**'
+      - 'public/riftcity-blocks/world-index.json'
+      - 'scripts/check-rift-building-programs.js'
+      - 'scripts/check-rift-world-index.js'
+      - 'package.json'
+      - '.github/workflows/ai-building-pipeline-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-building-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate world sources
+        run: node scripts/check-rift-world-index.js
+
+      - name: Run full RiftCity build verification
+        run: npm run build
