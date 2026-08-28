@@ -1,0 +1,17 @@
+{
+  "format": "riftcity-world-index",
+  "version": 1,
+  "activeBlockId": "downtown-block-001",
+  "blocks": [
+    {
+      "id": "downtown-block-001",
+      "name": "Commerce Block 01",
+      "district": "downtown",
+      "path": "./downtown-block-001.json",
+      "tags": ["active", "starter", "ai-authorable"],
+      "inspection": {
+        "views": ["top", "birdseye", "north", "east", "south", "west"]
+      }
+    }
+  ]
+}
