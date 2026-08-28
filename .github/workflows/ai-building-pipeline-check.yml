@@ -6,7 +6,10 @@ on:
       - ai-static-world-builder
     paths:
       - 'public/rift-building-program.js'
+      - 'public/rift-building-compiler.js'
+      - 'public/rift-building-pipeline.js'
       - 'public/rift-interior-architecture.js'
+      - 'public/rift-interior-pipeline.js'
       - 'public/rift-building-authoring.js'
       - 'public/rift-building-inspection.js'
       - 'public/rift-building-inspection-core.js'
@@ -21,6 +24,7 @@ on:
       - 'public/inspection.html'
       - 'public/riftcity-buildings/**'
       - 'public/riftcity-blocks/world-index.json'
+      - 'scripts/check-rift-building-stage-pipeline.js'
       - 'scripts/check-rift-building-programs.js'
       - 'scripts/check-rift-interior-architecture.js'
       - 'scripts/check-rift-inspection-pipeline.js'
