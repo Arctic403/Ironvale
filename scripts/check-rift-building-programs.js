@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compileRiftBuildingProgram } from '../public/rift-building-program.js';
 import { compileRiftCityBlock } from '../public/rift-city-block-importer.js';
+import { decodeRiftBlockState, RIFT_BLOCK_SHAPES } from '../public/rift-block-shapes.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceDir = path.join(root, 'public', 'riftcity-buildings');
@@ -33,6 +34,27 @@ for (const name of files) {
     if (!result.report.ok) failures.push(`${name}: report is not ok.`);
     if (!result.report.semantics?.worldBounds || !result.report.semantics?.chunk?.id) failures.push(`${name}: missing world-coordinate/chunk semantics.`);
     if (!result.report.stats?.entrances) failures.push(`${name}: building has no compiled entrance anchors.`);
+    if (source.building?.interior) {
+      const interior = result.report.semantics?.interior;
+      if (!interior) failures.push(`${name}: interior source produced no interior semantics.`);
+      if (result.report.stats.unreachableSpaces) failures.push(`${name}: ${result.report.stats.unreachableSpaces} interior space(s) are unreachable.`);
+      if (result.report.stats.blockedPortals) failures.push(`${name}: ${result.report.stats.blockedPortals} interior portal(s) are blocked.`);
+      if (result.report.stats.invalidVerticalCores) failures.push(`${name}: ${result.report.stats.invalidVerticalCores} vertical core(s) are invalid.`);
+      for (const portal of interior?.portals || []) {
+        const blocked = (portal.openingCellsWorld || []).filter(cell => runtime.grid.getBlockWorld(...cell)).length;
+        if (blocked) failures.push(`${name}: portal ${portal.id} is re-blocked by ${blocked} final runtime cell(s).`);
+      }
+      for (const core of interior?.verticalCores || []) {
+        for (const cell of core.openingCellsWorld || []) {
+          const state = runtime.grid.getBlockWorld(...cell);
+          if (!state) continue;
+          if (decodeRiftBlockState(state).shape !== RIFT_BLOCK_SHAPES.stair) {
+            failures.push(`${name}: vertical core ${core.id} is re-capped at ${cell.join(',')}.`);
+            break;
+          }
+        }
+      }
+    }
 
     const reportPath = source.output?.report_path ? path.resolve(root, source.output.report_path) : null;
     if (reportPath) {
@@ -47,7 +69,10 @@ for (const name of files) {
       tris: runtime.stats.triangles,
       anchors: result.report.stats.anchors,
       chunks: result.report.semantics.chunk.id,
-      notices: result.report.stats.notices
+      notices: result.report.stats.notices,
+      spaces: result.report.stats.spaces || 0,
+      portals: result.report.stats.portals || 0,
+      cores: result.report.stats.verticalCores || 0
     });
   } catch (error) {
     failures.push(`${name}: ${error?.message || error}`);
@@ -61,4 +86,7 @@ if (failures.length) {
 }
 
 console.log('Rift BuildingProgram verification passed.');
-for (const item of summaries) console.log(`- ${item.id}: ${item.ops} ops · ${item.cells} structural cells · ${item.tris} tris · ${item.anchors} anchors · chunk ${item.chunks} · ${item.notices} notice(s)`);
+for (const item of summaries) {
+  const interior = item.spaces ? ` · ${item.spaces} spaces · ${item.portals} portals · ${item.cores} vertical cores` : '';
+  console.log(`- ${item.id}: ${item.ops} ops · ${item.cells} structural cells · ${item.tris} tris · ${item.anchors} anchors${interior} · chunk ${item.chunks} · ${item.notices} notice(s)`);
+}

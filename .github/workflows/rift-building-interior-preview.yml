@@ -1,0 +1,91 @@
+name: Rift Building Interior Preview
+
+on:
+  push:
+    branches:
+      - ai-static-world-builder
+    paths:
+      - 'public/rift-building-program.js'
+      - 'public/rift-interior-architecture.js'
+      - 'public/rift-building-inspection.js'
+      - 'public/building-inspection.html'
+      - 'public/riftcity-buildings/**'
+      - 'scripts/check-rift-building-programs.js'
+      - 'scripts/check-rift-interior-architecture.js'
+      - '.github/workflows/rift-building-interior-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rift-building-interior-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify interior architecture
+        run: |
+          npm run verify:building-programs
+          npm run verify:interiors
+
+      - name: Start static RiftCity server
+        run: |
+          python3 -m http.server 4173 --directory public > /tmp/rift-building-static.log 2>&1 &
+          echo $! > /tmp/rift-building-static.pid
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:4173/building-inspection.html >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/rift-building-static.log
+          exit 1
+
+      - name: Render Bank floor diagnostics
+        run: |
+          mkdir -p rift-building-previews
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo 'No Chrome/Chromium binary found on the GitHub runner.' >&2
+            exit 1
+          fi
+          FLAGS=(
+            --headless=new
+            --no-sandbox
+            --disable-dev-shm-usage
+            --hide-scrollbars
+            --window-size=1800,1200
+            --virtual-time-budget=4000
+          )
+          BASE='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-b1.png "${BASE}&floor=1"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f1.png "${BASE}&floor=2"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f2.png "${BASE}&floor=3"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f3.png "${BASE}&floor=4"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-xray.png "${BASE}&floor=2&xray=1"
+          test -s rift-building-previews/bank-b1.png
+          test -s rift-building-previews/bank-f1.png
+          test -s rift-building-previews/bank-f2.png
+          test -s rift-building-previews/bank-f3.png
+          test -s rift-building-previews/bank-xray.png
+
+      - name: Upload interior previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: rift-building-interior-previews
+          path: rift-building-previews/*.png
+          if-no-files-found: error
+          retention-days: 14

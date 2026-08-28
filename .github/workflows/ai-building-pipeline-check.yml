@@ -6,6 +6,7 @@ on:
       - ai-static-world-builder
     paths:
       - 'public/rift-building-program.js'
+      - 'public/rift-interior-architecture.js'
       - 'public/rift-building-authoring.js'
       - 'public/rift-building-inspection.js'
       - 'public/building-inspection.html'
@@ -18,6 +19,7 @@ on:
       - 'public/riftcity-buildings/**'
       - 'public/riftcity-blocks/world-index.json'
       - 'scripts/check-rift-building-programs.js'
+      - 'scripts/check-rift-interior-architecture.js'
       - 'scripts/check-rift-world-index.js'
       - 'scripts/check-rift-downtown-composition.js'
       - 'scripts/check-rift-building-visibility.js'

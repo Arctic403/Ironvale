@@ -37,16 +37,30 @@ try {
   const footprintDepth = maxZ - minZ + 1;
   if (footprintWidth < 50 || footprintDepth < 46) failures.push(`Bank physical footprint ${footprintWidth}x${footprintDepth}m is below the MMO minimum 50x46m.`);
 
-  const atrium = bank.site_ops?.find(op => op.name === 'Bank huge double-height lobby atrium void');
-  if (!atrium || atrium.op !== 'cut_box') failures.push('Huge double-height lobby atrium cut is missing.');
+  const interior = semantics.interior;
+  if (!interior) failures.push('Bank has no compiled Interior Architecture semantics.');
+  const atrium = interior?.voids?.find(item => item.id === 'grand-lobby-atrium');
+  if (!atrium) failures.push('Grand lobby atrium structural void is missing.');
   else {
     const atriumWidth = atrium.max[0] - atrium.min[0] + 1;
-    const atriumDepth = atrium.max[2] - atrium.min[2] + 1;
+    const atriumDepth = atrium.max[1] - atrium.min[1] + 1;
     if (atriumWidth < 24 || atriumDepth < 14) failures.push(`Lobby atrium ${atriumWidth}x${atriumDepth}m is too small for the MMO benchmark.`);
+    if (atrium.removedCells < atriumWidth * atriumDepth) failures.push(`Lobby atrium removed only ${atrium.removedCells} floor cells; expected at least ${atriumWidth * atriumDepth}.`);
+  }
+  if ((interior?.spaces?.length || 0) < 15) failures.push(`Bank interior spaces ${interior?.spaces?.length || 0} < 15.`);
+  if ((interior?.portals?.length || 0) < 10) failures.push(`Bank interior portals ${interior?.portals?.length || 0} < 10.`);
+  if ((interior?.verticalCores?.length || 0) !== 3) failures.push(`Bank vertical cores ${interior?.verticalCores?.length || 0} != 3.`);
+  if (interior?.graph?.unreachable?.length) failures.push(`Bank has unreachable interior spaces: ${interior.graph.unreachable.join(', ')}.`);
+  if (result.overlay.report.stats.invalidVerticalCores) failures.push(`Bank has ${result.overlay.report.stats.invalidVerticalCores} invalid vertical core(s).`);
+  if (result.overlay.report.stats.blockedPortals) failures.push(`Bank has ${result.overlay.report.stats.blockedPortals} blocked interior portal(s).`);
+  for (const core of interior?.verticalCores || []) {
+    if (core.removedFloorCells < core.width) failures.push(`${core.id} reserved only ${core.removedFloorCells} floor-opening cells for width ${core.width}.`);
+    if (core.topLandings !== core.width || core.bottomLandings !== core.width) failures.push(`${core.id} landing support is incomplete.`);
+    if (core.blockedHeadroom || core.missingStairs) failures.push(`${core.id} has blocked headroom or missing stairs.`);
   }
 
   if (semantics.entrances.length < 3) failures.push(`Bank entrances ${semantics.entrances.length} < 3.`);
-  if (semantics.rooms.length < 12) failures.push(`Bank rooms ${semantics.rooms.length} < 12.`);
+  if (semantics.rooms.length < 15) failures.push(`Bank rooms/spaces ${semantics.rooms.length} < 15.`);
   if (!semantics.anchors.some(anchor => anchor.id === 'bank-teller-counter')) failures.push('Bank teller gameplay anchor is missing.');
   if (!semantics.anchors.some(anchor => anchor.id === 'bank-vault-door')) failures.push('Bank vault anchor is missing.');
   if (!semantics.anchors.some(anchor => anchor.id === 'bank-main-stairs')) failures.push('Bank main-stair circulation anchor is missing.');
@@ -60,7 +74,7 @@ try {
   if (!result.document.metadata?.world_composition?.overlays?.some(item => item.id === 'riftcity-bank-001')) failures.push('Bank composition metadata is missing.');
 
   if (!failures.length) {
-    console.log(`[downtown-composition] PASS · bank ${result.overlay.report.stats.structuralCells.toLocaleString()} structural cells / ${result.stats.overlayOperations} ops · footprint ${footprintWidth}x${footprintDepth}m · B1 + 3 floors · 250-player target · Downtown ${compiled.stats.cells.toLocaleString()} cells / ${compiled.stats.triangles.toLocaleString()} tris · bounds volume ${result.stats.boundsVolume.toLocaleString()}.`);
+    console.log(`[downtown-composition] PASS · bank ${result.overlay.report.stats.structuralCells.toLocaleString()} structural cells / ${result.stats.overlayOperations} ops · footprint ${footprintWidth}x${footprintDepth}m · B1 + 3 floors · 250-player target · H1.90 interior graph clean · Downtown ${compiled.stats.cells.toLocaleString()} cells / ${compiled.stats.triangles.toLocaleString()} tris · bounds volume ${result.stats.boundsVolume.toLocaleString()}.`);
   }
 } catch (error) {
   failures.push(error?.stack || error?.message || String(error));
