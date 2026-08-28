@@ -197,7 +197,7 @@ async function syncJobs() {
     ui.waitingCount.textContent = waiting.length;
     ui.completedCount.textContent = completed.size;
     for (const row of waiting) {
-      const loaded = await client.readJsonFile(row.path);
+      const loaded = await client.readQueueJson(row.path);
       const job = loaded.json;
       if (job.format !== RIFT_LOCAL_BUILD_JOB_FORMAT) continue;
       let program = job.candidate?.program || null;

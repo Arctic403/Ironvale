@@ -1,7 +1,8 @@
 export const DEFAULT_GITHUB_CONFIG = Object.freeze({
   owner: 'Arctic403',
   repo: 'RiftCityV1',
-  branch: 'ai-static-world-builder',
+  sourceBranch: 'ai-static-world-builder',
+  queueBranch: 'rift-local-queue',
   repositoryId: '1337864874',
   jobsDir: 'rift-local-jobs',
   resultsDir: 'rift-local-results'
@@ -126,9 +127,9 @@ export class RiftGitHubClient {
     return `/repos/${encodeURIComponent(this.config.owner)}/${encodeURIComponent(this.config.repo)}/contents/${encodePath(path)}`;
   }
 
-  async listJson(dir) {
+  async listJson(dir, ref = this.config.queueBranch) {
     try {
-      const rows = await this.api(`${this.contentPath(dir)}?ref=${encodeURIComponent(this.config.branch)}`);
+      const rows = await this.api(`${this.contentPath(dir)}?ref=${encodeURIComponent(ref)}`);
       return (Array.isArray(rows) ? rows : []).filter(item => item.type === 'file' && item.name.endsWith('.json'));
     } catch (error) {
       if (error.status === 404) return [];
@@ -136,23 +137,23 @@ export class RiftGitHubClient {
     }
   }
 
-  async readJsonFile(path) {
-    const row = await this.api(`${this.contentPath(path)}?ref=${encodeURIComponent(this.config.branch)}`);
+  async readJsonFile(path, ref = this.config.sourceBranch) {
+    const row = await this.api(`${this.contentPath(path)}?ref=${encodeURIComponent(ref)}`);
     if (!row?.content) throw new Error(`GitHub did not return inline content for '${path}'.`);
-    return { json: JSON.parse(base64ToUtf8(row.content)), sha: row.sha, path: row.path };
+    return { json: JSON.parse(base64ToUtf8(row.content)), sha: row.sha, path: row.path, ref };
   }
 
-  async exists(path) {
-    try { await this.api(`${this.contentPath(path)}?ref=${encodeURIComponent(this.config.branch)}`); return true; }
+  async exists(path, ref = this.config.queueBranch) {
+    try { await this.api(`${this.contentPath(path)}?ref=${encodeURIComponent(ref)}`); return true; }
     catch (error) { if (error.status === 404) return false; throw error; }
   }
 
   resultPath(jobId) { return `${this.config.resultsDir}/${cleanId(jobId)}.json`; }
 
-  async writeJsonFile(path, payload, message) {
+  async writeJsonFile(path, payload, message, ref = this.config.queueBranch) {
     let sha = null;
     try {
-      const current = await this.api(`${this.contentPath(path)}?ref=${encodeURIComponent(this.config.branch)}`);
+      const current = await this.api(`${this.contentPath(path)}?ref=${encodeURIComponent(ref)}`);
       sha = current?.sha || null;
     } catch (error) {
       if (error.status !== 404) throw error;
@@ -160,9 +161,11 @@ export class RiftGitHubClient {
     const body = {
       message: String(message || `Rift Local Builder: ${path}`),
       content: utf8ToBase64(`${JSON.stringify(payload, null, 2)}\n`),
-      branch: this.config.branch,
+      branch: ref,
       ...(sha ? { sha } : {})
     };
     return this.api(this.contentPath(path), { method: 'PUT', body });
   }
+
+  async readQueueJson(path) { return this.readJsonFile(path, this.config.queueBranch); }
 }

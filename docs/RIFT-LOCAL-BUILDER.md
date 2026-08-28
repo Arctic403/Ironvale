@@ -4,26 +4,30 @@ Rift Local Builder moves BuildingProgram iteration off Cloudflare and off the he
 
 ## Architecture
 
-`ChatGPT/GitHub -> rift-local-jobs/*.json -> GitHub Pages Builder -> browser Web Worker -> H2 compiler/validators -> rift-local-results/*.json -> final accepted source commit -> normal CI`
+`ChatGPT/GitHub -> rift-local-queue:rift-local-jobs/*.json -> GitHub Pages Builder -> browser Web Worker -> H2 compiler/validators -> rift-local-queue:rift-local-results/*.json -> final accepted source commit on ai-static-world-builder -> normal CI`
 
 Cloudflare is not used anywhere in this developer/build loop. The existing Cloudflare Worker remains the RiftCity game/API backend only.
 
-## Why job and result commits are cheap
+## Why the queue uses its own branch
 
-The local queue lives in two dedicated repository folders:
+Jobs and results use the dedicated `rift-local-queue` branch. This is intentionally separate from `ai-static-world-builder`.
+
+The AI branch already participates in an open pull request. GitHub pull-request path filters are evaluated against the PR's changed-file set, so pushing harmless job/result JSON to the AI branch could still retrigger preview workflows because older files in the PR match those filters. A separate queue branch has no pull request and none of RiftCity's workflows listen to it, so routine local-build traffic launches **zero GitHub Actions**.
+
+The queue contains:
 
 - `rift-local-jobs/`
 - `rift-local-results/`
 
-Existing heavy RiftCity workflows use path filters and do not watch either directory. Creating a job or returning a result therefore does not launch the Bank/world screenshot workflows. Builder code changes have two small dedicated workflows: one Node parity check and one static Pages deployment.
+Only the final accepted BuildingProgram update is committed to `ai-static-world-builder`, where normal CI can independently verify it once.
 
 ## Private repository warning
 
-`RiftCityV1` is private. GitHub Pages from a private personal repository requires a GitHub plan that supports Pages for private repositories. GitHub Pages sites are public on the internet unless using eligible organization/Enterprise private Pages. H2.10 deliberately publishes only the Builder shell plus the minimum H2 compiler runtime files; it does **not** publish the RiftCity game assets, Worker source, D1 schema, private BuildingPrograms, or job/result files.
+`RiftCityV1` is private. GitHub Pages from a private personal repository requires a GitHub plan that supports Pages for private repositories. GitHub Pages sites are public on the internet unless using eligible organization/Enterprise private Pages. H2.10 deliberately publishes only the Builder shell plus the minimum H2 compiler runtime files; it does **not** publish the RiftCity game assets, Worker source, D1 schema, private BuildingPrograms, or queue contents.
 
 If private-repository Pages is unavailable, the same minimal `_site` bundle can later be moved to a separate public Pages repository without changing the local worker/job protocol and without adding Cloudflare.
 
-## One-time GitHub setup
+## One-time GitHub App setup
 
 Create a GitHub App for the local Builder and install it only on `Arctic403/RiftCityV1`.
 
@@ -41,7 +45,7 @@ For Pages, open repository **Settings -> Pages -> Build and deployment -> Source
 
 ## iPhone use
 
-Open the Pages Builder URL in Safari. It can be added to the Home Screen. While the Builder page is open it can poll GitHub, compile jobs in a module Web Worker, validate every H2 stage, save full candidates/results in IndexedDB (and mirror JSON into OPFS where supported), then commit only the compact result manifest back to GitHub.
+Open the Pages Builder URL in Safari. It can be added to the Home Screen. While the Builder page is open it can poll `rift-local-queue`, compile jobs in a module Web Worker, validate every H2 stage, save full candidates/results in IndexedDB (and mirror JSON into OPFS where supported), then commit only the compact result manifest back to the queue branch.
 
 Closing/suspending Safari pauses polling. The phone is a local compute worker, not an always-on server.
 
@@ -63,20 +67,11 @@ Closing/suspending Safari pauses polling. The phone is a local compute worker, n
 }
 ```
 
-A job may alternatively use `source.path` instead of `candidate.program` to compile an already committed BuildingProgram.
+A job may alternatively use `source.path` instead of `candidate.program` to compile an already committed BuildingProgram from the source branch.
 
 ## Result contract
 
-The browser returns `riftcity-local-build-result` containing:
-
-- candidate SHA-256
-- compiled document SHA-256
-- BuildingPlan fingerprint
-- exact H2 pipeline snapshot
-- affected stages
-- compiler stats
-- diagnostics and repair tasks
-- PASS/FAIL
+The browser returns `riftcity-local-build-result` containing candidate SHA-256, compiled-document SHA-256, BuildingPlan fingerprint, exact H2 pipeline snapshot, affected stages, compiler stats, diagnostics/repair tasks and PASS/FAIL.
 
 The full compiled document stays on the device. The compact result is enough for ChatGPT/GitHub to verify that the candidate tested on the phone is exactly the candidate being approved.
 
