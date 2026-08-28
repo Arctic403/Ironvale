@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:blueprints && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera",
+    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:blueprints && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",
@@ -15,7 +15,8 @@
     "verify:player-physics": "node scripts/check-rift-player-physics.js",
     "verify:building-visibility": "node scripts/check-rift-building-visibility.js",
     "verify:smart-camera": "node scripts/check-rift-smart-camera.js",
-    "verify:third-person-camera": "node scripts/check-rift-third-person-camera.js"
+    "verify:third-person-camera": "node scripts/check-rift-third-person-camera.js",
+    "verify:ai-builder": "node scripts/check-rift-ai-builder.js"
   },
   "devDependencies": {
     "wrangler": "^4.30.0"

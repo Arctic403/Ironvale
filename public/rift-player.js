@@ -65,9 +65,11 @@ export function createRiftPlayer(engine, options = {}) {
   let runAmount = 0;
   let strideTime = 0;
   let visible = true;
+  let visualGroundOffset = 0;
 
   function setVisible(next) { visible = !!next; for (const d of drawables) d.visible = visible; }
   function setPosition(x, y, z) { position = [Number(x) || 0, Number(y) || 0, Number(z) || 0]; }
+  function setVisualGroundOffset(value) { visualGroundOffset = clamp(Number(value) || 0, 0, 0.5); }
   function setFacingRadians(angle) { facing = Number(angle) || 0; }
   function setMotion(isMoving, running = false) { moving = !!isMoving; runAmount = running ? 1 : 0; }
 
@@ -76,7 +78,8 @@ export function createRiftPlayer(engine, options = {}) {
     strideTime += Math.max(0, Number(dt) || 0) * (moving ? (runAmount > 0.4 ? 10 : 7) : 2.2);
     const swing = moving ? Math.sin(strideTime) * (0.15 + runAmount * 0.08) : Math.sin(strideTime) * 0.01;
     const bob = moving ? Math.abs(Math.sin(strideTime * 2)) * 0.018 : 0;
-    const [x, y, z] = position;
+    const [x, physicsY, z] = position;
+    const y = physicsY + visualGroundOffset;
     const forwardX = Math.sin(facing), forwardZ = Math.cos(facing);
     const sideX = Math.cos(facing), sideZ = -Math.sin(facing);
     const place = (drawable, ox, oy, oz) => {
@@ -97,11 +100,12 @@ export function createRiftPlayer(engine, options = {}) {
   return {
     parts, drawables,
     get position() { return [...position]; },
+    get visualGroundOffset() { return visualGroundOffset; },
     get facing() { return facing; },
     get height() { return RIFT_PLAYER_HEIGHT; },
     get eyeHeight() { return RIFT_PLAYER_EYE_HEIGHT; },
     get radius() { return RIFT_PLAYER_RADIUS; },
-    setVisible, setPosition, setFacingRadians, setMotion, update, destroy
+    setVisible, setPosition, setVisualGroundOffset, setFacingRadians, setMotion, update, destroy
   };
 }
 
@@ -122,6 +126,24 @@ export function riftPlayerStairTop(decoded, localX, localZ) {
   // connect continuously from the floor at its low edge (0 m) to the next
   // full-block level at its high edge (1 m), independent of the visual treads.
   return clamp(t, 0, 1);
+}
+
+export function riftPlayerVisibleStairTop(decoded, localX, localZ) {
+  const rampTop = riftPlayerStairTop(decoded, localX, localZ);
+  // Authored stair geometry is two discrete 0.5 m treads. Collision intentionally
+  // stays on the smooth ramp; this helper exists only to align the visible avatar
+  // with the top of whichever rendered tread is underneath its center.
+  return rampTop < 0.5 ? 0.5 : 1;
+}
+
+export function riftPlayerStairVisualOffset(state, worldX, physicsY, worldZ, cellY = Math.floor(physicsY - RIFT_PLAYER_COLLISION_SKIN)) {
+  if (!state) return 0;
+  const decoded = decodeRiftBlockState(state);
+  if (decoded.shape !== RIFT_BLOCK_SHAPES.stair) return 0;
+  const localX = worldX - Math.floor(worldX);
+  const localZ = worldZ - Math.floor(worldZ);
+  const visibleTopY = cellY + riftPlayerVisibleStairTop(decoded, localX, localZ);
+  return clamp(visibleTopY - physicsY, 0, 0.5);
 }
 
 export function riftPlayerShapeTopAt(state, worldX, worldZ) {
@@ -388,6 +410,51 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     return flatSupportContactAtHeight(x, z, supportY, tolerance).count >= stableSupportMinContacts;
   }
 
+  // H1.75: the high edge of a stair can still be under one foot after the
+  // player's center has crossed onto a lower slab/floor. Preserve that legitimate
+  // partial support until the circular foot really clears the stair. Without this
+  // handoff the center snapped down early and the trailing foot became trapped in
+  // the ramp volume. These probes are independent from flat-surface ownership so
+  // stairs do not become an infinite ledge magnet.
+  const stairEdgeSupportProbes = (() => {
+    const points = [[0, 0]];
+    for (const [fraction, count] of [[0.20, 8], [0.45, 12], [0.72, 16], [0.96, 20]]) {
+      const radius = player.radius * fraction;
+      for (let i = 0; i < count; i += 1) {
+        const angle = i / count * Math.PI * 2;
+        points.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+      }
+    }
+    return points;
+  })();
+
+  function hasStairSupportNearHeight(x, z, supportY, tolerance = 0.085) {
+    if (!Number.isFinite(supportY)) return false;
+    const cellY = Math.floor(supportY - RIFT_PLAYER_COLLISION_SKIN);
+    for (const [dx, dz] of stairEdgeSupportProbes) {
+      const px = x + dx, pz = z + dz;
+      const state = getState(px, cellY, pz);
+      if (!state) continue;
+      const decoded = decodeRiftBlockState(state);
+      if (decoded.shape !== RIFT_BLOCK_SHAPES.stair) continue;
+      const topY = cellY + riftPlayerShapeTopAt(state, px, pz);
+      if (Math.abs(topY - supportY) <= tolerance) return true;
+    }
+    return false;
+  }
+
+  function syncPlayerStairVisualOffset() {
+    if (typeof player.setVisualGroundOffset !== 'function') return;
+    if (creative && flying) {
+      player.setVisualGroundOffset(0);
+      return;
+    }
+    const [x, y, z] = player.position;
+    const cellY = Math.floor(y - RIFT_PLAYER_COLLISION_SKIN);
+    const state = getState(x, cellY, z);
+    player.setVisualGroundOffset(riftPlayerStairVisualOffset(state, x, y, z, cellY));
+  }
+
   function landingCandidatesUnderFootprint(x, z, previousY, candidateY, options = {}) {
     const groups = [];
     const groupTolerance = Math.max(0.018, Number(options.groupTolerance) || 0.028);
@@ -588,6 +655,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   function recoverToSafeGround(reason = 'recovery') {
     const target = safeRecoveryTarget();
     player.setPosition(...target);
+    player.setVisualGroundOffset?.(0);
     jumpVelocity = 0;
     grounded = true;
     stepAssist = null;
@@ -599,6 +667,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   function teleport(preferred) {
     const spawn = resolveSpawn(preferred);
     player.setPosition(...spawn);
+    player.setVisualGroundOffset?.(0);
     jumpVelocity = 0;
     grounded = true;
     stepAssist = null;
@@ -756,6 +825,18 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
       && hasStableFlatSupportAtHeight(targetX, targetZ, current.y)
       && !bodyBlocked(targetX, current.y, targetZ);
     if (keepCurrentFlatSupport) {
+      stepAssist = null;
+      return { moved: true, x: targetX, y: current.y, z: targetZ, grounded: true };
+    }
+
+    // H1.75 stair-exit ownership: a lower center sample (especially a half slab)
+    // must not pull the player down while the high end of the departing ramp is
+    // still under the foot. Keep the current height only while a stair sample is
+    // genuinely near that height; once the foot clears, the lower support wins.
+    const keepCurrentStairEdgeSupport = supportDelta <= -0.08
+      && hasStairSupportNearHeight(targetX, targetZ, current.y)
+      && !bodyBlocked(targetX, current.y, targetZ);
+    if (keepCurrentStairEdgeSupport) {
       stepAssist = null;
       return { moved: true, x: targetX, y: current.y, z: targetZ, grounded: true };
     }
@@ -951,11 +1032,16 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
         } else {
           if (stepAssist) stepAssist = null;
           const supportDelta = support == null ? -Infinity : support - nextY;
-          if (supportDelta <= -0.08 && hasStableFlatSupportAtHeight(nextX, nextZ, nextY) && !bodyBlocked(nextX, nextY, nextZ)) {
-            // Keep the current flat support owner while the foot manifold still
-            // has meaningful contact. Do not let the lower center sample snap the
-            // player down between input frames or immediately after a partial
-            // jump landing.
+          const keepFlatOwner = supportDelta <= -0.08
+            && hasStableFlatSupportAtHeight(nextX, nextZ, nextY)
+            && !bodyBlocked(nextX, nextY, nextZ);
+          const keepStairEdgeOwner = supportDelta <= -0.08
+            && hasStairSupportNearHeight(nextX, nextZ, nextY)
+            && !bodyBlocked(nextX, nextY, nextZ);
+          if (keepFlatOwner || keepStairEdgeOwner) {
+            // Flat tops and the high edge of a departing stair both retain
+            // support only while meaningful foot contact remains. This prevents
+            // idle stair->slab snapping/trapping without changing the smooth ramp.
             grounded = true;
           } else {
             const classification = classifyRiftPlayerGroundStep(nextY, support);
@@ -1028,6 +1114,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     const stepDt = stepCount ? frameDt / stepCount : 0;
     for (let i = 0; i < stepCount; i += 1) simulatePhysicsStep(stepDt, inputX, inputZ, running);
 
+    syncPlayerStairVisualOffset();
     const movingNow = Math.hypot(inputX, inputZ) > .04;
     player.setMotion(movingNow, running);
     player.update(frameDt);

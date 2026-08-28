@@ -57,6 +57,9 @@ function renderDrawer() {
       <a href="/dev/block-editor" class="drawer-dev-link">
         <span>▧</span><strong>Block Editor</strong><small>Private authoring workspace</small>
       </a>
+      <a href="/dev/ai-builder" class="drawer-dev-link">
+        <span>◎</span><strong>AI Builder</strong><small>Rift Engine agent workspace</small>
+      </a>
     </section>`:'';
   root.innerHTML=normal+developer;
 }

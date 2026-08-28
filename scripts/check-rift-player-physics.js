@@ -18,7 +18,9 @@ import {
   getRiftPlayerWorldFootprint,
   riftPlayerCrossedSupport,
   riftPlayerKillPlane,
-  riftPlayerShapeTopAt
+  riftPlayerShapeTopAt,
+  riftPlayerStairVisualOffset,
+  riftPlayerVisibleStairTop
 } from '../public/rift-player.js';
 
 const approx = (actual, expected, epsilon = 1e-6) => {
@@ -57,6 +59,12 @@ approx(riftPlayerShapeTopAt(southStair, 0.5, 0.1), 0.1);
 approx(riftPlayerShapeTopAt(southStair, 0.5, 0.9), 0.9);
 approx(riftPlayerShapeTopAt(westStair, 0.1, 0.5), 0.9);
 approx(riftPlayerShapeTopAt(westStair, 0.9, 0.5), 0.1);
+
+const eastDecoded = { shape: RIFT_BLOCK_SHAPES.stair, rotation: RIFT_BLOCK_ROTATIONS.east };
+approx(riftPlayerVisibleStairTop(eastDecoded, 0.2, 0.5), 0.5);
+approx(riftPlayerVisibleStairTop(eastDecoded, 0.8, 0.5), 1);
+approx(riftPlayerStairVisualOffset(eastStair, 3.2, 1.2, 2.5, 1), 0.3);
+approx(riftPlayerStairVisualOffset(eastStair, 3.8, 1.8, 2.5, 1), 0.2);
 
 const cells = new Map([
   ['0,0,0', full],
@@ -427,6 +435,7 @@ globalThis.window = {
 };
 let transitionPosition = [2.4, 1, 2.5];
 let transitionFacing = 0;
+let transitionVisualOffset = 0;
 const transitionCommits = [];
 const transitionPlayer = {
   radius: RIFT_PLAYER_RADIUS,
@@ -438,6 +447,7 @@ const transitionPlayer = {
     transitionCommits.push([...transitionPosition]);
   },
   setFacingRadians(value) { transitionFacing = value; },
+  setVisualGroundOffset(value) { transitionVisualOffset = Number(value) || 0; },
   setMotion() {},
   update() {}
 };
@@ -468,7 +478,7 @@ function walkTransition(code, predicate, { dt = 1 / 120, frames = 1200 } = {}) {
   const samples = [];
   for (let i = 0; i < frames; i += 1) {
     transitionController.update(dt);
-    samples.push([...transitionPosition]);
+    samples.push([...transitionPosition, transitionVisualOffset]);
     if (predicate(transitionPosition)) {
       transitionKey('keyup', code);
       return { reached: true, samples };
@@ -548,7 +558,13 @@ assert.equal(transition.reached, true, 'Ground->stair->full traversal must not s
 const uphillRampSamples = transition.samples.filter(([x]) => x >= 3.12 && x <= 3.64);
 assert.ok(uphillRampSamples.length >= 20, 'Stair regression must sample the continuous ramp interior.');
 for (const [x, y] of uphillRampSamples) approx(y, 1 + (x - 3), 0.025);
+const lowTreadVisualSamples = transition.samples.filter(([x]) => x >= 3.12 && x <= 3.48);
+const highTreadVisualSamples = transition.samples.filter(([x]) => x >= 3.52 && x <= 3.88);
+assert.ok(lowTreadVisualSamples.length >= 20 && highTreadVisualSamples.length >= 20, 'H1.75 must sample both rendered stair treads.');
+for (const [, physicsY, , visualOffset] of lowTreadVisualSamples) approx(physicsY + visualOffset, 1.5, 0.03);
+for (const [, physicsY, , visualOffset] of highTreadVisualSamples) approx(physicsY + visualOffset, 2, 0.03);
 approx(transitionPosition[1], 2, 1e-4);
+approx(transitionVisualOffset, 0, 1e-6);
 assert.equal(transitionController.recoveryCount, recoveriesBefore);
 
 // Traverse the same stair downhill. This verifies descending support follows the
@@ -564,6 +580,22 @@ for (const [x, y] of downhillRampSamples) approx(y, 1 + (x - 3), 0.03);
 settleTransition();
 approx(transitionPosition[1], 1, 1e-4);
 assert.equal(transitionController.recoveryCount, recoveriesBefore);
+
+// H1.75: leaving the HIGH edge of a smooth stair ramp onto a lower half slab
+// must not snap the center down while the trailing foot still overlaps the ramp.
+// That old handoff trapped the cylinder between the stair and slab around x=4.10.
+resetTransitionWorld();
+transitionSet(3, 1, 2, eastStair);
+transitionSet(4, 1, 2, bottomSlab);
+transitionController.teleport([3.65, 1.65, 2.5]);
+recoveriesBefore = transitionController.recoveryCount;
+transition = walkTransition('KeyD', p => p[0] >= 4.50, { dt: 1 / 600, frames: 1000 });
+assert.equal(transition.reached, true, 'Stair->lower-slab traversal must clear the old x≈4.10 trap.');
+assert.ok(transition.samples.some(([x, y]) => x > 4 && x < 4.28 && y > 1.85), 'Departing stair support must stay high while one foot still overlaps the ramp.');
+settleTransition();
+assert.equal(transitionController.grounded, true, 'Stair->lower-slab exit must settle on the slab.');
+approx(transitionPosition[1], 1.5, 1e-4);
+assert.equal(transitionController.recoveryCount, recoveriesBefore, 'Stair->lower-slab exit must not recover/teleport.');
 
 // Repeat the real controller traversal for every remaining stair rotation.
 // This catches a rotation mapping that looks correct in the scalar height helper
@@ -673,3 +705,4 @@ transitionController.destroy();
 if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow;
 console.log('[player-physics-check] H1.71 slab transitions + four-way visual-stair/invisible-ramp traversal: PASS');
 console.log('[player-physics-check] H1.72 stable edge support + partial-foot jump landing ownership: PASS');
+console.log('[player-physics-check] H1.75 stair visual tread alignment + stair-to-lower-slab handoff: PASS');

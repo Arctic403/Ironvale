@@ -29,7 +29,7 @@ export async function renderDowntown3D(root) {
       <div class="world3d-vignette" aria-hidden="true"></div>
 
       <div class="world3d-top-left downtown3d-title rift-import-title">
-        <span class="eyebrow">RIFT BLOCK ENGINE · H1.74 THIRD-PERSON · NO CUTAWAYS</span>
+        <span class="eyebrow">RIFT BLOCK ENGINE · H1.75 THIRD-PERSON · STAIR ALIGNMENT</span>
         <strong id="rift-import-name">LOADING COMMERCE BLOCK 01…</strong>
         <small id="rift-import-description">Third-person camera collision keeps the view inside playable space; roofs, walls and upper floors always render normally with no camera-driven cutaway behavior.</small>
       </div>
@@ -105,7 +105,7 @@ export async function renderDowntown3D(root) {
     await foundation.loadActiveBlock();
     return foundation;
   } catch (error) {
-    console.error('RiftCity H1.74 third-person block world failed to start', error);
+    console.error('RiftCity H1.75 third-person block world failed to start', error);
     if (status) {
       status.classList.add('error');
       status.innerHTML = `<strong>JSON BLOCK IMPORTER FAILED</strong><span>${escapeText(error?.message || 'The importer could not initialize.')}</span>`;
@@ -239,6 +239,77 @@ function createBlockImporterLab({ root, canvas, status }) {
       target: [imported.center[0], min[1] + Math.min(5, height * 0.28), imported.center[2]],
       orthoSize: Math.max(28, Math.min(88, Math.max(width, depth) * 1.18 + height * 0.35))
     };
+  };
+
+  const normalizeInspectionBounds = bounds => {
+    const fallback = imported?.worldBounds || { min: [0, 0, 0], max: [63, 16, 63] };
+    const source = bounds?.min && bounds?.max ? bounds : fallback;
+    const min = source.min.map(Number);
+    const max = source.max.map(Number);
+    return { min, max };
+  };
+
+  const setInspectionCamera = (mode = 'birdseye', bounds = null) => {
+    const next = String(mode || 'birdseye').toLowerCase();
+    if (next === 'third-person' || next === 'third' || next === 'player') {
+      topView = false;
+      resetPlayerCamera();
+      camera.updatePosition();
+      return { mode: 'third-person', target: [...camera.target], position: [...camera.position] };
+    }
+
+    const viewBounds = normalizeInspectionBounds(bounds);
+    const min = viewBounds.min;
+    const max = viewBounds.max;
+    const width = Math.max(1, max[0] - min[0] + 1);
+    const height = Math.max(1, max[1] - min[1] + 1);
+    const depth = Math.max(1, max[2] - min[2] + 1);
+    const center = [(min[0] + max[0] + 1) * 0.5, (min[1] + max[1] + 1) * 0.5, (min[2] + max[2] + 1) * 0.5];
+    const span = Math.max(width, depth);
+    topView = true;
+    camera.radius = Math.max(24, Math.min(150, span * 1.45 + height * 0.9));
+    camera.orthoSize = Math.max(12, Math.min(120, span * 1.28 + height * 0.22));
+
+    if (next === 'top') {
+      camera.setProjection('orthographic');
+      camera.alpha = -Math.PI / 2;
+      camera.beta = 0.055;
+    } else if (next === 'north' || next === 'south' || next === 'east' || next === 'west') {
+      camera.setProjection('perspective');
+      camera.beta = 1.02;
+      camera.radius = Math.max(10, Math.min(100, span * 1.05 + height * 0.8));
+      camera.alpha = next === 'north' ? -Math.PI / 2 : next === 'south' ? Math.PI / 2 : next === 'east' ? 0 : Math.PI;
+    } else {
+      camera.setProjection('orthographic');
+      camera.alpha = -Math.PI / 4;
+      camera.beta = 0.68;
+    }
+    camera.setTarget(...center);
+    camera.updatePosition();
+    topButton?.classList.toggle('active', true);
+    if (topButton) topButton.textContent = 'FOLLOW PLAYER';
+    return { mode: next === 'birdseye' ? 'birdseye' : next, target: [...camera.target], position: [...camera.position], bounds: viewBounds };
+  };
+
+  const captureCanvasPng = () => {
+    engine.render(camera);
+    const gl = engine.gl;
+    const width = Math.max(1, canvas.width | 0);
+    const height = Math.max(1, canvas.height | 0);
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const output = document.createElement('canvas');
+    output.width = width;
+    output.height = height;
+    const context = output.getContext('2d', { alpha: false });
+    const image = context.createImageData(width, height);
+    const stride = width * 4;
+    for (let y = 0; y < height; y += 1) {
+      const sourceStart = (height - 1 - y) * stride;
+      image.data.set(pixels.subarray(sourceStart, sourceStart + stride), y * stride);
+    }
+    context.putImageData(image, 0, 0);
+    return output.toDataURL('image/png');
   };
 
   const updateHud = () => {
@@ -552,6 +623,14 @@ function createBlockImporterLab({ root, canvas, status }) {
   return {
     engine,
     camera,
+    canvas,
+    player,
+    playerController,
+    creative,
+    setInspectionCamera,
+    captureCanvasPng,
+    setPlayerVisible(next) { player.setVisible(!!next); },
+    renderNow() { engine.render(camera); },
     faceValidation,
     storageValidation,
     shapeValidation,

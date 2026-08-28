@@ -157,6 +157,10 @@ export default {
       return serveDeveloperBlockEditor(request, env);
     }
 
+    if (url.pathname === '/dev/ai-builder' || url.pathname === '/dev/ai-builder/') {
+      return serveDeveloperAiBuilder(request, env);
+    }
+
     if (url.pathname === '/admin/logs' || url.pathname === '/admin/logs/') {
       const adminUrl = new URL('/admin-logs.html', request.url);
       return env.ASSETS.fetch(new Request(adminUrl, request));
@@ -2159,6 +2163,70 @@ window.addEventListener('pagehide',()=>destroyBlockWorld(),{once:true});
 boot().catch(error=>{
   console.error(error);
   root.innerHTML='<section class="dev-editor-denied"><strong>Block Editor failed to start</strong><a href="/">Return to RiftCity</a></section>';
+});
+</script>
+</body>
+</html>`, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, private',
+      'X-Robots-Tag': 'noindex, nofollow',
+      'Referrer-Policy': 'same-origin'
+    }
+  });
+}
+
+async function serveDeveloperAiBuilder(request, env) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) {
+    const status = gate.response.status === 401 ? 401 : 403;
+    return new Response(`<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>RiftCity Developer Access</title>
+<style>html,body{height:100%;margin:0;background:#04080b;color:#eef8fa;font:700 16px system-ui}main{height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box;text-align:center}a{color:#67e2b7}</style>
+</head><body><main><div><h1>Developer access required</h1><p>RiftCity AI Builder is restricted to developer/admin accounts.</p><a href="/">Return to RiftCity</a></div></main></body></html>`, {
+      status,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, private',
+        'X-Robots-Tag': 'noindex, nofollow',
+        'Referrer-Policy': 'same-origin'
+      }
+    });
+  }
+
+  return new Response(`<!doctype html>
+<html lang="en" class="rift-ai-builder-document">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#04080b">
+  <meta name="robots" content="noindex,nofollow">
+  <title>RiftCity — AI Builder</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/ai-builder.css">
+</head>
+<body class="rift-ai-builder-page">
+  <main id="dev-ai-builder-root" aria-label="RiftCity AI Builder">
+    <div class="dev-editor-loading"><strong>AI BUILDER</strong><span>Loading Rift Engine staging scene…</span></div>
+  </main>
+  <script type="module">
+import { renderDeveloperAiBuilder, destroyDeveloperAiBuilder } from '/editor/ai-builder-entry.js';
+const root=document.querySelector('#dev-ai-builder-root');
+async function boot(){
+  const response=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||!['admin','developer'].includes(data&&data.user&&data.user.role)){
+    root.innerHTML='<section class="dev-editor-denied"><strong>Developer access required</strong><a href="/">Return to RiftCity</a></section>';
+    return;
+  }
+  await renderDeveloperAiBuilder(root);
+}
+window.addEventListener('pagehide',()=>destroyDeveloperAiBuilder(),{once:true});
+boot().catch(error=>{
+  console.error(error);
+  root.innerHTML='<section class="dev-editor-denied"><strong>AI Builder failed to start</strong><a href="/">Return to RiftCity</a></section>';
 });
 </script>
 </body>

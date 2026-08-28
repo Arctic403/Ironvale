@@ -1748,3 +1748,24 @@ RiftCity's active City view now treats building geometry as authoritative at all
 
 `verify:building-visibility` and `verify:third-person-camera` now fail if any inside, outside or overview camera state produces hidden/suppressed building layers, or if the importer recreates camera-hideable render partitions.
 
+
+## H1.75 — stair visual tread alignment and lower-slab exit hardening
+
+- Stair collision remains the H1.71 smooth invisible 0→1 m ramp, so traversal physics do not regress to two discrete collision steps.
+- The six-part player now has a render-only ground offset while centered on a stair. Physics Y remains on the continuous ramp, while the visible avatar is raised to the authored 0.5 m / 1.0 m stair tread beneath it. The collision transform is never changed by this visual correction.
+- Leaving the high edge of a stair for a lower half slab/floor preserves legitimate partial stair-foot support until the circular foot really clears the ramp. This removes the reproducible stair→slab trap near the high edge without weakening H1.70 zero-penetration rules.
+- The player regression suite now verifies continuous ramp physics, both rendered tread heights, stair→lower-slab creep traversal, all four stair rotations, and zero recovery/teleport during the transition.
+
+## H1.76 — protected Rift Engine AI Builder foundation
+
+RiftCity now has a developer/admin-only `/dev/ai-builder` workspace designed for browser agents and human developers to inspect and edit the live Rift Engine staging scene without relying on fragile WebGL clicking.
+
+- The page is server-gated with the same `developer` / `admin` authorization boundary as the private Block Editor and is served `no-store`, `noindex`.
+- The normal Rift Engine/Blueprint compiler remains authoritative. AI Builder edits recompile the same `riftcity-city-block` document and persist only to the existing browser staging import; there is no direct live-world publish action in this pass.
+- Inspection cameras include bird's-eye, exact top, north, south, east, west and third-person. Focusing an object frames its real compiled Blueprint bounds.
+- A deterministic command surface exposes scene, inspect, select, focus, camera, move, rotate, duplicate, delete, undo/redo, local named checkpoints, clean PNG capture and JSON export/import.
+- Scene responses expose compiled object ids, bounds, origins, tags/groups, anchors, connections, world bounds, player/camera state and importer statistics so an agent can use exact geometry instead of guessing from pixels.
+- Clean screenshots are captured directly from the WebGL framebuffer, excluding all editor chrome. The latest capture is shown on-page and can be downloaded as PNG.
+- The same command backend is progressively exposed as WebMCP Site Tools when `document.modelContext.registerTool()` is available. Thirteen tools cover scene reading, object inspection/focus, camera control, Blueprint move/rotate/duplicate/delete, Blueprint import, undo/redo, checkpoints and clean captures.
+- Browsers without WebMCP keep the same accessible command textarea/buttons, so the page remains agent-friendly through conventional browser automation.
+- Gameplay cutaway behavior is not reintroduced. H1.74 full-building rendering and H1.75 player/stair behavior remain unchanged.
