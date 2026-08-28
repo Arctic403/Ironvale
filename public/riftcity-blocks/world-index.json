@@ -5,10 +5,10 @@
   "blocks": [
     {
       "id": "downtown-block-001",
-      "name": "Commerce Block 01",
-      "district": "downtown",
+      "name": "Downtown Commerce District V1",
+      "district": "downtown-commerce",
       "path": "./downtown-block-001.json",
-      "tags": ["active", "starter", "ai-authorable"],
+      "tags": ["active", "mmo-scale", "ai-authorable", "single-player"],
       "inspection": {
         "views": ["top", "birdseye", "north", "east", "south", "west"]
       }
