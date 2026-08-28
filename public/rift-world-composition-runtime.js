@@ -48,7 +48,7 @@ window.fetch = async function riftWorldComposedFetch(input, init) {
   headers.delete('content-encoding');
   headers.set('content-type', 'application/json; charset=utf-8');
   headers.set('cache-control', 'no-store');
-  headers.set('x-rift-world-composed', 'h1.86-bank');
+  headers.set('x-rift-world-composed', 'h1.87-mmo-bank');
   return new Response(JSON.stringify(document), {
     status: response.status,
     statusText: response.statusText,
@@ -57,7 +57,7 @@ window.fetch = async function riftWorldComposedFetch(input, init) {
 };
 
 window.RiftCityWorldComposition = Object.freeze({
-  version: 'H1.86',
+  version: 'H1.87',
   bankProgramUrl: BANK_PROGRAM_URL.href,
   composeDowntown,
   get last() { return lastComposition; },
