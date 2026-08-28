@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import {compileRiftBuildingProgram} from '../public/rift-building-program.js';
 import {compileRiftCityBlock} from '../public/rift-city-block-importer.js';
-import {buildRiftInspectionDocument,createRiftInspectionReport} from '../public/rift-building-inspection-core.js';
+import {buildRiftInspectionDocument,createRiftInspectionReport,inspectionFocus} from '../public/rift-building-inspection-core.js';
 
 const source=JSON.parse(fs.readFileSync(new URL('../public/riftcity-buildings/riftcity-bank-001.json',import.meta.url),'utf8'));
 const authoring=compileRiftBuildingProgram(source,{strict:true});
@@ -34,11 +34,29 @@ for(const [label,options] of cases){
     ok(compiled.stats.cells>60,`${label} inspection contains too little geometry (${compiled.stats.cells} cells).`);
     if(options.sectionDepth){
       const section=doc.metadata?.inspection?.section,axis=section?.axis==='x'?0:2,size=doc.bounds.max[axis]-doc.bounds.min[axis]+1;
-      ok(section?.depth===options.sectionDepth,`${label} did not preserve requested ${options.sectionDepth}m section depth.`);
-      ok(size<=options.sectionDepth,`${label} slice is ${size}m thick; expected at most ${options.sectionDepth}m.`);
+      ok(section?.depth===Number(options.sectionDepth),`${label} did not preserve requested ${options.sectionDepth}m section depth.`);
+      ok(size<=Number(options.sectionDepth),`${label} slice is ${size}m thick; expected at most ${options.sectionDepth}m.`);
+      ok((section?.solidCells||0)>60,`${label} section metadata reports too little solid geometry (${section?.solidCells||0} cells).`);
     }
   }catch(error){fail.push(`${label}: ${error.message}`)}
 }
 
+// Browser URLSearchParams returns null for absent keys. This must never become numeric 0.
+const browserStyle=[
+  ['browser-center-z',{mode:'section',sectionAxis:'z',sectionAt:null,sectionDepth:'3'}],
+  ['browser-center-x',{mode:'section',sectionAxis:'x',sectionAt:'',sectionDepth:'3'}],
+  ['browser-stair-z',{mode:'section',sectionAxis:'z',sectionAt:null,sectionDepth:'2',focus:'grand-stair-b1-f1'}],
+  ['browser-stair-x',{mode:'section',sectionAxis:'x',sectionAt:null,sectionDepth:'3',focus:'grand-stair-b1-f1'}]
+];
+for(const [label,options] of browserStyle){
+  try{
+    const doc=buildRiftInspectionDocument(authoring,options),compiled=compileRiftCityBlock(doc),section=doc.metadata?.inspection?.section,axis=section?.axis==='x'?0:2;
+    const focus=inspectionFocus(authoring,options.focus),expected=focus?Math.round(focus.target[axis]):Math.round((authoring.document.bounds.min[axis]+authoring.document.bounds.max[axis])/2);
+    ok(section?.at===expected,`${label} resolved sectionAt=${section?.at}; expected fallback ${expected}.`);
+    ok(section?.depth===Number(options.sectionDepth),`${label} lost browser-style sectionDepth '${options.sectionDepth}'.`);
+    ok(compiled.stats.cells>60,`${label} browser-style section contains too little geometry (${compiled.stats.cells} cells).`);
+  }catch(error){fail.push(`${label}: ${error.message}`)}
+}
+
 if(fail.length){console.error('[building-inspection-pipeline] FAIL');for(const item of fail)console.error(` - ${item}`);process.exit(1)}
-console.log(`[building-inspection-pipeline] PASS · ${report.clearance.spaces.length} spaces physically measured · Vault ${vault.median}m median · Grand Hall ${hall.median}m median · ${cases.length} inspection modes validated including finite architectural sections.`);
+console.log(`[building-inspection-pipeline] PASS · ${report.clearance.spaces.length} spaces physically measured · Vault ${vault.median}m median · Grand Hall ${hall.median}m median · ${cases.length} inspection modes + ${browserStyle.length} browser-query regressions validated.`);
