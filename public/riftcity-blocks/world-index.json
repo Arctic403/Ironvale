@@ -1,7 +1,7 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "downtown-block-001",
+  "activeBlockId": "building-program-smoke-001-generated",
   "blocks": [
     {
       "id": "downtown-block-001",
@@ -19,6 +19,17 @@
       "district": "engine-test",
       "path": "./nature-water-demo-001.json",
       "tags": ["engine-test", "grass", "water", "flow", "bridge", "ai-authorable"],
+      "inspection": {
+        "views": ["top", "birdseye", "north", "east", "south", "west"]
+      }
+    },
+    {
+      "id": "building-program-smoke-001-generated",
+      "name": "AI Building Pipeline Smoke · Generated",
+      "district": "pipeline-test",
+      "source_type": "building-program",
+      "path": "../riftcity-buildings/building-program-smoke-001.json",
+      "tags": ["engine-test", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
       "inspection": {
         "views": ["top", "birdseye", "north", "east", "south", "west"]
       }
