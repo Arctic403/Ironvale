@@ -1,5 +1,6 @@
 import { RiftCamera, RiftEngine } from './rift-engine.js';
 import { compileRiftCityBlock } from './rift-city-block-importer.js';
+import { compileRiftBuildingProgram } from './rift-building-program.js';
 
 const INDEX_URL = new URL('./riftcity-blocks/world-index.json', import.meta.url);
 const canvas = document.querySelector('#inspection-canvas');
@@ -11,6 +12,7 @@ const ALLOWED_VIEWS = new Set(['top', 'birdseye', 'north', 'east', 'south', 'wes
 let engine = null;
 let camera = null;
 let compiled = null;
+let authoring = null;
 let currentBlockUrl = null;
 
 function setStatus(message) {
@@ -19,9 +21,9 @@ function setStatus(message) {
 
 function safeLocalUrl(value, base) {
   const raw = String(value || '').trim();
-  if (!raw || /^(?:[a-z]+:)?\/\//i.test(raw)) throw new Error('Inspection block path must be a local source-controlled path.');
+  if (!raw || /^(?:[a-z]+:)?\/\//i.test(raw)) throw new Error('Inspection source path must be a local source-controlled path.');
   const url = new URL(raw.replace(/^\//, './'), base);
-  if (url.origin !== location.origin) throw new Error('Inspection block path must stay on the current origin.');
+  if (url.origin !== location.origin) throw new Error('Inspection source path must stay on the current origin.');
   return url;
 }
 
@@ -48,7 +50,7 @@ async function resolveBlock() {
     : entry?.path ? safeLocalUrl(entry.path, INDEX_URL) : null;
   if (!blockUrl) throw new Error(`World index does not define block ${requestedId || '(none)'}.`);
 
-  const document = await loadJson(blockUrl, entry?.name || requestedId || 'RiftCity block');
+  const document = await loadJson(blockUrl, entry?.name || requestedId || 'RiftCity source');
   return { index, entry, blockUrl, document };
 }
 
@@ -139,10 +141,21 @@ function resizeAndRender() {
 async function boot() {
   if (!canvas) throw new Error('Inspection canvas is missing.');
   const view = ALLOWED_VIEWS.has(requestedView) ? requestedView : 'top';
-  setStatus(`Resolving JSON world index · ${view.toUpperCase()} view…`);
+  setStatus(`Resolving source-controlled world · ${view.toUpperCase()} view…`);
   const resolved = await resolveBlock();
   currentBlockUrl = resolved.blockUrl;
-  compiled = compileRiftCityBlock(resolved.document);
+
+  const sourceType = String(resolved.entry?.source_type || resolved.entry?.sourceType || '').toLowerCase();
+  if (sourceType === 'building-program' || resolved.document?.format === 'riftcity-building-program') {
+    authoring = compileRiftBuildingProgram(resolved.document, { strict: true });
+    compiled = compileRiftCityBlock(authoring.document);
+    if (resolved.entry?.id && compiled.id !== resolved.entry.id) {
+      throw new Error(`BuildingProgram compiles to '${compiled.id}', but world index expects '${resolved.entry.id}'.`);
+    }
+  } else {
+    authoring = null;
+    compiled = compileRiftCityBlock(resolved.document);
+  }
 
   engine = new RiftEngine(canvas, {
     antialias: true,
@@ -169,18 +182,21 @@ async function boot() {
   resizeAndRender();
 
   const stats = compiled.stats || {};
-  setStatus(`${compiled.name} · ${view.toUpperCase()} · ${Number(stats.cells || 0).toLocaleString()} cells · ${Number(stats.triangles || 0).toLocaleString()} tris · source JSON only`);
+  const sourceLabel = authoring ? `BuildingProgram · ${authoring.report.stats.operations} ops` : 'source JSON only';
+  setStatus(`${compiled.name} · ${view.toUpperCase()} · ${Number(stats.cells || 0).toLocaleString()} cells · ${Number(stats.triangles || 0).toLocaleString()} tris · ${sourceLabel}`);
   document.documentElement.dataset.riftInspectionReady = '1';
   document.title = `READY · ${compiled.name} · ${view}`;
 
   const api = {
-    version: 1,
+    version: 2,
     view,
     blockId: compiled.id,
     blockName: compiled.name,
     blockUrl: currentBlockUrl.href,
+    sourceType: authoring ? 'building-program' : 'city-block',
     bounds: compiled.worldBounds,
     stats: { ...stats },
+    buildingReport: authoring ? authoring.report : null,
     capturePng: captureCanvasPng,
     setView(nextView) {
       const normalized = String(nextView || '').toLowerCase();
