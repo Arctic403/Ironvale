@@ -10,7 +10,9 @@ const files = {
   foundation: await readFile('public/downtown3d-foundation.js', 'utf8'),
   creative: await readFile('public/rift-creative-mode.js', 'utf8'),
   styles: await readFile('public/ai-builder.css', 'utf8'),
-  appStyles: await readFile('public/styles.css', 'utf8')
+  appStyles: await readFile('public/styles.css', 'utf8'),
+  riftBridgeRunner: await readFile('scripts/riftbridge-github-issue.js', 'utf8'),
+  riftBridgeWorkflow: await readFile('.github/workflows/riftbridge.yml', 'utf8')
 };
 const failures = [];
 const requireText = (source, text, label) => { if (!source.includes(text)) failures.push(`${label} missing '${text}'`); };
@@ -22,6 +24,17 @@ requireText(files.server, "/api/ai-builder/drafts", 'public D1 draft save');
 requireText(files.server, 'handleAiBuilderMcpRequest', 'remote MCP route');
 requireText(files.server, 'AI_BUILDER_MCP_PATH', 'remote MCP route');
 requireText(files.server, 'remoteMcp', 'public MCP discovery metadata');
+requireText(files.server, '/api/riftbridge', 'RiftBridge status route');
+requireText(files.server, 'submitRiftBridgeJob', 'RiftBridge job route');
+requireText(files.server, 'executeRiftBridgeJob', 'RiftBridge job executor');
+requireText(files.server, 'riftBridge', 'RiftBridge discovery metadata');
+requireText(files.mcp, 'executeRiftBridgeJob', 'RiftBridge shared compiler executor');
+requireText(files.mcp, "'github-riftbridge'", 'RiftBridge D1 source marker');
+requireText(files.riftBridgeWorkflow, 'issues:', 'RiftBridge GitHub issue trigger');
+requireText(files.riftBridgeWorkflow, "startsWith(github.event.issue.title, '[RIFT-AI]')", 'RiftBridge issue prefix guard');
+requireText(files.riftBridgeWorkflow, "github.event.issue.author_association == 'OWNER'", 'RiftBridge trusted author guard');
+requireText(files.riftBridgeRunner, 'RIFTBRIDGE_ENDPOINT', 'RiftBridge GitHub runner endpoint');
+requireText(files.riftBridgeRunner, 'riftbridge-result', 'RiftBridge machine-readable result comment');
 requireText(files.server, 'savePublicAiBuilderDraft', 'public D1 draft save');
 requireText(files.server, 'listAdminAiBuilderDrafts', 'developer D1 inbox');
 requireText(files.server, 'getAdminAiBuilderDraft', 'developer D1 inbox');
@@ -85,4 +98,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(` - ${failure}`));
   process.exit(1);
 }
-console.log(`RiftCity AI Builder regression passed: public no-account page + ${expectedTools.length} WebMCP tools + ${expectedRemoteTools.length} stateless remote MCP tools + D1-only AI draft handoff + developer Build Mode inbox.`);
+console.log(`RiftCity AI Builder regression passed: public no-account page + ${expectedTools.length} WebMCP tools + ${expectedRemoteTools.length} stateless remote MCP tools + GitHub RiftBridge relay + D1-only AI draft handoff + developer Build Mode inbox.`);

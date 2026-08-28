@@ -1799,3 +1799,33 @@ H1.78 keeps the H1.77 public `/dev/ai-builder` WebMCP cockpit and D1 review inbo
 - `/api/ai-builder/tools` now advertises both the 14 browser WebMCP tools and the 13 remote MCP tools plus the `/mcp` endpoint.
 
 The remote client owns its working Blueprint between calls. This keeps the public authoring bridge stateless and makes the D1 review draft the explicit handoff boundary into RiftCity.
+
+
+## H1.80 — GitHub RiftBridge relay for ChatGPT/mobile authoring
+
+H1.80 keeps Cloudflare and the H1.78 remote MCP server, but adds a second transport that can be driven through the GitHub connector already available in ChatGPT sessions that cannot attach arbitrary MCP servers.
+
+- A trusted repository owner/member/collaborator can open an issue whose title begins with `[RIFT-AI]` and whose body contains one fenced `riftbridge` JSON job.
+- `.github/workflows/riftbridge.yml` runs once when that issue is opened. Random public issue authors are ignored by the workflow guard.
+- `scripts/riftbridge-github-issue.js` submits exactly one HTTP request to `/api/riftbridge/jobs`; there is no polling loop.
+- The Worker reuses the same Blueprint v2 compiler/validation and bulk edit code as the H1.78 MCP tools. A job may supply a complete Blueprint or create a blank bounded Blueprint and apply up to 250 edits.
+- Successful jobs append exactly one source-tagged `github-riftbridge` draft to the existing D1 AI review inbox. The relay has no load, publish, deploy or live-world mutation operation.
+- The Action comments a compact machine-readable result containing the D1 draft id, SHA-256 and compiler counts. ChatGPT can read that comment through the existing GitHub connector.
+- `/api/riftbridge` exposes a public diagnostic summary, and `/api/ai-builder/tools` advertises the relay beside WebMCP and remote MCP.
+
+Example issue body:
+
+```riftbridge
+{
+  "format": "riftcity-riftbridge-job",
+  "version": 1,
+  "create": {
+    "id": "ai-test-block",
+    "name": "AI test block",
+    "bounds": { "min": [0, 0, 0], "max": [63, 31, 63] },
+    "palette": {}
+  },
+  "edits": [],
+  "name": "AI test block"
+}
+```

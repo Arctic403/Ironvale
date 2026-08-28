@@ -1,0 +1,28 @@
+name: RiftBridge AI Job
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  author:
+    if: >-
+      startsWith(github.event.issue.title, '[RIFT-AI]') &&
+      (github.event.issue.author_association == 'OWNER' ||
+       github.event.issue.author_association == 'MEMBER' ||
+       github.event.issue.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout RiftCity
+        uses: actions/checkout@v4
+
+      - name: Run RiftBridge authoring job
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RIFTBRIDGE_ENDPOINT: https://riftcityv1.kc-campbell132.workers.dev/api/riftbridge/jobs
+        run: node scripts/riftbridge-github-issue.js

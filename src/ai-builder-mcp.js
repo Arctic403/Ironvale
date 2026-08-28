@@ -3,7 +3,10 @@ import { createMcpHandler } from 'agents/mcp/server';
 import { z } from 'zod';
 import { expandRiftCityBlueprintLayer, RIFT_CITY_BLUEPRINT_VERSION } from '../public/rift-city-blueprints.js';
 
-export const AI_BUILDER_MCP_VERSION = 'H1.78';
+export const AI_BUILDER_MCP_VERSION = 'H1.80';
+export const RIFTBRIDGE_VERSION = 'H1.80';
+export const RIFTBRIDGE_ENDPOINT = '/api/riftbridge/jobs';
+export const RIFTBRIDGE_JOB_FORMAT = 'riftcity-riftbridge-job';
 export const AI_BUILDER_MCP_PATH = '/mcp';
 export const AI_BUILDER_REMOTE_TOOL_NAMES = Object.freeze([
   'rift_create_blueprint',
@@ -377,7 +380,7 @@ async function ensureDraftTable(env) {
   ]);
 }
 
-async function saveDraft(env, documentJson, requestedName = '') {
+async function saveDraft(env, documentJson, requestedName = '', source = 'public-ai-builder-mcp') {
   const document = parseDocument(documentJson);
   const compact = stringifyDocument(document);
   await ensureDraftTable(env);
@@ -388,8 +391,8 @@ async function saveDraft(env, documentJson, requestedName = '') {
   const digest = await sha256(compact);
   await env.DB.prepare(`
     INSERT INTO ai_builder_drafts (id, document_id, name, draft_json, sha256, source, tool_version, created_at)
-    VALUES (?, ?, ?, ?, ?, 'public-ai-builder-mcp', ?, ?)
-  `).bind(id, documentId, name, compact, digest, AI_BUILDER_MCP_VERSION, now).run();
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(id, documentId, name, compact, digest, String(source || 'public-ai-builder-mcp').slice(0, 80), AI_BUILDER_MCP_VERSION, now).run();
   return {
     ok: true,
     draftId: id,
@@ -401,6 +404,67 @@ async function saveDraft(env, documentJson, requestedName = '') {
     persistence: 'D1 review inbox only',
     publishAccess: false,
     loadAccess: false
+  };
+}
+
+
+function normalizeRiftBridgeCreate(create) {
+  if (!create || typeof create !== 'object' || Array.isArray(create)) {
+    throw new Error('RiftBridge job requires either document or create.');
+  }
+  const bounds = create.bounds;
+  if (!bounds || !Array.isArray(bounds.min) || !Array.isArray(bounds.max)) {
+    throw new Error('create.bounds.min and create.bounds.max are required.');
+  }
+  const [min_x, min_y, min_z] = asVec3(bounds.min, 'create.bounds.min');
+  const [max_x, max_y, max_z] = asVec3(bounds.max, 'create.bounds.max');
+  return createBlueprint({
+    id: String(create.id || '').trim(),
+    name: String(create.name || create.id || '').trim(),
+    min_x, min_y, min_z, max_x, max_y, max_z,
+    palette_json: JSON.stringify(create.palette || {})
+  });
+}
+
+export async function executeRiftBridgeJob(env, rawJob) {
+  if (!rawJob || typeof rawJob !== 'object' || Array.isArray(rawJob)) throw new Error('RiftBridge job must be a JSON object.');
+  if (rawJob.format !== RIFTBRIDGE_JOB_FORMAT) throw new Error(`RiftBridge format must be '${RIFTBRIDGE_JOB_FORMAT}'.`);
+  if (Number(rawJob.version) !== 1) throw new Error('RiftBridge job version must be 1.');
+
+  let documentJson;
+  if (rawJob.document != null) {
+    if (!rawJob.document || typeof rawJob.document !== 'object' || Array.isArray(rawJob.document)) throw new Error('job.document must be one Blueprint object.');
+    documentJson = stringifyDocument(rawJob.document);
+    parseDocument(documentJson);
+  } else {
+    documentJson = normalizeRiftBridgeCreate(rawJob.create).document_json;
+  }
+
+  const edits = rawJob.edits == null ? [] : rawJob.edits;
+  if (!Array.isArray(edits)) throw new Error('job.edits must be an array when supplied.');
+  if (edits.length) documentJson = applyEdits(documentJson, JSON.stringify(edits)).document_json;
+
+  const document = parseDocument(documentJson);
+  const validation = validateRemoteBlueprint(document);
+  const requestedName = String(rawJob.name || rawJob.title || document.name || document.id || '').trim().slice(0, 160);
+  const saved = await saveDraft(env, documentJson, requestedName, 'github-riftbridge');
+
+  return {
+    ok: true,
+    bridge: 'RiftBridge',
+    bridgeVersion: RIFTBRIDGE_VERSION,
+    format: RIFTBRIDGE_JOB_FORMAT,
+    jobId: String(rawJob.job_id || '').trim().slice(0, 200) || null,
+    source: 'github-riftbridge',
+    draft: saved,
+    validation,
+    guarantees: {
+      d1DraftOnly: true,
+      anonymousLoad: false,
+      publish: false,
+      deploy: false,
+      liveWorldMutation: false
+    }
   };
 }
 

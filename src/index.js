@@ -12,7 +12,7 @@ import {
 } from './plugins/index.js';
 import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast, getGameplayModifiers } from './services/gameplay.js';
 import { getLawState, getLawChancePenalty, applyCrimeHeat, recordActivity } from './services/living-city.js';
-import { handleAiBuilderMcpRequest, AI_BUILDER_MCP_PATH, AI_BUILDER_MCP_VERSION, AI_BUILDER_REMOTE_TOOL_NAMES } from './ai-builder-mcp.js';
+import { handleAiBuilderMcpRequest, AI_BUILDER_MCP_PATH, AI_BUILDER_MCP_VERSION, AI_BUILDER_REMOTE_TOOL_NAMES, executeRiftBridgeJob, RIFTBRIDGE_VERSION, RIFTBRIDGE_ENDPOINT, RIFTBRIDGE_JOB_FORMAT } from './ai-builder-mcp.js';
 
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -209,6 +209,8 @@ async function handleApi(request, env, url, requestId) {
   // write-only with respect to D1: agents may inspect/edit their in-browser
   // staging scene and submit a review draft, but only authenticated
   // developer/admin users can list, read or mark those drafts as loaded.
+  if (method === 'GET' && url.pathname === '/api/riftbridge') return getRiftBridgeStatus();
+  if (method === 'POST' && url.pathname === RIFTBRIDGE_ENDPOINT) return submitRiftBridgeJob(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/ai-builder/tools') return getPublicAiBuilderTools();
   if (method === 'POST' && url.pathname === '/api/ai-builder/drafts') return savePublicAiBuilderDraft(request, env, requestId);
   if (url.pathname === '/api/admin/ai-builder/drafts' && method === 'GET') return listAdminAiBuilderDrafts(request, env, url);
@@ -1154,6 +1156,17 @@ function getPublicAiBuilderTools() {
     toolCount: AI_BUILDER_PUBLIC_TOOLS.length,
     browserToolCount: AI_BUILDER_PUBLIC_TOOLS.length,
     tools: AI_BUILDER_PUBLIC_TOOLS,
+    riftBridge: {
+      version: RIFTBRIDGE_VERSION,
+      statusEndpoint: '/api/riftbridge',
+      jobEndpoint: RIFTBRIDGE_ENDPOINT,
+      jobFormat: RIFTBRIDGE_JOB_FORMAT,
+      githubIssueTitlePrefix: '[RIFT-AI]',
+      workflow: '.github/workflows/riftbridge.yml',
+      transport: 'GitHub Issue -> GitHub Actions -> Cloudflare HTTP -> D1 review draft',
+      persistence: 'D1 review inbox only',
+      publishAccess: false
+    },
     remoteMcp: {
       endpoint: AI_BUILDER_MCP_PATH,
       transport: 'Streamable HTTP',
@@ -1163,6 +1176,47 @@ function getPublicAiBuilderTools() {
       tools: AI_BUILDER_REMOTE_TOOL_NAMES
     }
   });
+}
+
+
+function getRiftBridgeStatus() {
+  return json({
+    ok: true,
+    service: 'riftcity-riftbridge',
+    version: RIFTBRIDGE_VERSION,
+    public: true,
+    accountRequired: false,
+    jobEndpoint: RIFTBRIDGE_ENDPOINT,
+    jobFormat: RIFTBRIDGE_JOB_FORMAT,
+    github: {
+      issueTitlePrefix: '[RIFT-AI]',
+      workflow: '.github/workflows/riftbridge.yml',
+      trustedIssueAuthors: ['OWNER', 'MEMBER', 'COLLABORATOR']
+    },
+    jobModel: 'one GitHub issue -> one GitHub Action -> one Cloudflare request -> one compiler-validated D1 review draft',
+    persistence: 'D1 review inbox only',
+    capabilities: ['create_blueprint', 'apply_up_to_250_edits', 'validate', 'save_d1_draft'],
+    prohibited: ['load_draft', 'publish', 'deploy', 'live_world_mutation']
+  });
+}
+
+async function submitRiftBridgeJob(request, env, requestId) {
+  let body;
+  try { body = await readJson(request); }
+  catch (error) { return json({ ok: false, error: safeErrorMessage(error), requestId }, 400); }
+
+  try {
+    const result = await executeRiftBridgeJob(env, body);
+    return json({ ...result, requestId }, 201);
+  } catch (error) {
+    return json({
+      ok: false,
+      service: 'riftcity-riftbridge',
+      version: RIFTBRIDGE_VERSION,
+      error: safeErrorMessage(error),
+      requestId
+    }, 400);
+  }
 }
 
 function validateAiBuilderDraftDocument(document) {
