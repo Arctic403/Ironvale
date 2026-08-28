@@ -33,6 +33,17 @@
       "inspection": {
         "views": ["top", "birdseye", "north", "east", "south", "west"]
       }
+    },
+    {
+      "id": "riftcity-bank-001-generated",
+      "name": "RiftCity Bank · H1.86 Generated",
+      "district": "downtown-commerce",
+      "source_type": "building-program",
+      "path": "../riftcity-buildings/riftcity-bank-001.json",
+      "tags": ["bank", "landmark", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
+      "inspection": {
+        "views": ["top", "birdseye", "north", "east", "south", "west"]
+      }
     }
   ]
 }
