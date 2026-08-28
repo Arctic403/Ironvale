@@ -3,6 +3,9 @@ import {composeRiftBuildingProgramIntoCityBlock,RIFT_DOWNTOWN_BANK_REPLACEMENT} 
 import {compileRiftCityBlock} from '../public/rift-city-block-importer.js';
 const base=JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/downtown-block-001.json',import.meta.url),'utf8'));
 const bank=JSON.parse(fs.readFileSync(new URL('../public/riftcity-buildings/riftcity-bank-001.json',import.meta.url),'utf8'));
+const worldIndex=JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/world-index.json',import.meta.url),'utf8'));
+const appSource=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+const runtimeSource=fs.readFileSync(new URL('../public/rift-world-composition-runtime.js',import.meta.url),'utf8');
 const failures=[]; const ok=(v,m)=>{if(!v)failures.push(m)};
 try{
  const r=composeRiftBuildingProgramIntoCityBlock(base,bank,RIFT_DOWNTOWN_BANK_REPLACEMENT),s=r.overlay.semantics,i=s.interior;
@@ -10,7 +13,19 @@ try{
  ok(r.stats.removedOperations===RIFT_DOWNTOWN_BANK_REPLACEMENT.removeNames.length,'Legacy Bank replacement count drifted.');
  ok(r.stats.overlayOperations>=180,`Bank generated only ${r.stats.overlayOperations} ops.`);
 
- // H1.95 deliberately removes the old basement/mezzanine concept. The public Bank is one monumental occupied level.
+ // The real City route must install composition before routing/rendering, not merely expose the Bank as a diagnostic source.
+ ok(appSource.includes("import './rift-world-composition-runtime.js';"),'app.js no longer directly depends on the Downtown composition runtime.');
+ ok(runtimeSource.includes("BANK_BUNDLE_REVISION = 'h1.96-one-level-grand-bank-v1'"),'Runtime Bank bundle revision is missing or drifted.');
+ ok(runtimeSource.includes('clearStaleBundledDowntownSnapshots();'),'Runtime no longer clears stale bundled Downtown snapshots before City boot.');
+ ok(runtimeSource.includes("saved?.id !== 'downtown-block-001'"),'Stale-snapshot guard no longer scopes itself to bundled Downtown saves.');
+ ok(runtimeSource.includes("item?.id === BANK_OVERLAY_ID"),'Stale-snapshot guard no longer verifies the Bank overlay.');
+ const activeEntry=worldIndex.blocks.find(x=>x.id===worldIndex.activeBlockId);
+ const bankEntry=worldIndex.blocks.find(x=>x.id==='riftcity-bank-001-generated');
+ ok(worldIndex.activeBlockId==='downtown-block-001','Downtown must remain the active playable district.');
+ ok(activeEntry?.runtime_overlays?.includes('riftcity-bank-001'),'Active Downtown index entry does not advertise the runtime Bank overlay.');
+ ok(bankEntry?.tags?.includes('one-level')&&!bankEntry?.tags?.includes('basement'),'World index still describes the obsolete basement Bank.');
+
+ // H1.95+ deliberately removes the old basement/mezzanine concept. The public Bank is one monumental occupied level.
  ok(s.floors.length===1,`Bank occupied-level metadata ${s.floors.length} != 1.`);
  ok(bank.building?.floors===1,'Bank must remain one occupied floor.');
  ok(bank.building?.ground_floor===1,'Street-level Bank floor must remain floor 1.');
@@ -61,12 +76,12 @@ try{
  for(const a of ['bank-service-desk','teller-line','manager-office','security-console','main-vault-center','armored-service'])
    ok(s.anchors.some(x=>x.id===a),`Bank anchor ${a} is missing.`);
 
- // H1.95 is street-level only. The composed district must no longer be expanded downward just to service a Bank basement.
+ // H1.95+ is street-level only. The composed district must no longer be expanded downward just to service a Bank basement.
  ok(r.document.bounds.min[1]>=base.bounds.min[1],`Bank unexpectedly expanded Downtown downward to Y ${r.document.bounds.min[1]}.`);
  ok(r.stats.boundsVolume<=3_000_000,'Downtown composed bounds exceed 3M cells.');
  const c=compileRiftCityBlock(r.document);
  ok(c.stats.cells>=85000,'Composed Downtown cell count is unexpectedly low.');
  ok(c.stats.triangles>=300000,'Composed Downtown triangle count is unexpectedly low.');
- if(!failures.length)console.log(`[downtown-composition] PASS · bank ${r.overlay.report.stats.structuralCells.toLocaleString()} structural cells / ${r.stats.overlayOperations} ops · footprint ${fw}x${fd}m · one occupied level · grand hall ${area(hall)}m² @ ${hall.clearHeight}m clear · vault ${area(vault)}m² @ ${vault.clearHeight}m clear · ${roofMasses.length} roof masses / ${roofLevels.length} roof tiers / ${roofPeak}m peak · Downtown ${c.stats.cells.toLocaleString()} cells / ${c.stats.triangles.toLocaleString()} tris · bounds volume ${r.stats.boundsVolume.toLocaleString()}.`);
+ if(!failures.length)console.log(`[downtown-composition] PASS · LIVE City route wired to ${bankEntry?.name||'Bank'} · bank ${r.overlay.report.stats.structuralCells.toLocaleString()} structural cells / ${r.stats.overlayOperations} ops · footprint ${fw}x${fd}m · one occupied level · grand hall ${area(hall)}m² @ ${hall.clearHeight}m clear · vault ${area(vault)}m² @ ${vault.clearHeight}m clear · ${roofMasses.length} roof masses / ${roofLevels.length} roof tiers / ${roofPeak}m peak · Downtown ${c.stats.cells.toLocaleString()} cells / ${c.stats.triangles.toLocaleString()} tris · bounds volume ${r.stats.boundsVolume.toLocaleString()}.`);
 }catch(e){failures.push(e?.stack||e?.message||String(e))}
 if(failures.length){console.error('[downtown-composition] FAIL');for(const f of failures)console.error(` - ${f}`);process.exit(1)}
