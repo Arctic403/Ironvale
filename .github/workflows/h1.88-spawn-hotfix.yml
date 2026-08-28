@@ -1,0 +1,127 @@
+name: H1.88 Spawn Hotfix
+
+on:
+  push:
+    branches:
+      - ai-static-world-builder
+    paths:
+      - '.github/workflows/h1.88-spawn-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+        with:
+          ref: ai-static-world-builder
+          fetch-depth: 0
+
+      - name: Patch surface-aware spawn resolver and regression
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          player_path = Path('public/rift-player.js')
+          text = player_path.read_text()
+          start = text.index('  function resolveSpawn(preferred) {')
+          end = text.index('\n\n  function rememberSafeGrounded', start)
+          replacement = '''  function resolveSpawn(preferred) {
+            const bounds = getWorldBounds?.();
+            const requested = preferred || (bounds
+              ? [(bounds.min[0] + bounds.max[0] + 1) / 2, bounds.min[1] + 2, (bounds.min[2] + bounds.max[2] + 1) / 2]
+              : [0, 1, 0]);
+            const clampedBase = constrainHorizontal(requested[0], requested[2]);
+            const base = [clampedBase.x, Number(requested[1]) || 0, clampedBase.z];
+            const trySpawnAt = (x, z, probeY, maxDrop) => {
+              const support = findGroundY(x, z, probeY, { maxRise: 0.1, maxDrop });
+              if (support == null || bodyBlocked(x, support, z)) return null;
+              return [x, support, z];
+            };
+
+            // Preserve authored anchors/floor targets first. A valid basement or
+            // upper-floor anchor must stay on its intended nearby support plane.
+            let spawn = trySpawnAt(base[0], base[2], base[1] + 2, 8);
+            if (spawn) return spawn;
+            for (let radius = 1; radius <= 14; radius += 1) {
+              for (let a = 0; a < 16; a += 1) {
+                const angle = a / 16 * Math.PI * 2;
+                const constrained = constrainHorizontal(base[0] + Math.cos(angle) * radius, base[2] + Math.sin(angle) * radius);
+                spawn = trySpawnAt(constrained.x, constrained.z, base[1] + 2, 8);
+                if (spawn) return spawn;
+              }
+            }
+
+            // H1.88: world minY is a storage/collision bound, NOT a surface datum.
+            // Basements, subway tunnels and sewers may extend below zero. If an
+            // old fallback/invalid anchor asks to spawn below all nearby support,
+            // scan the full loaded vertical column from above and recover onto a
+            // real walkable surface instead of returning minY + 1 and falling.
+            if (bounds) {
+              const worldHeight = Math.max(1, Number(bounds.max[1]) - Number(bounds.min[1]) + 1);
+              const topProbeY = Number(bounds.max[1]) + 1.25;
+              const fullDrop = worldHeight + 4;
+              spawn = trySpawnAt(base[0], base[2], topProbeY, fullDrop);
+              if (spawn) return spawn;
+              for (let radius = 1; radius <= 18; radius += 1) {
+                for (let a = 0; a < 24; a += 1) {
+                  const angle = a / 24 * Math.PI * 2;
+                  const constrained = constrainHorizontal(base[0] + Math.cos(angle) * radius, base[2] + Math.sin(angle) * radius);
+                  spawn = trySpawnAt(constrained.x, constrained.z, topProbeY, fullDrop);
+                  if (spawn) return spawn;
+                }
+              }
+            }
+
+            return [base[0], bounds ? Number(bounds.min[1]) + 1 : base[1], base[2]];
+          }'''
+          player_path.write_text(text[:start] + replacement + text[end:])
+
+          test_path = Path('scripts/check-rift-player-physics.js')
+          test = test_path.read_text()
+          marker = "controller.destroy();\nif (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow;"
+          if marker not in test:
+              raise SystemExit('player physics insertion marker not found')
+          regression = '''// H1.88: a real basement may lower world minY without lowering street level.
+          // The legacy Downtown fallback requested minY+2, which became -3 when the
+          // Bank gained a B1 basement. An invalid underground request must recover
+          // to actual walkable street support rather than starting a free-fall.
+          const undergroundBounds = { min: [0, -5, 0], max: [63, 24, 63] };
+          const undergroundController = createRiftPlayerController({
+            canvas: null,
+            camera: { flatForward: () => [0, 0, 1] },
+            getGrid: () => finiteGrid,
+            getWorldBounds: () => undergroundBounds,
+            player: fakePlayer,
+            touchRoot: { querySelector: () => null }
+          });
+          const undergroundSpawn = undergroundController.teleport([32, -3, 32]);
+          approx(undergroundSpawn[1], 1, 1e-5);
+          approx(fakePosition[1], 1, 1e-5);
+          assert.equal(undergroundController.grounded, true, 'Negative world bounds must not make the default player spawn fall.');
+          undergroundController.destroy();
+
+          '''
+          test_path.write_text(test.replace(marker, regression + marker, 1))
+          PY
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run full RiftCity verification
+        run: npm run build
+
+      - name: Commit hotfix to AI branch
+        shell: bash
+        run: |
+          git config user.name "Arctic403"
+          git config user.email "kc.campbell132@gmail.com"
+          git rm .github/workflows/h1.88-spawn-hotfix.yml
+          git add public/rift-player.js scripts/check-rift-player-physics.js
+          git commit -m "Fix player spawn with underground world bounds"
+          git push origin HEAD:ai-static-world-builder
