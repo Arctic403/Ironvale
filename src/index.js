@@ -12,6 +12,7 @@ import {
 } from './plugins/index.js';
 import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast, getGameplayModifiers } from './services/gameplay.js';
 import { getLawState, getLawChancePenalty, applyCrimeHeat, recordActivity } from './services/living-city.js';
+import { handleAiBuilderMcpRequest, AI_BUILDER_MCP_PATH, AI_BUILDER_MCP_VERSION, AI_BUILDER_REMOTE_TOOL_NAMES } from './ai-builder-mcp.js';
 
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -127,9 +128,13 @@ const CRIME_HISTORY_TABLE_SQL = `
 // This Worker owns the generic engines, validation, persistence and API behavior.
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const requestId = request.headers.get('cf-ray') || crypto.randomUUID();
+
+    if (url.pathname === AI_BUILDER_MCP_PATH) {
+      return handleAiBuilderMcpRequest(request, env, ctx);
+    }
 
     if (url.pathname.startsWith('/api/')) {
       try {
@@ -200,7 +205,7 @@ async function handleApi(request, env, url, requestId) {
   }
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
 
-  // H1.77 public AI Builder bridge. The anonymous surface is intentionally
+  // H1.78 public AI Builder + stateless remote MCP bridge. The anonymous surface is intentionally
   // write-only with respect to D1: agents may inspect/edit their in-browser
   // staging scene and submit a review draft, but only authenticated
   // developer/admin users can list, read or mark those drafts as loaded.
@@ -1096,7 +1101,7 @@ async function health(env) {
 
 
 const AI_BUILDER_DRAFT_MAX_BYTES = 2 * 1024 * 1024;
-const AI_BUILDER_TOOL_VERSION = 'H1.77';
+const AI_BUILDER_TOOL_VERSION = AI_BUILDER_MCP_VERSION;
 const AI_BUILDER_PUBLIC_TOOLS = Object.freeze([
   { name: 'rift_scene_state', access: 'public-browser', persistence: 'none' },
   { name: 'rift_inspect_object', access: 'public-browser', persistence: 'none' },
@@ -1147,7 +1152,16 @@ function getPublicAiBuilderTools() {
     draftSaveEndpoint: '/api/ai-builder/drafts',
     draftPersistence: 'D1 review inbox only; no anonymous load or publish endpoint exists.',
     toolCount: AI_BUILDER_PUBLIC_TOOLS.length,
-    tools: AI_BUILDER_PUBLIC_TOOLS
+    browserToolCount: AI_BUILDER_PUBLIC_TOOLS.length,
+    tools: AI_BUILDER_PUBLIC_TOOLS,
+    remoteMcp: {
+      endpoint: AI_BUILDER_MCP_PATH,
+      transport: 'Streamable HTTP',
+      authentication: 'none during development',
+      stateModel: 'stateless Blueprint document-in/document-out; D1 is only touched by rift_save_draft',
+      toolCount: AI_BUILDER_REMOTE_TOOL_NAMES.length,
+      tools: AI_BUILDER_REMOTE_TOOL_NAMES
+    }
   });
 }
 
@@ -2376,7 +2390,7 @@ boot().catch(error=>{
 }
 
 async function serveDeveloperAiBuilder(request, env) {
-  // H1.77: this staging surface is intentionally public during development.
+  // H1.78: this staging surface remains intentionally public during development.
   // It has no anonymous publish/load API. The only server mutation available to
   // the public builder is POST /api/ai-builder/drafts, which writes an immutable
   // review draft to D1 for a developer/admin to load later in normal Build Mode.

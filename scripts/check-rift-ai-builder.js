@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 
 const files = {
   server: await readFile('src/index.js', 'utf8'),
+  mcp: await readFile('src/ai-builder-mcp.js', 'utf8'),
+  package: await readFile('package.json', 'utf8'),
   schema: await readFile('schema.sql', 'utf8'),
   entry: await readFile('public/editor/ai-builder-entry.js', 'utf8'),
   builder: await readFile('public/rift-ai-builder.js', 'utf8'),
@@ -17,6 +19,9 @@ requireText(files.server, "/dev/ai-builder", 'server route');
 requireText(files.server, 'serveDeveloperAiBuilder', 'server route');
 requireText(files.server, "/api/ai-builder/tools", 'public tool manifest');
 requireText(files.server, "/api/ai-builder/drafts", 'public D1 draft save');
+requireText(files.server, 'handleAiBuilderMcpRequest', 'remote MCP route');
+requireText(files.server, 'AI_BUILDER_MCP_PATH', 'remote MCP route');
+requireText(files.server, 'remoteMcp', 'public MCP discovery metadata');
 requireText(files.server, 'savePublicAiBuilderDraft', 'public D1 draft save');
 requireText(files.server, 'listAdminAiBuilderDrafts', 'developer D1 inbox');
 requireText(files.server, 'getAdminAiBuilderDraft', 'developer D1 inbox');
@@ -36,6 +41,13 @@ requireText(files.builder, 'SAVE D1 DRAFT', 'AI Builder UI');
 requireText(files.builder, 'CAPTURE CLEAN PNG', 'AI Builder UI');
 requireText(files.builder, 'checkpoint', 'AI Builder staging');
 requireText(files.builder, 'document.modelContext || navigator.modelContext', 'WebMCP compatibility bridge');
+requireText(files.mcp, "createMcpHandler", 'Cloudflare Streamable HTTP MCP handler');
+requireText(files.mcp, "@modelcontextprotocol/server", 'MCP SDK v2');
+requireText(files.mcp, "route: AI_BUILDER_MCP_PATH", 'MCP /mcp route');
+requireText(files.mcp, "responseMode: 'auto'", 'stateless MCP response mode');
+requireText(files.mcp, "source, tool_version, created_at", 'MCP D1 draft append');
+requireText(files.package, '"@modelcontextprotocol/server": "2.0.0"', 'MCP SDK dependency');
+requireText(files.package, '"agents": "0.21.0"', 'Cloudflare Agents dependency');
 
 const expectedTools = [
   'rift_scene_state', 'rift_inspect_object', 'rift_focus_object', 'rift_set_camera',
@@ -45,6 +57,13 @@ const expectedTools = [
 ];
 for (const tool of expectedTools) requireText(files.builder, `name: '${tool}'`, `WebMCP tool ${tool}`);
 for (const tool of expectedTools) requireText(files.server, `name: '${tool}'`, `public manifest tool ${tool}`);
+
+const expectedRemoteTools = [
+  'rift_create_blueprint', 'rift_validate_blueprint', 'rift_scene_state', 'rift_inspect_object',
+  'rift_move_object', 'rift_rotate_object', 'rift_duplicate_object', 'rift_delete_object',
+  'rift_upsert_layout_object', 'rift_set_prefab', 'rift_delete_prefab', 'rift_apply_edits', 'rift_save_draft'
+];
+for (const tool of expectedRemoteTools) requireText(files.mcp, `registerTool('${tool}'`, `remote MCP tool ${tool}`);
 
 const expectedCommands = ['scene', 'inspect', 'select', 'focus', 'camera', 'move', 'rotate', 'duplicate', 'delete', 'undo', 'redo', 'checkpoint', 'restore', 'capture', 'save', 'export'];
 for (const command of expectedCommands) requireText(files.builder, `command === '${command}'`, `AI command ${command}`);
@@ -66,4 +85,4 @@ if (failures.length) {
   failures.forEach(failure => console.error(` - ${failure}`));
   process.exit(1);
 }
-console.log(`RiftCity AI Builder regression passed: public no-account page + ${expectedTools.length} WebMCP tools + D1-only AI draft handoff + developer Build Mode inbox.`);
+console.log(`RiftCity AI Builder regression passed: public no-account page + ${expectedTools.length} WebMCP tools + ${expectedRemoteTools.length} stateless remote MCP tools + D1-only AI draft handoff + developer Build Mode inbox.`);

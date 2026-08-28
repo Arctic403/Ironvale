@@ -1783,3 +1783,19 @@ RiftCity's AI Builder staging surface can now be opened without a RiftCity accou
 - The inbox tracks when a developer loaded a draft and who loaded it, while preserving the original immutable JSON + SHA-256 for review/debugging.
 - H1.74 full-building rendering and H1.75 player/stair behavior remain unchanged; no camera-driven cutaway behavior is reintroduced.
 
+
+## H1.78 — Public stateless Remote MCP authoring bridge
+
+H1.78 keeps the H1.77 public `/dev/ai-builder` WebMCP cockpit and D1 review inbox, then adds a real remote Model Context Protocol endpoint at `/mcp` for external AI clients.
+
+- Uses Cloudflare Agents' stateless `createMcpHandler()` with MCP SDK v2 Streamable HTTP transport.
+- Keeps browser WebMCP and remote MCP as separate execution surfaces: the remote Worker cannot depend on a browser tab's in-memory staging scene.
+- Remote authoring is document-in/document-out. Every edit tool accepts a complete `document_json`, validates the result with RiftCity's existing Blueprint compiler, and returns a replacement `document_json`.
+- Remote tools can create/validate/inspect Blueprints, move/rotate/duplicate/delete layout objects, upsert layout objects, add/remove prefabs, and apply up to 250 edits in one call.
+- No remote edit tool persists staging state. D1 is touched only by `rift_save_draft`.
+- `rift_save_draft` appends an immutable review item to the existing `ai_builder_drafts` inbox with source `public-ai-builder-mcp`.
+- The public MCP surface has no load, publish, block-draft, deployment, file-write or production-world mutation tool.
+- Developer/admin review remains in the normal Rift Engine Build Mode inbox introduced in H1.77.
+- `/api/ai-builder/tools` now advertises both the 14 browser WebMCP tools and the 13 remote MCP tools plus the `/mcp` endpoint.
+
+The remote client owns its working Blueprint between calls. This keeps the public authoring bridge stateless and makes the D1 review draft the explicit handoff boundary into RiftCity.
