@@ -75,15 +75,21 @@ function clipOp(op,bounds){
   const type=String(op.op||'').toLowerCase();if(type==='set')return inside(bounds,op.at)?clone(op):null;if(!op.min||!op.max)return clone(op);
   const hit=boxIntersection({min:op.min,max:op.max},bounds);if(!hit)return null;const next=clone(op);next.min=hit.min;next.max=hit.max;return next;
 }
+function clampInt(value,min,max){return Math.max(min,Math.min(max,Math.round(value)))}
 
 export function buildRiftInspectionDocument(authoring,options={}){
-  const mode=String(options.mode||'full').toLowerCase(),document=clone(authoring.document),floors=authoring.semantics.floors||[],floor=Number(options.floor)||0;let bounds=clone(document.bounds);
+  const mode=String(options.mode||'full').toLowerCase(),document=clone(authoring.document),floors=authoring.semantics.floors||[],floor=Number(options.floor)||0;let bounds=clone(document.bounds),section=null;
   if(floor){const meta=floors.find(item=>item.floor===floor);if(!meta)throw new Error(`Inspection floor ${floor} does not exist.`);const next=floors.find(item=>item.floor===floor+1);bounds.min[1]=meta.localY;bounds.max[1]=next?next.localY-1:document.bounds.max[1]}
   if(mode==='section'){
-    const axis=String(options.sectionAxis||'z').toLowerCase()==='x'?0:2,side=String(options.sectionSide||'low').toLowerCase()==='high'?'high':'low',focus=inspectionFocus(authoring,options.focus),fallback=focus?Math.round(focus.target[axis]):Math.round((bounds.min[axis]+bounds.max[axis])/2),at=Number.isFinite(Number(options.sectionAt))?Math.round(Number(options.sectionAt)):fallback;
-    if(side==='low')bounds.max[axis]=Math.min(bounds.max[axis],at);else bounds.min[axis]=Math.max(bounds.min[axis],at);
+    const axisName=String(options.sectionAxis||'z').toLowerCase()==='x'?'x':'z',axis=axisName==='x'?0:2,side=String(options.sectionSide||'low').toLowerCase()==='high'?'high':'low',focus=inspectionFocus(authoring,options.focus),fallback=focus?Math.round(focus.target[axis]):Math.round((bounds.min[axis]+bounds.max[axis])/2),requested=Number.isFinite(Number(options.sectionAt))?Number(options.sectionAt):fallback,at=clampInt(requested,bounds.min[axis],bounds.max[axis]),depthValue=Number(options.sectionDepth),depth=Number.isFinite(depthValue)&&depthValue>0?Math.max(1,Math.round(depthValue)):0;
+    if(depth){
+      const before=Math.floor((depth-1)/2),after=depth-1-before;
+      bounds.min[axis]=Math.max(bounds.min[axis],at-before);bounds.max[axis]=Math.min(bounds.max[axis],at+after);
+    }else if(side==='low')bounds.max[axis]=Math.min(bounds.max[axis],at);else bounds.min[axis]=Math.max(bounds.min[axis],at);
+    section={axis:axisName,side,at,depth:depth||null,bounds:{min:[...bounds.min],max:[...bounds.max]}};
   }
   document.bounds=bounds;document.ops=(document.ops||[]).map(op=>clipOp(op,bounds)).filter(Boolean).filter(op=>!(mode==='floor'&&String(op._semanticRole||'')==='roof'));
+  document.metadata={...(document.metadata||{}),inspection:{mode,floor:floor||null,section}};
   document.id=`${document.id}-inspection-${mode}${floor?`-f${floor}`:''}`;document.name=`${document.name} · inspection ${mode}${floor?` · F${floor}`:''}`;return document;
 }
 
