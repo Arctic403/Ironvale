@@ -4,9 +4,9 @@ export const RIFT_BUILDING_PIPELINE_STAGES = Object.freeze([
   { id: 'design-contract', kind: 'plan', dependsOn: [] },
   { id: 'semantic-topology', kind: 'plan', dependsOn: ['design-contract'] },
   { id: 'global-architecture', kind: 'plan', dependsOn: ['semantic-topology'] },
-  { id: 'core-reservation', kind: 'plan+geometry', dependsOn: ['global-architecture'] },
-  { id: 'structure', kind: 'geometry', dependsOn: ['core-reservation'] },
-  { id: 'circulation', kind: 'geometry', dependsOn: ['structure'] },
+  { id: 'structure', kind: 'geometry', dependsOn: ['global-architecture'] },
+  { id: 'core-reservation', kind: 'geometry', dependsOn: ['structure'] },
+  { id: 'circulation', kind: 'geometry', dependsOn: ['core-reservation'] },
   { id: 'interior', kind: 'geometry', dependsOn: ['circulation'] },
   { id: 'envelope', kind: 'geometry', dependsOn: ['interior'] },
   { id: 'detail-gameplay', kind: 'geometry', dependsOn: ['envelope'] },
@@ -126,18 +126,25 @@ export function createRiftBuildingPlan(program, { masses = [], floorCount = 1, f
       rotation: plan.architecture.rotation,
       floorStack: plan.architecture.floorStack,
       masses: plan.architecture.masses,
+      cores: plan.architecture.coreReservations,
+      voids: plan.architecture.voidReservations,
       roofIntent: plan.architecture.roofIntent,
       facadeIntent: plan.architecture.facadeIntent
+    },
+    structure: {
+      floorStack: plan.architecture.floorStack,
+      masses: plan.architecture.masses,
+      reservedCores: plan.architecture.coreReservations,
+      reservedVoids: plan.architecture.voidReservations
     },
     'core-reservation': {
       cores: plan.architecture.coreReservations,
       voids: plan.architecture.voidReservations
     },
-    structure: {
-      floorStack: plan.architecture.floorStack,
-      masses: plan.architecture.masses
+    circulation: {
+      cores: plan.architecture.coreReservations,
+      legacyStairs: clone(building.stair_runs || [])
     },
-    circulation: plan.architecture.coreReservations,
     interior: clone(interior),
     envelope: {
       facadeIntent: plan.architecture.facadeIntent,
@@ -145,6 +152,7 @@ export function createRiftBuildingPlan(program, { masses = [], floorCount = 1, f
     },
     'detail-gameplay': plan.details,
     'game-geometry': {
+      palette: clone(program?.palette || {}),
       chunkSize: Number(program?.chunk_size || 0),
       output: clone(program?.output || {})
     },
@@ -177,16 +185,16 @@ function downstreamClosure(seedIds) {
       }
     }
   }
-  return [...dirty];
+  return RIFT_BUILDING_PIPELINE_STAGES.map(stage => stage.id).filter(id => dirty.has(id));
 }
 
 function rootStageForPath(path) {
   const value = String(path || '');
   if (/^building\.interior\.(spaces|portals|entry_space|require_all_spaces_reachable)/.test(value)) return 'semantic-topology';
-  if (/^building\.interior\.(vertical_cores|voids)/.test(value)) return 'core-reservation';
+  if (/^building\.interior\.(vertical_cores|voids)/.test(value)) return 'global-architecture';
   if (/^building\.(masses|floors|floor_height|origin|rotation|design_rules|roof_plan)/.test(value) || /^lot\./.test(value)) return 'global-architecture';
   if (/^building\.stair_runs/.test(value)) return 'circulation';
-  if (/^building\.interior\.(walls)/.test(value)) return 'interior';
+  if (/^building\.interior\.walls/.test(value)) return 'interior';
   if (/^building\.(window_runs|entrances)/.test(value)) return 'envelope';
   if (/^building\.(anchors|asset_instances)/.test(value) || /^site_ops/.test(value)) return 'detail-gameplay';
   if (/^(palette|chunk_size|output)/.test(value)) return 'game-geometry';
@@ -271,7 +279,7 @@ export function createRiftBuildingPipelineTracker(plan, { strict = true } = {}) 
       format: 'riftcity-building-pipeline',
       version: RIFT_BUILDING_PIPELINE_VERSION,
       planFingerprint: plan?.fingerprint || null,
-      ok: stages.every(stage => !['fail'].includes(stage.status)),
+      ok: stages.every(stage => stage.status !== 'fail'),
       stages
     };
   }
