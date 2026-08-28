@@ -3,6 +3,7 @@ const key=(x,y,z)=>`${x}|${y}|${z}`;
 const inside=(b,p)=>p.every((v,i)=>v>=b.min[i]&&v<=b.max[i]);
 const boxIntersection=(a,b)=>{const min=a.min.map((v,i)=>Math.max(v,b.min[i])),max=a.max.map((v,i)=>Math.min(v,b.max[i]));return min.every((v,i)=>v<=max[i])?{min,max}:null};
 const percentile=(values,p)=>{if(!values.length)return 0;const a=[...values].sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.max(0,Math.floor((a.length-1)*p)))]};
+const optionalFiniteNumber=value=>{if(value==null)return null;if(typeof value==='string'&&!value.trim())return null;const n=Number(value);return Number.isFinite(n)?n:null};
 
 function solidState(document,state){
   const raw=document.palette?.[state]||{};
@@ -81,7 +82,7 @@ export function buildRiftInspectionDocument(authoring,options={}){
   const mode=String(options.mode||'full').toLowerCase(),document=clone(authoring.document),floors=authoring.semantics.floors||[],floor=Number(options.floor)||0;let bounds=clone(document.bounds),section=null;
   if(floor){const meta=floors.find(item=>item.floor===floor);if(!meta)throw new Error(`Inspection floor ${floor} does not exist.`);const next=floors.find(item=>item.floor===floor+1);bounds.min[1]=meta.localY;bounds.max[1]=next?next.localY-1:document.bounds.max[1]}
   if(mode==='section'){
-    const axisName=String(options.sectionAxis||'z').toLowerCase()==='x'?'x':'z',axis=axisName==='x'?0:2,side=String(options.sectionSide||'low').toLowerCase()==='high'?'high':'low',focus=inspectionFocus(authoring,options.focus),fallback=focus?Math.round(focus.target[axis]):Math.round((bounds.min[axis]+bounds.max[axis])/2),requested=Number.isFinite(Number(options.sectionAt))?Number(options.sectionAt):fallback,at=clampInt(requested,bounds.min[axis],bounds.max[axis]),depthValue=Number(options.sectionDepth),depth=Number.isFinite(depthValue)&&depthValue>0?Math.max(1,Math.round(depthValue)):0;
+    const axisName=String(options.sectionAxis||'z').toLowerCase()==='x'?'x':'z',axis=axisName==='x'?0:2,side=String(options.sectionSide||'low').toLowerCase()==='high'?'high':'low',focus=inspectionFocus(authoring,options.focus),fallback=focus?Math.round(focus.target[axis]):Math.round((bounds.min[axis]+bounds.max[axis])/2),explicitAt=optionalFiniteNumber(options.sectionAt),requested=explicitAt==null?fallback:explicitAt,at=clampInt(requested,bounds.min[axis],bounds.max[axis]),depthValue=optionalFiniteNumber(options.sectionDepth),depth=depthValue!=null&&depthValue>0?Math.max(1,Math.round(depthValue)):0;
     if(depth){
       const before=Math.floor((depth-1)/2),after=depth-1-before;
       bounds.min[axis]=Math.max(bounds.min[axis],at-before);bounds.max[axis]=Math.min(bounds.max[axis],at+after);
@@ -89,6 +90,10 @@ export function buildRiftInspectionDocument(authoring,options={}){
     section={axis:axisName,side,at,depth:depth||null,bounds:{min:[...bounds.min],max:[...bounds.max]}};
   }
   document.bounds=bounds;document.ops=(document.ops||[]).map(op=>clipOp(op,bounds)).filter(Boolean).filter(op=>!(mode==='floor'&&String(op._semanticRole||'')==='roof'));
+  if(section){
+    section.solidCells=replayRiftBuildingCells(document).size;
+    if(!section.solidCells)throw new Error(`Inspection section ${section.axis.toUpperCase()} @ ${section.at}${section.depth?` (${section.depth}m slice)`:''} produced no solid geometry. Adjust sectionAt/sectionDepth or focus.`);
+  }
   document.metadata={...(document.metadata||{}),inspection:{mode,floor:floor||null,section}};
   document.id=`${document.id}-inspection-${mode}${floor?`-f${floor}`:''}`;document.name=`${document.name} · inspection ${mode}${floor?` · F${floor}`:''}`;return document;
 }
