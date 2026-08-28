@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:blueprints && npm run verify:building-programs && npm run verify:interiors && npm run verify:inspection && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
+    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:blueprints && npm run verify:building-pipeline && npm run verify:building-programs && npm run verify:interiors && npm run verify:inspection && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",
@@ -12,6 +12,7 @@
     "db:migrate:remote": "wrangler d1 execute riftcity-v2 --remote --file=./schema.sql",
     "verify:js-only": "node scripts/verify-js-only.js",
     "verify:blueprints": "node scripts/check-rift-city-blueprints.js",
+    "verify:building-pipeline": "node scripts/check-rift-building-stage-pipeline.js",
     "verify:building-programs": "node scripts/check-rift-building-programs.js",
     "verify:interiors": "node scripts/check-rift-interior-architecture.js",
     "verify:inspection": "node scripts/check-rift-inspection-pipeline.js",
