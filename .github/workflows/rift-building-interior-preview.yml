@@ -34,7 +34,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     steps:
       - name: Checkout AI branch
         uses: actions/checkout@v4
@@ -75,12 +75,12 @@ jobs:
           cat /tmp/rift-building-static.log
           exit 1
 
-      - name: Render one-level bank review set
+      - name: Render decisive one-level bank review set
         shell: bash
         run: |
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
           if [ -z "$CHROME" ]; then echo 'No Chrome/Chromium binary found.' >&2; exit 1; fi
-          FLAGS=(--headless=new --no-sandbox --disable-dev-shm-usage --hide-scrollbars --ignore-gpu-blocklist --enable-webgl --use-angle=swiftshader --window-size=1800,1200 --virtual-time-budget=2500)
+          FLAGS=(--headless=new --no-sandbox --disable-dev-shm-usage --hide-scrollbars --ignore-gpu-blocklist --enable-webgl --use-angle=swiftshader --window-size=1800,1200 --virtual-time-budget=1800)
           BASE='http://127.0.0.1:4173/building-3d-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
           PLAN='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
           PIDS=()
@@ -104,40 +104,30 @@ jobs:
             if [ "${#PIDS[@]}" -ge 3 ]; then flush_shots; fi
           }
 
-          shot bank-exterior-top "$BASE&mode=full&view=top"
+          # Exterior silhouette / roof articulation / front identity.
           shot bank-exterior-iso-nw "$BASE&mode=full&view=iso-nw"
-          shot bank-exterior-iso-ne "$BASE&mode=full&view=iso-ne"
-          shot bank-exterior-iso-sw "$BASE&mode=full&view=iso-sw"
-          shot bank-exterior-iso-se "$BASE&mode=full&view=iso-se"
-          shot bank-exterior-north "$BASE&mode=full&view=north"
-          shot bank-exterior-east "$BASE&mode=full&view=east"
           shot bank-exterior-south "$BASE&mode=full&view=south"
-          shot bank-exterior-west "$BASE&mode=full&view=west"
+          shot bank-exterior-top "$BASE&mode=full&view=top"
 
-          for view in iso-nw iso-ne iso-sw iso-se; do
-            shot "bank-f1-$view" "$BASE&mode=floor&floor=1&view=$view"
-          done
+          # One-level spatial plan and open-height shell.
+          shot bank-f1-iso-se "$BASE&mode=floor&floor=1&view=iso-se"
+          shot bank-grand-hall-eye-north "$BASE&mode=full&space=grand-hall&view=inside-north"
+          shot bank-grand-hall-eye-south "$BASE&mode=full&space=grand-hall&view=inside-south"
 
-          for direction in north east south west; do
-            shot "bank-vault-eye-$direction" "$BASE&mode=full&space=main-vault&view=inside-$direction"
-            shot "bank-grand-hall-eye-$direction" "$BASE&mode=full&space=grand-hall&view=inside-$direction"
-          done
-
+          # Core Bank functions.
           shot bank-teller-eye-north "$BASE&mode=full&space=teller-gallery&view=inside-north"
-          shot bank-teller-eye-south "$BASE&mode=full&space=teller-gallery&view=inside-south"
+          shot bank-vault-eye-north "$BASE&mode=full&space=main-vault&view=inside-north"
+          shot bank-vault-eye-south "$BASE&mode=full&space=main-vault&view=inside-south"
           shot bank-executive-eye-west "$BASE&mode=full&space=east-executive-offices&view=inside-west"
           shot bank-security-eye-west "$BASE&mode=full&space=east-security&view=inside-west"
 
-          shot bank-section-north "$BASE&mode=section&sectionAxis=z&sectionDepth=3&view=south"
-          shot bank-section-south "$BASE&mode=section&sectionAxis=z&sectionDepth=3&view=north"
-          shot bank-section-west "$BASE&mode=section&sectionAxis=x&sectionDepth=3&view=east"
-          shot bank-section-east "$BASE&mode=section&sectionAxis=x&sectionDepth=3&view=west"
-          shot bank-vault-section-ns "$BASE&mode=section&sectionAxis=z&sectionDepth=3&focus=main-vault&view=south"
-          shot bank-vault-section-ew "$BASE&mode=section&sectionAxis=x&sectionDepth=3&focus=main-vault&view=east"
-          shot bank-teller-section-ns "$BASE&mode=section&sectionAxis=z&sectionDepth=3&focus=teller-gallery&view=south"
+          # True 3m slices prove roof/ceiling height and secure-core geometry.
+          shot bank-section-long "$BASE&mode=section&sectionAxis=z&sectionDepth=3&view=south"
+          shot bank-vault-section "$BASE&mode=section&sectionAxis=z&sectionDepth=3&focus=main-vault&view=south"
+          shot bank-teller-section "$BASE&mode=section&sectionAxis=z&sectionDepth=3&focus=teller-gallery&view=south"
 
+          # Semantic plan is the fastest way to catch disconnected/awkward room layout.
           shot bank-f1-plan "$PLAN&floor=1"
-          shot bank-xray-plan "$PLAN&floor=1&xray=1"
           flush_shots
 
       - name: Package AI review artifact
