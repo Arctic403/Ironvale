@@ -12,6 +12,16 @@
       "inspection": {
         "views": ["top", "birdseye", "north", "east", "south", "west"]
       }
+    },
+    {
+      "id": "nature-water-demo-001",
+      "name": "Nature + Flow Water Test",
+      "district": "engine-test",
+      "path": "./nature-water-demo-001.json",
+      "tags": ["engine-test", "grass", "water", "flow", "bridge", "ai-authorable"],
+      "inspection": {
+        "views": ["top", "birdseye", "north", "east", "south", "west"]
+      }
     }
   ]
 }
