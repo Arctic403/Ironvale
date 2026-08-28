@@ -75,7 +75,7 @@ jobs:
           cat /tmp/rift-building-static.log
           exit 1
 
-      - name: Render all exterior interior eye-level section and stair views
+      - name: Render one-level bank exterior interior eye-level and section views
         shell: bash
         run: |
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
@@ -95,29 +95,33 @@ jobs:
           snap bank-exterior-west 'mode=full&view=west'
 
           for view in iso-nw iso-ne iso-sw iso-se; do
-            snap "bank-b1-$view" "mode=floor&floor=1&view=$view"
-            snap "bank-f1-$view" "mode=floor&floor=2&view=$view"
+            snap "bank-f1-$view" "mode=floor&floor=1&view=$view"
           done
 
           for direction in north east south west; do
-            snap "bank-vault-eye-$direction" "mode=full&space=b1-vault&view=inside-$direction"
-            snap "bank-grand-hall-eye-$direction" "mode=full&space=f1-grand-hall&view=inside-$direction"
+            snap "bank-vault-eye-$direction" "mode=full&space=main-vault&view=inside-$direction"
+            snap "bank-grand-hall-eye-$direction" "mode=full&space=grand-hall&view=inside-$direction"
           done
 
-          # True 3m architectural section bands through the building center.
+          snap bank-teller-eye-north 'mode=full&space=teller-gallery&view=inside-north'
+          snap bank-teller-eye-south 'mode=full&space=teller-gallery&view=inside-south'
+          snap bank-executive-eye-west 'mode=full&space=east-executive-offices&view=inside-west'
+          snap bank-security-eye-west 'mode=full&space=east-security&view=inside-west'
+
+          # True 3m architectural section bands through the monumental one-level shell.
           snap bank-section-north 'mode=section&sectionAxis=z&sectionDepth=3&view=south'
           snap bank-section-south 'mode=section&sectionAxis=z&sectionDepth=3&view=north'
           snap bank-section-west 'mode=section&sectionAxis=x&sectionDepth=3&view=east'
           snap bank-section-east 'mode=section&sectionAxis=x&sectionDepth=3&view=west'
 
-          # Tight slices through the semantic grand-stair core: longitudinal and transverse.
-          snap bank-stair-section-ns 'mode=section&sectionAxis=z&sectionDepth=2&focus=grand-stair-b1-f1&view=south'
-          snap bank-stair-section-ew 'mode=section&sectionAxis=x&sectionDepth=3&focus=grand-stair-b1-f1&view=east'
+          # Focused slices through the new secure core and public transaction hall.
+          snap bank-vault-section-ns 'mode=section&sectionAxis=z&sectionDepth=3&focus=main-vault&view=south'
+          snap bank-vault-section-ew 'mode=section&sectionAxis=x&sectionDepth=3&focus=main-vault&view=east'
+          snap bank-teller-section-ns 'mode=section&sectionAxis=z&sectionDepth=3&focus=teller-gallery&view=south'
 
           PLAN='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-b1-plan.png "${PLAN}&floor=1"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-f1-plan.png "${PLAN}&floor=2"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-xray-plan.png "${PLAN}&floor=2&xray=1"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-f1-plan.png "${PLAN}&floor=1"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/full-resolution/bank-xray-plan.png "${PLAN}&floor=1&xray=1"
 
       - name: Package AI review artifact
         run: node scripts/package-rift-inspection-artifact.js rift-building-previews
