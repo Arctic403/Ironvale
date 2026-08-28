@@ -1,17 +1,15 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "downtown-block-001",
+  "activeBlockId": "riftcity-bank-001-generated",
   "blocks": [
     {
       "id": "downtown-block-001",
       "name": "Downtown Commerce District V1",
       "district": "downtown-commerce",
       "path": "./downtown-block-001.json",
-      "tags": ["active", "mmo-scale", "ai-authorable", "single-player"],
-      "inspection": {
-        "views": ["top", "birdseye", "north", "east", "south", "west"]
-      }
+      "tags": ["mmo-scale", "ai-authorable", "single-player"],
+      "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
       "id": "nature-water-demo-001",
@@ -19,9 +17,7 @@
       "district": "engine-test",
       "path": "./nature-water-demo-001.json",
       "tags": ["engine-test", "grass", "water", "flow", "bridge", "ai-authorable"],
-      "inspection": {
-        "views": ["top", "birdseye", "north", "east", "south", "west"]
-      }
+      "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
       "id": "building-program-smoke-001-generated",
@@ -30,9 +26,7 @@
       "source_type": "building-program",
       "path": "../riftcity-buildings/building-program-smoke-001.json",
       "tags": ["engine-test", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
-      "inspection": {
-        "views": ["top", "birdseye", "north", "east", "south", "west"]
-      }
+      "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
       "id": "riftcity-bank-001-generated",
@@ -40,10 +34,8 @@
       "district": "downtown-commerce",
       "source_type": "building-program",
       "path": "../riftcity-buildings/riftcity-bank-001.json",
-      "tags": ["bank", "landmark", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
-      "inspection": {
-        "views": ["top", "birdseye", "north", "east", "south", "west"]
-      }
+      "tags": ["active", "bank", "landmark", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
+      "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     }
   ]
 }
