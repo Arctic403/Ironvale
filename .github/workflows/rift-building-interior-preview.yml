@@ -86,9 +86,11 @@ jobs:
           PROFILE="$(mktemp -d)"
           cleanup() {
             if [ -f /tmp/rift-inspection-chrome.pid ]; then
-              kill "$(cat /tmp/rift-inspection-chrome.pid)" 2>/dev/null || true
+              CHROME_PID="$(cat /tmp/rift-inspection-chrome.pid)"
+              kill "$CHROME_PID" 2>/dev/null || true
+              wait "$CHROME_PID" 2>/dev/null || true
             fi
-            rm -rf "$PROFILE"
+            rm -rf "$PROFILE" 2>/dev/null || true
           }
           trap cleanup EXIT
 
