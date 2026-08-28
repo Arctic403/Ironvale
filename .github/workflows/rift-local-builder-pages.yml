@@ -1,0 +1,59 @@
+name: Rift Local Builder Pages
+
+on:
+  push:
+    branches: [ai-static-world-builder]
+    paths:
+      - 'public/builder/**'
+      - 'public/rift-building-program.js'
+      - 'public/rift-building-compiler.js'
+      - 'public/rift-building-pipeline.js'
+      - 'public/rift-interior-architecture.js'
+      - 'public/rift-interior-pipeline.js'
+      - 'public/rift-material-library.js'
+      - 'public/rift-world-coordinates.js'
+      - 'public/riftcity-icon.svg'
+      - '.github/workflows/rift-local-builder-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: rift-local-builder-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+      - name: Prepare minimal public builder artifact
+        run: |
+          mkdir -p _site/builder
+          cp -R public/builder/. _site/builder/
+          cp public/rift-building-program.js _site/
+          cp public/rift-building-compiler.js _site/
+          cp public/rift-building-pipeline.js _site/
+          cp public/rift-interior-architecture.js _site/
+          cp public/rift-interior-pipeline.js _site/
+          cp public/rift-material-library.js _site/
+          cp public/rift-world-coordinates.js _site/
+          cp public/riftcity-icon.svg _site/
+          touch _site/.nojekyll
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static builder
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
