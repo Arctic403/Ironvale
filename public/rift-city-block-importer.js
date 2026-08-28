@@ -18,7 +18,7 @@ import {
 export const RIFT_CITY_BLOCK_FORMAT = 'riftcity-city-block';
 export const RIFT_CITY_BLOCK_VERSION = 2;
 export const RIFT_CITY_BLOCK_LEGACY_VERSION = 1;
-export const RIFT_CITY_BLOCK_MAX_VOLUME = 2_000_000;
+export const RIFT_CITY_BLOCK_MAX_VOLUME = 3_000_000;
 export const RIFT_CITY_BLOCK_MAX_OP_TOUCHES = 3_000_000;
 
 const SHAPE_NAMES = Object.freeze({

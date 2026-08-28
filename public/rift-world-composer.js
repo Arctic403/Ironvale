@@ -2,7 +2,7 @@ import { compileRiftBuildingProgram } from './rift-building-program.js';
 
 const CITY_FORMAT = 'riftcity-city-block';
 const SUPPORTED_OPS = new Set(['set', 'fill_box', 'cut_box', 'hollow_box']);
-const DEFAULT_MAX_BOUNDS_VOLUME = 2_000_000;
+const DEFAULT_MAX_BOUNDS_VOLUME = 3_000_000;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));

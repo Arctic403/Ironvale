@@ -1,87 +1,36 @@
 import fs from 'node:fs';
-import { composeRiftBuildingProgramIntoCityBlock, RIFT_DOWNTOWN_BANK_REPLACEMENT } from '../public/rift-world-composer.js';
-import { compileRiftCityBlock } from '../public/rift-city-block-importer.js';
-
-const base = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/downtown-block-001.json', import.meta.url), 'utf8'));
-const bank = JSON.parse(fs.readFileSync(new URL('../public/riftcity-buildings/riftcity-bank-001.json', import.meta.url), 'utf8'));
-const failures = [];
-
-try {
-  const result = composeRiftBuildingProgramIntoCityBlock(base, bank, RIFT_DOWNTOWN_BANK_REPLACEMENT);
-  if (!result.overlay.report.ok) failures.push('Bank BuildingProgram report is not clean.');
-  if (result.stats.removedOperations !== RIFT_DOWNTOWN_BANK_REPLACEMENT.removeNames.length) {
-    failures.push(`removed ${result.stats.removedOperations} legacy bank op(s); expected ${RIFT_DOWNTOWN_BANK_REPLACEMENT.removeNames.length}`);
-  }
-  if (result.stats.overlayOperations < 120) failures.push(`Bank generated only ${result.stats.overlayOperations} ops; expanded MMO benchmark unexpectedly collapsed.`);
-  if (!result.document.ops.some(op => op._worldOverlayId === 'riftcity-bank-001')) failures.push('Composed district contains no tagged Bank overlay operations.');
-  if (result.document.ops.some(op => RIFT_DOWNTOWN_BANK_REPLACEMENT.removeNames.includes(String(op?.name || '')))) failures.push('Legacy Bank operations remain after composition.');
-
-  const semantics = result.overlay.semantics;
-  const lotMin = [181, -5, 21], lotMax = [234, 24, 77];
-  const boundsInside = semantics.worldBounds.min.every((v, i) => v >= lotMin[i]) && semantics.worldBounds.max.every((v, i) => v <= lotMax[i]);
-  if (!boundsInside) failures.push(`Bank world bounds ${semantics.worldBounds.min.join(',')} -> ${semantics.worldBounds.max.join(',')} escape the expanded NE bank lot.`);
-  if (semantics.floors.length !== 4) failures.push(`Bank level metadata ${semantics.floors.length} != 4 (B1 + F1-F3).`);
-  if (bank.building?.ground_floor !== 2) failures.push('Bank ground_floor must be level 2 so B1 remains physically below street grade.');
-  if (bank.building?.occupancy_target < 250) failures.push(`Bank occupancy target ${bank.building?.occupancy_target || 0} < 250.`);
-  if (bank.building?.design_rules?.min_public_corridor_width < 8) failures.push('Bank public circulation rule must remain at least 8m wide.');
-  if (bank.building?.design_rules?.main_stair_width < 8) failures.push('Bank grand stair rule must remain at least 8m wide.');
-  if (bank.building?.design_rules?.grand_lobby_clear_height < 10) failures.push('Bank lobby clear height must remain at least 10m.');
-
-  const origin = bank.building?.origin || [0,0,0];
-  const masses = bank.building?.masses || [];
-  const minX = Math.min(...masses.map(m => origin[0] + m.origin[0]));
-  const maxX = Math.max(...masses.map(m => origin[0] + m.origin[0] + m.size[0] - 1));
-  const minZ = Math.min(...masses.map(m => origin[2] + m.origin[2]));
-  const maxZ = Math.max(...masses.map(m => origin[2] + m.origin[2] + m.size[1] - 1));
-  const footprintWidth = maxX - minX + 1;
-  const footprintDepth = maxZ - minZ + 1;
-  if (footprintWidth < 50 || footprintDepth < 46) failures.push(`Bank physical footprint ${footprintWidth}x${footprintDepth}m is below the MMO minimum 50x46m.`);
-
-  const interior = semantics.interior;
-  if (!interior) failures.push('Bank has no compiled Interior Architecture semantics.');
-  const atrium = interior?.voids?.find(item => item.id === 'grand-lobby-atrium');
-  if (!atrium) failures.push('Grand lobby atrium structural void is missing.');
-  else {
-    const atriumWidth = atrium.max[0] - atrium.min[0] + 1;
-    const atriumDepth = atrium.max[1] - atrium.min[1] + 1;
-    if (atriumWidth < 24 || atriumDepth < 14) failures.push(`Lobby atrium ${atriumWidth}x${atriumDepth}m is too small for the MMO benchmark.`);
-    if (atrium.removedCells < atriumWidth * atriumDepth) failures.push(`Lobby atrium removed only ${atrium.removedCells} floor cells; expected at least ${atriumWidth * atriumDepth}.`);
-  }
-  if ((interior?.spaces?.length || 0) < 15) failures.push(`Bank interior spaces ${interior?.spaces?.length || 0} < 15.`);
-  if ((interior?.portals?.length || 0) < 10) failures.push(`Bank interior portals ${interior?.portals?.length || 0} < 10.`);
-  if ((interior?.verticalCores?.length || 0) !== 3) failures.push(`Bank vertical cores ${interior?.verticalCores?.length || 0} != 3.`);
-  if (interior?.graph?.unreachable?.length) failures.push(`Bank has unreachable interior spaces: ${interior.graph.unreachable.join(', ')}.`);
-  if (result.overlay.report.stats.invalidVerticalCores) failures.push(`Bank has ${result.overlay.report.stats.invalidVerticalCores} invalid vertical core(s).`);
-  if (result.overlay.report.stats.blockedPortals) failures.push(`Bank has ${result.overlay.report.stats.blockedPortals} blocked interior portal(s).`);
-  for (const core of interior?.verticalCores || []) {
-    if (core.removedFloorCells < core.width) failures.push(`${core.id} reserved only ${core.removedFloorCells} floor-opening cells for width ${core.width}.`);
-    if (core.topLandings !== core.width || core.bottomLandings !== core.width) failures.push(`${core.id} landing support is incomplete.`);
-    if (core.blockedHeadroom || core.missingStairs) failures.push(`${core.id} has blocked headroom or missing stairs.`);
-  }
-
-  if (semantics.entrances.length < 3) failures.push(`Bank entrances ${semantics.entrances.length} < 3.`);
-  if (semantics.rooms.length < 15) failures.push(`Bank rooms/spaces ${semantics.rooms.length} < 15.`);
-  if (!semantics.anchors.some(anchor => anchor.id === 'bank-teller-counter')) failures.push('Bank teller gameplay anchor is missing.');
-  if (!semantics.anchors.some(anchor => anchor.id === 'bank-vault-door')) failures.push('Bank vault anchor is missing.');
-  if (!semantics.anchors.some(anchor => anchor.id === 'bank-main-stairs')) failures.push('Bank main-stair circulation anchor is missing.');
-
-  if (result.document.bounds.min[1] !== -5) failures.push(`Composed Downtown basement bound ${result.document.bounds.min[1]} != -5.`);
-  if (result.stats.boundsVolume > 2_000_000) failures.push(`Composed bounds volume ${result.stats.boundsVolume} exceeds importer safety limit.`);
-
-  const compiled = compileRiftCityBlock(result.document);
-  if (compiled.stats.cells < 85000) failures.push(`Composed Downtown cell count ${compiled.stats.cells} is unexpectedly low.`);
-  if (compiled.stats.triangles < 300000) failures.push(`Composed Downtown triangle count ${compiled.stats.triangles} is unexpectedly low.`);
-  if (!result.document.metadata?.world_composition?.overlays?.some(item => item.id === 'riftcity-bank-001')) failures.push('Bank composition metadata is missing.');
-
-  if (!failures.length) {
-    console.log(`[downtown-composition] PASS · bank ${result.overlay.report.stats.structuralCells.toLocaleString()} structural cells / ${result.stats.overlayOperations} ops · footprint ${footprintWidth}x${footprintDepth}m · B1 + 3 floors · 250-player target · H1.90 interior graph clean · Downtown ${compiled.stats.cells.toLocaleString()} cells / ${compiled.stats.triangles.toLocaleString()} tris · bounds volume ${result.stats.boundsVolume.toLocaleString()}.`);
-  }
-} catch (error) {
-  failures.push(error?.stack || error?.message || String(error));
-}
-
-if (failures.length) {
-  console.error('[downtown-composition] FAIL');
-  for (const failure of failures) console.error(` - ${failure}`);
-  process.exit(1);
-}
+import {composeRiftBuildingProgramIntoCityBlock,RIFT_DOWNTOWN_BANK_REPLACEMENT} from '../public/rift-world-composer.js';
+import {compileRiftCityBlock} from '../public/rift-city-block-importer.js';
+const base=JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/downtown-block-001.json',import.meta.url),'utf8'));
+const bank=JSON.parse(fs.readFileSync(new URL('../public/riftcity-buildings/riftcity-bank-001.json',import.meta.url),'utf8'));
+const failures=[]; const ok=(v,m)=>{if(!v)failures.push(m)};
+try{
+ const r=composeRiftBuildingProgramIntoCityBlock(base,bank,RIFT_DOWNTOWN_BANK_REPLACEMENT),s=r.overlay.semantics,i=s.interior;
+ ok(r.overlay.report.ok,'Bank BuildingProgram report is not clean.');
+ ok(r.stats.removedOperations===RIFT_DOWNTOWN_BANK_REPLACEMENT.removeNames.length,'Legacy Bank replacement count drifted.');
+ ok(r.stats.overlayOperations>=120,`Bank generated only ${r.stats.overlayOperations} ops.`);
+ ok(s.floors.length===2,`Bank level metadata ${s.floors.length} != 2 (B1 + F1).`);
+ ok(bank.building?.ground_floor===2,'Ground floor must remain level 2 above B1.');
+ ok(bank.building?.floor_height>=10,'Bank storey spacing must remain at least 10m.');
+ ok(bank.building?.occupancy_target>=250,'Bank occupancy target must remain at least 250.');
+ ok(bank.building?.interior?.minimum_clear_height>=4,'Interior minimum clear height must remain at least 4m.');
+ const o=bank.building.origin||[0,0,0],m=bank.building.masses||[];
+ const minX=Math.min(...m.map(x=>o[0]+x.origin[0])),maxX=Math.max(...m.map(x=>o[0]+x.origin[0]+x.size[0]-1));
+ const minZ=Math.min(...m.map(x=>o[2]+x.origin[2])),maxZ=Math.max(...m.map(x=>o[2]+x.origin[2]+x.size[1]-1));
+ const fw=maxX-minX+1,fd=maxZ-minZ+1; ok(fw>=50&&fd>=48,`Bank footprint ${fw}x${fd}m is too small.`);
+ ok(i,'Compiled Interior Architecture semantics are missing.');
+ ok((i?.spaces?.length||0)>=10,'Bank needs at least 10 actual spaces.'); ok((i?.portals?.length||0)>=8,'Bank needs at least 8 real portals.');
+ ok((i?.verticalCores?.length||0)===1,'Bank must have exactly one B1→F1 stair core.');
+ ok(!i?.graph?.unreachable?.length,'Bank has unreachable interior spaces.'); ok(!r.overlay.report.stats.invalidVerticalCores,'Bank has an invalid stair core.'); ok(!r.overlay.report.stats.blockedPortals,'Bank has a blocked portal.');
+ const area=x=>(x.max[0]-x.min[0]+1)*(x.max[1]-x.min[1]+1),vault=i?.spaces?.find(x=>x.id==='b1-vault'),hall=i?.spaces?.find(x=>x.id==='f1-grand-hall');
+ ok(vault&&area(vault)>=450&&vault.clearHeight>=8,'Grand Vault must be at least 450m² with 8m clear height.');
+ ok(hall&&area(hall)>=700&&hall.clearHeight>=8,'Grand Banking Hall must be at least 700m² with 8m clear height.');
+ for(const space of i?.spaces||[]) ok(space.clearHeight>=4&&(space.clearRatio??1)>=.65,`${space.id} fails full-height room clearance.`);
+ for(const core of i?.verticalCores||[]){ok(core.width>=8,`${core.id} must remain at least 8m wide.`);ok(core.removedFloorCells>=core.width,`${core.id} opening is too small.`);ok(core.topLandings===core.width&&core.bottomLandings===core.width,`${core.id} landing support is incomplete.`);ok(!core.blockedHeadroom&&!core.missingStairs,`${core.id} has blocked headroom or missing stairs.`)}
+ const names=(bank.site_ops||[]).map(x=>String(x.name||'')); for(const l of ['B','A','N','K'])ok(names.some(n=>n.startsWith(`BANK letter ${l}`)),`BANK facade lettering is missing ${l}.`);
+ ok(s.entrances.length>=3,'Bank needs at least 3 entrances.'); for(const a of ['bank-teller-counter','bank-vault-door','bank-main-stairs'])ok(s.anchors.some(x=>x.id===a),`Bank anchor ${a} is missing.`);
+ ok(r.document.bounds.min[1]===-10,`Downtown basement bound ${r.document.bounds.min[1]} != -10.`); ok(r.stats.boundsVolume<=3_000_000,'Downtown composed bounds exceed 3M cells.');
+ const c=compileRiftCityBlock(r.document); ok(c.stats.cells>=85000,'Composed Downtown cell count is unexpectedly low.'); ok(c.stats.triangles>=300000,'Composed Downtown triangle count is unexpectedly low.');
+ if(!failures.length)console.log(`[downtown-composition] PASS · bank ${r.overlay.report.stats.structuralCells.toLocaleString()} structural cells / ${r.stats.overlayOperations} ops · footprint ${fw}x${fd}m · B1 + F1 · 8m grand-room clearance · structural BANK sign · Downtown ${c.stats.cells.toLocaleString()} cells / ${c.stats.triangles.toLocaleString()} tris · bounds volume ${r.stats.boundsVolume.toLocaleString()}.`);
+}catch(e){failures.push(e?.stack||e?.message||String(e))}
+if(failures.length){console.error('[downtown-composition] FAIL');for(const f of failures)console.error(` - ${f}`);process.exit(1)}

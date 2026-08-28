@@ -1,4 +1,5 @@
 export const RIFT_INTERIOR_ARCHITECTURE_VERSION = 1;
+export const RIFT_INTERIOR_MIN_CLEAR_HEIGHT = 4;
 
 const SIDES = ['north', 'east', 'south', 'west'];
 const DIR = Object.freeze({
@@ -95,13 +96,15 @@ function uniqueById(items, path) {
   }
 }
 
-function normalizeSpaces(raw, floorCount) {
+function normalizeSpaces(raw, floorCount, floorHeight, minimumClearHeight) {
   const spaces = (raw || []).map((item, index) => {
     const path = `building.interior.spaces[${index}]`;
     item = asObject(item, path);
     const rect = normalizeRect(item, path);
     const floor = asFloor(item.floor ?? 1, `${path}.floor`, floorCount);
     const capacity = item.capacity == null ? null : asPositiveInt(item.capacity, `${path}.capacity`, 10000);
+    const clearHeight = asPositiveInt(item.clear_height ?? minimumClearHeight, `${path}.clear_height`, Math.max(1, floorHeight - 1));
+    if (clearHeight < minimumClearHeight) fail(`${path}.clear_height must be at least the interior minimum of ${minimumClearHeight}m.`, `${path}.clear_height`);
     return {
       id: asId(item.id, `space-${index + 1}`, path),
       name: String(item.name || item.id || `Space ${index + 1}`),
@@ -109,6 +112,7 @@ function normalizeSpaces(raw, floorCount) {
       min: rect.min,
       max: rect.max,
       capacity,
+      clearHeight,
       tags: asTags(item.tags, `${path}.tags`)
     };
   });
@@ -237,7 +241,10 @@ function normalizeInterior(building, { floorCount, floorHeight, resolveState }) 
   if (!raw) return null;
   asObject(raw, 'building.interior');
   const version = asPositiveInt(raw.version ?? 1, 'building.interior.version', RIFT_INTERIOR_ARCHITECTURE_VERSION);
-  const spaces = normalizeSpaces(raw.spaces, floorCount);
+  const minimumClearHeight = asPositiveInt(raw.minimum_clear_height ?? RIFT_INTERIOR_MIN_CLEAR_HEIGHT, 'building.interior.minimum_clear_height', 16);
+  if (minimumClearHeight < RIFT_INTERIOR_MIN_CLEAR_HEIGHT) fail(`building.interior.minimum_clear_height must be at least ${RIFT_INTERIOR_MIN_CLEAR_HEIGHT}m.`, 'building.interior.minimum_clear_height');
+  if (minimumClearHeight > floorHeight - 1) fail(`building.interior.minimum_clear_height ${minimumClearHeight}m does not fit floor_height ${floorHeight}m.`, 'building.interior.minimum_clear_height');
+  const spaces = normalizeSpaces(raw.spaces, floorCount, floorHeight, minimumClearHeight);
   const walls = normalizeWalls(raw.walls, floorCount, floorHeight, resolveState);
   const portals = normalizePortals(raw.portals, spaces, floorCount, floorHeight);
   const voids = normalizeVoids(raw.voids, floorCount);
@@ -246,6 +253,7 @@ function normalizeInterior(building, { floorCount, floorHeight, resolveState }) 
   if (entrySpace && !spaces.some(space => space.id === entrySpace)) fail(`building.interior.entry_space references unknown space '${entrySpace}'.`, 'building.interior.entry_space');
   return {
     version,
+    minimumClearHeight,
     entrySpace,
     requireAllSpacesReachable: raw.require_all_spaces_reachable !== false,
     spaces,
@@ -459,13 +467,16 @@ function checkSpaceWalkability(cells, architecture, floorHeight, diagnostics) {
   const compiled = [];
   for (const space of architecture.spaces) {
     const floorY = floorPlane(space.floor, floorHeight);
+    const footprintCells = (space.max[0] - space.min[0] + 1) * (space.max[1] - space.min[1] + 1);
+    let supportedCells = 0;
     let walkableCells = 0;
     for (let z = space.min[1]; z <= space.max[1]; z += 1) {
       for (let x = space.min[0]; x <= space.max[0]; x += 1) {
         const support = cells.get(key(x, floorY, z));
         if (!support || !['floor', 'stair'].includes(support.role)) continue;
+        supportedCells += 1;
         let clear = true;
-        for (let h = 1; h <= Math.min(2, floorHeight - 1); h += 1) {
+        for (let h = 1; h <= space.clearHeight; h += 1) {
           if (cells.has(key(x, floorY + h, z))) {
             clear = false;
             break;
@@ -474,12 +485,17 @@ function checkSpaceWalkability(cells, architecture, floorHeight, diagnostics) {
         if (clear) walkableCells += 1;
       }
     }
+    const clearRatio = footprintCells ? walkableCells / footprintCells : 0;
     if (!walkableCells) {
       diag(diagnostics, 'error', 'interior_space_not_walkable',
-        `${space.id} has no walkable floor cell with standing clearance.`,
+        `${space.id} has no walkable floor cell with ${space.clearHeight}m clear height.`,
         { path: 'building.interior.spaces', interiorId: space.id, floor: space.floor });
+    } else if (clearRatio < 0.65) {
+      diag(diagnostics, 'error', 'interior_space_clearance_insufficient',
+        `${space.id} has ${Math.round(clearRatio * 100)}% of its footprint clear to ${space.clearHeight}m; at least 65% is required.`,
+        { path: 'building.interior.spaces', interiorId: space.id, floor: space.floor, clearHeight: space.clearHeight, clearRatio });
     }
-    compiled.push({ ...space, walkableCells });
+    compiled.push({ ...space, footprintCells, supportedCells, walkableCells, clearRatio });
   }
   return compiled;
 }
