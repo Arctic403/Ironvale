@@ -21,17 +21,24 @@ ok(vault?.median>=10,`Grand Vault physically measures only ${vault?.median||0}m 
 ok(hall?.median>=10,`Grand Banking Hall physically measures only ${hall?.median||0}m median clearance.`);
 ok(report.verticalCores.every(c=>!c.blockedHeadroom&&!c.missingStairs),'Inspection report found blocked stair headroom or missing stairs.');
 
-for(const [label,options] of [
+const cases=[
   ['full',{mode:'full'}],['b1-floor',{mode:'floor',floor:1}],['f1-floor',{mode:'floor',floor:2}],
-  ['north-section',{mode:'section',sectionAxis:'z',sectionSide:'low'}],['south-section',{mode:'section',sectionAxis:'z',sectionSide:'high'}],
-  ['west-section',{mode:'section',sectionAxis:'x',sectionSide:'low'}],['east-section',{mode:'section',sectionAxis:'x',sectionSide:'high'}],
-  ['stair-section',{mode:'section',sectionAxis:'z',sectionSide:'low',focus:'grand-stair-b1-f1'}]
-]){
+  ['north-section',{mode:'section',sectionAxis:'z',sectionDepth:3}],['south-section',{mode:'section',sectionAxis:'z',sectionDepth:3}],
+  ['west-section',{mode:'section',sectionAxis:'x',sectionDepth:3}],['east-section',{mode:'section',sectionAxis:'x',sectionDepth:3}],
+  ['stair-longitudinal-section',{mode:'section',sectionAxis:'z',sectionDepth:2,focus:'grand-stair-b1-f1'}],
+  ['stair-transverse-section',{mode:'section',sectionAxis:'x',sectionDepth:3,focus:'grand-stair-b1-f1'}]
+];
+for(const [label,options] of cases){
   try{
-    const doc=buildRiftInspectionDocument(authoring,options);const compiled=compileRiftCityBlock(doc);
-    ok(compiled.stats.cells>100,`${label} inspection contains too little geometry (${compiled.stats.cells} cells).`);
+    const doc=buildRiftInspectionDocument(authoring,options),compiled=compileRiftCityBlock(doc);
+    ok(compiled.stats.cells>60,`${label} inspection contains too little geometry (${compiled.stats.cells} cells).`);
+    if(options.sectionDepth){
+      const section=doc.metadata?.inspection?.section,axis=section?.axis==='x'?0:2,size=doc.bounds.max[axis]-doc.bounds.min[axis]+1;
+      ok(section?.depth===options.sectionDepth,`${label} did not preserve requested ${options.sectionDepth}m section depth.`);
+      ok(size<=options.sectionDepth,`${label} slice is ${size}m thick; expected at most ${options.sectionDepth}m.`);
+    }
   }catch(error){fail.push(`${label}: ${error.message}`)}
 }
 
 if(fail.length){console.error('[building-inspection-pipeline] FAIL');for(const item of fail)console.error(` - ${item}`);process.exit(1)}
-console.log(`[building-inspection-pipeline] PASS · ${report.clearance.spaces.length} spaces physically measured · Vault ${vault.median}m median · Grand Hall ${hall.median}m median · 8 render slice modes validated.`);
+console.log(`[building-inspection-pipeline] PASS · ${report.clearance.spaces.length} spaces physically measured · Vault ${vault.median}m median · Grand Hall ${hall.median}m median · ${cases.length} inspection modes validated including finite architectural sections.`);
