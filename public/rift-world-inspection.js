@@ -70,28 +70,28 @@ function inspectionCameraFor(block, view) {
     projection: view === 'north' || view === 'east' || view === 'south' || view === 'west' ? 'perspective' : 'orthographic',
     alpha: -Math.PI / 2,
     beta: 0.055,
-    radius: Math.max(24, Math.min(180, span * 1.5 + height)),
+    radius: Math.max(24, Math.min(420, span * 1.5 + height)),
     minRadius: 2,
-    maxRadius: 220,
-    orthoSize: Math.max(18, Math.min(180, span * 1.32 + height * 0.28)),
+    maxRadius: 520,
+    orthoSize: Math.max(18, Math.min(360, span * 1.32 + height * 0.28)),
     minOrthoSize: 8,
-    maxOrthoSize: 220,
+    maxOrthoSize: 420,
     minBeta: 0.02,
     maxBeta: 1.25,
     fov: Math.PI / 3.05,
     near: 0.05,
-    far: 420
+    far: 900
   });
 
   if (view === 'birdseye') {
     next.setProjection('orthographic');
     next.alpha = -Math.PI / 4;
     next.beta = 0.66;
-    next.orthoSize = Math.max(20, Math.min(180, span * 1.45 + height * 0.4));
+    next.orthoSize = Math.max(20, Math.min(360, span * 1.45 + height * 0.4));
   } else if (view === 'north' || view === 'east' || view === 'south' || view === 'west') {
     next.setProjection('perspective');
     next.beta = 0.92;
-    next.radius = Math.max(18, Math.min(160, span * 1.12 + height * 1.15));
+    next.radius = Math.max(18, Math.min(420, span * 1.12 + height * 1.15));
     next.alpha = view === 'north' ? -Math.PI / 2
       : view === 'south' ? Math.PI / 2
       : view === 'east' ? 0
@@ -148,8 +148,8 @@ async function boot() {
     antialias: true,
     clearColor: [0.045, 0.055, 0.065],
     fogColor: [0.045, 0.055, 0.065],
-    fogStart: 140,
-    fogEnd: 300
+    fogStart: 300,
+    fogEnd: 760
   });
 
   const meshOptions = {
