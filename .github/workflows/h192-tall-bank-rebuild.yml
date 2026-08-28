@@ -1,0 +1,195 @@
+name: H1.92 Tall Bank Rebuild
+
+on:
+  push:
+    branches: [ai-static-world-builder]
+    paths:
+      - '.github/workflows/h192-tall-bank-rebuild.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ai-static-world-builder
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Rebuild Bank vertical scale and facade detail
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('public/riftcity-buildings/riftcity-bank-001.json')
+          bank = json.loads(path.read_text())
+          b = bank['building']
+
+          assert bank['world_origin'][1] == -10, bank['world_origin']
+          assert b['floors'] == 2 and b['ground_floor'] == 2
+          assert b['floor_height'] == 10
+
+          # H1.92 physical vertical scale: B1 floor at -12, F1 floor at 0,
+          # roof at +11 => ten full air cells above the F1 walkable floor.
+          bank['world_origin'][1] = -12
+          b['floor_height'] = 12
+          rules = b.setdefault('design_rules', {})
+          rules.update({
+              'minimum_room_clear_height': 4,
+              'basement_clear_height': 10,
+              'public_ceiling_height': 10,
+              'grand_lobby_clear_height': 10,
+              'roof_thickness': 1,
+              'physical_storey_spacing': 12,
+              'minimum_authored_bank_room_clear_height': 8,
+          })
+
+          tags = [x for x in b.get('tags', []) if x != 'h1.91']
+          for tag in ['h1.92', '12m-storey-spacing', '10m-grand-hall-clearance', 'detailed-landmark-facade']:
+              if tag not in tags:
+                  tags.append(tag)
+          b['tags'] = tags
+
+          heights = {
+              'b1-vault': 10,
+              'b1-vault-lobby': 10,
+              'b1-deposit': 9,
+              'b1-security': 9,
+              'b1-service': 9,
+              'f1-grand-hall': 10,
+              'f1-teller': 9,
+              'f1-west-consult': 8,
+              'f1-east-services': 8,
+              'f1-rear-ops': 8,
+          }
+          for space in b['interior']['spaces']:
+              assert space['id'] in heights, space['id']
+              space['clear_height'] = heights[space['id']]
+
+          # Full-height architectural partitions; never the old 2-block-room look.
+          for wall in b['interior']['walls']:
+              wall['height'] = 10
+
+          portal_heights = {
+              'vault-to-lobby': 8,
+              'deposit-to-lobby': 7,
+              'security-to-lobby': 7,
+              'service-to-lobby': 7,
+              'teller-to-grand': 8,
+              'west-to-grand': 7,
+              'east-to-grand': 7,
+              'ops-to-teller': 7,
+          }
+          for portal in b['interior']['portals']:
+              portal['height'] = portal_heights[portal['id']]
+
+          core = b['interior']['vertical_cores'][0]
+          assert core['id'] == 'grand-stair-b1-f1'
+          core['steps'] = 12
+          core['head_clearance'] = 6
+          core['tags'] = list(dict.fromkeys(core.get('tags', []) + ['12m-rise', 'tall-room-clearance']))
+
+          anchor_y = {
+              'bank-teller-counter': 13,
+              'bank-vault-door': 1,
+              'bank-vault-center': 1,
+              'bank-atm-zone': 13,
+              'bank-main-stairs': 13,
+              'bank-security-desk': 13,
+              'bank-loading-zone': 13,
+              'bank-roof-service': 24,
+          }
+          for anchor in b.get('anchors', []):
+              if anchor['id'] in anchor_y:
+                  anchor['at'][1] = anchor_y[anchor['id']]
+
+          asset_y = {
+              'bank-atm-cluster': 13,
+              'bank-grand-chandelier': 21,
+              'bank-security-camera-front': 21,
+              'bank-security-camera-rear': 21,
+          }
+          for asset in b.get('asset_instances', []):
+              if asset['id'] in asset_y:
+                  asset['at'][1] = asset_y[asset['id']]
+
+          # Preserve the facade's world-space vertical placement while moving street
+          # level from local y=10 to local y=12; roof details move with the taller shell.
+          def lift_y(y):
+              if y <= 9:
+                  return y
+              if y == 10: return 12
+              if y == 11: return 13
+              if y == 12: return 14
+              if 13 <= y <= 18: return y + 2
+              if y == 19: return 22
+              if y == 20: return 24
+              if y == 21: return 25
+              return y + 4
+
+          for op in bank.get('site_ops', []):
+              if op.get('op') == 'set':
+                  op['at'][1] = lift_y(op['at'][1])
+              else:
+                  op['min'][1] = lift_y(op['min'][1])
+                  op['max'][1] = lift_y(op['max'][1])
+
+          # Extra landmark facade depth: a real colonnade/entablature/parapet composition.
+          details = [
+              {'op':'fill_box','state':'warm_stone','min':[18,12,50],'max':[19,20,51],'name':'Bank inner portico column west'},
+              {'op':'fill_box','state':'warm_stone','min':[34,12,50],'max':[35,20,51],'name':'Bank inner portico column east'},
+              {'op':'fill_box','state':'warm_stone','min':[12,21,50],'max':[41,22,51],'name':'Bank grand front entablature'},
+              {'op':'fill_box','state':'warm_stone','min':[14,24,49],'max':[39,25,50],'name':'Bank central parapet crown'},
+              {'op':'fill_box','state':'warm_stone','min':[5,24,43],'max':[15,24,49],'name':'Bank west pavilion parapet cap'},
+              {'op':'fill_box','state':'warm_stone','min':[37,24,43],'max':[47,24,49],'name':'Bank east pavilion parapet cap'},
+              {'op':'fill_box','state':'dark_metal','min':[22,24,46],'max':[31,24,48],'name':'Bank roof center accent'},
+              {'op':'fill_box','state':'warm_stone','min':[21,12,50],'max':[32,12,52],'name':'Bank monumental entrance threshold'},
+          ]
+          existing = {op.get('name') for op in bank.get('site_ops', [])}
+          bank['site_ops'].extend(op for op in details if op['name'] not in existing)
+
+          bank['output']['name'] = 'RiftCity Bank · H1.92 Grand Tall Bank'
+          path.write_text(json.dumps(bank, indent=2) + '\n')
+
+          # Tighten the regression so metadata cannot slide back to a low-ceiling Bank.
+          check = Path('scripts/check-rift-downtown-composition.js')
+          s = check.read_text()
+          replacements = {
+              "ok(bank.building?.floor_height>=10,'Bank storey spacing must remain at least 10m.');": "ok(bank.building?.floor_height>=12,'Bank storey spacing must remain at least 12m.');",
+              "ok(vault&&area(vault)>=450&&vault.clearHeight>=8,'Grand Vault must be at least 450m² with 8m clear height.');": "ok(vault&&area(vault)>=450&&vault.clearHeight>=10,'Grand Vault must be at least 450m² with 10m clear height.');",
+              "ok(hall&&area(hall)>=700&&hall.clearHeight>=8,'Grand Banking Hall must be at least 700m² with 8m clear height.');": "ok(hall&&area(hall)>=700&&hall.clearHeight>=10,'Grand Banking Hall must be at least 700m² with 10m clear height.');",
+              "for(const space of i?.spaces||[]) ok(space.clearHeight>=4&&(space.clearRatio??1)>=.65,`${space.id} fails full-height room clearance.`);": "for(const space of i?.spaces||[]) ok(space.clearHeight>=8&&(space.clearRatio??1)>=.65,`${space.id} must remain a genuinely tall Bank room (>=8m clear).`);",
+              "ok(r.document.bounds.min[1]===-10,`Downtown basement bound ${r.document.bounds.min[1]} != -10.`);": "ok(r.document.bounds.min[1]===-12,`Downtown basement bound ${r.document.bounds.min[1]} != -12.`);",
+              "B1 + F1 · 8m grand-room clearance": "B1 + F1 · 10m grand-room clearance",
+          }
+          for old, new in replacements.items():
+              if old not in s:
+                  raise SystemExit(f'missing regression text: {old}')
+              s = s.replace(old, new)
+          check.write_text(s)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Full RiftCity verification
+        run: npm run build
+
+      - name: Commit verified H1.92 rebuild
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/riftcity-buildings/riftcity-bank-001.json scripts/check-rift-downtown-composition.js
+          git rm .github/workflows/h192-tall-bank-rebuild.yml
+          git commit -m 'H1.92 give RiftCity Bank true tall rooms and facade detail'
+          git push origin HEAD:ai-static-world-builder
