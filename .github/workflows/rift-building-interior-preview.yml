@@ -1,4 +1,4 @@
-name: Rift Building Interior Preview
+name: Rift Building Full Inspection
 
 on:
   push:
@@ -8,10 +8,18 @@ on:
       - 'public/rift-building-program.js'
       - 'public/rift-interior-architecture.js'
       - 'public/rift-building-inspection.js'
+      - 'public/rift-building-inspection-core.js'
+      - 'public/rift-building-3d-inspection.js'
       - 'public/building-inspection.html'
+      - 'public/building-3d-inspection.html'
       - 'public/riftcity-buildings/**'
+      - 'public/rift-engine.js'
+      - 'public/rift-city-block-importer.js'
       - 'scripts/check-rift-building-programs.js'
       - 'scripts/check-rift-interior-architecture.js'
+      - 'scripts/check-rift-inspection-pipeline.js'
+      - 'scripts/report-rift-building-inspection.js'
+      - 'package.json'
       - '.github/workflows/rift-building-interior-preview.yml'
   workflow_dispatch:
 
@@ -19,13 +27,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: rift-building-interior-${{ github.ref }}
+  group: rift-building-full-inspection-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Checkout AI branch
         uses: actions/checkout@v4
@@ -38,50 +46,65 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Verify interior architecture
+      - name: Verify physical architecture and inspection slices
         run: |
           npm run verify:building-programs
           npm run verify:interiors
+          npm run verify:inspection
+          mkdir -p rift-building-previews
+          node scripts/report-rift-building-inspection.js public/riftcity-buildings/riftcity-bank-001.json > rift-building-previews/bank-inspection-report.json
 
       - name: Start static RiftCity server
         run: |
           python3 -m http.server 4173 --directory public > /tmp/rift-building-static.log 2>&1 &
           echo $! > /tmp/rift-building-static.pid
-          for i in {1..20}; do
-            if curl -fsS http://127.0.0.1:4173/building-inspection.html >/dev/null; then exit 0; fi
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/building-3d-inspection.html >/dev/null; then exit 0; fi
             sleep 0.25
           done
           cat /tmp/rift-building-static.log
           exit 1
 
-      - name: Render H1.91 Bank floor diagnostics
+      - name: Render all exterior interior section and stair views
+        shell: bash
         run: |
-          mkdir -p rift-building-previews
           CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$CHROME" ]; then
-            echo 'No Chrome/Chromium binary found on the GitHub runner.' >&2
-            exit 1
-          fi
-          FLAGS=(
-            --headless=new
-            --no-sandbox
-            --disable-dev-shm-usage
-            --hide-scrollbars
-            --window-size=1800,1200
-            --virtual-time-budget=4000
-          )
-          BASE='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-b1.png "${BASE}&floor=1"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f1.png "${BASE}&floor=2"
-          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-xray.png "${BASE}&floor=2&xray=1"
-          test -s rift-building-previews/bank-b1.png
-          test -s rift-building-previews/bank-f1.png
-          test -s rift-building-previews/bank-xray.png
+          if [ -z "$CHROME" ]; then echo 'No Chrome/Chromium binary found.' >&2; exit 1; fi
+          FLAGS=(--headless=new --no-sandbox --disable-dev-shm-usage --hide-scrollbars --ignore-gpu-blocklist --enable-webgl --use-angle=swiftshader --window-size=1800,1200 --virtual-time-budget=5000)
+          BASE='http://127.0.0.1:4173/building-3d-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
+          snap(){ "$CHROME" "${FLAGS[@]}" --screenshot="rift-building-previews/$1.png" "$BASE&$2"; test -s "rift-building-previews/$1.png"; }
 
-      - name: Upload interior previews
+          snap bank-exterior-top 'mode=full&view=top'
+          snap bank-exterior-iso-nw 'mode=full&view=iso-nw'
+          snap bank-exterior-iso-ne 'mode=full&view=iso-ne'
+          snap bank-exterior-iso-sw 'mode=full&view=iso-sw'
+          snap bank-exterior-iso-se 'mode=full&view=iso-se'
+          snap bank-exterior-north 'mode=full&view=north'
+          snap bank-exterior-east 'mode=full&view=east'
+          snap bank-exterior-south 'mode=full&view=south'
+          snap bank-exterior-west 'mode=full&view=west'
+
+          for view in iso-nw iso-ne iso-sw iso-se; do
+            snap "bank-b1-$view" "mode=floor&floor=1&view=$view"
+            snap "bank-f1-$view" "mode=floor&floor=2&view=$view"
+          done
+
+          snap bank-section-north 'mode=section&sectionAxis=z&sectionSide=low&view=south'
+          snap bank-section-south 'mode=section&sectionAxis=z&sectionSide=high&view=north'
+          snap bank-section-west 'mode=section&sectionAxis=x&sectionSide=low&view=east'
+          snap bank-section-east 'mode=section&sectionAxis=x&sectionSide=high&view=west'
+          snap bank-stair-section-ns 'mode=section&sectionAxis=z&sectionSide=low&focus=grand-stair-b1-f1&view=iso-se'
+          snap bank-stair-section-ew 'mode=section&sectionAxis=x&sectionSide=low&focus=grand-stair-b1-f1&view=iso-ne'
+
+          PLAN='http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json'
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-b1-plan.png "${PLAN}&floor=1"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-f1-plan.png "${PLAN}&floor=2"
+          "$CHROME" "${FLAGS[@]}" --screenshot=rift-building-previews/bank-xray-plan.png "${PLAN}&floor=2&xray=1"
+
+      - name: Upload complete building inspection bundle
         uses: actions/upload-artifact@v4
         with:
-          name: rift-building-interior-previews
-          path: rift-building-previews/*.png
+          name: rift-building-full-inspection
+          path: rift-building-previews/*
           if-no-files-found: error
           retention-days: 14
