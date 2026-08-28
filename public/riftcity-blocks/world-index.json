@@ -30,11 +30,11 @@
     },
     {
       "id": "riftcity-bank-001-generated",
-      "name": "RiftCity Bank · H1.86 Generated",
+      "name": "RiftCity Bank · H1.87 MMO Interior",
       "district": "downtown-commerce",
       "source_type": "building-program",
       "path": "../riftcity-buildings/riftcity-bank-001.json",
-      "tags": ["bank", "landmark", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
+      "tags": ["bank", "landmark", "mmo-scale", "250-player-capacity", "basement", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     }
   ]
