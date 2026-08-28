@@ -8,7 +8,8 @@
       "name": "Downtown Commerce District V1",
       "district": "downtown-commerce",
       "path": "./downtown-block-001.json",
-      "tags": ["active", "mmo-scale", "ai-authorable", "single-player"],
+      "runtime_overlays": ["riftcity-bank-001"],
+      "tags": ["active", "mmo-scale", "ai-authorable", "single-player", "h1.96-grand-bank-overlay"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
@@ -30,11 +31,11 @@
     },
     {
       "id": "riftcity-bank-001-generated",
-      "name": "RiftCity Bank · H1.87 MMO Interior",
+      "name": "RiftCity Bank · H1.96 One-Level Grand Landmark",
       "district": "downtown-commerce",
       "source_type": "building-program",
       "path": "../riftcity-buildings/riftcity-bank-001.json",
-      "tags": ["bank", "landmark", "mmo-scale", "250-player-capacity", "basement", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
+      "tags": ["bank", "landmark", "mmo-scale", "300-player-capacity", "one-level", "grand-hall", "vault", "tellers", "offices", "non-flat-roof", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     }
   ]
