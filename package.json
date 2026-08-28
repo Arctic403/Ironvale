@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:blueprints && npm run verify:building-programs && npm run verify:interiors && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
+    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:blueprints && npm run verify:building-programs && npm run verify:interiors && npm run verify:inspection && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",
@@ -13,13 +13,14 @@
     "verify:js-only": "node scripts/verify-js-only.js",
     "verify:blueprints": "node scripts/check-rift-city-blueprints.js",
     "verify:building-programs": "node scripts/check-rift-building-programs.js",
+    "verify:interiors": "node scripts/check-rift-interior-architecture.js",
+    "verify:inspection": "node scripts/check-rift-inspection-pipeline.js",
     "verify:world-composition": "node scripts/check-rift-downtown-composition.js",
     "verify:player-physics": "node scripts/check-rift-player-physics.js",
     "verify:building-visibility": "node scripts/check-rift-building-visibility.js",
     "verify:smart-camera": "node scripts/check-rift-smart-camera.js",
     "verify:third-person-camera": "node scripts/check-rift-third-person-camera.js",
-    "verify:ai-builder": "node scripts/check-rift-ai-builder.js",
-    "verify:interiors": "node scripts/check-rift-interior-architecture.js"
+    "verify:ai-builder": "node scripts/check-rift-ai-builder.js"
   },
   "devDependencies": {
     "wrangler": "^4.30.0"
