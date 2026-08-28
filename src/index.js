@@ -199,6 +199,19 @@ async function handleApi(request, env, url, requestId) {
     if (response) return response;
   }
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
+
+  // H1.77 public AI Builder bridge. The anonymous surface is intentionally
+  // write-only with respect to D1: agents may inspect/edit their in-browser
+  // staging scene and submit a review draft, but only authenticated
+  // developer/admin users can list, read or mark those drafts as loaded.
+  if (method === 'GET' && url.pathname === '/api/ai-builder/tools') return getPublicAiBuilderTools();
+  if (method === 'POST' && url.pathname === '/api/ai-builder/drafts') return savePublicAiBuilderDraft(request, env, requestId);
+  if (url.pathname === '/api/admin/ai-builder/drafts' && method === 'GET') return listAdminAiBuilderDrafts(request, env, url);
+  if (url.pathname.startsWith('/api/admin/ai-builder/drafts/')) {
+    if (method === 'GET') return getAdminAiBuilderDraft(request, env, url);
+    if (method === 'POST' && url.pathname.endsWith('/loaded')) return markAdminAiBuilderDraftLoaded(request, env, url, requestId);
+  }
+
   if (method === 'GET' && url.pathname === '/api/admin/logs') return getSystemLogs(request, env, url);
 
   if (method === 'POST' && url.pathname === '/api/admin/assets/register') return registerApprovedAsset(request, env, requestId);
@@ -1079,6 +1092,191 @@ async function health(env) {
     result.database = 'error';
   }
   return json(result, result.ok ? 200 : 503);
+}
+
+
+const AI_BUILDER_DRAFT_MAX_BYTES = 2 * 1024 * 1024;
+const AI_BUILDER_TOOL_VERSION = 'H1.77';
+const AI_BUILDER_PUBLIC_TOOLS = Object.freeze([
+  { name: 'rift_scene_state', access: 'public-browser', persistence: 'none' },
+  { name: 'rift_inspect_object', access: 'public-browser', persistence: 'none' },
+  { name: 'rift_focus_object', access: 'public-browser', persistence: 'none' },
+  { name: 'rift_set_camera', access: 'public-browser', persistence: 'none' },
+  { name: 'rift_move_object', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_rotate_object', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_duplicate_object', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_delete_object', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_import_blueprint', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_undo', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_redo', access: 'public-browser', persistence: 'staging-only' },
+  { name: 'rift_checkpoint', access: 'public-browser', persistence: 'browser-local' },
+  { name: 'rift_capture_view', access: 'public-browser', persistence: 'none' },
+  { name: 'rift_save_draft', access: 'public', persistence: 'd1-review-draft' }
+]);
+
+async function ensureAiBuilderDraftTable(env) {
+  await env.DB.batch([
+    env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS ai_builder_drafts (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        draft_json TEXT NOT NULL,
+        sha256 TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'public-ai-builder',
+        tool_version TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        loaded_at INTEGER,
+        loaded_by TEXT,
+        FOREIGN KEY (loaded_by) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_ai_builder_drafts_created ON ai_builder_drafts(created_at DESC)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_ai_builder_drafts_loaded ON ai_builder_drafts(loaded_at, created_at DESC)')
+  ]);
+}
+
+function getPublicAiBuilderTools() {
+  return json({
+    ok: true,
+    service: 'riftcity-ai-builder',
+    version: AI_BUILDER_TOOL_VERSION,
+    public: true,
+    accountRequired: false,
+    page: '/dev/ai-builder',
+    draftSaveEndpoint: '/api/ai-builder/drafts',
+    draftPersistence: 'D1 review inbox only; no anonymous load or publish endpoint exists.',
+    toolCount: AI_BUILDER_PUBLIC_TOOLS.length,
+    tools: AI_BUILDER_PUBLIC_TOOLS
+  });
+}
+
+function validateAiBuilderDraftDocument(document) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) return 'Draft document must be a JSON object.';
+  if (document.format !== 'riftcity-city-block') return "Draft format must be 'riftcity-city-block'.";
+  if (!Number.isInteger(Number(document.version)) || Number(document.version) < 1 || Number(document.version) > 2) return 'Draft version must be 1 or 2.';
+  if (typeof document.id !== 'string' || !document.id.trim() || document.id.length > 160) return 'Draft id is required and must be 160 characters or fewer.';
+  if (document.units != null && document.units !== 'meters') return "Draft units must be 'meters'.";
+  if (!Array.isArray(document.origin) || document.origin.length !== 3 || !document.origin.every(Number.isFinite)) return 'Draft origin must contain three finite meter coordinates.';
+  const bounds = document.bounds;
+  if (!bounds || !Array.isArray(bounds.min) || !Array.isArray(bounds.max) || bounds.min.length !== 3 || bounds.max.length !== 3) return 'Draft bounds.min and bounds.max must each contain three coordinates.';
+  if (![...bounds.min, ...bounds.max].every(Number.isFinite)) return 'Draft bounds must contain finite coordinates.';
+  if (!document.palette || typeof document.palette !== 'object' || Array.isArray(document.palette)) return 'Draft palette is required.';
+  if (document.ops != null && !Array.isArray(document.ops)) return 'Draft ops must be an array when present.';
+  if (document.layout != null && !Array.isArray(document.layout)) return 'Draft layout must be an array when present.';
+  if (!Array.isArray(document.ops) && !Array.isArray(document.layout)) return 'Draft must contain ops or Blueprint layout objects.';
+  if (document.prefabs != null && (typeof document.prefabs !== 'object' || Array.isArray(document.prefabs))) return 'Draft prefabs must be an object when present.';
+  return '';
+}
+
+async function savePublicAiBuilderDraft(request, env, requestId) {
+  const body = await readJson(request);
+  if (!body?.document) return json({ ok: false, error: 'A RiftCity draft document is required.' }, 400);
+  const validationError = validateAiBuilderDraftDocument(body.document);
+  if (validationError) return json({ ok: false, error: validationError }, 400);
+
+  let draftJson;
+  try { draftJson = JSON.stringify(body.document); }
+  catch { return json({ ok: false, error: 'Draft document could not be serialized.' }, 400); }
+  const byteLength = new TextEncoder().encode(draftJson).byteLength;
+  if (byteLength > AI_BUILDER_DRAFT_MAX_BYTES) {
+    return json({ ok: false, error: 'AI Builder drafts are capped at 2 MB.' }, 413);
+  }
+
+  await ensureAiBuilderDraftTable(env);
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const documentId = String(body.document.id).trim().slice(0, 160);
+  const requestedName = typeof body.name === 'string' ? body.name.trim() : '';
+  const name = (requestedName || String(body.document.name || documentId || 'RiftCity AI Draft')).slice(0, 160);
+  const digest = await sha256(draftJson);
+
+  await env.DB.prepare(`
+    INSERT INTO ai_builder_drafts (id, document_id, name, draft_json, sha256, source, tool_version, created_at)
+    VALUES (?, ?, ?, ?, ?, 'public-ai-builder', ?, ?)
+  `).bind(id, documentId, name, draftJson, digest, AI_BUILDER_TOOL_VERSION, now).run();
+
+  return json({
+    ok: true,
+    draftId: id,
+    documentId,
+    name,
+    sha256: digest,
+    bytes: byteLength,
+    savedAt: now,
+    review: 'Saved to the D1 AI draft inbox. Only developer/admin accounts can load it in RiftCity Build Mode.',
+    requestId
+  }, 201);
+}
+
+async function listAdminAiBuilderDrafts(request, env, url) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  await ensureAiBuilderDraftTable(env);
+  const requested = Number(url.searchParams.get('limit') || 40);
+  const limit = Number.isFinite(requested) ? Math.max(1, Math.min(100, Math.floor(requested))) : 40;
+  const result = await env.DB.prepare(`
+    SELECT id, document_id, name, sha256, source, tool_version, created_at, loaded_at, loaded_by
+    FROM ai_builder_drafts
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).bind(limit).all();
+  return json({ ok: true, drafts: result.results || [] });
+}
+
+function adminAiBuilderDraftId(pathname, loadedSuffix = false) {
+  const pattern = loadedSuffix
+    ? /^\/api\/admin\/ai-builder\/drafts\/([^/]+)\/loaded$/
+    : /^\/api\/admin\/ai-builder\/drafts\/([^/]+)$/;
+  const match = pathname.match(pattern);
+  if (!match) return '';
+  try { return decodeURIComponent(match[1]); } catch { return ''; }
+}
+
+async function getAdminAiBuilderDraft(request, env, url) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const id = adminAiBuilderDraftId(url.pathname);
+  if (!id) return json({ ok: false, error: 'Invalid AI draft id.' }, 400);
+  await ensureAiBuilderDraftTable(env);
+  const row = await env.DB.prepare(`
+    SELECT id, document_id, name, draft_json, sha256, source, tool_version, created_at, loaded_at, loaded_by
+    FROM ai_builder_drafts WHERE id = ?
+  `).bind(id).first();
+  if (!row) return json({ ok: false, error: 'AI draft not found.' }, 404);
+  let document;
+  try { document = JSON.parse(row.draft_json); }
+  catch { return json({ ok: false, error: 'Stored AI draft JSON is corrupted.' }, 500); }
+  return json({
+    ok: true,
+    draft: {
+      id: row.id,
+      documentId: row.document_id,
+      name: row.name,
+      sha256: row.sha256,
+      source: row.source,
+      toolVersion: row.tool_version,
+      createdAt: row.created_at,
+      loadedAt: row.loaded_at,
+      loadedBy: row.loaded_by,
+      document
+    }
+  });
+}
+
+async function markAdminAiBuilderDraftLoaded(request, env, url, requestId) {
+  const gate = await requireAdmin(request, env);
+  if (gate.response) return gate.response;
+  const id = adminAiBuilderDraftId(url.pathname, true);
+  if (!id) return json({ ok: false, error: 'Invalid AI draft id.' }, 400);
+  await ensureAiBuilderDraftTable(env);
+  const now = Date.now();
+  const result = await env.DB.prepare(`
+    UPDATE ai_builder_drafts SET loaded_at = ?, loaded_by = ? WHERE id = ?
+  `).bind(now, gate.auth.user.id, id).run();
+  if (!Number(result.meta?.changes || 0)) return json({ ok: false, error: 'AI draft not found.' }, 404);
+  await writeAudit(env, gate.auth.user.id, 'ai_builder.draft_loaded', gate.auth.user.id, { draftId: id });
+  return json({ ok: true, draftId: id, loadedAt: now, requestId });
 }
 
 
@@ -2178,24 +2376,10 @@ boot().catch(error=>{
 }
 
 async function serveDeveloperAiBuilder(request, env) {
-  const gate = await requireAdmin(request, env);
-  if (gate.response) {
-    const status = gate.response.status === 401 ? 401 : 403;
-    return new Response(`<!doctype html>
-<html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>RiftCity Developer Access</title>
-<style>html,body{height:100%;margin:0;background:#04080b;color:#eef8fa;font:700 16px system-ui}main{height:100%;display:grid;place-items:center;padding:24px;box-sizing:border-box;text-align:center}a{color:#67e2b7}</style>
-</head><body><main><div><h1>Developer access required</h1><p>RiftCity AI Builder is restricted to developer/admin accounts.</p><a href="/">Return to RiftCity</a></div></main></body></html>`, {
-      status,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store, private',
-        'X-Robots-Tag': 'noindex, nofollow',
-        'Referrer-Policy': 'same-origin'
-      }
-    });
-  }
-
+  // H1.77: this staging surface is intentionally public during development.
+  // It has no anonymous publish/load API. The only server mutation available to
+  // the public builder is POST /api/ai-builder/drafts, which writes an immutable
+  // review draft to D1 for a developer/admin to load later in normal Build Mode.
   return new Response(`<!doctype html>
 <html lang="en" class="rift-ai-builder-document">
 <head>
@@ -2203,24 +2387,19 @@ async function serveDeveloperAiBuilder(request, env) {
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#04080b">
   <meta name="robots" content="noindex,nofollow">
-  <title>RiftCity — AI Builder</title>
+  <title>RiftCity — Public AI Builder</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/ai-builder.css">
+  <link rel="alternate" type="application/json" href="/api/ai-builder/tools" title="RiftCity AI Builder tool manifest">
 </head>
 <body class="rift-ai-builder-page">
-  <main id="dev-ai-builder-root" aria-label="RiftCity AI Builder">
-    <div class="dev-editor-loading"><strong>AI BUILDER</strong><span>Loading Rift Engine staging scene…</span></div>
+  <main id="dev-ai-builder-root" aria-label="RiftCity Public AI Builder">
+    <div class="dev-editor-loading"><strong>AI BUILDER</strong><span>Loading public Rift Engine staging scene…</span></div>
   </main>
   <script type="module">
 import { renderDeveloperAiBuilder, destroyDeveloperAiBuilder } from '/editor/ai-builder-entry.js';
 const root=document.querySelector('#dev-ai-builder-root');
 async function boot(){
-  const response=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store'});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok||!['admin','developer'].includes(data&&data.user&&data.user.role)){
-    root.innerHTML='<section class="dev-editor-denied"><strong>Developer access required</strong><a href="/">Return to RiftCity</a></section>';
-    return;
-  }
   await renderDeveloperAiBuilder(root);
 }
 window.addEventListener('pagehide',()=>destroyDeveloperAiBuilder(),{once:true});
@@ -2234,7 +2413,7 @@ boot().catch(error=>{
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'no-store, private',
+      'Cache-Control': 'no-store',
       'X-Robots-Tag': 'noindex, nofollow',
       'Referrer-Policy': 'same-origin'
     }

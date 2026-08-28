@@ -10,7 +10,9 @@ function esc(value=''){return String(value).replace(/&/g,'&amp;').replace(/</g,'
 export function createRiftCreativeMode({root,canvas,engine,camera,getImported,loadDocument,playerController,player}){
   const toggle=root.querySelector('#rift-creative-toggle'),panel=root.querySelector('#rift-creative-panel'),select=root.querySelector('#rift-creative-object'),status=root.querySelector('#rift-creative-status'),modeLabel=root.querySelector('#rift-mode-label');
   const stateSelect=root.querySelector('#rift-creative-block-state'),actionButtons=[...root.querySelectorAll('[data-rift-block-action]')];
+  const aiDraftSelect=root.querySelector('#rift-ai-draft-select'),aiDraftStatus=root.querySelector('#rift-ai-draft-status'),aiDraftMeta=root.querySelector('#rift-ai-draft-meta');
   let active=false,draft=null,selectedId='',undo=[],redo=[],action='break',selectedState='',stairRotation='north',pointerDown=null,hoverPoint=null;
+  let aiDraftRows=[];
   const markerEdges=[];
   const edgeColorBreak='#ff6f66',edgeColorPlace='#65e39a';
   for(let i=0;i<12;i+=1)markerEdges.push(engine.addBox({color:edgeColorBreak,dynamic:true,scale:[.02,.02,.02],visible:false,blockFaceShade:1}));
@@ -18,6 +20,70 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   const currentLayout=()=>Array.isArray(draft?.layout)?draft.layout:[];
   const selectedObject=()=>currentLayout().find(item=>String(item.id||'')===selectedId)||null;
   const setStatus=text=>{if(status)status.textContent=text;};
+  const setAiDraftStatus=text=>{if(aiDraftStatus)aiDraftStatus.textContent=text;};
+  async function apiJson(path,options={}){
+    try{
+      const response=await fetch(path,{credentials:'same-origin',...options});
+      const data=await response.json().catch(()=>({}));
+      return {...data,ok:response.ok&&data.ok!==false,status:response.status};
+    }catch(error){return {ok:false,status:0,error:error?.message||'Could not reach RiftCity server'};}
+  }
+
+  function renderAiDraftRows(){
+    if(!aiDraftSelect)return;
+    if(!aiDraftRows.length){aiDraftSelect.innerHTML='<option value="">NO AI DRAFTS</option>';if(aiDraftMeta)aiDraftMeta.textContent='No D1 AI drafts are currently available.';return;}
+    aiDraftSelect.innerHTML=aiDraftRows.map(row=>{
+      const state=row.loaded_at?'LOADED':'NEW',stamp=row.created_at?new Date(Number(row.created_at)).toLocaleString():'unknown time';
+      return `<option value="${esc(row.id)}">${esc(state)} · ${esc(row.name||row.document_id||row.id)} · ${esc(stamp)}</option>`;
+    }).join('');
+    syncAiDraftMeta();
+  }
+  function syncAiDraftMeta(){
+    if(!aiDraftMeta||!aiDraftSelect)return;
+    const row=aiDraftRows.find(item=>item.id===aiDraftSelect.value);
+    aiDraftMeta.textContent=row?`${row.document_id} · ${row.sha256?.slice?.(0,12)||'no hash'}… · ${row.loaded_at?'previously loaded':'not loaded yet'}`:'Choose a draft.';
+  }
+  async function refreshAiDrafts(){
+    if(!aiDraftSelect)return false;
+    setAiDraftStatus('Checking D1 AI draft inbox…');
+    const result=await apiJson('/api/admin/ai-builder/drafts?limit=60');
+    if(!result.ok){
+      aiDraftRows=[];renderAiDraftRows();
+      setAiDraftStatus(result.status===401||result.status===403?'DEV ONLY · sign in with a developer/admin account to load AI drafts.':`AI draft inbox unavailable: ${result.error||'server error'}`);
+      return false;
+    }
+    aiDraftRows=Array.isArray(result.drafts)?result.drafts:[];
+    renderAiDraftRows();
+    setAiDraftStatus(`D1 AI DRAFT INBOX · ${aiDraftRows.length} draft${aiDraftRows.length===1?'':'s'} · loading stays in Build Mode staging.`);
+    return true;
+  }
+  async function loadSelectedAiDraft(){
+    const id=String(aiDraftSelect?.value||'');
+    if(!id){setAiDraftStatus('Choose an AI draft first.');return false;}
+    setAiDraftStatus('Loading AI draft from D1…');
+    const result=await apiJson(`/api/admin/ai-builder/drafts/${encodeURIComponent(id)}`);
+    if(!result.ok||!result.draft?.document){setAiDraftStatus(`AI draft load failed: ${result.error||'invalid draft'}`);return false;}
+    const before=draft?JSON.stringify(draft):null;
+    try{
+      if(before){undo.push(before);if(undo.length>60)undo.shift();redo.length=0;}
+      loadDocument(result.draft.document,`D1 AI DRAFT · ${result.draft.name||result.draft.documentId||id}`,{
+        persist:true,
+        fileName:`${result.draft.documentId||'riftcity'}-ai-draft.json`,
+        preserveCamera:true,
+        preservePlayer:true
+      });
+      draft=clone(getImported().document);selectedId='';refreshPalette();refreshSelect();
+      await apiJson(`/api/admin/ai-builder/drafts/${encodeURIComponent(id)}/loaded`,{method:'POST'});
+      await refreshAiDrafts();
+      setStatus(`Loaded D1 AI draft ${result.draft.name||result.draft.documentId||id}. Review/edit it here before any export or future publish step.`);
+      setAiDraftStatus(`LOADED INTO BUILD MODE STAGING · ${result.draft.name||result.draft.documentId||id}`);
+      return true;
+    }catch(error){
+      if(before&&undo[undo.length-1]===before)undo.pop();
+      setAiDraftStatus(`AI draft rejected by the Rift Engine: ${error?.message||error}`);
+      return false;
+    }
+  }
 
   function refreshPalette(){
     if(!stateSelect||!draft?.palette)return;
@@ -130,11 +196,15 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   function redoAction(){if(!redo.length)return;undo.push(JSON.stringify(draft));draft=JSON.parse(redo.pop());applyDraft('Redo.');}
   function exportDraft(){if(!draft)return;const blob=new Blob([JSON.stringify(draft,null,2)],{type:'application/json'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`${draft.id||'riftcity-world'}-creative.json`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(link.href),1200);}
 
+  aiDraftSelect?.addEventListener('change',syncAiDraftMeta);
+  root.querySelector('#rift-ai-draft-refresh')?.addEventListener('click',refreshAiDrafts);
+  root.querySelector('#rift-ai-draft-load')?.addEventListener('click',loadSelectedAiDraft);
+
   select?.addEventListener('change',()=>{selectedId=select.value;updateReadout();});
   root.querySelectorAll('[data-rift-nudge]').forEach(button=>button.addEventListener('click',()=>{const [x,y,z]=button.dataset.riftNudge.split(',').map(Number);transform(x,y,z);}));
   root.querySelector('#rift-creative-rotate-left')?.addEventListener('click',()=>rotateSelected(-1));root.querySelector('#rift-creative-rotate-right')?.addEventListener('click',()=>rotateSelected(1));root.querySelector('#rift-creative-duplicate')?.addEventListener('click',duplicateSelected);root.querySelector('#rift-creative-delete')?.addEventListener('click',deleteSelected);root.querySelector('#rift-creative-undo')?.addEventListener('click',undoAction);root.querySelector('#rift-creative-redo')?.addEventListener('click',redoAction);root.querySelector('#rift-creative-export')?.addEventListener('click',exportDraft);root.querySelector('#rift-creative-close')?.addEventListener('click',()=>panel?.classList.remove('open'));root.querySelector('#rift-creative-open-panel')?.addEventListener('click',()=>panel?.classList.toggle('open'));
 
-  function enter(){const imported=getImported?.();if(!imported)return;active=true;draft=clone(imported.document);undo=[];redo=[];playerController.setCreativeMode(true);root.classList.add('rift-creative-active');panel?.classList.add('open');toggle?.classList.add('active');if(toggle)toggle.textContent='PLAY MODE';if(modeLabel)modeLabel.textContent='BUILD';refreshPalette();refreshSelect();setAction('break');setStatus('Build Mode ON. Stay in the overhead world and tap/click exact visible cells or use Blueprint object tools for large edits.');}
+  function enter(){const imported=getImported?.();if(!imported)return;active=true;draft=clone(imported.document);undo=[];redo=[];playerController.setCreativeMode(true);root.classList.add('rift-creative-active');panel?.classList.add('open');toggle?.classList.add('active');if(toggle)toggle.textContent='PLAY MODE';if(modeLabel)modeLabel.textContent='BUILD';refreshPalette();refreshSelect();setAction('break');setStatus('Build Mode ON. Stay in the overhead world and tap/click exact visible cells or use Blueprint object tools for large edits.');refreshAiDrafts();}
   function exit(){if(!active){panel?.classList.remove('open');return;}active=false;playerController.setCreativeMode(false);hoverPoint=null;root.classList.remove('rift-creative-active');panel?.classList.remove('open');toggle?.classList.remove('active');if(toggle)toggle.textContent='BUILD MODE';if(modeLabel)modeLabel.textContent='PLAY';setMarkerCell(null);}
   function toggleMode(){active?exit():enter();}toggle?.addEventListener('click',toggleMode);
 
@@ -147,7 +217,7 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   window.addEventListener('keydown',onKeyDown,{passive:false});
 
   return {
-    update(){updateTarget();},get active(){return active;},
+    update(){updateTarget();},get active(){return active;},refreshAiDrafts,loadSelectedAiDraft,
     onDocumentLoaded(){if(active){draft=clone(getImported().document);refreshPalette();refreshSelect();}},
     destroy(){exit();toggle?.removeEventListener('click',toggleMode);window.removeEventListener('keydown',onKeyDown);canvas.removeEventListener('pointerdown',onCanvasPointerDown);canvas.removeEventListener('pointermove',onCanvasPointerMove);canvas.removeEventListener('pointerup',onCanvasPointerUp);engine.removeDrawables(markerEdges);}
   };

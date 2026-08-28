@@ -3440,6 +3440,7 @@ body.dev-block-editor-page{
 .rift-creative-panel details{border:1px solid rgba(255,255,255,.09);background:#0d1112;padding:6px}
 .rift-creative-panel summary{cursor:pointer;color:#aeb7b2;font-size:.45rem;font-weight:950;letter-spacing:.08em;padding:4px 2px}
 .rift-creative-panel details[open]{display:grid;gap:6px}
+.rift-ai-draft-inbox{border-color:rgba(111,174,235,.38)!important}.rift-ai-draft-inbox summary{color:#9cc9f5!important}.rift-ai-draft-inbox #rift-ai-draft-status{border-left-color:#6faeeb;background:rgba(111,174,235,.07)}.rift-ai-draft-inbox #rift-ai-draft-meta{display:block;padding:4px 2px;color:#91a9ba}
 .rift-creative-active .rift-player-actions button[data-rift-player-jump]{border-color:rgba(100,211,152,.7)}
 @media(pointer:fine){.rift-creative-active .rift-player-touch{display:none}}
 .rift-player-actions button[data-rift-player-down]{display:none}.rift-creative-active .rift-player-actions button[data-rift-player-down]{display:block}

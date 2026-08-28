@@ -1769,3 +1769,17 @@ RiftCity now has a developer/admin-only `/dev/ai-builder` workspace designed for
 - The same command backend is progressively exposed as WebMCP Site Tools when `document.modelContext.registerTool()` is available. Thirteen tools cover scene reading, object inspection/focus, camera control, Blueprint move/rotate/duplicate/delete, Blueprint import, undo/redo, checkpoints and clean captures.
 - Browsers without WebMCP keep the same accessible command textarea/buttons, so the page remains agent-friendly through conventional browser automation.
 - Gameplay cutaway behavior is not reintroduced. H1.74 full-building rendering and H1.75 player/stair behavior remain unchanged.
+
+## H1.77 — public AI Builder tools + D1 review-draft handoff
+
+RiftCity's AI Builder staging surface can now be opened without a RiftCity account while keeping the live-world authoring boundary on the developer side.
+
+- `/dev/ai-builder` is intentionally public/no-account during this development phase, remains `no-store` + `noindex`, and boots the same Rift Engine staging scene without calling `/api/auth/me`.
+- The existing thirteen WebMCP scene/edit/camera/capture tools remain browser-staging operations. H1.77 adds `rift_save_draft` as tool fourteen and uses `document.modelContext || navigator.modelContext` during the browser API transition.
+- `GET /api/ai-builder/tools` is a public machine-readable manifest so an external agent can verify the currently exposed tool set without needing a RiftCity session.
+- `POST /api/ai-builder/drafts` is the only anonymous D1 mutation. It accepts a structurally valid `riftcity-city-block` document up to 2 MB, hashes it, and appends an immutable review draft to `ai_builder_drafts`. There is deliberately no anonymous draft-list, draft-load or publish endpoint.
+- The normal in-game Rift Engine **Build Mode** now contains a developer-only **AI Draft Inbox**. Its list/read/loaded endpoints all pass through `requireAdmin()`, so only `developer`/`admin` accounts can pull an AI draft out of D1.
+- Loading an AI draft recompiles it through the normal Rift Engine importer into Build Mode staging. It does **not** publish the world, replace source files, or bypass the existing review/export path.
+- The inbox tracks when a developer loaded a draft and who loaded it, while preserving the original immutable JSON + SHA-256 for review/debugging.
+- H1.74 full-building rendering and H1.75 player/stair behavior remain unchanged; no camera-driven cutaway behavior is reintroduced.
+

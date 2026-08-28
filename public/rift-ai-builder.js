@@ -125,7 +125,7 @@ export function mountRiftAiBuilder({ root, foundation }) {
   panel.setAttribute('aria-label', 'RiftCity AI Builder');
   panel.innerHTML = `
     <header class="rift-ai-builder-head">
-      <div><span>RIFTCITY DEV</span><strong>AI BUILDER</strong><small>STAGING · structured commands + scene inspection</small></div>
+      <div><span>RIFTCITY PUBLIC</span><strong>AI BUILDER</strong><small>STAGING · public tools · D1 review drafts only</small></div>
       <div class="rift-ai-builder-badges"><span data-ai-webmcp>WEBMCP CHECKING</span><button type="button" data-ai-collapse aria-label="Collapse AI Builder">−</button></div>
     </header>
     <div class="rift-ai-builder-body">
@@ -164,6 +164,7 @@ export function mountRiftAiBuilder({ root, foundation }) {
             <button type="button" class="primary" data-ai-import>IMPORT TO STAGING</button>
             <button type="button" data-ai-load-current>LOAD CURRENT</button>
             <button type="button" data-ai-export>EXPORT JSON</button>
+            <button type="button" class="primary" data-ai-save-d1>SAVE D1 DRAFT</button>
           </div>
         </section>
         <section class="rift-ai-card">
@@ -184,7 +185,7 @@ export function mountRiftAiBuilder({ root, foundation }) {
         </section>
       </div>
       <footer class="rift-ai-footer">
-        <span data-ai-summary>--</span>
+        <span data-ai-summary>PUBLIC STAGING · --</span>
         <a href="/">EXIT TO RIFTCITY</a>
       </footer>
     </div>`;
@@ -404,6 +405,24 @@ export function mountRiftAiBuilder({ root, foundation }) {
     } catch (error) { return writeResult({ ok: false, error: `Invalid JSON: ${error?.message || error}` }); }
   };
 
+  const saveD1Draft = async (name = '') => {
+    try {
+      const response = await fetch('/api/ai-builder/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: String(name || draft?.name || draft?.id || 'RiftCity AI Draft'),
+          document: draft
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) return writeResult({ ok: false, error: payload.error || `Draft save failed with HTTP ${response.status}.` });
+      return writeResult({ ...payload, ok: true });
+    } catch (error) {
+      return writeResult({ ok: false, error: `D1 draft save failed: ${error?.message || error}` });
+    }
+  };
+
   const captureView = (filename = '') => {
     try {
       const dataUrl = foundation.captureCanvasPng();
@@ -417,7 +436,7 @@ export function mountRiftAiBuilder({ root, foundation }) {
     } catch (error) { return writeResult({ ok: false, error: `Capture failed: ${error?.message || error}` }); }
   };
 
-  const help = () => writeResult(`RiftCity AI Builder commands\n\nscene\ninspect <object-id>\nselect <object-id>\nfocus <object-id>\ncamera birdseye|top|north|south|east|west|third-person [object-id]\nmove <object-id> <dx> <dy> <dz>\nrotate <object-id> north|east|south|west|cw|ccw\nduplicate <object-id>\ndelete <object-id>\nundo\nredo\ncheckpoint <name>\nrestore <name>\ncheckpoints\ncapture [filename]\nexport\nhelp`);
+  const help = () => writeResult(`RiftCity AI Builder commands\n\nscene\ninspect <object-id>\nselect <object-id>\nfocus <object-id>\ncamera birdseye|top|north|south|east|west|third-person [object-id]\nmove <object-id> <dx> <dy> <dz>\nrotate <object-id> north|east|south|west|cw|ccw\nduplicate <object-id>\ndelete <object-id>\nundo\nredo\ncheckpoint <name>\nrestore <name>\ncheckpoints\ncapture [filename]\nsave [draft-name]\nexport\nhelp`);
 
   const runCommand = raw => {
     const line = String(raw || '').trim();
@@ -440,6 +459,7 @@ export function mountRiftAiBuilder({ root, foundation }) {
     if (command === 'restore') return restoreCheckpoint(parts.join(' '));
     if (command === 'checkpoints') return writeResult({ ok: true, checkpoints: readCheckpoints().map(({ name, createdAt }) => ({ name, createdAt })) });
     if (command === 'capture') return captureView(parts.join('-'));
+    if (command === 'save') return saveD1Draft(parts.join(' '));
     if (command === 'export') { downloadText(`${safeFileName(draft.id)}-ai-builder.json`, JSON.stringify(draft, null, 2)); return writeResult({ ok: true, exported: draft.id }); }
     return writeResult({ ok: false, error: `Unknown command '${command}'. Run help.` });
   };
@@ -455,6 +475,7 @@ export function mountRiftAiBuilder({ root, foundation }) {
   q('[data-ai-import]').addEventListener('click', () => importBlueprint(blueprintInput.value));
   q('[data-ai-load-current]').addEventListener('click', () => { blueprintInput.value = JSON.stringify(draft, null, 2); writeResult({ ok: true, message: 'Current staging Blueprint loaded into the textarea.' }); });
   q('[data-ai-export]').addEventListener('click', () => { downloadText(`${safeFileName(draft.id)}-ai-builder.json`, JSON.stringify(draft, null, 2)); writeResult({ ok: true, exported: draft.id }); });
+  q('[data-ai-save-d1]').addEventListener('click', () => saveD1Draft());
   q('[data-ai-checkpoint]').addEventListener('click', () => saveCheckpoint(checkpointName.value));
   q('[data-ai-restore]').addEventListener('click', () => restoreCheckpoint(checkpointsSelect.value));
   q('[data-ai-capture]').addEventListener('click', () => captureView());
@@ -464,14 +485,15 @@ export function mountRiftAiBuilder({ root, foundation }) {
   commandInput.addEventListener('keydown', event => { if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); runCommand(commandInput.value); } });
 
   const toolAbortController = new AbortController();
+  const modelContext = document.modelContext || navigator.modelContext || null;
   const registerTool = async spec => {
-    if (!document.modelContext?.registerTool) return false;
-    await document.modelContext.registerTool(spec, { signal: toolAbortController.signal });
+    if (!modelContext?.registerTool) return false;
+    await modelContext.registerTool(spec, { signal: toolAbortController.signal });
     return true;
   };
 
   const setupWebMcp = async () => {
-    if (!document.modelContext?.registerTool) {
+    if (!modelContext?.registerTool) {
       webmcpBadge.textContent = 'WEBMCP FALLBACK UI';
       webmcpBadge.dataset.state = 'fallback';
       return;
@@ -491,7 +513,8 @@ export function mountRiftAiBuilder({ root, foundation }) {
       { name: 'rift_undo', description: 'Undo the most recent RiftCity AI Builder staging edit.', inputSchema: { type: 'object', properties: {} }, execute: async () => undoAction(), ...write },
       { name: 'rift_redo', description: 'Redo the most recently undone RiftCity AI Builder staging edit.', inputSchema: { type: 'object', properties: {} }, execute: async () => redoAction(), ...write },
       { name: 'rift_checkpoint', description: 'Save a named local staging checkpoint for the current RiftCity Blueprint.', inputSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }, execute: async ({ name }) => saveCheckpoint(name), ...write },
-      { name: 'rift_capture_view', description: 'Capture the current Rift Engine canvas as a clean PNG and show it in the AI Builder page.', inputSchema: { type: 'object', properties: { filename: { type: 'string' } } }, execute: async ({ filename } = {}) => captureView(filename || ''), ...write }
+      { name: 'rift_capture_view', description: 'Capture the current Rift Engine canvas as a clean PNG and show it in the AI Builder page.', inputSchema: { type: 'object', properties: { filename: { type: 'string' } } }, execute: async ({ filename } = {}) => captureView(filename || ''), ...write },
+      { name: 'rift_save_draft', description: 'Save the current RiftCity staging Blueprint to the public D1 review inbox. This does not publish or load anything into the live world.', inputSchema: { type: 'object', properties: { name: { type: 'string' } } }, execute: async ({ name } = {}) => saveD1Draft(name || ''), ...write }
     ];
     for (const tool of tools) await registerTool(tool);
     webmcpBadge.textContent = `WEBMCP ${tools.length} TOOLS`;
@@ -512,7 +535,8 @@ export function mountRiftAiBuilder({ root, foundation }) {
     inspect: id => objectInfo(foundation, draft, id),
     run: runCommand,
     importBlueprint,
-    capture: captureView
+    capture: captureView,
+    saveDraft: saveD1Draft
   });
 
   return {

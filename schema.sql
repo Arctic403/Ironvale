@@ -527,6 +527,28 @@ CREATE TABLE IF NOT EXISTS casino_history (
 );
 
 
+-- H1.77 public AI Builder review inbox. Public agents may only append
+-- immutable Blueprint drafts here. Listing/loading is restricted in the Worker
+-- to developer/admin accounts and loading never publishes a draft automatically.
+CREATE TABLE IF NOT EXISTS ai_builder_drafts (
+  id TEXT PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  draft_json TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'public-ai-builder',
+  tool_version TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  loaded_at INTEGER,
+  loaded_by TEXT,
+  FOREIGN KEY (loaded_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_builder_drafts_created
+  ON ai_builder_drafts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_builder_drafts_loaded
+  ON ai_builder_drafts(loaded_at, created_at DESC);
+
 -- Development world-authoring layouts.
 -- Images/assets remain source-controlled; only lightweight block geometry/config is stored here.
 CREATE TABLE IF NOT EXISTS block_layouts (

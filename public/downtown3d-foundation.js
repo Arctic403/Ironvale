@@ -77,6 +77,13 @@ export async function renderDowntown3D(root) {
           <div class="rift-creative-actions"><button id="rift-creative-rotate-left">↶ ROTATE</button><button id="rift-creative-rotate-right">ROTATE ↷</button><button id="rift-creative-duplicate">DUPLICATE</button><button id="rift-creative-delete" class="danger">DELETE</button></div>
         </details>
         <div class="rift-creative-actions"><button id="rift-creative-undo">UNDO</button><button id="rift-creative-redo">REDO</button></div>
+        <details class="rift-ai-draft-inbox">
+          <summary>AI DRAFT INBOX · DEV ONLY</summary>
+          <p id="rift-ai-draft-status">Developer/admin accounts can load public AI Builder drafts from D1 into this normal Build Mode. Loading is still staging only.</p>
+          <label>AI DRAFT<select id="rift-ai-draft-select"><option value="">REFRESH TO LIST DRAFTS</option></select></label>
+          <div class="rift-creative-actions"><button id="rift-ai-draft-refresh" type="button">REFRESH</button><button id="rift-ai-draft-load" class="primary" type="button">LOAD DRAFT</button></div>
+          <small id="rift-ai-draft-meta">Nothing from this inbox publishes automatically.</small>
+        </details>
         <button id="rift-creative-export" class="primary" type="button">EXPORT WORLD JSON</button>
         <small>BUILD MODE: keep walking normally · tap/click cells directly · BREAK/PLACE · B swaps tools · R rotates stairs/prefabs · pinch/wheel zoom · Ctrl/Cmd+Z undo</small>
       </aside>
