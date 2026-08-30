@@ -1,5 +1,13 @@
 import { mat4FromTRS, mat4LookAt, mat4Orthographic, mat4Perspective, normalize3 } from './rift-engine-math.js';
 import { createBoxGeometry, createCylinderGeometry, createSphereGeometry } from './rift-engine-geometry.js';
+import {
+  createRiftTextureAtlasCanvas,
+  RIFT_TEXTURE_ATLAS_COLUMNS,
+  RIFT_TEXTURE_ATLAS_ROWS
+} from './rift-texture-atlas.js';
+
+const TEXTURE_SENTINEL_R = 254 / 255;
+const TEXTURE_SENTINEL_B = 1 / 255;
 
 const VERTEX_SHADER = `#version 300 es
 precision highp float;
@@ -36,36 +44,80 @@ uniform float uBlockFaceShade;
 uniform float uBlockElevationCue;
 uniform float uBlockElevationBase;
 uniform vec3 uCameraPosition;
+uniform sampler2D uTextureAtlas;
 out vec4 outColor;
+
+const float RIFT_TEX_SENTINEL_R = ${TEXTURE_SENTINEL_R.toFixed(9)};
+const float RIFT_TEX_SENTINEL_B = ${TEXTURE_SENTINEL_B.toFixed(9)};
+const float RIFT_ATLAS_COLUMNS = ${RIFT_TEXTURE_ATLAS_COLUMNS.toFixed(1)};
+const float RIFT_ATLAS_ROWS = ${RIFT_TEXTURE_ATLAS_ROWS.toFixed(1)};
+
 float stableVariation(vec2 p){
   float broad = sin(p.x * 0.29 + sin(p.y * 0.13) * 0.8);
   float cross = cos(p.y * 0.23 - p.x * 0.09);
   return broad * 0.62 + cross * 0.38;
 }
+
 float riftBlockFaceShade(vec3 n){
   vec3 an = abs(n);
   if(an.y >= an.x && an.y >= an.z) return n.y >= 0.0 ? 1.00 : 0.52;
   if(an.x >= an.z) return n.x >= 0.0 ? 0.74 : 0.68;
   return n.z >= 0.0 ? 0.86 : 0.80;
 }
+
 float riftBlockElevationShade(vec3 n, float worldY){
   if(uBlockElevationCue <= 0.001 || n.y <= 0.65) return 1.0;
   float metersAboveBase = max(worldY - uBlockElevationBase, 0.0);
   return 1.0 + min(metersAboveBase * uBlockElevationCue, 0.12);
 }
+
+bool riftTextureEncoded(vec3 code){
+  return abs(code.r - RIFT_TEX_SENTINEL_R) < 0.0019 && abs(code.b - RIFT_TEX_SENTINEL_B) < 0.0019;
+}
+
+vec2 riftPlanarUv(vec3 normal){
+  vec3 an = abs(normal);
+  vec2 uv;
+  if(an.y >= an.x && an.y >= an.z) uv = vWorldPosition.xz;
+  else if(an.x >= an.z) uv = vWorldPosition.zy;
+  else uv = vWorldPosition.xy;
+  // Keep every one-meter block face on a complete texture tile while partial
+  // slabs/stairs naturally use the matching portion of that same tile.
+  return fract(uv + vec2(0.0001));
+}
+
+vec3 riftAtlasColor(vec3 code, vec3 normal){
+  float tileIndex = floor(code.g * 255.0 + 0.5);
+  float tileX = mod(tileIndex, RIFT_ATLAS_COLUMNS);
+  float tileY = floor(tileIndex / RIFT_ATLAS_COLUMNS);
+  vec2 localUv = riftPlanarUv(normal);
+  // Tiny inset prevents bilinear filtering from sampling a neighbouring tile.
+  localUv = mix(vec2(0.018), vec2(0.982), localUv);
+  vec2 atlasUv = vec2(
+    (tileX + localUv.x) / RIFT_ATLAS_COLUMNS,
+    (tileY + localUv.y) / RIFT_ATLAS_ROWS
+  );
+  return texture(uTextureAtlas, atlasUv).rgb;
+}
+
 void main(){
   vec3 normal = normalize(vNormal);
   float diffuse = max(dot(normal, normalize(-uLightDirection)), 0.0);
+  vec3 source = riftTextureEncoded(vVertexColor)
+    ? riftAtlasColor(vVertexColor, normal)
+    : vVertexColor;
   float variation = stableVariation(vWorldPosition.xz) * uNoise;
-  vec3 base = clamp(uColor * vVertexColor * (1.0 + variation), 0.0, 1.0);
+  vec3 base = clamp(uColor * source * (1.0 + variation), 0.0, 1.0);
+
   if(uBlockGrid > 0.001){
     vec3 an = abs(normal);
     vec2 uv = an.y > 0.65 ? vWorldPosition.xz : (an.x > an.z ? vWorldPosition.zy : vWorldPosition.xy);
     vec2 cell = abs(fract(uv) - 0.5);
     vec2 width = max(fwidth(uv) * 1.15, vec2(0.012));
     float seam = max(smoothstep(0.46 - width.x, 0.49, cell.x), smoothstep(0.46 - width.y, 0.49, cell.y));
-    base *= mix(1.0, 0.72, seam * clamp(uBlockGrid, 0.0, 1.0));
+    base *= mix(1.0, 0.82, seam * clamp(uBlockGrid, 0.0, 1.0));
   }
+
   float directionalLight = 0.59 + diffuse * 0.52;
   float blockFaceLight = riftBlockFaceShade(normal);
   float faceMix = clamp(uBlockFaceShade, 0.0, 1.0);
@@ -99,16 +151,15 @@ function createProgram(gl) {
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const info = gl.getProgramInfoLog(program) || 'Unknown shader link error';
+    const info = gl.getProgramInfoLog(program) || 'Unknown Rift Engine link error';
     gl.deleteProgram(program);
-    throw new Error(`Rift Engine shader link failed: ${info}`);
+    throw new Error(`Rift Engine program link failed: ${info}`);
   }
   return program;
 }
 
 function normalizeGeometrySource(source) {
   if (!source?.vertices || !source?.indices) throw new Error('Custom geometry requires vertices and indices.');
-
   const rawVertices = source.vertices instanceof Float32Array ? source.vertices : new Float32Array(source.vertices);
   const sourceStride = Math.trunc(Number(source.vertexStride) || 6);
   if (sourceStride !== 6 && sourceStride !== 9) {
@@ -172,10 +223,26 @@ function uploadGeometry(gl, rawSource) {
   };
 }
 
+function uploadTextureAtlas(gl) {
+  const canvas = createRiftTextureAtlasCanvas();
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, canvas);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return texture;
+}
+
 function hexToRgb(hex) {
-  const clean = String(hex).replace('#','');
+  const clean = String(hex).replace('#', '');
   const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
   const number = Number.parseInt(full, 16);
+  if (!Number.isFinite(number)) return [1, 1, 1];
   return [((number >> 16) & 255) / 255, ((number >> 8) & 255) / 255, (number & 255) / 255];
 }
 
@@ -266,13 +333,15 @@ export class RiftEngine {
       blockFaceShade: gl.getUniformLocation(this.program, 'uBlockFaceShade'),
       blockElevationCue: gl.getUniformLocation(this.program, 'uBlockElevationCue'),
       blockElevationBase: gl.getUniformLocation(this.program, 'uBlockElevationBase'),
-      cameraPosition: gl.getUniformLocation(this.program, 'uCameraPosition')
+      cameraPosition: gl.getUniformLocation(this.program, 'uCameraPosition'),
+      textureAtlas: gl.getUniformLocation(this.program, 'uTextureAtlas')
     };
     this.geometry = {
       box: uploadGeometry(gl, createBoxGeometry()),
       cylinder8: uploadGeometry(gl, createCylinderGeometry(8)),
       sphere: uploadGeometry(gl, createSphereGeometry(10, 6))
     };
+    this.textureAtlas = uploadTextureAtlas(gl);
     this.drawables = [];
     this.customGeometryCounter = 1;
     this.projection = new Float32Array(16);
@@ -295,9 +364,9 @@ export class RiftEngine {
     gl.frontFace(gl.CCW);
   }
 
-  addBox(options) { return this.addDrawable('box', options); }
-  addCylinder(options) { return this.addDrawable('cylinder8', options); }
-  addSphere(options) { return this.addDrawable('sphere', options); }
+  addBox(options = {}) { return this.addDrawable('box', options); }
+  addCylinder(options = {}) { return this.addDrawable('cylinder8', options); }
+  addSphere(options = {}) { return this.addDrawable('sphere', options); }
 
   addMesh(source, options = {}) {
     const key = `custom-${this.customGeometryCounter++}`;
@@ -311,17 +380,14 @@ export class RiftEngine {
     const key = drawable?.ownedGeometry || drawable?.geometry;
     const mesh = this.geometry[key];
     if (!mesh) throw new Error('Rift Engine updateMesh requires a live mesh drawable.');
-
     const source = normalizeGeometrySource(rawSource);
     const gl = this.gl;
-
     gl.bindVertexArray(mesh.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, source.vertices, gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, source.indices, gl.DYNAMIC_DRAW);
     gl.bindVertexArray(null);
-
     mesh.count = source.indices.length;
     mesh.indexType = source.indices instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
     return drawable;
@@ -392,7 +458,8 @@ export class RiftEngine {
       draws: this.lastFrameDraws,
       drawables: this.drawables.length,
       pixelRatio: this.pixelRatio,
-      antialias: !!this.contextAttributes.antialias
+      antialias: !!this.contextAttributes.antialias,
+      textureAtlas: true
     };
   }
 
@@ -434,6 +501,9 @@ export class RiftEngine {
     gl.uniform1f(this.uniforms.fogStart, this.fogStart);
     gl.uniform1f(this.uniforms.fogEnd, this.fogEnd);
     gl.uniform3fv(this.uniforms.cameraPosition, camera.position);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.textureAtlas);
+    gl.uniform1i(this.uniforms.textureAtlas, 0);
 
     let currentGeometry = null;
     let cullEnabled = true;
@@ -448,8 +518,7 @@ export class RiftEngine {
       if (!mesh) continue;
       const wantsCull = !drawable.doubleSided;
       if (wantsCull !== cullEnabled) {
-        if (wantsCull) gl.enable(gl.CULL_FACE);
-        else gl.disable(gl.CULL_FACE);
+        if (wantsCull) gl.enable(gl.CULL_FACE); else gl.disable(gl.CULL_FACE);
         cullEnabled = wantsCull;
       }
       if (currentGeometry !== mesh) {
@@ -469,6 +538,7 @@ export class RiftEngine {
     this.lastFrameDraws = draws;
     if (!cullEnabled) gl.enable(gl.CULL_FACE);
     gl.bindVertexArray(null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
   }
 
   dispose() {
@@ -480,6 +550,7 @@ export class RiftEngine {
       gl.deleteBuffer(mesh.vertexBuffer);
       gl.deleteBuffer(mesh.indexBuffer);
     }
+    if (this.textureAtlas) gl.deleteTexture(this.textureAtlas);
     gl.deleteProgram(this.program);
     this.drawables.length = 0;
   }

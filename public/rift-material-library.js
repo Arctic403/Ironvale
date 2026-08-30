@@ -1,22 +1,34 @@
-export const RIFT_SHARED_MATERIAL_RANGE = Object.freeze({ min: 240, max: 255 });
+export const RIFT_SHARED_MATERIAL_RANGE = Object.freeze({ min: 238, max: 255 });
 
-// Engine-reserved authoring materials. Documents can still override any entry by name,
-// but authors should keep material ids 240..255 reserved so shared states stay stable.
+// Material colors with this sentinel are not display colors. The Rift renderer
+// decodes the green channel as a tile index into the original procedural atlas.
+// This keeps the existing 9-float section mesh contract and batching intact.
+const TEXTURE_SENTINEL_R = 254 / 255;
+const TEXTURE_SENTINEL_B = 1 / 255;
+const atlasColor = index => Object.freeze([TEXTURE_SENTINEL_R, index / 255, TEXTURE_SENTINEL_B]);
+
+const solid = (material_id, textureIndex, texture, display_name) => Object.freeze({
+  material_id,
+  shape: 'full',
+  color: atlasColor(textureIndex),
+  texture,
+  display_name
+});
+
+// Engine-reserved authoring materials. These are real atlas-backed blocks.
+// Texture artwork is generated locally by RiftCity at runtime; no third-party
+// copyrighted texture files are bundled or fetched.
 export const RIFT_SHARED_PALETTE = Object.freeze({
-  grass_block: Object.freeze({
-    material_id: 240,
-    shape: 'full',
-    color: Object.freeze([0.21, 0.39, 0.15]),
-    texture: 'grass_block',
-    display_name: 'grass block'
-  }),
+  clay: solid(238, 14, 'clay', 'clay'),
+  mud: solid(239, 15, 'mud', 'mud'),
+  grass_block: solid(240, 0, 'grass', 'grass block'),
   grass_detail: Object.freeze({
     material_id: 241,
     shape: 'grass_detail',
     kind: 'detail',
     color: Object.freeze([0.18, 0.48, 0.11]),
     texture: 'grass_blades',
-    display_name: 'grass',
+    display_name: 'grass detail',
     height: 0.58,
     width: 0.72
   }),
@@ -31,13 +43,19 @@ export const RIFT_SHARED_PALETTE = Object.freeze({
     flow: Object.freeze([0.8, 0.35]),
     flow_speed: 0.55
   }),
-  dirt: Object.freeze({
-    material_id: 243,
-    shape: 'full',
-    color: Object.freeze([0.34, 0.24, 0.14]),
-    texture: 'dirt',
-    display_name: 'dirt'
-  })
+  dirt: solid(243, 1, 'dirt', 'dirt'),
+  dirt_dark: solid(244, 2, 'dirt_dark', 'dark dirt'),
+  dirt_dry: solid(245, 3, 'dirt_dry', 'dry dirt'),
+  stone: solid(246, 4, 'stone', 'stone'),
+  stone_light: solid(247, 5, 'stone_light', 'light stone'),
+  stone_dark: solid(248, 6, 'stone_dark', 'dark stone'),
+  cobblestone: solid(249, 7, 'cobblestone', 'cobblestone'),
+  mossy_stone: solid(250, 8, 'mossy_stone', 'mossy stone'),
+  oak_wood: solid(251, 9, 'oak_wood', 'oak wood'),
+  pine_wood: solid(252, 10, 'pine_wood', 'pine wood'),
+  aged_wood: solid(253, 11, 'aged_wood', 'aged wood'),
+  sand: solid(254, 12, 'sand', 'sand'),
+  gravel: solid(255, 13, 'gravel', 'gravel')
 });
 
 function cloneEntry(entry) {
@@ -76,3 +94,14 @@ export function ensureRiftSharedPalette(document) {
   document.palette = mergeRiftSharedPalette(document.palette || {});
   return document;
 }
+
+// The old Commerce map could be persisted in a player's browser and would beat
+// the new bundled reset on load. Clear that one legacy slot once when this base
+// material generation lands; future user-authored saves use normal persistence.
+try {
+  const migrationKey = 'riftcity:base-texture-reset:v1';
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(migrationKey) !== '1') {
+    localStorage.removeItem('riftcity:h1.57:active-city-block:v1');
+    localStorage.setItem(migrationKey, '1');
+  }
+} catch (_) {}
