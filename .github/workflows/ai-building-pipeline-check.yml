@@ -1,0 +1,66 @@
+name: AI Building Pipeline Check
+
+on:
+  push:
+    branches:
+      - ai-static-world-builder
+    paths:
+      - 'public/rift-building-program.js'
+      - 'public/rift-building-compiler.js'
+      - 'public/rift-building-pipeline.js'
+      - 'public/rift-interior-architecture.js'
+      - 'public/rift-interior-pipeline.js'
+      - 'public/rift-building-authoring.js'
+      - 'public/rift-building-inspection.js'
+      - 'public/rift-building-inspection-core.js'
+      - 'public/rift-building-3d-inspection.js'
+      - 'public/building-inspection.html'
+      - 'public/building-3d-inspection.html'
+      - 'public/rift-world-coordinates.js'
+      - 'public/rift-world-composer.js'
+      - 'public/rift-world-composition-runtime.js'
+      - 'public/rift-world-inspection.js'
+      - 'public/index.html'
+      - 'public/inspection.html'
+      - 'public/riftcity-buildings/**'
+      - 'public/riftcity-blocks/world-index.json'
+      - 'scripts/check-rift-building-stage-pipeline.js'
+      - 'scripts/check-rift-building-programs.js'
+      - 'scripts/check-rift-interior-architecture.js'
+      - 'scripts/check-rift-inspection-pipeline.js'
+      - 'scripts/report-rift-building-inspection.js'
+      - 'scripts/check-rift-world-index.js'
+      - 'scripts/check-rift-downtown-composition.js'
+      - 'scripts/check-rift-building-visibility.js'
+      - 'package.json'
+      - '.github/workflows/ai-building-pipeline-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-building-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Validate world sources
+        run: node scripts/check-rift-world-index.js
+
+      - name: Run full RiftCity build verification
+        run: npm run build

@@ -610,28 +610,54 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   }
 
   function resolveSpawn(preferred) {
-    const bounds = getWorldBounds?.();
-    const requested = preferred || (bounds
-      ? [(bounds.min[0] + bounds.max[0] + 1) / 2, bounds.min[1] + 2, (bounds.min[2] + bounds.max[2] + 1) / 2]
-      : [0, 1, 0]);
-    const clampedBase = constrainHorizontal(requested[0], requested[2]);
-    const base = [clampedBase.x, requested[1], clampedBase.z];
-    const sampled = findGroundY(base[0], base[2], base[1] + 2, { maxRise: 0.1, maxDrop: 8 });
-    const y = sampled ?? (bounds ? bounds.min[1] + 1 : 0);
-    if (sampled != null && !bodyBlocked(base[0], y, base[2])) return [base[0], y, base[2]];
+  const bounds = getWorldBounds?.();
+  const requested = preferred || (bounds
+    ? [(bounds.min[0] + bounds.max[0] + 1) / 2, bounds.min[1] + 2, (bounds.min[2] + bounds.max[2] + 1) / 2]
+    : [0, 1, 0]);
+  const clampedBase = constrainHorizontal(requested[0], requested[2]);
+  const base = [clampedBase.x, Number(requested[1]) || 0, clampedBase.z];
+  const trySpawnAt = (x, z, probeY, maxDrop) => {
+    const support = findGroundY(x, z, probeY, { maxRise: 0.1, maxDrop });
+    if (support == null || bodyBlocked(x, support, z)) return null;
+    return [x, support, z];
+  };
 
-    for (let radius = 1; radius <= 14; radius += 1) {
-      for (let a = 0; a < 16; a += 1) {
-        const angle = a / 16 * Math.PI * 2;
+  // Preserve authored anchors/floor targets first. A valid basement or
+  // upper-floor anchor must stay on its intended nearby support plane.
+  let spawn = trySpawnAt(base[0], base[2], base[1] + 2, 8);
+  if (spawn) return spawn;
+  for (let radius = 1; radius <= 14; radius += 1) {
+    for (let a = 0; a < 16; a += 1) {
+      const angle = a / 16 * Math.PI * 2;
+      const constrained = constrainHorizontal(base[0] + Math.cos(angle) * radius, base[2] + Math.sin(angle) * radius);
+      spawn = trySpawnAt(constrained.x, constrained.z, base[1] + 2, 8);
+      if (spawn) return spawn;
+    }
+  }
+
+  // H1.88: world minY is a storage/collision bound, NOT a surface datum.
+  // Basements, subway tunnels and sewers may extend below zero. If an
+  // old fallback/invalid anchor asks to spawn below all nearby support,
+  // scan the full loaded vertical column from above and recover onto a
+  // real walkable surface instead of returning minY + 1 and falling.
+  if (bounds) {
+    const worldHeight = Math.max(1, Number(bounds.max[1]) - Number(bounds.min[1]) + 1);
+    const topProbeY = Number(bounds.max[1]) + 1.25;
+    const fullDrop = worldHeight + 4;
+    spawn = trySpawnAt(base[0], base[2], topProbeY, fullDrop);
+    if (spawn) return spawn;
+    for (let radius = 1; radius <= 18; radius += 1) {
+      for (let a = 0; a < 24; a += 1) {
+        const angle = a / 24 * Math.PI * 2;
         const constrained = constrainHorizontal(base[0] + Math.cos(angle) * radius, base[2] + Math.sin(angle) * radius);
-        const x = constrained.x, z = constrained.z;
-        const support = findGroundY(x, z, base[1] + 2, { maxRise: 0.1, maxDrop: 8 });
-        if (support == null) continue;
-        if (!bodyBlocked(x, support, z)) return [x, support, z];
+        spawn = trySpawnAt(constrained.x, constrained.z, topProbeY, fullDrop);
+        if (spawn) return spawn;
       }
     }
-    return [base[0], y, base[2]];
   }
+
+  return [base[0], bounds ? Number(bounds.min[1]) + 1 : base[1], base[2]];
+}
 
   function rememberSafeGrounded(x, y, z) {
     const constrained = constrainHorizontal(x, z);

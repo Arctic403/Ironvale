@@ -1,0 +1,38 @@
+name: Rift Local Builder Parity
+
+on:
+  push:
+    branches: [ai-static-world-builder]
+    paths:
+      - 'public/builder/**'
+      - 'public/rift-building-program.js'
+      - 'public/rift-building-compiler.js'
+      - 'public/rift-building-pipeline.js'
+      - 'public/rift-interior-architecture.js'
+      - 'public/rift-interior-pipeline.js'
+      - 'public/rift-material-library.js'
+      - 'public/rift-world-coordinates.js'
+      - 'scripts/check-rift-local-builder.js'
+      - '.github/workflows/rift-local-builder-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rift-local-builder-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify browser/local compiler parity
+        run: node scripts/check-rift-local-builder.js

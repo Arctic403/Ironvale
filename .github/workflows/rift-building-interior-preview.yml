@@ -1,0 +1,150 @@
+name: Rift Building Full Inspection
+
+on:
+  push:
+    branches:
+      - ai-static-world-builder
+    paths:
+      - 'public/rift-building-program.js'
+      - 'public/rift-interior-architecture.js'
+      - 'public/rift-building-inspection.js'
+      - 'public/rift-building-inspection-core.js'
+      - 'public/rift-building-3d-inspection.js'
+      - 'public/building-inspection.html'
+      - 'public/building-3d-inspection.html'
+      - 'public/riftcity-buildings/**'
+      - 'public/rift-engine.js'
+      - 'public/rift-city-block-importer.js'
+      - 'scripts/check-rift-building-programs.js'
+      - 'scripts/check-rift-interior-architecture.js'
+      - 'scripts/check-rift-inspection-pipeline.js'
+      - 'scripts/report-rift-building-inspection.js'
+      - 'scripts/package-rift-inspection-artifact.js'
+      - 'scripts/capture-rift-inspection.js'
+      - 'package.json'
+      - '.github/workflows/rift-building-interior-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rift-building-full-inspection-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout AI branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Ensure inspection image tools
+        shell: bash
+        run: |
+          if command -v magick >/dev/null 2>&1 || { command -v convert >/dev/null 2>&1 && command -v montage >/dev/null 2>&1; }; then
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y imagemagick
+
+      - name: Verify physical architecture and inspection slices
+        run: |
+          npm run verify:building-programs
+          npm run verify:interiors
+          npm run verify:inspection
+          node --check scripts/capture-rift-inspection.js
+          mkdir -p rift-building-previews/full-resolution rift-building-previews/previews
+          node scripts/report-rift-building-inspection.js public/riftcity-buildings/riftcity-bank-001.json > rift-building-previews/bank-inspection-report.json
+
+      - name: Start static RiftCity server
+        run: |
+          python3 -m http.server 4173 --directory public > /tmp/rift-building-static.log 2>&1 &
+          echo $! > /tmp/rift-building-static.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/building-3d-inspection.html >/dev/null; then exit 0; fi
+            sleep 0.25
+          done
+          cat /tmp/rift-building-static.log
+          exit 1
+
+      - name: Render decisive one-level bank review set in one Chrome session
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then echo 'No Chrome/Chromium binary found.' >&2; exit 1; fi
+
+          PROFILE="$(mktemp -d)"
+          cleanup() {
+            if [ -f /tmp/rift-inspection-chrome.pid ]; then
+              CHROME_PID="$(cat /tmp/rift-inspection-chrome.pid)"
+              kill "$CHROME_PID" 2>/dev/null || true
+              wait "$CHROME_PID" 2>/dev/null || true
+            fi
+            rm -rf "$PROFILE" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          "$CHROME" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --hide-scrollbars \
+            --ignore-gpu-blocklist \
+            --enable-webgl \
+            --use-angle=swiftshader \
+            --window-size=1800,1200 \
+            --remote-debugging-address=127.0.0.1 \
+            --remote-debugging-port=9222 \
+            --user-data-dir="$PROFILE" \
+            about:blank > /tmp/rift-inspection-chrome.log 2>&1 &
+          echo $! > /tmp/rift-inspection-chrome.pid
+
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:9222/json/version >/dev/null; then break; fi
+            if [ "$i" -eq 60 ]; then
+              cat /tmp/rift-inspection-chrome.log
+              exit 1
+            fi
+            sleep 0.1
+          done
+
+          node scripts/capture-rift-inspection.js \
+            --port=9222 \
+            --output=rift-building-previews/full-resolution
+
+          test "$(find rift-building-previews/full-resolution -maxdepth 1 -name '*.png' | wc -l)" -eq 15
+
+      - name: Package AI review artifact
+        run: node scripts/package-rift-inspection-artifact.js rift-building-previews
+
+      - name: Upload fast AI review bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: rift-building-ai-review
+          path: |
+            rift-building-previews/manifest.json
+            rift-building-previews/bank-inspection-report.json
+            rift-building-previews/contact-sheet.webp
+            rift-building-previews/previews/*.webp
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 14
+
+      - name: Upload optional full-resolution PNG bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: rift-building-full-resolution
+          path: rift-building-previews/full-resolution/*.png
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 14

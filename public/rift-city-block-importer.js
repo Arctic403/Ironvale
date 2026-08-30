@@ -7,6 +7,7 @@ import {
 } from './rift-block-section.js';
 import { expandRiftCityBlueprintLayer } from './rift-city-blueprints.js';
 import { buildRiftVisibilityStructures } from './rift-building-visibility.js';
+import { mergeRiftSharedPalette } from './rift-material-library.js';
 import {
   RIFT_BLOCK_ROTATIONS,
   RIFT_BLOCK_SHAPES,
@@ -17,7 +18,7 @@ import {
 export const RIFT_CITY_BLOCK_FORMAT = 'riftcity-city-block';
 export const RIFT_CITY_BLOCK_VERSION = 2;
 export const RIFT_CITY_BLOCK_LEGACY_VERSION = 1;
-export const RIFT_CITY_BLOCK_MAX_VOLUME = 2_000_000;
+export const RIFT_CITY_BLOCK_MAX_VOLUME = 3_000_000;
 export const RIFT_CITY_BLOCK_MAX_OP_TOUCHES = 3_000_000;
 
 const SHAPE_NAMES = Object.freeze({
@@ -27,6 +28,12 @@ const SHAPE_NAMES = Object.freeze({
   slab_top: RIFT_BLOCK_SHAPES.topSlab,
   top_slab: RIFT_BLOCK_SHAPES.topSlab,
   stair: RIFT_BLOCK_SHAPES.stair
+});
+
+const SPECIAL_SHAPES = Object.freeze({
+  grass_detail: 'detail',
+  grass: 'detail',
+  water: 'fluid'
 });
 
 const ROTATION_NAMES = Object.freeze({
@@ -70,30 +77,72 @@ function normalizeColor(value, label) {
   });
 }
 
+function finiteNumber(value, fallback, min = -Infinity, max = Infinity) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function normalizeFlow(value, label) {
+  if (value == null) return [0.8, 0.35];
+  if (!Array.isArray(value) || value.length !== 2) throw new Error(`${label}.flow must be [x,z].`);
+  const x = Number(value[0]), z = Number(value[1]);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) throw new Error(`${label}.flow must contain finite numbers.`);
+  const length = Math.hypot(x, z);
+  return length > 0.0001 ? [x / length, z / length] : [0.8, 0.35];
+}
+
 function normalizePalette(rawPalette) {
   if (!rawPalette || typeof rawPalette !== 'object' || Array.isArray(rawPalette)) throw new Error('palette must be an object.');
   const palette = new Map();
   const stateColors = new Map();
   const stateLabels = new Map();
+  const mergedPalette = mergeRiftSharedPalette(rawPalette);
 
-  for (const [name, raw] of Object.entries(rawPalette)) {
+  for (const [name, raw] of Object.entries(mergedPalette)) {
     if (!name || !raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`Invalid palette entry ${name || '(unnamed)'}.`);
     if (String(raw.shape || '').toLowerCase() === 'air' || Number(raw.material_id) === 0) {
-      palette.set(name, Object.freeze({ name, state: 0, materialId: 0, shape: 'air', rotation: 'north', color: [0, 0, 0] }));
+      palette.set(name, Object.freeze({ name, state: 0, materialId: 0, shape: 'air', rotation: 'north', color: [0, 0, 0], kind: 'air' }));
       continue;
     }
 
     const materialId = asInt(raw.material_id, `palette.${name}.material_id`);
     if (materialId < 1 || materialId > 255) throw new Error(`palette.${name}.material_id must be 1..255.`);
     const shapeName = String(raw.shape || 'full').toLowerCase();
+    const requestedKind = String(raw.kind || '').toLowerCase();
+    const specialKind = requestedKind === 'fluid' || requestedKind === 'detail'
+      ? requestedKind
+      : SPECIAL_SHAPES[shapeName] || null;
+    const color = normalizeColor(raw.color || [1, 1, 1], `palette.${name}`);
+    const texture = String(raw.texture || name || '').toLowerCase();
+
+    if (specialKind) {
+      const entry = Object.freeze({
+        name,
+        state: 0,
+        materialId,
+        shape: shapeName,
+        rotation: 'north',
+        color,
+        texture,
+        kind: specialKind,
+        height: finiteNumber(raw.height, 0.58, 0.08, 1.5),
+        width: finiteNumber(raw.width, 0.72, 0.08, 1.5),
+        surfaceHeight: finiteNumber(raw.surface_height, 0.86, 0.05, 0.98),
+        flow: normalizeFlow(raw.flow, `palette.${name}`),
+        flowSpeed: finiteNumber(raw.flow_speed, 0.55, 0, 4)
+      });
+      palette.set(name, entry);
+      continue;
+    }
+
     const shape = SHAPE_NAMES[shapeName];
     if (shape == null) throw new Error(`palette.${name}.shape '${shapeName}' is unsupported.`);
     const rotationName = String(raw.rotation || 'north').toLowerCase();
     const rotation = shape === RIFT_BLOCK_SHAPES.stair ? ROTATION_NAMES[rotationName] : RIFT_BLOCK_ROTATIONS.north;
     if (rotation == null) throw new Error(`palette.${name}.rotation '${rotationName}' is unsupported.`);
-    const color = normalizeColor(raw.color || [1, 1, 1], `palette.${name}`);
     const state = encodeRiftBlockState({ material: materialId, shape, rotation });
-    const entry = Object.freeze({ name, state, materialId, shape: shapeName, rotation: rotationName, color });
+    const entry = Object.freeze({ name, state, materialId, shape: shapeName, rotation: rotationName, color, texture, kind: 'solid' });
     palette.set(name, entry);
     stateColors.set(state, color);
     stateLabels.set(state, name);
@@ -126,19 +175,25 @@ function addOrigin(point, origin) {
   return [point[0] + origin[0], point[1] + origin[1], point[2] + origin[2]];
 }
 
-function resolveState(parsed, key, label, rotationTurns = 0) {
+function resolvePaletteEntry(parsed, key, label, rotationTurns = 0) {
   const name = String(key || '');
   const entry = parsed.palette.get(name);
   if (!entry) throw new Error(`${label} references unknown palette state '${name}'.`);
   const turns = ((Number(rotationTurns) || 0) % 4 + 4) % 4;
-  if (!turns || entry.shape !== 'stair') return entry.state;
+  if (!turns || entry.kind !== 'solid' || entry.shape !== 'stair') return entry;
 
   const baseRotation = ROTATION_NAMES[entry.rotation];
   const rotation = (baseRotation + turns) % 4;
   const state = encodeRiftBlockState({ material: entry.materialId, shape: RIFT_BLOCK_SHAPES.stair, rotation });
   if (!parsed.stateColors.has(state)) parsed.stateColors.set(state, entry.color);
   if (!parsed.stateLabels.has(state)) parsed.stateLabels.set(state, `${name}@${['north', 'east', 'south', 'west'][rotation]}`);
-  return state;
+  return Object.freeze({ ...entry, state, rotation: ['north', 'east', 'south', 'west'][rotation] });
+}
+
+function requireSolidEntry(parsed, key, label, rotationTurns = 0) {
+  const entry = resolvePaletteEntry(parsed, key, label, rotationTurns);
+  if (entry.kind !== 'solid') throw new Error(`${label} '${entry.name}' is ${entry.kind}; hollow building shells require a solid block state.`);
+  return entry;
 }
 
 function createSectionAt(grid, worldX, worldY, worldZ) {
@@ -204,6 +259,141 @@ function compileSectionMeshes(grid, resolveColor) {
   return { meshes, totals };
 }
 
+
+function specialKey(x, y, z) { return `${x}|${y}|${z}`; }
+
+function pushGeometryQuad(buffer, corners, normal, color, doubleSided = false) {
+  const add = (points, faceNormal) => {
+    const base = buffer.vertices.length / 9;
+    for (const point of points) buffer.vertices.push(
+      point[0], point[1], point[2],
+      faceNormal[0], faceNormal[1], faceNormal[2],
+      color[0], color[1], color[2]
+    );
+    buffer.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    buffer.quads += 1;
+  };
+  add(corners, normal);
+  if (doubleSided) add([corners[3], corners[2], corners[1], corners[0]], [-normal[0], -normal[1], -normal[2]]);
+}
+
+function finishSpecialGeometry(buffer, kind, extra = {}) {
+  const vertexCount = buffer.vertices.length / 9;
+  const IndexArray = vertexCount > 65535 ? Uint32Array : Uint16Array;
+  return {
+    vertices: new Float32Array(buffer.vertices),
+    vertexStride: 9,
+    indices: new IndexArray(buffer.indices),
+    visibleFaces: buffer.quads,
+    quads: buffer.quads,
+    vertexCount,
+    triangles: buffer.quads * 2,
+    shapeAware: true,
+    riftSpecialKind: kind,
+    ...extra
+  };
+}
+
+function coordNoise(x, y, z) {
+  const value = Math.sin(x * 12.9898 + y * 37.719 + z * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function buildGrassDetailGeometry(cells) {
+  const buffer = { vertices: [], indices: [], quads: 0 };
+  for (const cell of cells) {
+    const entry = cell.entry;
+    const jitter = coordNoise(cell.x, cell.y, cell.z);
+    const width = entry.width * (0.82 + jitter * 0.32);
+    const height = entry.height * (0.78 + coordNoise(cell.z, cell.x, cell.y) * 0.42);
+    const cx = cell.x + 0.5 + (jitter - 0.5) * 0.16;
+    const cz = cell.z + 0.5 + (coordNoise(cell.y, cell.z, cell.x) - 0.5) * 0.16;
+    const y0 = cell.y + 0.025;
+    const y1 = y0 + height;
+    const shade = 0.86 + jitter * 0.22;
+    const color = entry.color.map(component => Math.max(0, Math.min(1, component * shade)));
+    for (const angle of [Math.PI * 0.25, Math.PI * 0.75]) {
+      const dx = Math.cos(angle) * width * 0.5;
+      const dz = Math.sin(angle) * width * 0.5;
+      const corners = [
+        [cx - dx, y0, cz - dz],
+        [cx - dx, y1, cz - dz],
+        [cx + dx, y1, cz + dz],
+        [cx + dx, y0, cz + dz]
+      ];
+      const length = Math.hypot(dx, dz) || 1;
+      const normal = [dz / length, 0, -dx / length];
+      pushGeometryQuad(buffer, corners, normal, color, true);
+    }
+  }
+  return finishSpecialGeometry(buffer, 'detail');
+}
+
+function buildWaterGeometry(cells, cellMap) {
+  const buffer = { vertices: [], indices: [], quads: 0 };
+  for (const cell of cells) {
+    const { x, y, z, entry } = cell;
+    const top = y + entry.surfaceHeight;
+    const bottom = y + 0.04;
+    const color = entry.color;
+    const waterAt = (dx, dy, dz) => {
+      const neighbor = cellMap.get(specialKey(x + dx, y + dy, z + dz));
+      return neighbor?.entry?.kind === 'fluid';
+    };
+    if (!waterAt(0, 1, 0)) {
+      pushGeometryQuad(buffer, [
+        [x, top, z], [x, top, z + 1], [x + 1, top, z + 1], [x + 1, top, z]
+      ], [0, 1, 0], color, false);
+    }
+    if (!waterAt(1, 0, 0)) pushGeometryQuad(buffer, [
+      [x + 1, bottom, z], [x + 1, top, z], [x + 1, top, z + 1], [x + 1, bottom, z + 1]
+    ], [1, 0, 0], color, false);
+    if (!waterAt(-1, 0, 0)) pushGeometryQuad(buffer, [
+      [x, bottom, z + 1], [x, top, z + 1], [x, top, z], [x, bottom, z]
+    ], [-1, 0, 0], color, false);
+    if (!waterAt(0, 0, 1)) pushGeometryQuad(buffer, [
+      [x + 1, bottom, z + 1], [x + 1, top, z + 1], [x, top, z + 1], [x, bottom, z + 1]
+    ], [0, 0, 1], color, false);
+    if (!waterAt(0, 0, -1)) pushGeometryQuad(buffer, [
+      [x, bottom, z], [x, top, z], [x + 1, top, z], [x + 1, bottom, z]
+    ], [0, 0, -1], color, false);
+  }
+  const first = cells[0]?.entry;
+  return finishSpecialGeometry(buffer, 'fluid', {
+    riftFlow: first?.flow ? [...first.flow] : [0.8, 0.35],
+    riftFlowSpeed: Number(first?.flowSpeed) || 0.55
+  });
+}
+
+function compileSpecialMeshes(specialCells) {
+  const details = [];
+  const fluidGroups = new Map();
+  let fluidCount = 0;
+  for (const cell of specialCells.values()) {
+    if (cell.entry.kind === 'fluid') {
+      fluidCount += 1;
+      const flow = cell.entry.flow || [0.8, 0.35];
+      const key = `${cell.entry.name}|${flow[0].toFixed(4)},${flow[1].toFixed(4)}|${Number(cell.entry.flowSpeed || 0).toFixed(4)}`;
+      let group = fluidGroups.get(key);
+      if (!group) { group = []; fluidGroups.set(key, group); }
+      group.push(cell);
+    } else if (cell.entry.kind === 'detail') details.push(cell);
+  }
+  const meshes = [];
+  let triangles = 0, quads = 0, vertices = 0, fluidMeshIndex = 0;
+  if (details.length) {
+    const geometry = buildGrassDetailGeometry(details);
+    meshes.push({ section: ['detail', 0, 0], geometry, visibilityLayers: [], specialKind: 'detail' });
+    triangles += geometry.triangles; quads += geometry.quads; vertices += geometry.vertexCount;
+  }
+  for (const fluids of fluidGroups.values()) {
+    const geometry = buildWaterGeometry(fluids, specialCells);
+    meshes.push({ section: ['fluid', fluidMeshIndex++, 0], geometry, visibilityLayers: [], specialKind: 'fluid' });
+    triangles += geometry.triangles; quads += geometry.quads; vertices += geometry.vertexCount;
+  }
+  return { meshes, details: details.length, fluids: fluidCount, triangles, quads, vertices };
+}
+
 export function parseRiftCityBlockJson(input) {
   const document = typeof input === 'string' ? JSON.parse(input) : input;
   if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('RiftCity block JSON must be an object.');
@@ -219,7 +409,7 @@ export function parseRiftCityBlockJson(input) {
   const origin = asVec3(document.origin || [0, 0, 0], 'origin');
   const bounds = normalizeBounds(document.bounds);
   const paletteInfo = normalizePalette(document.palette);
-  const blueprint = expandRiftCityBlueprintLayer(document, { bounds });
+  const blueprint = expandRiftCityBlueprintLayer({ ...document, palette: mergeRiftSharedPalette(document.palette) }, { bounds });
   const ops = blueprint.ops;
   if (!ops.length) throw new Error(version === 1
     ? 'ops must contain at least one operation.'
@@ -242,6 +432,7 @@ export function parseRiftCityBlockJson(input) {
 export function compileRiftCityBlock(input) {
   const parsed = parseRiftCityBlockJson(input);
   const grid = new RiftSectionGrid();
+  const specialCells = new Map();
   let opTouches = 0;
   let writes = 0;
 
@@ -251,11 +442,28 @@ export function compileRiftCityBlock(input) {
       throw new Error(`Block operations touch more than ${RIFT_CITY_BLOCK_MAX_OP_TOUCHES.toLocaleString()} cells.`);
     }
   };
-  const writeLocal = (x, y, z, state) => {
+  const clearLocal = (x, y, z) => {
     const local = [x, y, z];
     if (!localInside(parsed.bounds, local)) throw new Error(`Operation writes outside declared bounds at ${x},${y},${z}.`);
     const world = addOrigin(local, parsed.origin);
-    if (writeWorldState(grid, world[0], world[1], world[2], state)) writes += 1;
+    const key = specialKey(world[0], world[1], world[2]);
+    const specialRemoved = specialCells.delete(key);
+    const solidRemoved = writeWorldState(grid, world[0], world[1], world[2], RIFT_SECTION_AIR);
+    if (specialRemoved || solidRemoved) writes += 1;
+  };
+  const writeLocalEntry = (x, y, z, entry) => {
+    const local = [x, y, z];
+    if (!localInside(parsed.bounds, local)) throw new Error(`Operation writes outside declared bounds at ${x},${y},${z}.`);
+    const world = addOrigin(local, parsed.origin);
+    const key = specialKey(world[0], world[1], world[2]);
+    if (entry.kind === 'fluid' || entry.kind === 'detail') {
+      writeWorldState(grid, world[0], world[1], world[2], RIFT_SECTION_AIR);
+      specialCells.set(key, { x: world[0], y: world[1], z: world[2], local: [...local], entry });
+      writes += 1;
+      return;
+    }
+    specialCells.delete(key);
+    if (writeWorldState(grid, world[0], world[1], world[2], entry.state)) writes += 1;
   };
 
   parsed.ops.forEach((op, index) => {
@@ -267,7 +475,7 @@ export function compileRiftCityBlock(input) {
       const at = asVec3(op.at, `${label}.at`);
       if (!localInside(parsed.bounds, at)) throw new Error(`${label}.at is outside declared bounds.`);
       touch(1);
-      writeLocal(at[0], at[1], at[2], resolveState(parsed, op.state, `${label}.state`, op._stateRotationTurns));
+      writeLocalEntry(at[0], at[1], at[2], resolvePaletteEntry(parsed, op.state, `${label}.state`, op._stateRotationTurns));
       return;
     }
 
@@ -276,22 +484,26 @@ export function compileRiftCityBlock(input) {
       if (!boxInside(parsed.bounds, box)) throw new Error(`${label} is outside declared bounds.`);
       touch(box.volume);
 
-      if (type === 'fill_box' || type === 'cut_box') {
-        const state = type === 'cut_box' ? RIFT_SECTION_AIR : resolveState(parsed, op.state, `${label}.state`, op._stateRotationTurns);
-        forEachBoxCell(box, (x, y, z) => writeLocal(x, y, z, state));
+      if (type === 'fill_box') {
+        const entry = resolvePaletteEntry(parsed, op.state, `${label}.state`, op._stateRotationTurns);
+        forEachBoxCell(box, (x, y, z) => writeLocalEntry(x, y, z, entry));
+        return;
+      }
+      if (type === 'cut_box') {
+        forEachBoxCell(box, clearLocal);
         return;
       }
 
-      const wallState = resolveState(parsed, op.state, `${label}.state`, op._stateRotationTurns);
-      const roofState = op.roof_state ? resolveState(parsed, op.roof_state, `${label}.roof_state`, op._stateRotationTurns) : wallState;
+      const wallEntry = requireSolidEntry(parsed, op.state, `${label}.state`, op._stateRotationTurns);
+      const roofEntry = op.roof_state ? requireSolidEntry(parsed, op.roof_state, `${label}.roof_state`, op._stateRotationTurns) : wallEntry;
       const thickness = Math.max(1, Math.min(8, asInt(op.wall_thickness ?? 1, `${label}.wall_thickness`)));
       const floor = op.floor !== false;
       forEachBoxCell(box, (x, y, z) => {
         const edgeX = Math.min(x - box.min[0], box.max[0] - x) < thickness;
         const edgeZ = Math.min(z - box.min[2], box.max[2] - z) < thickness;
-        if (floor && y === box.min[1]) writeLocal(x, y, z, wallState);
-        else if (y === box.max[1]) writeLocal(x, y, z, roofState);
-        else if (edgeX || edgeZ) writeLocal(x, y, z, wallState);
+        if (floor && y === box.min[1]) writeLocalEntry(x, y, z, wallEntry);
+        else if (y === box.max[1]) writeLocalEntry(x, y, z, roofEntry);
+        else if (edgeX || edgeZ) writeLocalEntry(x, y, z, wallEntry);
       });
       return;
     }
@@ -302,7 +514,10 @@ export function compileRiftCityBlock(input) {
   const resolveColor = ({ state = 0 } = {}) => parsed.stateColors.get(state) || [1, 1, 1];
   const { cells, partialCells } = countSectionCells(grid);
   const visibilityStructures = buildRiftVisibilityStructures(parsed.ops, { origin: parsed.origin });
-  const { meshes, totals } = compileSectionMeshes(grid, resolveColor);
+  const solidCompilation = compileSectionMeshes(grid, resolveColor);
+  const specialCompilation = compileSpecialMeshes(specialCells);
+  const meshes = [...solidCompilation.meshes, ...specialCompilation.meshes];
+  const totals = solidCompilation.totals;
   const worldMin = addOrigin(parsed.bounds.min, parsed.origin);
   const worldMax = addOrigin(parsed.bounds.max, parsed.origin);
   const center = [
@@ -331,9 +546,11 @@ export function compileRiftCityBlock(input) {
     partialCells,
     sections: grid.size,
     stateBytes: grid.size * (RIFT_SECTION_SIZE ** 3) * Uint16Array.BYTES_PER_ELEMENT,
-    quads: totals.quads,
-    vertices: totals.vertices,
-    triangles: totals.triangles,
+    quads: totals.quads + specialCompilation.quads,
+    vertices: totals.vertices + specialCompilation.vertices,
+    triangles: totals.triangles + specialCompilation.triangles,
+    fluidCells: specialCompilation.fluids,
+    detailCells: specialCompilation.details,
     shapeAwareSections: totals.shapeAwareSections,
     visibilityStructures: visibilityStructures.length,
     visibilityRoofAttachments: visibilityStructures.reduce((sum, structure) => sum + (structure.roofAttachments?.length || 0), 0),
@@ -372,6 +589,7 @@ export function compileRiftCityBlock(input) {
     document: parsed.document,
     grid,
     meshes,
+    specialCells,
     palette: parsed.palette,
     stateColors: parsed.stateColors,
     stateLabels: parsed.stateLabels,
@@ -417,7 +635,9 @@ export function validateRiftCityBlockImporter() {
       { op: 'hollow_box', state: 'solid', roof_state: 'solid', floor: true, wall_thickness: 1, min: [0, 1, 0], max: [3, 3, 3] },
       { op: 'cut_box', min: [1, 1, 0], max: [1, 2, 0] },
       { op: 'set', state: 'slab', at: [1, 1, 1] },
-      { op: 'set', state: 'stair', at: [2, 1, 1] }
+      { op: 'set', state: 'stair', at: [2, 1, 1] },
+      { op: 'set', state: 'grass_detail', at: [1, 2, 1] },
+      { op: 'set', state: 'water', at: [2, 2, 1] }
     ]
   };
 
@@ -428,6 +648,10 @@ export function validateRiftCityBlockImporter() {
     if (!riftBlockStateHasPartialShape(result.grid.getBlockWorld(2, 1, 1))) failures.push('stair did not compile as a partial shape');
     if (result.stats.sections !== 1) failures.push(`self-test section count ${result.stats.sections} != 1`);
     if (result.stats.triangles <= 0 || result.stats.vertices <= 0) failures.push('self-test produced no render geometry');
+    if (result.grid.getBlockWorld(1, 2, 1) !== 0 || result.grid.getBlockWorld(2, 2, 1) !== 0) failures.push('detail/fluid states incorrectly became solid collision blocks');
+    if (result.stats.detailCells !== 1 || result.stats.fluidCells !== 1) failures.push(`special material counts ${result.stats.detailCells}/${result.stats.fluidCells} != 1/1`);
+    if (result.specialCells.get('1|2|1')?.entry?.kind !== 'detail') failures.push('grass detail did not compile into the non-solid detail layer');
+    if (result.specialCells.get('2|2|1')?.entry?.kind !== 'fluid') failures.push('water did not compile into the non-solid fluid layer');
   } catch (error) {
     failures.push(error.message);
   }
