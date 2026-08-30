@@ -6,6 +6,9 @@ const base = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/downt
 const worldIndex = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/world-index.json', import.meta.url), 'utf8'));
 const runtimeSource = fs.readFileSync(new URL('../public/rift-world-composition-runtime.js', import.meta.url), 'utf8');
 const atlasSource = fs.readFileSync(new URL('../public/rift-texture-atlas.js', import.meta.url), 'utf8');
+const engineSource = fs.readFileSync(new URL('../public/rift-engine.js', import.meta.url), 'utf8');
+const qualitySource = fs.readFileSync(new URL('../public/rift-render-quality.js', import.meta.url), 'utf8');
+const materialSource = fs.readFileSync(new URL('../public/rift-material-library.js', import.meta.url), 'utf8');
 const failures = [];
 const ok = (value, message) => { if (!value) failures.push(message); };
 
@@ -28,8 +31,23 @@ try {
   ok(atlasSource.includes("'grass', 'dirt', 'dirt_dark', 'dirt_dry'"), 'Texture atlas natural-material tiles are missing.');
   ok(atlasSource.includes("'mossy_stone', 'oak_wood', 'pine_wood', 'aged_wood'"), 'Texture atlas stone/wood variations are missing.');
   ok(atlasSource.includes('No third-party texture art is bundled.'), 'Atlas copyright/provenance guard comment is missing.');
+
+  // Both renderer layers must remain atlas-aware. rift-render-quality patches the
+  // engine prototype at runtime, so dropping this sampler there would silently
+  // replace the correct base shader with a color/procedural-only shader.
+  ok(engineSource.includes('uniform sampler2D uTextureAtlas'), 'Base RiftEngine shader lost the texture-atlas sampler.');
+  ok(engineSource.includes("textureAtlas: gl.getUniformLocation(this.program, 'uTextureAtlas')"), 'Base RiftEngine uniform map lost textureAtlas.');
+  ok(engineSource.includes('gl.bindTexture(gl.TEXTURE_2D, this.textureAtlas)'), 'Base RiftEngine no longer binds the texture atlas before drawing.');
+  ok(qualitySource.includes("from './rift-texture-atlas.js'"), 'Render-quality runtime is not importing atlas dimensions.');
+  ok(qualitySource.includes('uniform sampler2D uTextureAtlas'), 'Render-quality replacement shader lost the atlas sampler.');
+  ok(qualitySource.includes("textureAtlas: u('uTextureAtlas')"), 'Render-quality replacement uniform map lost textureAtlas.');
+  ok(qualitySource.includes('riftTextureEncoded'), 'Render-quality shader no longer recognizes atlas-backed material sentinels.');
+  ok(qualitySource.includes('riftAtlasColor'), 'Render-quality shader no longer samples atlas-backed materials.');
+
   ok(!runtimeSource.includes('window.fetch ='), 'World composition runtime is intercepting fetch again.');
   ok(runtimeSource.includes("disabled: true"), 'World composition runtime is not explicitly disabled for the reset.');
+  ok(runtimeSource.includes('isLegacyDowntownSnapshot'), 'Legacy saved-world cleanup no longer checks the stored document identity.');
+  ok(!materialSource.includes("localStorage.removeItem('riftcity:h1.57:active-city-block:v1')"), 'Material initialization can still blindly erase the active-world save.');
 
   const activeEntry = worldIndex.blocks.find(entry => entry.id === worldIndex.activeBlockId);
   ok(worldIndex.activeBlockId === 'riftcity-base-world-001', `World index activeBlockId ${worldIndex.activeBlockId} != riftcity-base-world-001.`);
@@ -45,7 +63,7 @@ try {
   ok(compiled.worldBounds.min[2] === 0 && compiled.worldBounds.max[2] === 95, 'Base world Z bounds drifted.');
 
   if (!failures.length) {
-    console.log(`[downtown-composition] PASS · base-world reset · ${compiled.stats.cells.toLocaleString()} terrain cells · ${expectedTextures.length} original atlas-backed natural materials · runtime city overlays disabled.`);
+    console.log(`[downtown-composition] PASS · base-world reset · ${compiled.stats.cells.toLocaleString()} terrain cells · ${expectedTextures.length} original atlas-backed natural materials · atlas-aware graphics override · runtime city overlays disabled.`);
   }
 } catch (error) {
   failures.push(error?.stack || error?.message || String(error));
