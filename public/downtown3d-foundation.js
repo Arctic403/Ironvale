@@ -63,12 +63,12 @@ export async function renderDowntown3D(root) {
         </div>
       </div>
 
-      <aside id="rift-creative-panel" class="rift-creative-panel" aria-label="RiftCity overhead build tools">
+      <aside id="rift-creative-panel" class="rift-creative-panel" aria-label="RiftCity reticle build tools">
         <header><div><span>RIFTCITY BUILD MODE</span><strong>OVERHEAD CITY BUILDER</strong></div><button id="rift-creative-close" type="button">HIDE</button></header>
         <div class="rift-creative-block-actions"><button data-rift-block-action="break" class="active">BREAK CELL</button><button data-rift-block-action="place">PLACE CELL</button></div>
         <label>BLOCK<select id="rift-creative-block-state"></select></label>
         <button id="rift-creative-stair-rotate" type="button">ROTATE STAIR ↷</button>
-        <p id="rift-creative-status">Enter Build Mode, then tap/click the exact RiftBlock cell you want to edit from above.</p>
+        <p id="rift-creative-status">Enter Build Mode, aim the center reticle at a RiftBlock, then tap/click the canvas to use BREAK or PLACE.</p>
         <details><summary>BLUEPRINT OBJECT TOOLS</summary>
           <label>OBJECT<select id="rift-creative-object"></select></label>
           <div class="rift-creative-readout"><div><span>SELECTED</span><b id="rift-creative-selected">NONE</b></div><div><span>POSITION</span><b id="rift-creative-pos">--</b></div><div><span>ROTATION</span><b id="rift-creative-rot">--</b></div></div>
@@ -223,12 +223,18 @@ function createBlockImporterLab({ root, canvas, status }) {
   let firstPersonActive = false;
 
   const syncPlayerVisibility = () => player.setVisible(requestedPlayerVisible && !firstPersonActive);
+  const syncReticleUi = () => {
+    const reticleActive = !topView;
+    root.classList.toggle('rift-reticle-active', reticleActive);
+    shell?.classList.toggle('rift-reticle-active', reticleActive);
+    firstPersonReticle?.setAttribute('aria-hidden', reticleActive ? 'false' : 'true');
+  };
   const syncFirstPersonUi = () => {
     root.classList.toggle('rift-first-person-active', firstPersonActive);
     shell?.classList.toggle('rift-first-person-active', firstPersonActive);
     firstPersonButton?.classList.toggle('active', firstPersonActive);
     if (firstPersonButton) firstPersonButton.textContent = firstPersonActive ? 'THIRD PERSON' : 'FIRST PERSON';
-    firstPersonReticle?.setAttribute('aria-hidden', firstPersonActive ? 'false' : 'true');
+    syncReticleUi();
     syncPlayerVisibility();
   };
   const setFirstPerson = (next, { resetCamera = true } = {}) => {
@@ -261,6 +267,7 @@ function createBlockImporterLab({ root, canvas, status }) {
       camera.radius = THIRD_PERSON_DISTANCE;
       camera.setTarget(p[0], p[1] + 1.15, p[2]);
     }
+    syncReticleUi();
   };
 
   const updatePlayerCamera = dt => {
@@ -335,6 +342,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     camera.updatePosition();
     topButton?.classList.toggle('active', true);
     if (topButton) topButton.textContent = 'FOLLOW PLAYER';
+    syncReticleUi();
     return { mode: next === 'birdseye' ? 'birdseye' : next, target: [...camera.target], position: [...camera.position], bounds: viewBounds };
   };
 
@@ -575,19 +583,27 @@ function createBlockImporterLab({ root, canvas, status }) {
     camera.updatePosition();
     topButton?.classList.toggle('active', topView);
     if (topButton) topButton.textContent = topView ? 'FOLLOW PLAYER' : 'CITY OVERVIEW';
+    syncReticleUi();
   };
   topButton?.addEventListener('click', onTop);
   const onResetView = () => resetPlayerCamera();
   viewButton?.addEventListener('click', onResetView);
 
   const orbit = setupThirdPersonCameraControls(canvas, camera, {
-    isLocked: () => !!creative?.active || topView,
+    isLocked: () => topView,
     getController: () => firstPersonActive ? firstPersonCamera : thirdPersonCamera
   });
   creative = createRiftCreativeMode({
     root, canvas, engine, camera, player, playerController,
     getImported: () => imported,
-    loadDocument
+    loadDocument,
+    preparePlayerView: () => {
+      topView = false;
+      topButton?.classList.remove('active');
+      if (topButton) topButton.textContent = 'CITY OVERVIEW';
+      resetPlayerCamera();
+      syncReticleUi();
+    }
   });
   thirdPersonCamera = createRiftThirdPersonCamera({
     camera,

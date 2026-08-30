@@ -4,15 +4,21 @@ const clone=value=>JSON.parse(JSON.stringify(value));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const norm=v=>{const l=Math.hypot(...v)||1;return v.map(n=>n/l);};
 
+export function riftReticleClientPoint(canvas){
+  const rect=canvas?.getBoundingClientRect?.();
+  if(!rect)return [0,0];
+  return [rect.left+rect.width*.5,rect.top+rect.height*.5];
+}
+
 function objectPoint(object){ if(Array.isArray(object.origin))return object.origin;if(Array.isArray(object.center))return object.center;if(Array.isArray(object.from)&&Array.isArray(object.to))return object.from.map((v,i)=>(v+object.to[i])/2);return [0,0,0]; }
 function shiftVec(vec,dx,dy,dz){if(!Array.isArray(vec))return;vec[0]+=dx;vec[1]+=dy;vec[2]+=dz;}
 function esc(value=''){return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
 
-export function createRiftCreativeMode({root,canvas,engine,camera,getImported,loadDocument,playerController,player}){
+export function createRiftCreativeMode({root,canvas,engine,camera,getImported,loadDocument,playerController,player,preparePlayerView}){
   const toggle=root.querySelector('#rift-creative-toggle'),panel=root.querySelector('#rift-creative-panel'),select=root.querySelector('#rift-creative-object'),status=root.querySelector('#rift-creative-status'),modeLabel=root.querySelector('#rift-mode-label');
   const stateSelect=root.querySelector('#rift-creative-block-state'),actionButtons=[...root.querySelectorAll('[data-rift-block-action]')];
   const aiDraftSelect=root.querySelector('#rift-ai-draft-select'),aiDraftStatus=root.querySelector('#rift-ai-draft-status'),aiDraftMeta=root.querySelector('#rift-ai-draft-meta');
-  let active=false,draft=null,selectedId='',undo=[],redo=[],action='break',selectedState='',stairRotation='north',pointerDown=null,hoverPoint=null;
+  let active=false,draft=null,selectedId='',undo=[],redo=[],action='break',selectedState='',stairRotation='north',pointerDown=null;
   let aiDraftRows=[];
   const markerEdges=[];
   const edgeColorBreak='#ff6f66',edgeColorPlace='#65e39a';
@@ -158,8 +164,8 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
     draft.palette[name]={...clone(entry),rotation:target};return name;
   }
 
-  function editBlockAtPoint(clientX,clientY){
-    if(!active)return;const hit=raycast(clientX,clientY);if(!hit){setStatus('No RiftBlock under that point. Zoom or tap another visible cell.');return;}
+  function editBlockAtReticle(){
+    if(!active)return;const [clientX,clientY]=riftReticleClientPoint(canvas),hit=raycast(clientX,clientY);if(!hit){setStatus('No RiftBlock under the reticle. Look at a visible block and try again.');return;}
     const target=action==='place'?hit.place:hit.hit;if(!target){setStatus('No free adjacent cell for placement.');return;}
     const local=worldToLocal(target);if(!insideLocal(local)){setStatus(`BLOCKED: ${target.join(',')} is outside this JSON block bounds.`);return;}
     captureHistory();draft.ops=Array.isArray(draft.ops)?draft.ops:[];
@@ -180,12 +186,12 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   }
 
   function updateTarget(){
-    if(!active||!hoverPoint){setMarkerCell(null);return;}
-    const hit=raycast(hoverPoint[0],hoverPoint[1]);
+    if(!active){setMarkerCell(null);return;}
+    const [clientX,clientY]=riftReticleClientPoint(canvas),hit=raycast(clientX,clientY);
     setMarkerCell(hit?(action==='place'?hit.place:hit.hit):null,action);
   }
 
-  function setAction(next){action=next==='place'?'place':'break';for(const button of actionButtons)button.classList.toggle('active',button.dataset.riftBlockAction===action);setStatus(action==='break'?'BREAK CELL: tap/click the visible RiftBlock cell you want to remove.':'PLACE CELL: tap/click a visible block face to place the selected block beside it.');updateTarget();}
+  function setAction(next){action=next==='place'?'place':'break';for(const button of actionButtons)button.classList.toggle('active',button.dataset.riftBlockAction===action);setStatus(action==='break'?'BREAK CELL: aim the reticle at a RiftBlock, then tap/click the canvas.':'PLACE CELL: aim the reticle at a block face, then tap/click to place the selected block beside it.');updateTarget();}
   actionButtons.forEach(button=>button.addEventListener('click',()=>setAction(button.dataset.riftBlockAction)));
   stateSelect?.addEventListener('change',()=>{selectedState=stateSelect.value;const entry=draft?.palette?.[selectedState];if(entry?.shape==='stair')stairRotation=String(entry.rotation||'north');});
   root.querySelector('#rift-creative-stair-rotate')?.addEventListener('click',()=>{stairRotation=ROTATIONS[(Math.max(0,ROTATIONS.indexOf(stairRotation))+1)%4];setStatus(`Stair placement faces ${stairRotation.toUpperCase()}.`);});
@@ -206,13 +212,13 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   root.querySelectorAll('[data-rift-nudge]').forEach(button=>button.addEventListener('click',()=>{const [x,y,z]=button.dataset.riftNudge.split(',').map(Number);transform(x,y,z);}));
   root.querySelector('#rift-creative-rotate-left')?.addEventListener('click',()=>rotateSelected(-1));root.querySelector('#rift-creative-rotate-right')?.addEventListener('click',()=>rotateSelected(1));root.querySelector('#rift-creative-duplicate')?.addEventListener('click',duplicateSelected);root.querySelector('#rift-creative-delete')?.addEventListener('click',deleteSelected);root.querySelector('#rift-creative-undo')?.addEventListener('click',undoAction);root.querySelector('#rift-creative-redo')?.addEventListener('click',redoAction);root.querySelector('#rift-creative-export')?.addEventListener('click',exportDraft);root.querySelector('#rift-creative-close')?.addEventListener('click',()=>panel?.classList.remove('open'));root.querySelector('#rift-creative-open-panel')?.addEventListener('click',()=>panel?.classList.toggle('open'));
 
-  function enter(){const imported=getImported?.();if(!imported)return;active=true;draft=ensureRiftSharedPalette(clone(imported.document));undo=[];redo=[];playerController.setCreativeMode(true);root.classList.add('rift-creative-active');panel?.classList.add('open');toggle?.classList.add('active');if(toggle)toggle.textContent='PLAY MODE';if(modeLabel)modeLabel.textContent='BUILD';refreshPalette();refreshSelect();setAction('break');setStatus('Build Mode ON. Stay in the overhead world and tap/click exact visible cells or use Blueprint object tools for large edits.');refreshAiDrafts();}
-  function exit(){if(!active){panel?.classList.remove('open');return;}active=false;playerController.setCreativeMode(false);hoverPoint=null;root.classList.remove('rift-creative-active');panel?.classList.remove('open');toggle?.classList.remove('active');if(toggle)toggle.textContent='BUILD MODE';if(modeLabel)modeLabel.textContent='PLAY';setMarkerCell(null);}
+  function enter(){const imported=getImported?.();if(!imported)return;preparePlayerView?.();active=true;draft=ensureRiftSharedPalette(clone(imported.document));undo=[];redo=[];playerController.setCreativeMode(true);root.classList.add('rift-creative-active');panel?.classList.add('open');toggle?.classList.add('active');if(toggle)toggle.textContent='PLAY MODE';if(modeLabel)modeLabel.textContent='BUILD';refreshPalette();refreshSelect();setAction('break');setStatus('Build Mode ON. Look through the center reticle, drag to aim, then tap/click the canvas to use the selected BREAK or PLACE tool.');refreshAiDrafts();}
+  function exit(){if(!active){panel?.classList.remove('open');return;}active=false;playerController.setCreativeMode(false);root.classList.remove('rift-creative-active');panel?.classList.remove('open');toggle?.classList.remove('active');if(toggle)toggle.textContent='BUILD MODE';if(modeLabel)modeLabel.textContent='PLAY';setMarkerCell(null);}
   function toggleMode(){active?exit():enter();}toggle?.addEventListener('click',toggleMode);
 
-  function onCanvasPointerDown(event){if(!active||event.button>0)return;hoverPoint=[event.clientX,event.clientY];pointerDown={id:event.pointerId,x:event.clientX,y:event.clientY,time:performance.now()};updateTarget();}
-  function onCanvasPointerMove(event){if(!active)return;hoverPoint=[event.clientX,event.clientY];updateTarget();}
-  function onCanvasPointerUp(event){if(!active||!pointerDown||pointerDown.id!==event.pointerId)return;hoverPoint=[event.clientX,event.clientY];const moved=Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y),elapsed=performance.now()-pointerDown.time;pointerDown=null;if(moved<10&&elapsed<700){editBlockAtPoint(event.clientX,event.clientY);event.preventDefault();}updateTarget();}
+  function onCanvasPointerDown(event){if(!active||event.button>0)return;pointerDown={id:event.pointerId,x:event.clientX,y:event.clientY,time:performance.now()};updateTarget();}
+  function onCanvasPointerMove(){if(!active)return;updateTarget();}
+  function onCanvasPointerUp(event){if(!active||!pointerDown||pointerDown.id!==event.pointerId)return;const moved=Math.hypot(event.clientX-pointerDown.x,event.clientY-pointerDown.y),elapsed=performance.now()-pointerDown.time;pointerDown=null;if(moved<10&&elapsed<700){editBlockAtReticle();event.preventDefault();}updateTarget();}
   canvas.addEventListener('pointerdown',onCanvasPointerDown,{passive:false});canvas.addEventListener('pointermove',onCanvasPointerMove,{passive:true});canvas.addEventListener('pointerup',onCanvasPointerUp,{passive:false});canvas.addEventListener('pointercancel',()=>{pointerDown=null;});
 
   function onKeyDown(event){if(!active)return;if(event.code==='Escape'){exit();event.preventDefault();return;}if((event.metaKey||event.ctrlKey)&&event.code==='KeyZ'){event.shiftKey?redoAction():undoAction();event.preventDefault();return;}if((event.metaKey||event.ctrlKey)&&event.code==='KeyY'){redoAction();event.preventDefault();return;}if(event.code==='KeyB'&&!event.repeat){setAction(action==='break'?'place':'break');event.preventDefault();return;}if(event.code==='KeyR'&&!event.repeat){const entry=draft?.palette?.[selectedState];if(entry?.shape==='stair')root.querySelector('#rift-creative-stair-rotate')?.click();else rotateSelected(1);event.preventDefault();}}
