@@ -6,7 +6,7 @@ import { compileRiftCityBlock, validateRiftCityBlockImporter } from './rift-city
 import { assertMeterScale } from './rift-world-scale.js';
 import { createRiftPlayer, createRiftPlayerController } from './rift-player.js';
 import { createRiftCreativeMode } from './rift-creative-mode.js';
-import { createRiftThirdPersonCamera } from './rift-third-person-camera.js';
+import { createRiftThirdPersonCamera, createRiftFirstPersonCamera } from './rift-third-person-camera.js';
 
 let activeFoundation = null;
 const DEFAULT_BLOCK_URL = new URL('./riftcity-blocks/downtown-block-001.json', import.meta.url);
@@ -27,6 +27,7 @@ export async function renderDowntown3D(root) {
     <section class="world3d-shell downtown3d-foundation rift-block-import-lab" aria-label="RiftCity JSON city block importer">
       <canvas id="riftcity-3d-canvas" aria-label="Imported RiftCity block preview"></canvas>
       <div class="world3d-vignette" aria-hidden="true"></div>
+      <div id="rift-first-person-reticle" class="rift-first-person-reticle" aria-hidden="true"><span></span></div>
 
       <div class="world3d-top-left downtown3d-title rift-import-title">
         <span class="eyebrow">RIFT BLOCK ENGINE · H1.75 THIRD-PERSON · STAIR ALIGNMENT</span>
@@ -42,6 +43,7 @@ export async function renderDowntown3D(root) {
         <button id="rift-import-cull" class="world3d-hud-button active" type="button">CULL ON</button>
         <button id="rift-import-top" class="world3d-hud-button" type="button">CITY OVERVIEW</button>
         <button id="rift-import-view" class="world3d-hud-button" type="button">RESET VIEW</button>
+        <button id="rift-first-person-toggle" class="world3d-hud-button" type="button">FIRST PERSON</button>
         <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
         <input id="rift-import-file" class="rift-import-file" type="file" accept=".json,application/json" aria-label="Choose a RiftCity city block JSON file">
       </div>
@@ -202,10 +204,13 @@ function createBlockImporterLab({ root, canvas, status }) {
   const cullButton = root.querySelector('#rift-import-cull');
   const topButton = root.querySelector('#rift-import-top');
   const viewButton = root.querySelector('#rift-import-view');
+  const firstPersonButton = root.querySelector('#rift-first-person-toggle');
+  const firstPersonReticle = root.querySelector('#rift-first-person-reticle');
   const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
   const fileInput = root.querySelector('#rift-import-file');
 
   const player = createRiftPlayer(engine, { position: [32, 2, 32] });
+  let requestedPlayerVisible = true;
   player.setVisible(true);
   const playerController = createRiftPlayerController({
     canvas, camera, player, touchRoot: root,
@@ -214,13 +219,41 @@ function createBlockImporterLab({ root, canvas, status }) {
   });
   let creative = null;
   let thirdPersonCamera = null;
+  let firstPersonCamera = null;
+  let firstPersonActive = false;
+
+  const syncPlayerVisibility = () => player.setVisible(requestedPlayerVisible && !firstPersonActive);
+  const syncFirstPersonUi = () => {
+    root.classList.toggle('rift-first-person-active', firstPersonActive);
+    shell?.classList.toggle('rift-first-person-active', firstPersonActive);
+    firstPersonButton?.classList.toggle('active', firstPersonActive);
+    if (firstPersonButton) firstPersonButton.textContent = firstPersonActive ? 'THIRD PERSON' : 'FIRST PERSON';
+    firstPersonReticle?.setAttribute('aria-hidden', firstPersonActive ? 'false' : 'true');
+    syncPlayerVisibility();
+  };
+  const setFirstPerson = (next, { resetCamera = true } = {}) => {
+    firstPersonActive = !!next;
+    if (firstPersonActive) {
+      topView = false;
+      topButton?.classList.remove('active');
+      if (topButton) topButton.textContent = 'CITY OVERVIEW';
+      if (resetCamera) firstPersonCamera?.reset({ immediate: true });
+    } else if (resetCamera) {
+      thirdPersonCamera?.reset({ immediate: true });
+    }
+    syncFirstPersonUi();
+    return firstPersonActive;
+  };
 
   const resetPlayerCamera = () => {
     topView = false;
     topButton?.classList.remove('active');
     if (topButton) topButton.textContent = 'CITY OVERVIEW';
-    if (thirdPersonCamera) thirdPersonCamera.reset({ immediate: true });
-    else {
+    if (firstPersonActive && firstPersonCamera) {
+      firstPersonCamera.reset({ immediate: true });
+    } else if (thirdPersonCamera) {
+      thirdPersonCamera.reset({ immediate: true });
+    } else {
       const p = player.position;
       camera.setProjection('perspective');
       camera.alpha = THIRD_PERSON_ALPHA;
@@ -232,7 +265,8 @@ function createBlockImporterLab({ root, canvas, status }) {
 
   const updatePlayerCamera = dt => {
     if (topView) return;
-    thirdPersonCamera?.update(dt);
+    if (firstPersonActive) firstPersonCamera?.update(dt);
+    else thirdPersonCamera?.update(dt);
   };
 
   const calculateCamera = () => {
@@ -258,12 +292,18 @@ function createBlockImporterLab({ root, canvas, status }) {
 
   const setInspectionCamera = (mode = 'birdseye', bounds = null) => {
     const next = String(mode || 'birdseye').toLowerCase();
+    if (next === 'first-person' || next === 'first' || next === 'fp') {
+      setFirstPerson(true);
+      return { mode: 'first-person', target: [...camera.target], position: [...camera.position] };
+    }
     if (next === 'third-person' || next === 'third' || next === 'player') {
+      setFirstPerson(false, { resetCamera: false });
       topView = false;
       resetPlayerCamera();
       camera.updatePosition();
       return { mode: 'third-person', target: [...camera.target], position: [...camera.position] };
     }
+    if (firstPersonActive) setFirstPerson(false, { resetCamera: false });
 
     const viewBounds = normalizeInspectionBounds(bounds);
     const min = viewBounds.min;
@@ -522,6 +562,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (!imported) return;
     topView = !topView;
     if (topView) {
+      if (firstPersonActive) setFirstPerson(false, { resetCamera: false });
       const view = calculateCamera();
       camera.setProjection('orthographic');
       camera.alpha = -Math.PI / 2;
@@ -540,8 +581,8 @@ function createBlockImporterLab({ root, canvas, status }) {
   viewButton?.addEventListener('click', onResetView);
 
   const orbit = setupThirdPersonCameraControls(canvas, camera, {
-    isLocked: () => !!creative?.active,
-    getController: () => thirdPersonCamera
+    isLocked: () => !!creative?.active || topView,
+    getController: () => firstPersonActive ? firstPersonCamera : thirdPersonCamera
   });
   creative = createRiftCreativeMode({
     root, canvas, engine, camera, player, playerController,
@@ -555,6 +596,27 @@ function createBlockImporterLab({ root, canvas, status }) {
     getGrid: () => imported?.grid || null,
     isOverview: () => topView
   });
+  firstPersonCamera = createRiftFirstPersonCamera({
+    camera,
+    getPlayerPosition: () => player.position,
+    getPlayerFacing: () => player.facing,
+    setPlayerFacing: angle => player.setFacingRadians(angle),
+    getEyeHeight: () => player.eyeHeight
+  });
+  syncFirstPersonUi();
+
+  const toggleFirstPerson = () => setFirstPerson(!firstPersonActive);
+  const onFirstPersonButton = () => toggleFirstPerson();
+  const onViewModeKey = event => {
+    if (event.code !== 'KeyV' || event.repeat) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    if (creative?.active) return;
+    event.preventDefault();
+    toggleFirstPerson();
+  };
+  firstPersonButton?.addEventListener('click', onFirstPersonButton);
+  window.addEventListener('keydown', onViewModeKey, { passive: false });
+
   const resize = () => {
     const target = coarsePointer ? 1.35 : 1.75;
     const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
@@ -636,7 +698,12 @@ function createBlockImporterLab({ root, canvas, status }) {
     creative,
     setInspectionCamera,
     captureCanvasPng,
-    setPlayerVisible(next) { player.setVisible(!!next); },
+    setPlayerVisible(next) {
+      requestedPlayerVisible = !!next;
+      syncPlayerVisibility();
+    },
+    setFirstPerson,
+    get firstPersonActive() { return firstPersonActive; },
     renderNow() { engine.render(camera); },
     faceValidation,
     storageValidation,
@@ -658,6 +725,8 @@ function createBlockImporterLab({ root, canvas, status }) {
       cullButton?.removeEventListener('click', onCull);
       topButton?.removeEventListener('click', onTop);
       viewButton?.removeEventListener('click', onResetView);
+      firstPersonButton?.removeEventListener('click', onFirstPersonButton);
+      window.removeEventListener('keydown', onViewModeKey);
       fullscreenButton?.removeEventListener('click', onFullscreenButton);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
