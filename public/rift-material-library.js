@@ -95,13 +95,6 @@ export function ensureRiftSharedPalette(document) {
   return document;
 }
 
-// The old Commerce map could be persisted in a player's browser and would beat
-// the new bundled reset on load. Clear that one legacy slot once when this base
-// material generation lands; future user-authored saves use normal persistence.
-try {
-  const migrationKey = 'riftcity:base-texture-reset:v1';
-  if (typeof localStorage !== 'undefined' && localStorage.getItem(migrationKey) !== '1') {
-    localStorage.removeItem('riftcity:h1.57:active-city-block:v1');
-    localStorage.setItem(migrationKey, '1');
-  }
-} catch (_) {}
+// Saved-world migration belongs to the world-composition runtime, where the
+// stored document ID is checked before anything is removed. Material imports
+// must stay side-effect free so a valid new base-world save can never be wiped.
