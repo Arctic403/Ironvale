@@ -87,7 +87,7 @@ export async function renderDowntown3D(root) {
           <small id="rift-ai-draft-meta">Nothing from this inbox publishes automatically.</small>
         </details>
         <button id="rift-creative-export" class="primary" type="button">EXPORT WORLD JSON</button>
-        <small>BUILD MODE: keep walking normally · tap/click cells directly · BREAK/PLACE · B swaps tools · R rotates stairs/prefabs · pinch/wheel zoom · Ctrl/Cmd+Z undo</small>
+        <small>BUILD MODE: keep walking normally · tap/click cells directly · BREAK/PLACE · B swaps tools · R rotates stairs/prefabs · swipe/drag to look · Ctrl/Cmd+Z undo</small>
       </aside>
 
       <div class="downtown3d-meter rift-import-meter" aria-live="polite">
@@ -609,6 +609,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     camera,
     getPlayerPosition: () => player.position,
     getPlayerFacing: () => player.facing,
+    setPlayerFacing: angle => player.setFacingRadians(angle),
     getGrid: () => imported?.grid || null,
     isOverview: () => topView
   });
@@ -834,57 +835,41 @@ function clearPersistedBlock() {
 }
 
 function setupThirdPersonCameraControls(canvas, camera, { isLocked = () => false, getController = () => null } = {}) {
-  const pointers = new Map();
-  let lastPinch = null;
-
-  const pinchDistance = () => {
-    if (pointers.size < 2) return null;
-    const [a, b] = [...pointers.values()].slice(0, 2);
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  };
+  let lookPointerId = null;
+  let previousPoint = null;
 
   const onPointerDown = event => {
     if (event.button != null && event.button !== 0) return;
-    if (isLocked()) return;
+    if (isLocked() || lookPointerId != null) return;
     event.preventDefault();
-    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    lookPointerId = event.pointerId;
+    previousPoint = { x: event.clientX, y: event.clientY };
     try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
-    lastPinch = pinchDistance();
   };
 
   const onPointerMove = event => {
-    const previous = pointers.get(event.pointerId);
-    if (!previous || isLocked()) return;
+    if (event.pointerId !== lookPointerId || !previousPoint || isLocked()) return;
     event.preventDefault();
     const next = { x: event.clientX, y: event.clientY };
-    pointers.set(event.pointerId, next);
-    const controller = getController();
-    if (pointers.size >= 2) {
-      const pinch = pinchDistance();
-      if (pinch != null && lastPinch != null) controller?.zoom?.((lastPinch - pinch) * 0.018);
-      lastPinch = pinch;
-    } else {
-      controller?.orbit?.((next.x - previous.x) * -0.008, (next.y - previous.y) * 0.006);
-    }
+    const dx = next.x - previousPoint.x;
+    const dy = next.y - previousPoint.y;
+    previousPoint = next;
+    getController()?.orbit?.(dx * -0.008, dy * 0.006);
   };
 
   const onPointerUp = event => {
-    pointers.delete(event.pointerId);
+    if (event.pointerId !== lookPointerId) return;
+    lookPointerId = null;
+    previousPoint = null;
     try { canvas.releasePointerCapture(event.pointerId); } catch (_) {}
-    lastPinch = pinchDistance();
   };
 
-  const onWheel = event => {
-    if (isLocked()) return;
-    event.preventDefault();
-    getController()?.zoom?.(event.deltaY * 0.012);
-  };
-
+  // No pinch and no wheel handler by design: gameplay third-person distance is
+  // fixed. Additional fingers are ignored instead of being interpreted as zoom.
   canvas.addEventListener('pointerdown', onPointerDown, { passive: false });
   canvas.addEventListener('pointermove', onPointerMove, { passive: false });
   canvas.addEventListener('pointerup', onPointerUp, { passive: false });
   canvas.addEventListener('pointercancel', onPointerUp, { passive: false });
-  canvas.addEventListener('wheel', onWheel, { passive: false });
 
   return {
     destroy() {
@@ -892,7 +877,6 @@ function setupThirdPersonCameraControls(canvas, camera, { isLocked = () => false
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
-      canvas.removeEventListener('wheel', onWheel);
     }
   };
 }

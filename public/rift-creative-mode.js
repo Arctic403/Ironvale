@@ -4,9 +4,19 @@ const clone=value=>JSON.parse(JSON.stringify(value));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const norm=v=>{const l=Math.hypot(...v)||1;return v.map(n=>n/l);};
 
-export function riftReticleClientPoint(canvas){
+export function riftReticleClientPoint(canvas, viewport = globalThis.visualViewport || null){
   const rect=canvas?.getBoundingClientRect?.();
   if(!rect)return [0,0];
+  // The HUD reticle is fixed to the visible screen center. Use that same client
+  // point for picking so third-person camera motion can never drag the pointer
+  // around the world. If the screen center is outside a windowed canvas, fall
+  // back to the canvas center.
+  const vw=Number(viewport?.width),vh=Number(viewport?.height);
+  const vx=Number(viewport?.offsetLeft)||0,vy=Number(viewport?.offsetTop)||0;
+  if(Number.isFinite(vw)&&vw>0&&Number.isFinite(vh)&&vh>0){
+    const x=vx+vw*.5,y=vy+vh*.5;
+    if(x>=rect.left&&x<=rect.left+rect.width&&y>=rect.top&&y<=rect.top+rect.height)return [x,y];
+  }
   return [rect.left+rect.width*.5,rect.top+rect.height*.5];
 }
 

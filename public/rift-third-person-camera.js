@@ -4,7 +4,10 @@ export const RIFT_THIRD_PERSON_CAMERA_DEFAULTS = Object.freeze({
   distance: 8.5,
   minDistance: 2.2,
   targetHeight: 1.15,
-  lookAhead: 0.45,
+  // Keep the center reticle meaningfully out in the world instead of sitting
+  // on top of the avatar. The camera boom remains centered on the player; this
+  // value controls only the forward look/aim point.
+  lookAhead: 7.5,
   beta: 1.02,
   targetResponsiveness: 10,
   distanceResponsiveness: 14,
@@ -84,65 +87,107 @@ export function createRiftThirdPersonCamera({
   camera,
   getPlayerPosition = () => [0, 0, 0],
   getPlayerFacing = () => 0,
+  setPlayerFacing = null,
   getGrid = () => null,
   isOverview = () => false,
   options = {}
 } = {}) {
   if (!camera) throw new Error('createRiftThirdPersonCamera requires a RiftCamera.');
   const config = { ...RIFT_THIRD_PERSON_CAMERA_DEFAULTS, ...options };
-  let preferredDistance = config.distance;
+  const fixedDistance = Math.max(config.minDistance, Number(config.distance) || RIFT_THIRD_PERSON_CAMERA_DEFAULTS.distance);
+  let boomBeta = Number(config.beta) || RIFT_THIRD_PERSON_CAMERA_DEFAULTS.beta;
+  let currentDistance = fixedDistance;
+
+  const playerAnchor = () => {
+    const p = getPlayerPosition?.() || [0, 0, 0];
+    return [
+      Number(p[0]) || 0,
+      (Number(p[1]) || 0) + config.targetHeight,
+      Number(p[2]) || 0
+    ];
+  };
+
+  const aimTarget = (anchor, facing) => {
+    const f = Number(facing) || 0;
+    const ahead = Math.max(2, Number(config.lookAhead) || RIFT_THIRD_PERSON_CAMERA_DEFAULTS.lookAhead);
+    return [
+      anchor[0] + Math.sin(f) * ahead,
+      anchor[1],
+      anchor[2] + Math.cos(f) * ahead
+    ];
+  };
+
+  const setCameraPose = (position, target) => {
+    const dx = position[0] - target[0];
+    const dy = position[1] - target[1];
+    const dz = position[2] - target[2];
+    const radius = Math.max(0.001, Math.hypot(dx, dy, dz));
+    camera.target[0] = target[0];
+    camera.target[1] = target[1];
+    camera.target[2] = target[2];
+    camera.radius = radius;
+    camera.alpha = Math.atan2(dz, dx);
+    camera.beta = Math.acos(clamp(dy / radius, -1, 1));
+    camera.updatePosition?.();
+  };
+
+  const resolvePose = ({ immediate = false, dt = 0 } = {}) => {
+    const facing = normalizeAngle(getPlayerFacing());
+    const anchor = playerAnchor();
+    const boomAlpha = riftThirdPersonAlphaBehindFacing(facing);
+    const safeDistance = resolveRiftThirdPersonCameraDistance({
+      grid: getGrid(), target: anchor, alpha: boomAlpha, beta: boomBeta,
+      desiredDistance: fixedDistance, minDistance: config.minDistance,
+      collisionStep: config.collisionStep, collisionSkin: config.collisionSkin
+    });
+    if (immediate) currentDistance = safeDistance;
+    else {
+      const responsiveness = safeDistance < currentDistance ? config.distanceResponsiveness * 2.2 : config.distanceResponsiveness;
+      currentDistance += (safeDistance - currentDistance) * smoothFactor(dt, responsiveness);
+    }
+    const position = desiredCameraPosition(anchor, boomAlpha, boomBeta, currentDistance);
+    setCameraPose(position, aimTarget(anchor, facing));
+  };
 
   const reset = ({ immediate = false } = {}) => {
     camera.setProjection('perspective');
-    camera.beta = config.beta;
-    camera.alpha = riftThirdPersonAlphaBehindFacing(getPlayerFacing());
-    preferredDistance = config.distance;
-    camera.minRadius = config.minDistance;
-    camera.maxRadius = Math.max(config.distance * 1.8, 14);
-    if (immediate) {
-      const target = desiredTarget(getPlayerPosition(), getPlayerFacing(), config);
-      const radius = resolveRiftThirdPersonCameraDistance({
-        grid: getGrid(), target, alpha: camera.alpha, beta: camera.beta,
-        desiredDistance: preferredDistance, minDistance: config.minDistance,
-        collisionStep: config.collisionStep, collisionSkin: config.collisionSkin
-      });
-      camera.radius = radius;
-      camera.setTarget(...target);
-    }
+    boomBeta = Number(config.beta) || RIFT_THIRD_PERSON_CAMERA_DEFAULTS.beta;
+    currentDistance = fixedDistance;
+    // Radius is now the encoded camera->aim distance, not a user zoom value.
+    // Keep broad limits so RiftCamera can faithfully represent the manual pose.
+    camera.minRadius = 0.1;
+    camera.maxRadius = 64;
+    resolvePose({ immediate: true, dt: 0 });
   };
 
   const orbit = (deltaAlpha = 0, deltaBeta = 0) => {
-    camera.alpha = normalizeAngle(camera.alpha + Number(deltaAlpha || 0));
-    camera.beta = clamp(camera.beta + Number(deltaBeta || 0), 0.72, 1.22);
+    // One-finger look: horizontal drag turns RiftPlayer; vertical drag changes
+    // only the boom elevation. Camera distance is intentionally fixed.
+    const nextFacing = normalizeAngle(getPlayerFacing() + Number(deltaAlpha || 0));
+    setPlayerFacing?.(nextFacing);
+    boomBeta = clamp(boomBeta + Number(deltaBeta || 0), 0.72, 1.34);
   };
 
-  const zoom = delta => {
-    preferredDistance = clamp(preferredDistance + Number(delta || 0), config.minDistance, 14);
-  };
+  // Third-person zoom is intentionally disabled. Camera collision may retract
+  // the boom temporarily, but touch/pinch/wheel input can never change distance.
+  const zoom = () => {};
 
   const update = dt => {
     if (isOverview()) return;
     camera.setProjection('perspective');
-    const wantedTarget = desiredTarget(getPlayerPosition(), getPlayerFacing(), config);
-    const tf = smoothFactor(dt, config.targetResponsiveness);
-    camera.target[0] += (wantedTarget[0] - camera.target[0]) * tf;
-    camera.target[1] += (wantedTarget[1] - camera.target[1]) * tf;
-    camera.target[2] += (wantedTarget[2] - camera.target[2]) * tf;
-
-    const safeDistance = resolveRiftThirdPersonCameraDistance({
-      grid: getGrid(), target: camera.target, alpha: camera.alpha, beta: camera.beta,
-      desiredDistance: preferredDistance, minDistance: config.minDistance,
-      collisionStep: config.collisionStep, collisionSkin: config.collisionSkin
-    });
-    const responsiveness = safeDistance < camera.radius ? config.distanceResponsiveness * 2.2 : config.distanceResponsiveness;
-    camera.radius += (safeDistance - camera.radius) * smoothFactor(dt, responsiveness);
-    camera.updatePosition();
+    resolvePose({ dt });
   };
 
   reset({ immediate: true });
-  return { update, reset, orbit, zoom, get preferredDistance() { return preferredDistance; } };
+  return {
+    update,
+    reset,
+    orbit,
+    zoom,
+    get preferredDistance() { return fixedDistance; },
+    get boomBeta() { return boomBeta; }
+  };
 }
-
 export function validateRiftThirdPersonCamera() {
   const failures = [];
   const fakeGrid = {
@@ -153,6 +198,43 @@ export function validateRiftThirdPersonCamera() {
   const facing = 0;
   const alpha = riftThirdPersonAlphaBehindFacing(facing);
   if (Math.abs(alpha + Math.PI / 2) > 1e-8) failures.push('north-facing player camera is not positioned behind the player');
+
+  const makeCamera = () => ({
+    projection:'perspective', position:[0,0,0], target:[0,0,0], alpha:0, beta:1.02, radius:8.5,
+    minRadius:0, maxRadius:64,
+    setProjection(mode){ this.projection=mode; },
+    setTarget(x,y,z){ this.target=[x,y,z]; this.updatePosition(); },
+    updatePosition(){
+      const sinBeta=Math.sin(this.beta);
+      this.position[0]=this.target[0]+this.radius*sinBeta*Math.cos(this.alpha);
+      this.position[1]=this.target[1]+this.radius*Math.cos(this.beta);
+      this.position[2]=this.target[2]+this.radius*sinBeta*Math.sin(this.alpha);
+    }
+  });
+
+  let turnFacing = 0;
+  const turnCamera = makeCamera();
+  const turnController = createRiftThirdPersonCamera({
+    camera: turnCamera,
+    getPlayerPosition: () => [0,0,0],
+    getPlayerFacing: () => turnFacing,
+    setPlayerFacing: value => { turnFacing = value; },
+    getGrid: () => ({ getBlockWorld: () => 0 })
+  });
+  if (turnCamera.target[2] < RIFT_THIRD_PERSON_CAMERA_DEFAULTS.lookAhead - 0.01) failures.push('third-person reticle target is not projected far enough in front of the player');
+  if (!(turnCamera.position[2] < 0)) failures.push('third-person camera position is not physically behind the player');
+  const beforeZoomPosition = [...turnCamera.position];
+  turnController.zoom(999);
+  turnController.update(0);
+  if (Math.abs(turnController.preferredDistance - RIFT_THIRD_PERSON_CAMERA_DEFAULTS.distance) > 1e-8) failures.push('third-person fixed camera distance changed through zoom input');
+  if (Math.hypot(turnCamera.position[0]-beforeZoomPosition[0],turnCamera.position[1]-beforeZoomPosition[1],turnCamera.position[2]-beforeZoomPosition[2]) > 1e-8) failures.push('third-person zoom input moved the camera');
+
+  turnController.orbit(-0.25, 0);
+  turnController.update(0);
+  if (Math.abs(turnFacing + 0.25) > 1e-8) failures.push('third-person horizontal look does not rotate player facing');
+  const expectedAhead = [Math.sin(turnFacing) * RIFT_THIRD_PERSON_CAMERA_DEFAULTS.lookAhead, Math.cos(turnFacing) * RIFT_THIRD_PERSON_CAMERA_DEFAULTS.lookAhead];
+  if (Math.hypot(turnCamera.target[0]-expectedAhead[0],turnCamera.target[2]-expectedAhead[1]) > 1e-6) failures.push('third-person center aim target does not stay far ahead of player facing');
+
   const target = [0.5, 2, 0.5];
   const clear = resolveRiftThirdPersonCameraDistance({ grid: { getBlockWorld: () => 0 }, target, alpha, beta: 1.02, desiredDistance: 8.5 });
   if (Math.abs(clear - 8.5) > 1e-6) failures.push('clear third-person view changed camera distance');
@@ -160,7 +242,6 @@ export function validateRiftThirdPersonCamera() {
   if (!(blocked < 8.5 && blocked >= RIFT_THIRD_PERSON_CAMERA_DEFAULTS.minDistance)) failures.push('camera collision did not retract before a blocking wall');
   return { ok: failures.length === 0, failures };
 }
-
 const DEFAULT_PITCH_LIMIT = Math.PI * 0.46;
 
 export const RIFT_FIRST_PERSON_CAMERA_DEFAULTS = Object.freeze({
