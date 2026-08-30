@@ -2,7 +2,7 @@ name: Rift World Preview
 
 on:
   push:
-    branches: [ai-static-world-builder]
+    branches: [main, ai-static-world-builder]
     paths:
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
@@ -15,6 +15,9 @@ on:
       - 'public/rift-engine.js'
       - 'public/rift-engine-geometry.js'
       - 'public/rift-engine-math.js'
+      - 'public/rift-render-quality.js'
+      - 'public/rift-texture-atlas.js'
+      - 'public/rift-material-library.js'
       - 'public/rift-city-block-importer.js'
       - 'public/rift-city-blueprints.js'
       - 'scripts/check-rift-world-index.js'
@@ -35,6 +38,9 @@ on:
       - 'public/rift-engine.js'
       - 'public/rift-engine-geometry.js'
       - 'public/rift-engine-math.js'
+      - 'public/rift-render-quality.js'
+      - 'public/rift-texture-atlas.js'
+      - 'public/rift-material-library.js'
       - 'public/rift-city-block-importer.js'
       - 'public/rift-city-blueprints.js'
       - 'scripts/check-rift-world-index.js'
@@ -60,6 +66,10 @@ jobs:
           node scripts/check-rift-city-blueprints.js
           node scripts/check-rift-interior-architecture.js
           node scripts/check-rift-downtown-composition.js
+          node --check public/rift-engine.js
+          node --check public/rift-render-quality.js
+          node --check public/rift-texture-atlas.js
+          node --check public/rift-material-library.js
           node --check public/rift-world-inspection.js
 
       - name: Start static RiftCity server
