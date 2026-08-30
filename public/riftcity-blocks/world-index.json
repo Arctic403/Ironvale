@@ -1,15 +1,15 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "downtown-block-001",
+  "activeBlockId": "riftcity-base-world-001",
   "blocks": [
     {
-      "id": "downtown-block-001",
-      "name": "Downtown Commerce District V1",
-      "district": "downtown-commerce",
+      "id": "riftcity-base-world-001",
+      "name": "RiftCity Base World",
+      "district": "base-world",
       "path": "./downtown-block-001.json",
-      "runtime_overlays": ["riftcity-bank-001"],
-      "tags": ["active", "mmo-scale", "ai-authorable", "single-player", "h2.01-research-bank-overlay"],
+      "runtime_overlays": [],
+      "tags": ["active", "base-world", "texture-atlas-v1", "ai-authorable", "single-player"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
@@ -32,10 +32,10 @@
     {
       "id": "riftcity-bank-001-generated",
       "name": "RiftCity Bank · H2.01 Research Branch",
-      "district": "downtown-commerce",
+      "district": "diagnostic-archive",
       "source_type": "building-program",
       "path": "../riftcity-buildings/riftcity-bank-001.json",
-      "tags": ["bank", "landmark", "one-level", "relationship-banking", "atm-vestibule", "tellers", "private-offices", "security", "safe-deposit", "vault", "armored-service", "BANK-signage", "non-flat-roof", "ai-building-program", "semantic", "h2-staged", "world-coordinates", "diagnostic"],
+      "tags": ["diagnostic", "archived-city-program", "ai-building-program", "semantic", "world-coordinates"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     }
   ]
