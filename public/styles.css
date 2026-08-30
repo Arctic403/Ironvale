@@ -3453,3 +3453,60 @@ body.dev-block-editor-page{
 .rift-first-person-reticle:before{left:10px;top:2px;width:2px;height:18px}.rift-first-person-reticle:after{left:2px;top:10px;width:18px;height:2px}
 .rift-creative-active .rift-first-person-reticle:before,.rift-creative-active .rift-first-person-reticle:after{background:#8ef0b4}
 .rift-block-import-lab.rift-reticle-active #riftcity-3d-canvas{cursor:none}
+
+/* H1.85 — portrait fullscreen gameplay HUD cleanup
+   iOS may keep the device in portrait even when the world asks for landscape.
+   In that state, keep the canvas + gameplay controls clear and move all dev
+   world actions into the existing ☰ Game Menu > WORLD panel. */
+@media (orientation:portrait) and (pointer:coarse){
+  body.world3d-game-mode .rift-import-title,
+  body.world3d-game-mode .rift-import-actions,
+  body.world3d-game-mode .rift-import-meter,
+  body.world3d-game-mode .downtown3d-meter{
+    display:none!important;
+  }
+
+  body.world3d-game-mode .topbar,
+  body.world3d-game-mode .session-status,
+  body.world3d-game-mode .hud-shell,
+  body.world3d-game-mode .effects-strip,
+  body.world3d-game-mode .mobile-nav{
+    display:none!important;
+  }
+
+  body.world3d-game-mode .rift-game-top-controls{
+    top:max(8px,env(safe-area-inset-top));
+    left:max(8px,env(safe-area-inset-left));
+    gap:6px;
+  }
+
+  body.world3d-game-mode .rift-game-circle{
+    width:42px;
+    height:42px;
+    background:rgba(7,16,24,.72);
+  }
+
+  body.world3d-game-mode .rift-player-pad{
+    left:max(12px,env(safe-area-inset-left));
+    bottom:max(12px,env(safe-area-inset-bottom));
+    width:96px;
+    height:96px;
+    background:rgba(9,12,14,.32);
+  }
+
+  body.world3d-game-mode .rift-player-actions{
+    right:max(12px,env(safe-area-inset-right));
+    bottom:max(12px,env(safe-area-inset-bottom));
+    gap:8px;
+  }
+
+  body.world3d-game-mode .rift-player-actions button{
+    width:58px;
+    height:58px;
+    background:rgba(9,12,14,.48);
+  }
+
+  body.world3d-game-mode .world3d-prompt{
+    bottom:max(82px,calc(env(safe-area-inset-bottom) + 72px));
+  }
+}

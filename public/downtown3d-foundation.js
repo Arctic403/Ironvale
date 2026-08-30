@@ -48,7 +48,7 @@ export async function renderDowntown3D(root) {
         <input id="rift-import-file" class="rift-import-file" type="file" accept=".json,application/json" aria-label="Choose a RiftCity city block JSON file">
       </div>
 
-      <div id="downtown3d-status" class="downtown3d-status" role="status">
+      <div id="downtown3d-status" class="downtown3d-status settled" role="status">
         <strong>LOADING JSON BLOCK IMPORTER…</strong>
         <span>Re-running block winding, section storage, full/slab/stair and importer validation before rendering the first authored city block.</span>
       </div>
@@ -117,6 +117,7 @@ export async function renderDowntown3D(root) {
     console.error('RiftCity H1.75 third-person block world failed to start', error);
     if (status) {
       status.classList.add('error');
+      status.classList.remove('settled');
       status.innerHTML = `<strong>JSON BLOCK IMPORTER FAILED</strong><span>${escapeText(error?.message || 'The importer could not initialize.')}</span>`;
     }
     activeFoundation?.destroy?.();
@@ -127,6 +128,7 @@ export async function renderDowntown3D(root) {
 
 function createBlockImporterLab({ root, canvas, status }) {
   assertMeterScale();
+  const validatorDebugEnabled = () => document.body.classList.contains('rift-validator-debug');
 
   const faceValidation = validateRiftBlockFaceWinding();
   if (!faceValidation.ok) throw new Error(`Invalid block face winding: ${faceValidation.failures.join(', ')}`);
@@ -385,8 +387,13 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (trisMetric) trisMetric.textContent = `TRIS ${stats.triangles.toLocaleString()}`;
   };
 
-  const showReady = () => {
+  const showReady = (force = false) => {
     if (!status || !imported) return;
+    if (!force && !validatorDebugEnabled()) {
+      status.classList.remove('ready');
+      status.classList.add('settled');
+      return;
+    }
     const stats = imported.stats;
     status.classList.add('ready');
     status.classList.remove('error', 'settled');
@@ -453,12 +460,12 @@ function createBlockImporterLab({ root, canvas, status }) {
     }
     if (!options.preserveCamera) resetPlayerCamera(true);
     creative?.onDocumentLoaded?.();
-    if (!(options.persist && persistenceLabel === 'UNSAVED')) showReady();
+    if (!(options.persist && persistenceLabel === 'UNSAVED')) showReady(options.forceStatus === true);
     return compiled;
   };
 
   const loadBundledBlock = async ({ reason = '' } = {}) => {
-    if (status) {
+    if (status && validatorDebugEnabled()) {
       status.classList.remove('ready', 'error', 'settled');
       status.innerHTML = '<strong>IMPORTING COMMERCE BLOCK 01…</strong><span>Fetching the bundled JSON, validating its contract, expanding compact operations and compiling cross-section block meshes.</span>';
     }
@@ -467,7 +474,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     const document = await response.json();
     if (destroyed) return null;
     const compiled = loadDocument(document, 'DEFAULT BLOCK 001', { persistenceLabel: 'BUNDLED' });
-    if (reason && status) {
+    if (reason && status && validatorDebugEnabled()) {
       status.classList.add('ready');
       status.classList.remove('error', 'settled');
       status.innerHTML = `<strong>DEFAULT BLOCK RESTORED</strong><span>${escapeText(reason)}</span>`;
@@ -479,7 +486,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     const saved = readPersistedBlock();
     if (!saved) return loadBundledBlock();
 
-    if (status) {
+    if (status && validatorDebugEnabled()) {
       status.classList.remove('ready', 'error', 'settled');
       status.innerHTML = `<strong>RESTORING ACTIVE IMPORT…</strong><span>${escapeText(saved.fileName || saved.name || saved.id || 'Saved city block')} was saved by the JSON importer in this browser preview.</span>`;
     }
@@ -509,6 +516,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (file.size > 2 * 1024 * 1024) {
       if (status) {
         status.classList.add('error');
+        status.classList.remove('ready', 'settled');
         status.innerHTML = '<strong>IMPORT REJECTED</strong><span>JSON test files are capped at 2 MB so a bad import cannot freeze the iPhone preview.</span>';
       }
       fileInput.value = '';
@@ -522,7 +530,8 @@ function createBlockImporterLab({ root, canvas, status }) {
       const text = await file.text();
       loadDocument(JSON.parse(text), file.name.toUpperCase(), {
         persist: true,
-        fileName: file.name
+        fileName: file.name,
+        forceStatus: true
       });
     } catch (error) {
       console.error('RiftCity JSON block import rejected', error);
@@ -545,6 +554,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     } catch (error) {
       if (status) {
         status.classList.add('error');
+        status.classList.remove('ready', 'settled');
         status.innerHTML = `<strong>BLOCK 001 RELOAD FAILED</strong><span>${escapeText(error?.message || 'Could not reload bundled block.')}</span>`;
       }
     }
@@ -609,7 +619,8 @@ function createBlockImporterLab({ root, canvas, status }) {
     camera,
     getPlayerPosition: () => player.position,
     getPlayerFacing: () => player.facing,
-    setPlayerFacing: angle => player.setFacingRadians(angle),
+    // Third-person free-look owns camera yaw. RiftPlayer facing is controlled
+    // independently by camera-relative movement in rift-player.js.
     getGrid: () => imported?.grid || null,
     isOverview: () => topView
   });
@@ -627,12 +638,22 @@ function createBlockImporterLab({ root, canvas, status }) {
   const onViewModeKey = event => {
     if (event.code !== 'KeyV' || event.repeat) return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    if (!document.body.classList.contains('rift-dev-mode')) return;
     if (creative?.active) return;
     event.preventDefault();
     toggleFirstPerson();
   };
+  const onDevModeChange = event => {
+    if (!event.detail?.enabled && firstPersonActive) setFirstPerson(false);
+  };
+  const onValidatorDebugChange = event => {
+    if (event.detail?.enabled) showReady(true);
+    else if (status && !status.classList.contains('error')) status.classList.add('settled');
+  };
   firstPersonButton?.addEventListener('click', onFirstPersonButton);
   window.addEventListener('keydown', onViewModeKey, { passive: false });
+  window.addEventListener('riftdevmodechange', onDevModeChange);
+  window.addEventListener('riftvalidatordebugchange', onValidatorDebugChange);
 
   const resize = () => {
     const target = coarsePointer ? 1.35 : 1.75;
@@ -744,6 +765,8 @@ function createBlockImporterLab({ root, canvas, status }) {
       viewButton?.removeEventListener('click', onResetView);
       firstPersonButton?.removeEventListener('click', onFirstPersonButton);
       window.removeEventListener('keydown', onViewModeKey);
+      window.removeEventListener('riftdevmodechange', onDevModeChange);
+      window.removeEventListener('riftvalidatordebugchange', onValidatorDebugChange);
       fullscreenButton?.removeEventListener('click', onFullscreenButton);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
