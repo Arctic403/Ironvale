@@ -6,6 +6,7 @@
 // authored on top of the base material system.
 
 const ACTIVE_BLOCK_STORAGE_KEY = 'riftcity:h1.57:active-city-block:v1';
+const LEGACY_DOWNTOWN_ID = 'downtown-block-001';
 const RESET_REVISION = 'base-world-texture-atlas-v1';
 let lastComposition = null;
 
@@ -16,9 +17,18 @@ function storageCandidates() {
   return candidates;
 }
 
+function isLegacyDowntownSnapshot(saved) {
+  return saved?.id === LEGACY_DOWNTOWN_ID || saved?.document?.id === LEGACY_DOWNTOWN_ID;
+}
+
 export function clearLegacyDowntownSnapshots() {
   for (const storage of storageCandidates()) {
-    try { storage.removeItem(ACTIVE_BLOCK_STORAGE_KEY); } catch (_) {}
+    try {
+      const raw = storage.getItem(ACTIVE_BLOCK_STORAGE_KEY);
+      if (!raw) continue;
+      const saved = JSON.parse(raw);
+      if (isLegacyDowntownSnapshot(saved)) storage.removeItem(ACTIVE_BLOCK_STORAGE_KEY);
+    } catch (_) {}
   }
 }
 
