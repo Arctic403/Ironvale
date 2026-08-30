@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, ai-static-world-builder]
     paths:
+      - 'package.json'
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
@@ -20,13 +21,16 @@ on:
       - 'public/rift-material-library.js'
       - 'public/rift-city-block-importer.js'
       - 'public/rift-city-blueprints.js'
-      - 'scripts/check-rift-world-index.js'
-      - 'scripts/check-rift-downtown-composition.js'
-      - 'scripts/check-rift-interior-architecture.js'
+      - 'public/rift-building-visibility.js'
+      - 'public/rift-player.js'
+      - 'public/rift-smart-camera.js'
+      - 'public/rift-third-person-camera.js'
+      - 'scripts/**/*.js'
       - '.github/workflows/rift-world-preview.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'package.json'
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
@@ -43,9 +47,11 @@ on:
       - 'public/rift-material-library.js'
       - 'public/rift-city-block-importer.js'
       - 'public/rift-city-blueprints.js'
-      - 'scripts/check-rift-world-index.js'
-      - 'scripts/check-rift-downtown-composition.js'
-      - 'scripts/check-rift-interior-architecture.js'
+      - 'public/rift-building-visibility.js'
+      - 'public/rift-player.js'
+      - 'public/rift-smart-camera.js'
+      - 'public/rift-third-person-camera.js'
+      - 'scripts/**/*.js'
       - '.github/workflows/rift-world-preview.yml'
   workflow_dispatch:
 
@@ -60,17 +66,8 @@ jobs:
       - name: Checkout RiftCity
         uses: actions/checkout@v4
 
-      - name: Validate composed world + interiors
-        run: |
-          node scripts/check-rift-world-index.js
-          node scripts/check-rift-city-blueprints.js
-          node scripts/check-rift-interior-architecture.js
-          node scripts/check-rift-downtown-composition.js
-          node --check public/rift-engine.js
-          node --check public/rift-render-quality.js
-          node --check public/rift-texture-atlas.js
-          node --check public/rift-material-library.js
-          node --check public/rift-world-inspection.js
+      - name: Mirror Cloudflare build verification
+        run: npm run build
 
       - name: Start static RiftCity server
         run: |
