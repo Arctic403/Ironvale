@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101a16">
   <title>Ironvale</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=20260831-landscape-rpg-r1">
 </head>
 <body>
   <section id="auth-screen" class="screen">
@@ -28,6 +28,13 @@
 
   <main id="world-screen" class="screen" hidden>
     <canvas id="rift-canvas"></canvas>
+
+    <div id="rotate-device" class="rotate-device" aria-live="polite">
+      <div class="rotate-device-card">
+        <strong>Rotate to Landscape</strong>
+        <span>Ironvale gameplay is landscape only.</span>
+      </div>
+    </div>
 
     <div class="topbar">
       <div>
@@ -84,9 +91,25 @@
       <button type="button" data-freecam-vertical="-1" aria-label="Freecam down">▼</button>
     </div>
 
-    <div class="look-hint">Swipe: look · center reticle: aim</div>
+    <div id="combat-hud" class="combat-hud">
+      <div id="target-pill" class="target-pill">
+        <span>Target</span>
+        <strong id="target-name">No target</strong>
+        <button id="lock-target-button" type="button" disabled>Lock</button>
+      </div>
+      <div class="combat-actions">
+        <div class="ability-buttons" aria-label="Abilities">
+          <button type="button" data-ability-slot="1" aria-label="Ability 1">1</button>
+          <button type="button" data-ability-slot="2" aria-label="Ability 2">2</button>
+          <button type="button" data-ability-slot="3" aria-label="Ability 3">3</button>
+        </div>
+        <button id="basic-attack-button" class="basic-attack" type="button">Attack</button>
+      </div>
+    </div>
+
+    <div class="look-hint">Swipe: look · tap enemy: target</div>
   </main>
 
-  <script type="module" src="/app.js?v=20260831-character-sparse-r1"></script>
+  <script type="module" src="/app.js?v=20260831-landscape-rpg-r1"></script>
 </body>
 </html>

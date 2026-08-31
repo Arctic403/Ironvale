@@ -46,12 +46,19 @@ if (!app.includes('const CHARACTER_MODEL_URL = new URL(') || !app.includes('cons
 if (!app.includes('if (next && preserveCamera && !freecamEnabled) updateOrbitCamera();') || !app.includes('// Make the mode switch atomic: camera, center ray and reticle all agree immediately.')) failures.push('freecam atomic camera refresh');
 if (!app.includes('character fallback: ${characterError}')) failures.push('visible character fallback diagnostics');
 if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person RPG focus');
+if (!app.includes('const MOBILE_LANDSCAPE_DISTANCE = 6.2') || !app.includes('function applyViewportCameraProfile(') || !app.includes('isMobileLandscapeGameplay()')) failures.push('mobile landscape camera profile');
+if (!app.includes('function selectCombatTargetAtScreen(') || !app.includes('function performBasicAttack(') || !app.includes('window.IronvaleTargeting')) failures.push('tap-target RPG combat controls');
 if (!app.includes('function currentViewRay(') || !app.includes('terrain.raycast(ray.origin, ray.direction, 1800, .5)')) failures.push('center-view interaction ray');
 if (app.includes('reticleScreen') || app.includes('moveReticleToClient(') || app.includes('raycastTerrainAtScreen(')) failures.push('movable pointer reticle returned');
-if (!app.includes('reticle.hidden = false;')) failures.push('world reticle is not persistent');
+if (!app.includes('reticle.hidden = true;') || !app.includes('reticle.hidden = !freecamEnabled;')) failures.push('reticle must be Freecam-only during normal RPG gameplay');
 if (/orbitCamera\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app) || /freecam\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app)) failures.push('fixed-pixel camera yaw math returned');
 if (/orbitCamera\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app) || /freecam\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app)) failures.push('fixed-pixel camera pitch math returned');
 if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier still present');
+
+const indexHtml = fs.readFileSync('public/index.html', 'utf8');
+const styles = fs.readFileSync('public/styles.css', 'utf8');
+if (!indexHtml.includes('id="combat-hud"') || !indexHtml.includes('id="rotate-device"') || !indexHtml.includes('data-ability-slot="1"')) failures.push('landscape RPG HUD markup');
+if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
 if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
@@ -81,4 +88,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: textured animated humanoid + centered-reticle RPG camera + adaptive stitched terrain LOD + C++/WASM terrain core.');
+console.log('Ironvale core verified: textured animated humanoid + landscape RPG tap-target controls + Freecam reticle tools + adaptive stitched terrain LOD + C++/WASM terrain core.');

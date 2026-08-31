@@ -27,6 +27,12 @@ const freecamSpeedInput = $('#freecam-speed');
 const freecamSpeedValue = $('#freecam-speed-value');
 const reticle = $('#terrain-reticle');
 const altitudeControls = $('#freecam-altitude');
+const combatHud = $('#combat-hud');
+const targetPill = $('#target-pill');
+const targetName = $('#target-name');
+const lockTargetButton = $('#lock-target-button');
+const basicAttackButton = $('#basic-attack-button');
+const lookHint = $('.look-hint');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
@@ -48,6 +54,14 @@ const THIRD_PERSON_FOCUS_HEIGHT = 1.20;
 const PLAYER_COLLIDER_HALF_HEIGHT = .9;
 const FREECAM_MIN_PITCH = -1.45;
 const FREECAM_MAX_PITCH = 1.45;
+const MOBILE_LANDSCAPE_DISTANCE = 6.2;
+const MOBILE_LANDSCAPE_FOV = 55 * Math.PI / 180;
+const MOBILE_LANDSCAPE_PITCH = .34;
+const DEFAULT_ORBIT_DISTANCE = 8.0;
+const TARGET_TAP_MAX_MS = 260;
+const TARGET_TAP_MAX_PX = 9;
+const TARGET_PICK_MAX_DISTANCE = 80;
+const AUTO_ATTACK_RANGE = 5.5;
 
 let authMode = 'login';
 let engine = null;
@@ -73,9 +87,13 @@ let lastCameraPosition = [320, 16, 338];
 let lastCameraTarget = [320, 0, 320];
 let freecamVertical = 0;
 let joystickActive = false;
+let selectedTargetId = null;
+let hardLockEnabled = false;
+let viewportCameraProfile = '';
+const combatTargets = new Map();
 
 const player = { x: 320, y: .9, z: 320, yaw: 0, vy: 0, grounded: true };
-const orbitCamera = { yaw: Math.PI, pitch: .34, distance: 9.5, fov: Math.PI / 3 };
+const orbitCamera = { yaw: Math.PI, pitch: .34, distance: DEFAULT_ORBIT_DISTANCE, fov: Math.PI / 3 };
 const freecam = { x: 320, y: 16, z: 338, yaw: 0, pitch: .6, fov: Math.PI / 3 };
 const input = { forward: 0, strafe: 0, keys: new Set() };
 const undoStack = [];
@@ -121,6 +139,9 @@ $('#logout-button').addEventListener('click', async () => {
 
 $('#terrain-tools-button').addEventListener('click', () => { tools.hidden = !tools.hidden; });
 freecamButton.addEventListener('click', () => setFreecam(!freecamEnabled));
+lockTargetButton.addEventListener('click', () => setHardLock(!hardLockEnabled));
+basicAttackButton.addEventListener('click', performBasicAttack);
+document.querySelectorAll('[data-ability-slot]').forEach(button => button.addEventListener('click', () => triggerAbility(Number(button.dataset.abilitySlot) || 0, button)));
 
 document.querySelectorAll('[data-brush]').forEach(button => button.addEventListener('click', () => {
   brushMode = button.dataset.brush;
@@ -179,6 +200,8 @@ window.addEventListener('blur', () => {
 });
 window.addEventListener('pagehide', () => savePosition(true));
 window.addEventListener('beforeunload', () => savePosition(true));
+window.addEventListener('resize', () => applyViewportCameraProfile());
+window.visualViewport?.addEventListener('resize', () => applyViewportCameraProfile());
 
 setupCanvasControls();
 setupJoystick();
@@ -232,8 +255,11 @@ async function startWorld(url) {
   playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
   void installRiggedPlayerVisual();
+  applyViewportCameraProfile(true);
   updateOrbitCamera();
-  reticle.hidden = false;
+  reticle.hidden = true;
+  combatHud.hidden = false;
+  refreshCombatHud();
   updateReticleVisual();
   updateReticleTarget();
   const stats = terrain.getStats?.() || {};
@@ -265,12 +291,17 @@ function stopWorld() {
   redoStack.length = 0;
   freecamEnabled = false;
   freecamVertical = 0;
+  selectedTargetId = null;
+  hardLockEnabled = false;
+  viewportCameraProfile = '';
   worldScreen.classList.remove('freecam');
   freecamButton.classList.remove('active');
   freecamButton.textContent = 'Freecam';
   reticle.hidden = true;
   altitudeControls.hidden = true;
   brushReadout.hidden = true;
+  combatHud.hidden = true;
+  refreshCombatHud();
   worldScreen.hidden = true;
 }
 
@@ -503,6 +534,7 @@ function frame(now) {
   if (freecamEnabled) updateFreecam(dt);
   else updatePlayer(dt);
   updatePlayerCharacterAnimation(dt);
+  if (!freecamEnabled) updateHardLockCamera(dt);
   updateCamera();
   updateTerrainLod(now);
   updateReticleTarget();
@@ -584,6 +616,26 @@ function updateFreecam(dt) {
   freecam.y += clamp(vertical, -1, 1) * speed * dt;
 }
 
+function isMobileLandscapeGameplay() {
+  return window.matchMedia?.('(pointer: coarse)').matches === true && window.innerWidth > window.innerHeight;
+}
+
+function applyViewportCameraProfile(force = false) {
+  const profile = isMobileLandscapeGameplay() ? 'mobile-landscape' : 'default';
+  if (!force && profile === viewportCameraProfile) return;
+  viewportCameraProfile = profile;
+  if (profile === 'mobile-landscape') {
+    orbitCamera.distance = MOBILE_LANDSCAPE_DISTANCE;
+    orbitCamera.fov = MOBILE_LANDSCAPE_FOV;
+    orbitCamera.pitch = MOBILE_LANDSCAPE_PITCH;
+  } else {
+    orbitCamera.distance = DEFAULT_ORBIT_DISTANCE;
+    orbitCamera.fov = Math.PI / 3;
+    orbitCamera.pitch = .34;
+  }
+  if (engine && !freecamEnabled) updateOrbitCamera();
+}
+
 function updateCamera() {
   if (freecamEnabled) {
     const direction = freecamForward();
@@ -641,9 +693,15 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
   worldScreen.classList.toggle('freecam', freecamEnabled);
   freecamButton.classList.toggle('active', freecamEnabled);
   freecamButton.textContent = freecamEnabled ? 'Freecam ON' : 'Freecam';
-  reticle.hidden = false;
+  reticle.hidden = !freecamEnabled;
   altitudeControls.hidden = !freecamEnabled;
   brushReadout.hidden = !freecamEnabled;
+  combatHud.hidden = freecamEnabled;
+  if (freecamEnabled) hardLockEnabled = false;
+  refreshCombatHud();
+  lookHint.textContent = freecamEnabled
+    ? 'Swipe: look · center reticle: terrain tools'
+    : 'Swipe: look · tap enemy: target';
   reticleHit = null;
   if (brushMesh) brushMesh.visible = false;
   editorStatus.textContent = freecamEnabled
@@ -658,6 +716,11 @@ function setupCanvasControls() {
   let orbitPointerId = null;
   let orbitLastX = 0;
   let orbitLastY = 0;
+  let orbitDownX = 0;
+  let orbitDownY = 0;
+  let orbitDownAt = 0;
+  let orbitTravel = 0;
+  let orbitLooking = false;
 
   canvas.addEventListener('contextmenu', event => {
     if (freecamEnabled) event.preventDefault();
@@ -667,8 +730,11 @@ function setupCanvasControls() {
     if (!freecamEnabled) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       orbitPointerId = event.pointerId;
-      orbitLastX = event.clientX;
-      orbitLastY = event.clientY;
+      orbitLastX = orbitDownX = event.clientX;
+      orbitLastY = orbitDownY = event.clientY;
+      orbitDownAt = performance.now();
+      orbitTravel = 0;
+      orbitLooking = false;
       canvas.setPointerCapture(event.pointerId);
       return;
     }
@@ -710,7 +776,9 @@ function setupCanvasControls() {
       const dy = event.clientY - orbitLastY;
       orbitLastX = event.clientX;
       orbitLastY = event.clientY;
-      applyCameraLookDelta(orbitCamera, dx, dy, ORBIT_MIN_PITCH, ORBIT_MAX_PITCH);
+      orbitTravel += Math.hypot(dx, dy);
+      if (!orbitLooking && orbitTravel > LOOK_START_PX) orbitLooking = true;
+      if (orbitLooking) applyCameraLookDelta(orbitCamera, dx, dy, ORBIT_MIN_PITCH, ORBIT_MAX_PITCH);
       return;
     }
 
@@ -745,7 +813,15 @@ function setupCanvasControls() {
 
   const finish = event => {
     if (!freecamEnabled) {
-      if (event.pointerId === orbitPointerId) orbitPointerId = null;
+      if (event.pointerId !== orbitPointerId) return;
+      const duration = performance.now() - orbitDownAt;
+      const displacement = Math.hypot(event.clientX - orbitDownX, event.clientY - orbitDownY);
+      if (!orbitLooking && duration <= TARGET_TAP_MAX_MS && displacement <= TARGET_TAP_MAX_PX) {
+        selectCombatTargetAtScreen(event.clientX, event.clientY);
+      }
+      orbitPointerId = null;
+      orbitLooking = false;
+      orbitTravel = 0;
       if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture?.(event.pointerId);
       return;
     }
@@ -775,7 +851,7 @@ function setupCanvasControls() {
 
   canvas.addEventListener('pointerup', finish);
   canvas.addEventListener('pointercancel', event => {
-    if (event.pointerId === orbitPointerId) orbitPointerId = null;
+    if (event.pointerId === orbitPointerId) { orbitPointerId = null; orbitLooking = false; orbitTravel = 0; }
     if (gesture && event.pointerId === gesture.pointerId) cancelGesture();
   });
 
@@ -871,6 +947,12 @@ function currentViewRay() {
 }
 
 function updateReticleTarget() {
+  if (!freecamEnabled) {
+    reticleHit = null;
+    reticle.classList.remove('no-hit');
+    if (brushMesh) brushMesh.visible = false;
+    return;
+  }
   if (!terrain || !engine) {
     reticleHit = null;
     reticle.classList.remove('no-hit');
@@ -900,6 +982,235 @@ function raycastTerrainAtReticle() {
   if (!ray || !terrain) return null;
   return terrain.raycast(ray.origin, ray.direction, 1800, .5);
 }
+
+
+
+function screenPointRay(clientX, clientY) {
+  if (!engine) return null;
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  const nx = ((clientX - rect.left) / width) * 2 - 1;
+  const ny = 1 - ((clientY - rect.top) / height) * 2;
+  const forward = normalize3(
+    lastCameraTarget[0] - lastCameraPosition[0],
+    lastCameraTarget[1] - lastCameraPosition[1],
+    lastCameraTarget[2] - lastCameraPosition[2]
+  );
+  const right = normalize3(...cross3(forward, [0, 1, 0]));
+  const up = normalize3(...cross3(right, forward));
+  const fov = Number(freecamEnabled ? freecam.fov : orbitCamera.fov) || Math.PI / 3;
+  const tan = Math.tan(fov * .5);
+  const aspect = width / height;
+  const direction = normalize3(
+    forward[0] + right[0] * nx * tan * aspect + up[0] * ny * tan,
+    forward[1] + right[1] * nx * tan * aspect + up[1] * ny * tan,
+    forward[2] + right[2] * nx * tan * aspect + up[2] * ny * tan
+  );
+  return { origin: [...lastCameraPosition], direction };
+}
+
+function targetWorldPosition(target) {
+  if (!target) return null;
+  let source = typeof target.getPosition === 'function' ? target.getPosition() : target.position;
+  if (!source) return null;
+  if (Array.isArray(source)) {
+    const x = Number(source[0]), y = Number(source[1]), z = Number(source[2]);
+    return [x, y, z].every(Number.isFinite) ? [x, y, z] : null;
+  }
+  const x = Number(source.x), y = Number(source.y), z = Number(source.z);
+  return [x, y, z].every(Number.isFinite) ? [x, y, z] : null;
+}
+
+function raySphereDistance(ray, center, radius) {
+  const ox = ray.origin[0] - center[0];
+  const oy = ray.origin[1] - center[1];
+  const oz = ray.origin[2] - center[2];
+  const b = ox * ray.direction[0] + oy * ray.direction[1] + oz * ray.direction[2];
+  const c = ox * ox + oy * oy + oz * oz - radius * radius;
+  const discriminant = b * b - c;
+  if (discriminant < 0) return null;
+  const root = Math.sqrt(discriminant);
+  const near = -b - root;
+  if (near >= 0) return near;
+  const far = -b + root;
+  return far >= 0 ? far : null;
+}
+
+function registerCombatTarget(id, descriptor = {}) {
+  const key = String(id || '').trim();
+  if (!key) throw new Error('Combat target id is required.');
+  combatTargets.set(key, {
+    ...descriptor,
+    id: key,
+    name: String(descriptor.name || key),
+    radius: Math.max(.25, Number(descriptor.radius) || 1),
+    enabled: descriptor.enabled !== false
+  });
+  refreshCombatHud();
+  return () => unregisterCombatTarget(key);
+}
+
+function unregisterCombatTarget(id) {
+  const key = String(id || '');
+  combatTargets.delete(key);
+  if (selectedTargetId === key) clearCombatTarget();
+}
+
+function selectedCombatTarget() {
+  const target = selectedTargetId ? combatTargets.get(selectedTargetId) : null;
+  if (!target || target.enabled === false || !targetWorldPosition(target)) return null;
+  return target;
+}
+
+function setSelectedCombatTarget(target) {
+  selectedTargetId = target?.id && combatTargets.has(target.id) ? target.id : null;
+  if (!selectedTargetId) hardLockEnabled = false;
+  refreshCombatHud();
+  window.dispatchEvent(new CustomEvent('ironvale:target-changed', { detail: { targetId: selectedTargetId, target: selectedCombatTarget() } }));
+}
+
+function clearCombatTarget() {
+  setSelectedCombatTarget(null);
+}
+
+function pickCombatTargetAtScreen(clientX, clientY) {
+  const ray = screenPointRay(clientX, clientY);
+  if (!ray) return null;
+  let best = null;
+  let bestDistance = Infinity;
+  for (const target of combatTargets.values()) {
+    if (target.enabled === false) continue;
+    const center = targetWorldPosition(target);
+    if (!center) continue;
+    const hitDistance = raySphereDistance(ray, center, target.radius);
+    const maxDistance = Math.max(1, Number(target.maxTargetDistance) || TARGET_PICK_MAX_DISTANCE);
+    if (hitDistance == null || hitDistance > maxDistance || hitDistance >= bestDistance) continue;
+    best = target;
+    bestDistance = hitDistance;
+  }
+  return best;
+}
+
+function selectCombatTargetAtScreen(clientX, clientY) {
+  if (freecamEnabled) return null;
+  const target = pickCombatTargetAtScreen(clientX, clientY);
+  setSelectedCombatTarget(target);
+  return target;
+}
+
+function findAutoAttackTarget() {
+  const basis = cameraGroundBasis(orbitCamera.yaw);
+  let best = null;
+  let bestScore = Infinity;
+  for (const target of combatTargets.values()) {
+    if (target.enabled === false) continue;
+    const position = targetWorldPosition(target);
+    if (!position) continue;
+    const dx = position[0] - player.x;
+    const dz = position[2] - player.z;
+    const distance = Math.hypot(dx, dz);
+    const range = Math.max(1, Number(target.autoAttackRange) || AUTO_ATTACK_RANGE);
+    if (distance > range || distance < .001) continue;
+    const facing = (dx / distance) * basis.forwardX + (dz / distance) * basis.forwardZ;
+    if (facing < .1) continue;
+    const score = distance - facing * 1.5;
+    if (score < bestScore) { best = target; bestScore = score; }
+  }
+  return best;
+}
+
+function facePlayerTowardTarget(target) {
+  const position = targetWorldPosition(target);
+  if (!position) return;
+  const dx = position[0] - player.x;
+  const dz = position[2] - player.z;
+  if (Math.hypot(dx, dz) < .001) return;
+  player.yaw = Math.atan2(dx, dz);
+  updatePlayerVisualTransform();
+}
+
+function setHardLock(enabled) {
+  hardLockEnabled = Boolean(enabled) && Boolean(selectedCombatTarget()) && !freecamEnabled;
+  refreshCombatHud();
+}
+
+function updateHardLockCamera(dt) {
+  if (!hardLockEnabled || freecamEnabled) return;
+  const target = selectedCombatTarget();
+  const position = targetWorldPosition(target);
+  if (!target || !position) { setHardLock(false); return; }
+  const dx = position[0] - player.x;
+  const dz = position[2] - player.z;
+  const distance = Math.hypot(dx, dz);
+  if (distance > TARGET_PICK_MAX_DISTANCE || distance < .001) { setHardLock(false); return; }
+  const desiredYaw = cameraAnglesFromDirection([dx, 0, dz]).yaw;
+  orbitCamera.yaw = moveAngleToward(orbitCamera.yaw, desiredYaw, Math.max(.01, dt) * 7.5);
+  player.yaw = Math.atan2(dx, dz);
+  updatePlayerVisualTransform();
+}
+
+function performBasicAttack() {
+  if (freecamEnabled) return;
+  let target = selectedCombatTarget();
+  if (!target) {
+    target = findAutoAttackTarget();
+    if (target) setSelectedCombatTarget(target);
+  }
+  if (!target) {
+    flashTargetStatus('No target nearby');
+    pulseCombatButton(basicAttackButton);
+    return;
+  }
+  facePlayerTowardTarget(target);
+  pulseCombatButton(basicAttackButton);
+  window.dispatchEvent(new CustomEvent('ironvale:basic-attack', { detail: { targetId: target.id, target } }));
+}
+
+function triggerAbility(slot, button) {
+  if (freecamEnabled || !slot) return;
+  const target = selectedCombatTarget();
+  if (!target) {
+    flashTargetStatus('Tap a target first');
+    pulseCombatButton(button);
+    return;
+  }
+  facePlayerTowardTarget(target);
+  pulseCombatButton(button);
+  window.dispatchEvent(new CustomEvent('ironvale:ability', { detail: { slot, targetId: target.id, target } }));
+}
+
+function refreshCombatHud() {
+  if (!targetName || !lockTargetButton || !targetPill) return;
+  const target = selectedCombatTarget();
+  targetName.textContent = target?.name || 'No target';
+  targetPill.classList.toggle('active', Boolean(target));
+  lockTargetButton.disabled = !target || freecamEnabled;
+  lockTargetButton.classList.toggle('active', Boolean(target && hardLockEnabled));
+  lockTargetButton.textContent = hardLockEnabled && target ? 'Locked' : 'Lock';
+}
+
+function flashTargetStatus(message) {
+  if (!targetName) return;
+  targetName.textContent = message;
+  setTimeout(refreshCombatHud, 850);
+}
+
+function pulseCombatButton(button) {
+  if (!button) return;
+  button.classList.remove('pressed');
+  void button.offsetWidth;
+  button.classList.add('pressed');
+  setTimeout(() => button.classList.remove('pressed'), 140);
+}
+
+window.IronvaleTargeting = Object.freeze({
+  register: registerCombatTarget,
+  unregister: unregisterCombatTarget,
+  select: id => setSelectedCombatTarget(combatTargets.get(String(id || '')) || null),
+  clear: clearCombatTarget,
+  getSelected: selectedCombatTarget
+});
 
 function captureTerrainState() {
   return {
@@ -1128,6 +1439,11 @@ function setupJoystick() {
   };
   stick.addEventListener('pointerup', end);
   stick.addEventListener('pointercancel', end);
+}
+
+function moveAngleToward(current, target, maxDelta) {
+  const delta = wrapAngle(target - current);
+  return wrapAngle(current + clamp(delta, -maxDelta, maxDelta));
 }
 
 function wrapAngle(angle) {
