@@ -22,6 +22,7 @@ expect(compiled.stats.cells > 18000 && compiled.stats.operations >= 45, 'starter
 if (world.version >= 2) {
   expect(world.bounds?.max?.[0] >= 159 && world.bounds?.max?.[2] >= 159, 'rebuilt starter region must span multiple Rift sections');
   expect((world.layout || []).length >= 30 && Object.keys(world.prefabs || {}).length >= 8, 'starter region prefab composition is missing');
+  expect(compiled.stats.sections >= 100 && compiled.stats.operations >= 900 && compiled.stats.detailCells >= 1000, 'Brackenford region scale/detail regressed');
   expect(worldText.includes('Warden hall') && worldText.includes('Reeve great hall') && worldText.includes('North Watch'), 'rebuilt core-town landmarks are missing');
   expect(worldText.includes('Farmhouse') && worldText.includes('Barn') && worldText.includes('West barley'), 'working farmstead is missing');
   expect(worldText.includes('Blackstone cave tunnel') && worldText.includes('Blackstone cave chamber'), 'Blackstone cave terrain is missing');
