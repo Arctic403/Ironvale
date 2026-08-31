@@ -40,6 +40,7 @@ const CAMERA_PITCH_RADIANS_PER_VIEW = Math.PI * 0.80;
 const CAMERA_MAX_EVENT_FRACTION = 0.22;
 const ORBIT_MIN_PITCH = -0.12;
 const ORBIT_MAX_PITCH = 1.05;
+const THIRD_PERSON_FOCUS_HEIGHT = 1.20;
 const FREECAM_MIN_PITCH = -1.45;
 const FREECAM_MAX_PITCH = 1.45;
 
@@ -67,7 +68,6 @@ const player = { x: 320, y: .9, z: 320, yaw: 0, vy: 0, grounded: true };
 const orbitCamera = { yaw: Math.PI, pitch: .34, distance: 9.5, fov: Math.PI / 3 };
 const freecam = { x: 320, y: 16, z: 338, yaw: 0, pitch: .6, fov: Math.PI / 3 };
 const input = { forward: 0, strafe: 0, keys: new Set() };
-const reticleScreen = { u: .5, v: .5 };
 const undoStack = [];
 const redoStack = [];
 
@@ -217,6 +217,9 @@ async function startWorld(url) {
   playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
   updateOrbitCamera();
+  reticle.hidden = false;
+  updateReticleVisual();
+  updateReticleTarget();
   const stats = terrain.getStats?.() || {};
   terrainStatus.textContent = `640×640 · ${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · adaptive LOD`;
   lastFrame = performance.now();
@@ -477,7 +480,7 @@ function updateCamera() {
 
 function updateOrbitCamera() {
   if (!engine) return;
-  const target = [player.x, player.y + .7, player.z];
+  const target = [player.x, player.y + THIRD_PERSON_FOCUS_HEIGHT, player.z];
   const forward = cameraForward(orbitCamera.yaw, orbitCamera.pitch);
   const position = [
     target[0] - forward[0] * orbitCamera.distance,
@@ -510,13 +513,11 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
   freecamVertical = 0;
   input.forward = 0;
   input.strafe = 0;
-  reticleScreen.u = .5;
-  reticleScreen.v = .5;
   updateReticleVisual();
   worldScreen.classList.toggle('freecam', freecamEnabled);
   freecamButton.classList.toggle('active', freecamEnabled);
   freecamButton.textContent = freecamEnabled ? 'Freecam ON' : 'Freecam';
-  reticle.hidden = !freecamEnabled;
+  reticle.hidden = false;
   altitudeControls.hidden = !freecamEnabled;
   brushReadout.hidden = !freecamEnabled;
   reticleHit = null;
@@ -565,7 +566,6 @@ function setupCanvasControls() {
       travel: 0
     };
 
-    moveReticleToClient(event.clientX, event.clientY);
 
     if (gesture.mode === 'pending') {
       clearTimeout(longPressTimer);
@@ -606,7 +606,9 @@ function setupCanvasControls() {
     }
 
     if (gesture.mode === 'sculpt') {
-      moveReticleToClient(event.clientX, event.clientY);
+      applyCameraLookDelta(freecam, dx, dy, FREECAM_MIN_PITCH, FREECAM_MAX_PITCH);
+      updateCamera();
+      updateReticleTarget();
       applyContinuousBrushStamp();
     }
   });
@@ -623,7 +625,7 @@ function setupCanvasControls() {
     const displacement = Math.hypot(event.clientX - endedGesture.downX, event.clientY - endedGesture.downY);
 
     if (endedGesture.mode === 'pending' && duration <= TAP_MAX_MS && displacement <= TAP_MAX_PX) {
-      moveReticleToClient(event.clientX, event.clientY);
+      updateCamera();
       updateReticleTarget();
       if (reticleHit) applySingleBrushStamp();
     }
@@ -655,7 +657,7 @@ function setupCanvasControls() {
 function beginContinuousSculpt() {
   if (!gesture || gesture.mode !== 'pending' || !terrain) return;
   gesture.mode = 'sculpt';
-  moveReticleToClient(gesture.x, gesture.y);
+  updateCamera();
   updateReticleTarget();
   if (!reticleHit) {
     gesture.mode = 'pending';
@@ -685,7 +687,6 @@ function cancelGesture() {
 
 function applyContinuousBrushStamp() {
   if (!gesture || gesture.mode !== 'sculpt' || !terrain) return;
-  moveReticleToClient(gesture.x, gesture.y);
   updateReticleTarget();
   if (!reticleHit) return;
   applyBrushAtReticle(CONTINUOUS_STRENGTH_SCALE, sculptFlattenY, false);
@@ -718,34 +719,41 @@ function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately
   terrainStatus.textContent = `640×640 · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
 }
 
-function moveReticleToClient(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const safeX = clamp(clientX - rect.left, 18, Math.max(18, rect.width - 18));
-  const safeY = clamp(clientY - rect.top, 18, Math.max(18, rect.height - 18));
-  reticleScreen.u = safeX / Math.max(1, rect.width);
-  reticleScreen.v = safeY / Math.max(1, rect.height);
-  updateReticleVisual();
-  updateReticleTarget();
+function updateReticleVisual() {
+  // RPG interaction contract: the reticle never follows the pointer.
+  reticle.style.left = '50%';
+  reticle.style.top = '50%';
+  brushReadout.style.left = '50%';
+  brushReadout.style.top = 'calc(50% + 25px)';
 }
 
-function updateReticleVisual() {
-  const left = `${reticleScreen.u * 100}%`;
-  const top = `${reticleScreen.v * 100}%`;
-  reticle.style.left = left;
-  reticle.style.top = top;
-  brushReadout.style.left = left;
-  brushReadout.style.top = `calc(${top} + 25px)`;
+function currentViewRay() {
+  if (!engine) return null;
+  const origin = [lastCameraPosition[0], lastCameraPosition[1], lastCameraPosition[2]];
+  const direction = normalize3(
+    lastCameraTarget[0] - lastCameraPosition[0],
+    lastCameraTarget[1] - lastCameraPosition[1],
+    lastCameraTarget[2] - lastCameraPosition[2]
+  );
+  return { origin, direction };
 }
 
 function updateReticleTarget() {
-  if (!freecamEnabled || !terrain) {
+  if (!terrain || !engine) {
     reticleHit = null;
     reticle.classList.remove('no-hit');
     if (brushMesh) brushMesh.visible = false;
     return;
   }
+
   reticleHit = raycastTerrainAtReticle();
   reticle.classList.toggle('no-hit', !reticleHit);
+
+  if (!freecamEnabled) {
+    if (brushMesh) brushMesh.visible = false;
+    return;
+  }
+
   if (reticleHit) {
     brushReadout.textContent = `${brushModeLabel(brushMode)} · ${Number(radiusInput.value)}m · Y ${reticleHit.y.toFixed(1)}`;
     updateBrushMarkerPosition();
@@ -756,59 +764,9 @@ function updateReticleTarget() {
 }
 
 function raycastTerrainAtReticle() {
-  const rect = canvas.getBoundingClientRect();
-  const clientX = rect.left + reticleScreen.u * rect.width;
-  const clientY = rect.top + reticleScreen.v * rect.height;
-  return raycastTerrainAtScreen(clientX, clientY);
-}
-
-function raycastTerrainAtScreen(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const nx = ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1;
-  const ny = 1 - ((clientY - rect.top) / Math.max(1, rect.height)) * 2;
-  const forward = normalize3(
-    lastCameraTarget[0] - lastCameraPosition[0],
-    lastCameraTarget[1] - lastCameraPosition[1],
-    lastCameraTarget[2] - lastCameraPosition[2]
-  );
-  const right = normalize3(...cross3(forward, [0, 1, 0]));
-  const up = normalize3(...cross3(right, forward));
-  const tangent = Math.tan(freecam.fov / 2);
-  const aspect = rect.width / Math.max(1, rect.height);
-  const direction = normalize3(
-    forward[0] + right[0] * nx * tangent * aspect + up[0] * ny * tangent,
-    forward[1] + right[1] * nx * tangent * aspect + up[1] * ny * tangent,
-    forward[2] + right[2] * nx * tangent * aspect + up[2] * ny * tangent
-  );
-
-  let previous = null;
-  for (let t = .2; t <= 1800; t += 1) {
-    const x = lastCameraPosition[0] + direction[0] * t;
-    const y = lastCameraPosition[1] + direction[1] * t;
-    const z = lastCameraPosition[2] + direction[2] * t;
-    const height = terrain.sampleHeight(x, z);
-    if (height == null) { previous = null; continue; }
-    const diff = y - height;
-    if (Math.abs(diff) < .02) return { x, y: height, z };
-    if (previous && previous.diff > 0 && diff <= 0) {
-      let low = previous.t, high = t;
-      for (let i = 0; i < 10; i += 1) {
-        const mid = (low + high) / 2;
-        const mx = lastCameraPosition[0] + direction[0] * mid;
-        const my = lastCameraPosition[1] + direction[1] * mid;
-        const mz = lastCameraPosition[2] + direction[2] * mid;
-        const mh = terrain.sampleHeight(mx, mz);
-        if (mh == null || my - mh > 0) low = mid;
-        else high = mid;
-      }
-      const finalT = (low + high) / 2;
-      const fx = lastCameraPosition[0] + direction[0] * finalT;
-      const fz = lastCameraPosition[2] + direction[2] * finalT;
-      return { x: fx, y: terrain.sampleHeight(fx, fz) ?? 0, z: fz };
-    }
-    previous = { t, diff };
-  }
-  return null;
+  const ray = currentViewRay();
+  if (!ray || !terrain) return null;
+  return terrain.raycast(ray.origin, ray.direction, 1800, .5);
 }
 
 function captureTerrainState() {
