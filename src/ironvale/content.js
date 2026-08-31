@@ -52,7 +52,7 @@ export const IRONVALE_ZONES = Object.freeze([
     id: 'brackenford-lowlands', name: 'Brackenford Lowlands', levelMin: 1, levelMax: 10, kind: 'starter-zone',
     worldId: 'brackenford-lowlands-001', worldUrl: '/rift-world-blocks/brackenford-lowlands-001.json',
     description: 'A broad working lowland of crooked medieval lanes, irregular timber-and-stone buildings, farms, wooded hills, an abandoned watch and the Blackstone cave ridge around Brackenford.',
-    spawn: { id: 'valeborn-training-yard', position: [62, 2, 64], facing: 0 },
+    spawn: { id: 'valeborn-training-yard', position: [82, 3, 92], facing: 0 },
     campaignId: 'the-broken-oath', chapterId: 'ash-on-the-road'
   }
 ]);
