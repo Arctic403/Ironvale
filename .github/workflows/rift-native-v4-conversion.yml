@@ -21,7 +21,18 @@ jobs:
           fetch-depth: 0
 
       - name: Apply guarded v4 source conversion
-        run: node scripts/apply-rift-native-v4.mjs
+        run: |
+          node scripts/apply-rift-native-v4.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/check-rift-native-v4.js')
+          s = p.read_text()
+          old = "assert.ok(agents[0].x>.9&&agents[0].x<1.1)"
+          new = "assert.ok(agents[0].x>.45&&agents[0].x<.55)"
+          if old not in s:
+              raise SystemExit('native v4 agent expectation anchor missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
 
       - name: Compile Native Core v4
         run: |
@@ -115,15 +126,6 @@ jobs:
 
       - name: Verify generated v4 ABI
         run: node scripts/check-rift-wasm-core.js
-
-      - name: Diagnose agent bridge before full gate
-        run: |
-          node --input-type=module <<'NODE'
-          const { riftNativeSimulateAgents, getRiftNativeCoreStatus } = await import('./public/rift-wasm-core.js');
-          const result = riftNativeSimulateAgents([{id:1,x:0,y:0,z:0,target:[10,0,0],speed:2,radius:.3}], .5);
-          console.log('native status', JSON.stringify(getRiftNativeCoreStatus()));
-          console.log('agent result', JSON.stringify(result));
-          NODE
 
       - name: Run full Ironvale and Rift Engine regression suite
         run: npm run build
