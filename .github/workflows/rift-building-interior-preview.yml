@@ -12,7 +12,7 @@ on:
       - 'public/rift-building-3d-inspection.js'
       - 'public/building-inspection.html'
       - 'public/building-3d-inspection.html'
-      - 'public/riftcity-buildings/**'
+      - 'public/rift-buildings/**'
       - 'public/rift-engine.js'
       - 'public/rift-city-block-importer.js'
       - 'scripts/check-rift-building-programs.js'
@@ -64,7 +64,7 @@ jobs:
           npm run verify:inspection
           node --check scripts/capture-rift-inspection.js
           mkdir -p rift-building-previews/full-resolution rift-building-previews/previews
-          node scripts/report-rift-building-inspection.js public/riftcity-buildings/riftcity-bank-001.json > rift-building-previews/bank-inspection-report.json
+          node scripts/report-rift-building-inspection.js public/rift-buildings/legacy-building-fixture-001.json > rift-building-previews/bank-inspection-report.json
 
       - name: Start static RiftCity server
         run: |
