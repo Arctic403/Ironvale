@@ -12,7 +12,6 @@ const replacements=[
   ["max:[4,8,4]","max:[4,7,4]"]
 ];
 for(const [a,b] of replacements){if(a===b) continue;if(s.includes(a))s=s.replace(a,b);}
-// If a prior failed run's generous metadata somehow made it into the builder, normalize that too.
 s=s.replaceAll("max:[15,16,13]","max:[15,11,13]")
    .replaceAll("max:[20,20,16]","max:[20,14,16]")
    .replaceAll("max:[23,20,14]","max:[23,17,14]")
@@ -22,4 +21,4 @@ s=s.replaceAll("max:[15,16,13]","max:[15,11,13]")
    .replaceAll("max:[24,20,24]","max:[24,16,24]")
    .replaceAll("max:[4,9,4]","max:[4,7,4]");
 fs.writeFileSync(path,s);
-console.log('[brackenford-v2] normalized prefab bounds to actual geometry extents');
+console.log('[brackenford-v2] prefab geometry bounds normalized; ready for full starter verifier');
