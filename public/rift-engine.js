@@ -90,6 +90,15 @@ function normalizeGeometry(geometry) {
   const indices=geometry.indices instanceof Uint32Array||geometry.indices instanceof Uint16Array?geometry.indices:(vertices.length/stride>65535?new Uint32Array(geometry.indices||[]):new Uint16Array(geometry.indices||[]));
   return {vertices,indices,stride};
 }
+function viewportMetrics(canvas, pixelRatio) {
+  const rect = canvas.getBoundingClientRect();
+  const cssWidth = Math.max(1, Number(rect.width) || Number(canvas.clientWidth) || 1);
+  const cssHeight = Math.max(1, Number(rect.height) || Number(canvas.clientHeight) || 1);
+  const ratio = Math.max(0.5, Math.min(Number(pixelRatio) || 1, 2));
+  const width = Math.max(1, Math.round(cssWidth * ratio));
+  const height = Math.max(1, Math.round(cssHeight * ratio));
+  return { rect, cssWidth, cssHeight, width, height, aspect: cssWidth / cssHeight, pixelRatio: ratio };
+}
 
 export class RiftEngine {
   constructor(canvas, options = {}) {
@@ -99,6 +108,7 @@ export class RiftEngine {
     const gl=this.gl; this.program=createProgram(gl); this.meshes=new Set(); this.projection=new Float32Array(16); this.view=new Float32Array(16); this.model=new Float32Array(16);
     this.camera={position:[160,22,178],target:[160,10,160],fov:Math.PI/3,near:0.08,far:650};
     this.environment={clear:options.clear||[0.56,0.72,0.86],fog:options.fog||[0.64,0.75,0.82],fogNear:120,fogFar:420,light:[0.45,-1,0.28]};
+    this.viewport={rect:null,cssWidth:1,cssHeight:1,width:1,height:1,aspect:1,pixelRatio:1};
     this.locations={projection:gl.getUniformLocation(this.program,'uProjection'),view:gl.getUniformLocation(this.program,'uView'),model:gl.getUniformLocation(this.program,'uModel'),light:gl.getUniformLocation(this.program,'uLightDirection'),fogColor:gl.getUniformLocation(this.program,'uFogColor'),fogNear:gl.getUniformLocation(this.program,'uFogNear'),fogFar:gl.getUniformLocation(this.program,'uFogFar'),camera:gl.getUniformLocation(this.program,'uCamera'),tint:gl.getUniformLocation(this.program,'uTint')};
     gl.enable(gl.DEPTH_TEST);
     // Terrain caves need to be visible from inside and outside; no voxel-face culling assumptions.
@@ -113,7 +123,12 @@ export class RiftEngine {
   _upload(mesh,geometry){const gl=this.gl,data=normalizeGeometry(geometry);if(mesh.vao)this._disposeMesh(mesh);mesh.vao=gl.createVertexArray();mesh.vertexBuffer=gl.createBuffer();mesh.indexBuffer=gl.createBuffer();mesh.count=data.indices.length;mesh.indexType=data.indices instanceof Uint32Array?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT;mesh.stride=data.stride;gl.bindVertexArray(mesh.vao);gl.bindBuffer(gl.ARRAY_BUFFER,mesh.vertexBuffer);gl.bufferData(gl.ARRAY_BUFFER,data.vertices,gl.STATIC_DRAW);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,mesh.indexBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,data.indices,gl.STATIC_DRAW);const bytes=data.stride*4;gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,bytes,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,bytes,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,bytes,24);gl.bindVertexArray(null)}
   _disposeMesh(mesh){const gl=this.gl;if(mesh.vertexBuffer)gl.deleteBuffer(mesh.vertexBuffer);if(mesh.indexBuffer)gl.deleteBuffer(mesh.indexBuffer);if(mesh.vao)gl.deleteVertexArray(mesh.vao);mesh.vertexBuffer=mesh.indexBuffer=mesh.vao=null}
   setCamera(camera){if(camera.position)this.camera.position=[...camera.position];if(camera.target)this.camera.target=[...camera.target];if(Number.isFinite(camera.fov))this.camera.fov=camera.fov;if(Number.isFinite(camera.near))this.camera.near=camera.near;if(Number.isFinite(camera.far))this.camera.far=camera.far}
-  resize(pixelRatio=Math.min(devicePixelRatio||1,2)){const width=Math.max(1,Math.round(this.canvas.clientWidth*pixelRatio)),height=Math.max(1,Math.round(this.canvas.clientHeight*pixelRatio));if(this.canvas.width!==width||this.canvas.height!==height){this.canvas.width=width;this.canvas.height=height}this.gl.viewport(0,0,width,height)}
-  render(){const gl=this.gl;this.resize();const aspect=this.canvas.width/Math.max(1,this.canvas.height);perspective(this.projection,this.camera.fov,aspect,this.camera.near,this.camera.far);lookAt(this.view,this.camera.position,this.camera.target);const clear=this.environment.clear;gl.clearColor(clear[0],clear[1],clear[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.locations.projection,false,this.projection);gl.uniformMatrix4fv(this.locations.view,false,this.view);gl.uniform3fv(this.locations.light,this.environment.light);gl.uniform3fv(this.locations.fogColor,this.environment.fog);gl.uniform1f(this.locations.fogNear,this.environment.fogNear);gl.uniform1f(this.locations.fogFar,this.environment.fogFar);gl.uniform3fv(this.locations.camera,this.camera.position);for(const mesh of this.meshes){if(!mesh.visible||!mesh.count)continue;modelMatrix(this.model,mesh.position,mesh.yaw,mesh.scale);gl.uniformMatrix4fv(this.locations.model,false,this.model);gl.uniform3fv(this.locations.tint,mesh.tint);gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0)}gl.bindVertexArray(null)}
+  resize(pixelRatio=Math.min(devicePixelRatio||1,2)){
+    const viewport=viewportMetrics(this.canvas,pixelRatio);this.viewport=viewport;
+    if(this.canvas.width!==viewport.width||this.canvas.height!==viewport.height){this.canvas.width=viewport.width;this.canvas.height=viewport.height}
+    this.gl.viewport(0,0,viewport.width,viewport.height);return viewport
+  }
+  getViewport(){return this.viewport}
+  render(){const gl=this.gl;const viewport=this.resize();const aspect=viewport.aspect;perspective(this.projection,this.camera.fov,aspect,this.camera.near,this.camera.far);lookAt(this.view,this.camera.position,this.camera.target);const clear=this.environment.clear;gl.clearColor(clear[0],clear[1],clear[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.locations.projection,false,this.projection);gl.uniformMatrix4fv(this.locations.view,false,this.view);gl.uniform3fv(this.locations.light,this.environment.light);gl.uniform3fv(this.locations.fogColor,this.environment.fog);gl.uniform1f(this.locations.fogNear,this.environment.fogNear);gl.uniform1f(this.locations.fogFar,this.environment.fogFar);gl.uniform3fv(this.locations.camera,this.camera.position);for(const mesh of this.meshes){if(!mesh.visible||!mesh.count)continue;modelMatrix(this.model,mesh.position,mesh.yaw,mesh.scale);gl.uniformMatrix4fv(this.locations.model,false,this.model);gl.uniform3fv(this.locations.tint,mesh.tint);gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0)}gl.bindVertexArray(null)}
   destroy(){for(const mesh of [...this.meshes])this.removeMesh(mesh);this.gl.deleteProgram(this.program);this.meshes.clear()}
 }
