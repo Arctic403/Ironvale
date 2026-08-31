@@ -7,9 +7,9 @@
   "terrain": {
     "format": "rift-terrain-v1",
     "origin": [0, 0, 0],
-    "size": [320, 320],
+    "size": [640, 640],
     "sampleSpacing": 1,
-    "chunkSize": 32,
+    "chunkSize": 64,
     "seed": 1,
     "baseHeight": 0,
     "maxWalkSlope": 0.82,
@@ -19,7 +19,7 @@
     "edits": []
   },
   "anchors": {
-    "starter_spawn": {"x":160,"z":160,"facing":0,"terrainSnap":true}
+    "starter_spawn": {"x":320,"z":320,"facing":0,"terrainSnap":true}
   },
   "objects": [],
   "metadata": {
@@ -27,6 +27,8 @@
     "legacyBlocks": false,
     "voxelGrid": false,
     "blankCanvas": true,
-    "description": "Blank continuous Rift Terrain canvas. No generated hills, caves, roads, structures, props or map content."
+    "negativeWorldY": true,
+    "lowerBarrier": false,
+    "description": "Blank continuous Rift Terrain canvas. Negative Y is valid world space. No generated hills, caves, roads, structures, props, map content or artificial lower barrier."
   }
 }
