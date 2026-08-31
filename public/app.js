@@ -13,7 +13,25 @@ import { initPwaSupport } from './pwa.js';
 initShell(); initPwaSupport();
 $('#login-form').addEventListener('submit', event => { event.preventDefault(); submitAuth('/api/auth/login', event.currentTarget); });
 $('#register-form').addEventListener('submit', event => { event.preventDefault(); submitAuth('/api/auth/register', event.currentTarget); });
-window.addEventListener('hashchange', route);
+
+let routeQueued = false;
+function scheduleRoute() {
+  if (routeQueued) return;
+  routeQueued = true;
+  queueMicrotask(() => {
+    routeQueued = false;
+    route().catch(error => {
+      console.error('Ironvale route dispatch failed', error);
+      const root = $('#game-root');
+      if (root) root.innerHTML = `<div class="rc-error"><strong>Navigation failed</strong><p>${escapeHtml(error?.message || 'Unknown navigation error')}</p><button class="rc-button" data-route="world">Return to World</button></div>`;
+    });
+  });
+}
+
+window.addEventListener('hashchange', scheduleRoute);
+window.addEventListener('popstate', scheduleRoute);
+window.addEventListener('ironvale:navigate', scheduleRoute);
+
 let focusSessionRefreshPending = false;
 window.addEventListener('focus', async () => {
   if (!state.authenticated || focusSessionRefreshPending) return;
@@ -24,29 +42,80 @@ window.addEventListener('focus', async () => {
 });
 
 async function boot() {
-  await refreshSession();
-  if (!location.hash) go('world'); else await route();
+  const authenticated = await refreshSession();
+  if (!authenticated) return;
+  if (!location.hash) { go('world'); return; }
+  await route();
+}
+
+function destroyWorldSafely() {
+  try { destroyCity2D(); }
+  catch (error) {
+    // World teardown must never be allowed to abort SPA navigation. The native
+    // engine cleanup is best-effort here; the next world mount creates a fresh
+    // foundation instance.
+    console.warn('Ironvale world teardown failed during navigation', error);
+    document.body.classList.remove('world3d-game-mode');
+  }
+}
+
+function createRouteMount(root, routeName) {
+  const mount = document.createElement('div');
+  mount.className = 'ironvale-route-mount';
+  mount.dataset.routeMount = routeName;
+  mount.innerHTML = '<div class="rc-loading"><span></span><strong>Loading Ironvale…</strong></div>';
+  root.replaceChildren(mount);
+  return mount;
 }
 
 async function route() {
-  destroyCity2D();
-  const request = ++state.activeRequest, parsed = parseRoute(); state.route = parsed;
-  if (!state.authenticated) { const ok = await refreshSession({ navigate: false }); if (!ok) return; }
-  const root = $('#game-root'); root.innerHTML = '<div class="rc-loading"><span></span><strong>Loading Ironvale…</strong></div>';
+  const request = ++state.activeRequest;
+  const parsed = parseRoute();
+  state.route = parsed;
+
+  destroyWorldSafely();
+
+  if (!state.authenticated) {
+    const ok = await refreshSession({ navigate: false });
+    if (!ok || request !== state.activeRequest) return;
+  }
+
+  const root = $('#game-root');
+  if (!root) return;
+  const mount = createRouteMount(root, parsed.name);
   updateActiveNav(parsed.name);
+  const isCurrent = () => request === state.activeRequest && state.route?.name === parsed.name && mount.isConnected;
+
   try {
-    if (parsed.name === 'world') { setPageTitle('World', 'THE IRONVALE MARCHES'); await renderCity(root); }
-    else if (parsed.name === 'character') { setPageTitle('Character', 'TRAVELER'); await renderCharacter(root); }
-    else if (parsed.name === 'journal') { setPageTitle('Journal', 'QUESTS'); await renderJournal(root); }
-    else if (parsed.name === 'inventory') { setPageTitle('Inventory', 'GEAR & SUPPLIES'); await renderInventory(root); }
-    else if (parsed.name === 'codex') { setPageTitle('Codex', 'WORLD KNOWLEDGE'); await renderCodex(root); }
-    else go('world');
+    if (parsed.name === 'world') {
+      setPageTitle('World', 'THE IRONVALE MARCHES');
+      await renderCity(mount);
+    } else if (parsed.name === 'character') {
+      setPageTitle('Character', 'TRAVELER');
+      await renderCharacter(mount);
+    } else if (parsed.name === 'journal') {
+      setPageTitle('Journal', 'QUESTS');
+      await renderJournal(mount);
+    } else if (parsed.name === 'inventory') {
+      setPageTitle('Inventory', 'GEAR & SUPPLIES');
+      await renderInventory(mount);
+    } else if (parsed.name === 'codex') {
+      setPageTitle('Codex', 'WORLD KNOWLEDGE');
+      await renderCodex(mount);
+    } else {
+      go('world');
+      return;
+    }
   } catch (error) {
+    // A slow request from a route that has already been replaced must not paint
+    // over the current route or report a misleading page error.
+    if (!isCurrent()) return;
     console.error(error);
-    root.innerHTML = `<div class="rc-error"><strong>Page failed to load</strong><p>${escapeHtml(error?.message || 'Unknown frontend error')}</p><button class="rc-button" data-route="world">Return to World</button></div>`;
+    mount.innerHTML = `<div class="rc-error"><strong>Page failed to load</strong><p>${escapeHtml(error?.message || 'Unknown frontend error')}</p><button class="rc-button" data-route="world">Return to World</button></div>`;
     showToast('An Ironvale page failed to render.', true);
   }
-  if (request !== state.activeRequest) return;
+
+  if (!isCurrent()) return;
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 
