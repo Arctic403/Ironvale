@@ -1,0 +1,61 @@
+name: Rift Native v2 Integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rift-native-v2-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout RiftCity
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply native v2 hot-path patch
+        run: node scripts/apply-rift-native-v2-integration.mjs
+
+      - name: Install Cloudflare Worker dependencies
+        run: bun install
+
+      - name: Run full RiftCity build and native regressions
+        run: npm run build
+
+      - name: Verify Wrangler bundles Worker + WASM v2
+        run: npx wrangler deploy --dry-run --outdir=/tmp/rift-native-v2-worker
+
+      - name: Smoke-test local Cloudflare Worker runtime
+        run: |
+          npx wrangler dev --local --port 8791 > /tmp/rift-native-v2-worker.log 2>&1 &
+          WORKER_PID=$!
+          trap 'kill $WORKER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8791/api/health > /tmp/rift-native-v2-health.json; then
+              cat /tmp/rift-native-v2-health.json
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/rift-native-v2-worker.log
+          exit 1
+
+      - name: Commit tested engine integration to main
+        run: |
+          git diff --check
+          if git diff --quiet -- public/rift-block-section.js public/rift-player.js package.json; then
+            echo 'Native v2 engine integration is already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/rift-block-section.js public/rift-player.js package.json
+          git commit -m 'Integrate Rift native v2 engine hot paths'
+          git push origin HEAD:main
