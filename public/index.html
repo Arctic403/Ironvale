@@ -45,7 +45,7 @@
       <div class="tool-heading">
         <div>
           <strong>Terrain Tools</strong>
-          <small>Freecam + movable reticle sculpting.</small>
+          <small>Freecam + hold-to-paint sculpting.</small>
         </div>
       </div>
 
@@ -65,7 +65,7 @@
       <div class="history-grid"><button id="undo-terrain">Undo</button><button id="redo-terrain">Redo</button></div>
       <div class="history-grid"><button id="save-terrain">Save Draft</button><button id="export-terrain">Export</button></div>
       <button id="reset-terrain" class="wide danger">Reset to Blank</button>
-      <small id="editor-status" class="editor-status">Turn Freecam ON. 1 finger aims, tap sculpts, 2 fingers look.</small>
+      <small id="editor-status" class="editor-status">Turn Freecam ON. Swipe to look; hold then drag to sculpt continuously.</small>
     </div>
 
     <div id="terrain-reticle" class="terrain-reticle" hidden aria-hidden="true">
@@ -84,7 +84,7 @@
       <button type="button" data-freecam-vertical="-1" aria-label="Freecam down">▼</button>
     </div>
 
-    <div class="look-hint">1 finger aim · 2 fingers look</div>
+    <div class="look-hint">Swipe: look · hold + drag: sculpt</div>
   </main>
 
   <script type="module" src="/app.js"></script>
