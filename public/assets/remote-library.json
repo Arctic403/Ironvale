@@ -1,0 +1,17 @@
+{
+  "format": "ironvale-asset-library-pointer-v1",
+  "repository": "Arctic403/RiftAssets",
+  "branch": "main",
+  "pinnedCommit": "0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9",
+  "registry": "https://raw.githubusercontent.com/Arctic403/RiftAssets/main/ironvale/registry.json",
+  "pinnedRegistry": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/registry.json",
+  "lock": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/asset-lock.json",
+  "libraryBase": "https://raw.githubusercontent.com/Arctic403/RiftAssets/main/ironvale/library",
+  "pagesBase": "https://arctic403.github.io/RiftAssets/ironvale/library",
+  "delivery": "on-demand",
+  "cachePolicy": "cache only assets actually selected or used",
+  "shippingPolicy": "promote only world-used optimized assets into Ironvale public assets",
+  "sourceLibraryBytes": 418381824,
+  "registeredModels": 500,
+  "lockedFiles": 996
+}
