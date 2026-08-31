@@ -1,6 +1,8 @@
-import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
+import path from 'node:path';
 
 mkdirSync('public', { recursive: true });
 const compiler = process.env.CXX || 'clang++';
@@ -20,7 +22,34 @@ if (result.error) {
   process.exit(1);
 }
 if (result.status !== 0) process.exit(result.status || 1);
+
 const wasm = readFileSync(rawOutput);
 writeFileSync('public/rift-core.wasm.gz', gzipSync(wasm, { level: 9 }));
 unlinkSync(rawOutput);
-console.log(`Built public/rift-core.wasm.gz (${wasm.length} raw bytes).`);
+
+const nativeExtensions = /\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx)$/i;
+function collectNativeFiles(dir, result = []) {
+  for (const name of readdirSync(dir)) {
+    const full = path.join(dir, name);
+    const stat = statSync(full);
+    if (stat.isDirectory()) collectNativeFiles(full, result);
+    else if (nativeExtensions.test(name)) result.push(full.replaceAll('\\', '/'));
+  }
+  return result;
+}
+function gitBlobSha(filePath) {
+  const bytes = readFileSync(filePath);
+  return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+}
+
+const sources = collectNativeFiles('native').sort().map(filePath => ({
+  path: filePath,
+  gitBlobSha: gitBlobSha(filePath)
+}));
+writeFileSync('public/rift-core.sources.json', JSON.stringify({
+  format: 'rift-core-sources-v1',
+  abi: 1,
+  sources
+}, null, 2) + '\n');
+
+console.log(`Built public/rift-core.wasm.gz (${wasm.length} raw bytes) from ${sources.length} native source/header file(s).`);
