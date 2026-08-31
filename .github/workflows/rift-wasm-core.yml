@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
-      - name: Checkout RiftCity
+      - name: Checkout Ironvale
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -72,12 +72,42 @@ jobs:
             -Wl,--export=rift_raycast_hit_ptr \
             -Wl,--export=rift_raycast_distance \
             -Wl,--export=rift_raycast_world \
+            -Wl,--export=rift_mesh_partial_block_count \
+            -Wl,--export=rift_mesh_occupied_microvoxels \
+            -Wl,--export=rift_mesh_visible_microfaces \
+            -Wl,--export=rift_mesh_culled_microfaces \
+            -Wl,--export=rift_set_block_world \
+            -Wl,--export=rift_batch_mutate_world \
+            -Wl,--export=rift_player_result_ptr \
+            -Wl,--export=rift_player_flags_ptr \
+            -Wl,--export=rift_player_step_world \
+            -Wl,--export=rift_spatial_capacity \
+            -Wl,--export=rift_spatial_entities_ptr \
+            -Wl,--export=rift_spatial_meta_ptr \
+            -Wl,--export=rift_spatial_results_ptr \
+            -Wl,--export=rift_spatial_query_sphere \
+            -Wl,--export=rift_agent_capacity \
+            -Wl,--export=rift_agent_data_ptr \
+            -Wl,--export=rift_simulate_agents \
+            -Wl,--export=rift_path_point_capacity \
+            -Wl,--export=rift_path_points_ptr \
+            -Wl,--export=rift_pathfind_world \
+            -Wl,--export=rift_combat_result_ptr \
+            -Wl,--export=rift_combat_resolve \
             -Wl,--export=rift_metric_mesh_builds \
             -Wl,--export=rift_metric_faces_emitted \
             -Wl,--export=rift_metric_batch_calls \
             -Wl,--export=rift_metric_batch_cells \
             -Wl,--export=rift_metric_raycasts \
             -Wl,--export=rift_metric_raycast_steps \
+            -Wl,--export=rift_metric_player_steps \
+            -Wl,--export=rift_metric_collision_probes \
+            -Wl,--export=rift_metric_mutations \
+            -Wl,--export=rift_metric_pathfinds \
+            -Wl,--export=rift_metric_path_nodes \
+            -Wl,--export=rift_metric_spatial_queries \
+            -Wl,--export=rift_metric_agent_steps \
+            -Wl,--export=rift_metric_combat_resolves \
             -Wl,--export=rift_metric_reset \
             native/rift-core.cpp \
             -o public/wasm/rift-core.wasm
