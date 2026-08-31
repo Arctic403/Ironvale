@@ -1,0 +1,65 @@
+name: Ironvale Foundation Conversion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ironvale-foundation-conversion.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Ironvale
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Ironvale foundation
+        run: |
+          python scripts/apply-ironvale-foundation-backend.py
+          python scripts/apply-ironvale-foundation-frontend.py
+
+      - name: Verify conversion diff and syntax
+        run: |
+          git diff --check
+          python -m py_compile scripts/apply-ironvale-foundation-backend.py scripts/apply-ironvale-foundation-frontend.py
+          node --check src/index.js
+          node --check src/ironvale/content.js
+          node --check src/ironvale/api.js
+          node --check public/app.js
+          node --check public/ui/api.js
+          node --check public/ui/router.js
+          node --check public/ui/shell.js
+          node --check public/views/city.js
+          node --check public/views/character.js
+          node --check public/views/journal.js
+          node --check public/views/inventory.js
+          node --check public/views/codex.js
+          node --check public/downtown3d-foundation.js
+          node --check public/rift-game-menu.js
+          node --check scripts/check-ironvale-foundation.js
+
+      - name: Run full Ironvale and Rift Engine regression suite
+        run: npm run build
+
+      - name: Install Worker dependencies
+        run: npm install --ignore-scripts
+
+      - name: Verify Cloudflare Worker and WASM bundle
+        run: npx wrangler deploy --dry-run
+
+      - name: Commit verified Ironvale foundation to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No Ironvale conversion changes to commit."
+            exit 0
+          fi
+          git commit -m "Establish Ironvale medieval MMO foundation"
+          git push origin HEAD:main
