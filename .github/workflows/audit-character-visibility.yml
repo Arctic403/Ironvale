@@ -12,92 +12,91 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Quaternius GLB hierarchy
+      - name: Inspect Quaternius character and animation transforms
         shell: bash
         run: |
           python3 <<'PY'
           import json, math, struct
           from pathlib import Path
 
-          path = Path('public/assets/characters/quaternius/universal-base-male.glb')
-          data = path.read_bytes()
-          if data[:4] != b'glTF':
-              raise SystemExit('bad GLB magic')
-          version, total = struct.unpack_from('<II', data, 4)
-          if version != 2 or total != len(data):
-              raise SystemExit('bad GLB header')
-          chunk_len, chunk_type = struct.unpack_from('<II', data, 12)
-          if chunk_type != 0x4E4F534A:
-              raise SystemExit('first chunk is not JSON')
-          doc = json.loads(data[20:20+chunk_len].decode('utf-8').rstrip('\x00 '))
+          TYPE_COMPONENTS={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4,'MAT4':16}
+          COMPONENT_FMT={5120:'b',5121:'B',5122:'h',5123:'H',5125:'I',5126:'f'}
+          COMPONENT_SIZE={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4}
 
-          nodes = doc.get('nodes', [])
-          parents = [-1] * len(nodes)
-          for p, node in enumerate(nodes):
-              for c in node.get('children', []):
-                  parents[c] = p
+          def parse_glb(path):
+              data=Path(path).read_bytes()
+              assert data[:4]==b'glTF'
+              version,total=struct.unpack_from('<II',data,4)
+              assert version==2 and total==len(data)
+              off=12; doc=None; binary=None
+              while off+8<=len(data):
+                  ln,typ=struct.unpack_from('<II',data,off); off+=8
+                  chunk=data[off:off+ln]; off+=ln
+                  if typ==0x4E4F534A: doc=json.loads(chunk.decode('utf-8').rstrip('\x00 '))
+                  elif typ==0x004E4942: binary=chunk
+              return doc,binary
 
-          def mul(a,b):
-              out=[0.0]*16
-              for c in range(4):
-                  for r in range(4):
-                      out[c*4+r] = sum(a[k*4+r]*b[c*4+k] for k in range(4))
-              return out
+          def accessor(doc,binary,index):
+              a=doc['accessors'][index]; bv=doc['bufferViews'][a['bufferView']]
+              comps=TYPE_COMPONENTS[a['type']]; ctype=a['componentType']; size=COMPONENT_SIZE[ctype]
+              stride=bv.get('byteStride',comps*size); start=bv.get('byteOffset',0)+a.get('byteOffset',0)
+              vals=[]
+              for i in range(a['count']):
+                  base=start+i*stride
+                  row=[]
+                  for c in range(comps):
+                      v=struct.unpack_from('<'+COMPONENT_FMT[ctype],binary,base+c*size)[0]
+                      if a.get('normalized'):
+                          if ctype==5120: v=max(v/127,-1)
+                          elif ctype==5121: v=v/255
+                          elif ctype==5122: v=max(v/32767,-1)
+                          elif ctype==5123: v=v/65535
+                      row.append(float(v))
+                  vals.append(row)
+              return vals
 
-          def trs(node):
-              if 'matrix' in node:
-                  return [float(v) for v in node['matrix']]
-              t=node.get('translation',[0,0,0]); q=node.get('rotation',[0,0,0,1]); s=node.get('scale',[1,1,1])
-              x,y,z,w=[float(v) for v in q]
-              x2=x+x; y2=y+y; z2=z+z
-              xx=x*x2; xy=x*y2; xz=x*z2; yy=y*y2; yz=y*z2; zz=z*z2; wx=w*x2; wy=w*y2; wz=w*z2
-              sx,sy,sz=[float(v) for v in s]
-              return [
-                  (1-(yy+zz))*sx,(xy+wz)*sx,(xz-wy)*sx,0,
-                  (xy-wz)*sy,(1-(xx+zz))*sy,(yz+wx)*sy,0,
-                  (xz+wy)*sz,(yz-wx)*sz,(1-(xx+yy))*sz,0,
-                  float(t[0]),float(t[1]),float(t[2]),1
-              ]
+          model,model_bin=parse_glb('public/assets/characters/quaternius/universal-base-male.glb')
+          anim,anim_bin=parse_glb('public/assets/characters/quaternius/universal-animation-library.glb')
+          model_names={n.get('name'):i for i,n in enumerate(model.get('nodes',[])) if n.get('name')}
+          anim_names={i:n.get('name') for i,n in enumerate(anim.get('nodes',[]))}
 
-          local=[trs(n) for n in nodes]
-          world=[None]*len(nodes)
-          def resolve(i):
-              if world[i] is not None: return world[i]
-              p=parents[i]
-              world[i]=mul(resolve(p),local[i]) if p>=0 else local[i]
-              return world[i]
-          for i in range(len(nodes)): resolve(i)
+          print('MODEL scene roots', model.get('scenes'))
+          print('MODEL root joint node 64=', model['nodes'][64])
+          print('MODEL scene parent node 68=', model['nodes'][68])
+          print('ANIMATION NAMES:', [a.get('name') for a in anim.get('animations',[])])
 
-          def fmt(m):
-              return '['+', '.join(f'{v:.6g}' for v in m)+']'
-          def identity_error(m):
-              ident=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]
-              return max(abs(a-b) for a,b in zip(m,ident))
+          for wanted in ('Idle_Loop','Walk_Loop','Jog_Fwd_Loop'):
+              clip=next((a for a in anim.get('animations',[]) if a.get('name')==wanted),None)
+              if not clip:
+                  print('\nCLIP',wanted,'NOT FOUND'); continue
+              print('\nCLIP',wanted,'channels=',len(clip.get('channels',[])))
+              interesting=[]
+              for ch in clip.get('channels',[]):
+                  target=ch.get('target',{}); name=anim_names.get(target.get('node')); path=target.get('path')
+                  if name not in ('root','pelvis','Pelvis','hips','Hips','mixamorig:Hips'):
+                      continue
+                  sampler=clip['samplers'][ch['sampler']]
+                  times=accessor(anim,anim_bin,sampler['input'])
+                  values=accessor(anim,anim_bin,sampler['output'])
+                  first=values[1] if sampler.get('interpolation')=='CUBICSPLINE' and len(values)>1 else values[0]
+                  mins=[min(row[c] for row in values) for c in range(len(values[0]))]
+                  maxs=[max(row[c] for row in values) for c in range(len(values[0]))]
+                  interesting.append((name,path,first,mins,maxs,times[0][0],times[-1][0]))
+              for item in interesting: print(' ',item)
 
-          print('scenes=', doc.get('scenes'))
-          print('skins=', len(doc.get('skins',[])), 'meshes=', len(doc.get('meshes',[])), 'nodes=', len(nodes))
-          for i,n in enumerate(nodes):
-              if 'mesh' in n or 'skin' in n:
-                  print('\nMESH NODE', i, n.get('name'), 'mesh=',n.get('mesh'),'skin=',n.get('skin'),'parent=',parents[i])
-                  print(' local=',fmt(local[i]))
-                  print(' world=',fmt(world[i]))
-                  print(' worldIdentityError=',identity_error(world[i]))
-          for si,skin in enumerate(doc.get('skins',[])):
-              joints=skin.get('joints',[])
-              print('\nSKIN',si,skin.get('name'),'skeleton=',skin.get('skeleton'),'joints=',len(joints))
-              if skin.get('skeleton') is not None:
-                  s=skin['skeleton']; print(' skeleton node=',s,nodes[s].get('name'),'world=',fmt(world[s]))
-              roots=[j for j in joints if parents[j] not in joints]
-              print(' joint roots=',[(j,nodes[j].get('name'),parents[j],fmt(world[j])) for j in roots])
+          # Validate that the bind-pose skin matrices are approximately identity for vertices influenced by one joint.
+          skin=model['skins'][0]
+          ibm=accessor(model,model_bin,skin['inverseBindMatrices'])
+          print('\nIBM[0]=',ibm[0])
+          print('joint[0]=',skin['joints'][0],model['nodes'][skin['joints'][0]].get('name'))
 
-          # Prove whether the runtime's omission of inverse(meshGlobal) is material for this asset.
-          affected=[]
-          for i,n in enumerate(nodes):
-              if 'mesh' in n and 'skin' in n and identity_error(world[i]) > 1e-6:
-                  affected.append(i)
-          print('\nNON_IDENTITY_SKINNED_MESH_NODES=', affected)
-          if affected:
-              print('RESULT: Rift current skin formula is missing inverse(meshGlobal) for this exact asset.')
-          else:
-              print('RESULT: mesh globals are identity; investigate another visibility cause.')
+          # Material/texture facts that can cause whole-load failure before capsule removal.
+          print('\nMATERIALS')
+          for i,m in enumerate(model.get('materials',[])):
+              pbr=m.get('pbrMetallicRoughness',{})
+              print(i,m.get('name'),'baseColorFactor=',pbr.get('baseColorFactor'),'baseColorTexture=',pbr.get('baseColorTexture'))
+          print('IMAGES')
+          for i,img in enumerate(model.get('images',[])):
+              print(i,'mime=',img.get('mimeType'),'bufferView=',img.get('bufferView'),'uri=',img.get('uri'))
+          print('TEXTURES',model.get('textures'))
           PY
