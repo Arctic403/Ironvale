@@ -10,6 +10,7 @@ on:
       - 'src/wasm/**/*.wasm'
       - 'public/wasm/**/*.wasm'
       - 'public/rift-wasm-core.js'
+      - 'public/rift-block-section.js'
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
@@ -42,6 +43,7 @@ on:
       - 'src/wasm/**/*.wasm'
       - 'public/wasm/**/*.wasm'
       - 'public/rift-wasm-core.js'
+      - 'public/rift-block-section.js'
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
@@ -87,6 +89,21 @@ jobs:
       - name: Verify Wrangler Worker + WASM bundle
         run: npx wrangler deploy --dry-run --outdir=/tmp/rift-worker-dry
 
+      - name: Smoke-test Cloudflare Worker + WASM runtime
+        run: |
+          npx wrangler dev --local --port 8792 > /tmp/rift-worker-runtime.log 2>&1 &
+          WORKER_PID=$!
+          trap 'kill $WORKER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8792/api/health > /tmp/rift-worker-health.json; then
+              cat /tmp/rift-worker-health.json
+              exit 0
+            fi
+            sleep 0.5
+          done
+          cat /tmp/rift-worker-runtime.log
+          exit 1
+
       - name: Start static RiftCity server
         run: |
           python3 -m http.server 4173 --directory public > /tmp/riftcity-static.log 2>&1 &
@@ -117,6 +134,9 @@ jobs:
             --window-size=1600,1200
             --virtual-time-budget=5000
           )
+          "$CHROME" "${FLAGS[@]}" --dump-dom 'http://127.0.0.1:4173/inspection.html?view=top' > /tmp/rift-native-browser-dom.html
+          grep -q 'data-rift-native-core="wasm"' /tmp/rift-native-browser-dom.html
+          grep -q 'data-rift-native-core-version="2"' /tmp/rift-native-browser-dom.html
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-world-previews/downtown-top.png 'http://127.0.0.1:4173/inspection.html?view=top'
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-world-previews/downtown-birdseye.png 'http://127.0.0.1:4173/inspection.html?view=birdseye'
           test -s rift-world-previews/downtown-top.png
