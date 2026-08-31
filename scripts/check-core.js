@@ -19,22 +19,28 @@ if (world.metadata?.blankCanvas !== true) failures.push('terrain must boot as bl
 if (world.metadata?.negativeWorldY !== true || world.metadata?.lowerBarrier !== false) failures.push('negative Y/lower barrier contract');
 if (world.terrain?.size?.[0] !== 640 || world.terrain?.size?.[1] !== 640) failures.push('terrain must be 640x640');
 if (world.terrain?.sampleSpacing !== 1) failures.push('terrain editing must retain 1m samples');
-if (world.terrain?.chunkSize !== 64) failures.push('terrain render chunk size must be 64m');
+if (world.terrain?.chunkSize !== 64 || world.terrain?.sectionSize !== 64) failures.push('terrain sections must be 64m');
+if (world.terrain?.componentSize !== 128) failures.push('terrain components must be 128m');
+if (JSON.stringify(world.terrain?.lod?.steps) !== JSON.stringify([1,2,4,8,16])) failures.push('adaptive terrain LOD steps');
+if (world.terrain?.lod?.neighborMaxLevelDelta !== 1 || world.terrain?.lod?.seamMode !== 'edge-morph') failures.push('terrain LOD seam contract');
 if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
 if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
 if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
 
 const app = fs.readFileSync('public/app.js', 'utf8');
-if (!/TERRAIN_RENDER_LOD\s*=\s*2/.test(app)) failures.push('mobile terrain LOD 2');
+if (!app.includes('function updateTerrainLod(') || !app.includes('terrain.planSectionLods(')) failures.push('adaptive terrain LOD controller');
+if (!app.includes('function rebuildDirtyTerrainSections(')) failures.push('dirty terrain section rebuilds');
 if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
-if (!app.includes('function applyReticleBrush(')) failures.push('reticle sculpt action');
+if (!app.includes('function applyBrushAtReticle(')) failures.push('reticle sculpt action');
 if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier still present');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 if (!terrain.includes("import { RiftCore } from './rift-core.js'")) failures.push('terrain is not backed by RiftCore WASM');
 if (!terrain.includes('NATIVE.rift_terrain_apply_brush')) failures.push('terrain brush not native');
-if (!terrain.includes('NATIVE.rift_terrain_build_chunk')) failures.push('terrain meshing not native');
+if (!terrain.includes('NATIVE.rift_terrain_build_section')) failures.push('section meshing/stitching not native');
+if (!terrain.includes('planSectionLods(')) failures.push('terrain LOD planner missing');
+if (!terrain.includes('markDirtyRegion(')) failures.push('terrain dirty region tracking missing');
 if (!terrain.includes('NATIVE.rift_terrain_sample_height')) failures.push('terrain sampling not native');
 if (!terrain.includes('NATIVE.rift_terrain_raycast')) failures.push('native terrain raycast missing');
 
@@ -50,4 +56,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: C++/WASM terrain core + WebGL/browser shell + 640m blank world + thin auth/character backend.');
+console.log('Ironvale core verified: 128m components + 64m sections + adaptive stitched LOD + dirty rebuilds + C++/WASM terrain core.');

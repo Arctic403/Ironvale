@@ -20,6 +20,8 @@ int rift_terrain_walkable_at(float x, float z);
 int rift_terrain_is_manual_hole_at(float x, float z);
 int rift_terrain_apply_brush(int mode, float x, float z, float radius, float strength, float targetHeight);
 int rift_terrain_build_chunk(int chunkX, int chunkZ, float chunkSize, int lod);
+int rift_terrain_build_section(int sectionX, int sectionZ, float sectionSize, int lod,
+                               int northLod, int eastLod, int southLod, int westLod);
 unsigned int rift_mesh_vertices_ptr();
 int rift_mesh_vertex_float_count();
 unsigned int rift_mesh_indices_ptr();

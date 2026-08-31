@@ -24,7 +24,8 @@ const freecamSpeedValue = $('#freecam-speed-value');
 const reticle = $('#terrain-reticle');
 const altitudeControls = $('#freecam-altitude');
 
-const TERRAIN_RENDER_LOD = 2;
+const TERRAIN_LOD_REFRESH_MS = 180;
+const TERRAIN_LOD_FALLBACK_STEP = 2;
 const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v2';
 const MAX_HISTORY = 10;
 const LONG_PRESS_MS = 260;
@@ -39,6 +40,8 @@ let engine = null;
 let terrain = null;
 let worldDocument = null;
 let terrainMeshes = new Map();
+let terrainLodPlan = new Map();
+let lastTerrainLodRefresh = 0;
 let playerMesh = null;
 let brushMesh = null;
 let animationFrame = 0;
@@ -196,19 +199,18 @@ async function startWorld(url) {
   engine = new RiftEngine(canvas);
   engine.environment.fogNear = 320;
   engine.environment.fogFar = 1200;
-  rebuildTerrainMeshes();
-
   const spawn = worldDocument?.anchors?.starter_spawn || { x: 320, z: 320 };
   if (!terrain.containsXZ(player.x, player.z)) {
     player.x = spawn.x;
     player.z = spawn.z;
   }
 
+  rebuildTerrainMeshes();
   playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
   updateOrbitCamera();
   const stats = terrain.getStats?.() || {};
-  terrainStatus.textContent = `640×640 blank terrain · ${stats.surfaceChunks ?? terrainMeshes.size} render chunks · LOD ${TERRAIN_RENDER_LOD}`;
+  terrainStatus.textContent = `640×640 · ${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · adaptive LOD`;
   lastFrame = performance.now();
   animationFrame = requestAnimationFrame(frame);
 }
@@ -222,6 +224,8 @@ function stopWorld() {
   terrain = null;
   worldDocument = null;
   terrainMeshes = new Map();
+  terrainLodPlan = new Map();
+  lastTerrainLodRefresh = 0;
   playerMesh = null;
   brushMesh = null;
   reticleHit = null;
@@ -244,38 +248,104 @@ function showAuth() {
   setAuthStatus('');
 }
 
+function sectionSignature(section, neighbors) {
+  return [
+    section.lodStep,
+    neighbors.north,
+    neighbors.east,
+    neighbors.south,
+    neighbors.west
+  ].join(':');
+}
+
+function buildTerrainSection(section, plan = terrainLodPlan, force = false) {
+  if (!engine || !terrain || !section) return;
+  const key = section.key;
+  const neighbors = terrain.sectionNeighborLods(plan, section.sectionX, section.sectionZ, section.lodStep);
+  const signature = sectionSignature(section, neighbors);
+  const existing = terrainMeshes.get(key);
+  if (!force && existing?.signature === signature) return;
+
+  const entry = terrain.buildSurfaceSectionGeometry(
+    section.sectionX,
+    section.sectionZ,
+    section.lodStep,
+    neighbors
+  );
+  if (existing?.mesh) {
+    engine.updateMesh(existing.mesh, entry.geometry || entry);
+    existing.lodStep = section.lodStep;
+    existing.signature = signature;
+    existing.componentId = section.componentId;
+  } else {
+    terrainMeshes.set(key, {
+      mesh: engine.addMesh(entry.geometry || entry),
+      lodStep: section.lodStep,
+      signature,
+      componentId: section.componentId
+    });
+  }
+}
+
 function rebuildTerrainMeshes() {
   if (!engine || !terrain) return;
-  for (const mesh of terrainMeshes.values()) engine.removeMesh(mesh);
+  for (const entry of terrainMeshes.values()) if (entry?.mesh) engine.removeMesh(entry.mesh);
   terrainMeshes.clear();
-  const chunksX = Math.ceil(terrain.width / terrain.chunkSize);
-  const chunksZ = Math.ceil(terrain.depth / terrain.chunkSize);
-  for (let cz = 0; cz < chunksZ; cz += 1) {
-    for (let cx = 0; cx < chunksX; cx += 1) {
-      const entry = terrain.buildSurfaceChunkGeometry(cx, cz, TERRAIN_RENDER_LOD);
-      terrainMeshes.set(`${cx}:${cz}`, engine.addMesh(entry.geometry || entry));
-    }
-  }
+
+  terrainLodPlan = terrain.planSectionLods(player.x, player.z);
+  for (const section of terrainLodPlan.values()) buildTerrainSection(section, terrainLodPlan, true);
+  terrain.consumeDirtySections();
+  lastTerrainLodRefresh = performance.now();
   rebuildBrushMarker();
 }
 
-function rebuildTerrainArea(x, z, radius) {
-  if (!engine || !terrain) return;
-  const chunksX = Math.ceil(terrain.width / terrain.chunkSize);
-  const chunksZ = Math.ceil(terrain.depth / terrain.chunkSize);
-  const minCx = clamp(Math.floor((x - radius - terrain.origin[0]) / terrain.chunkSize), 0, chunksX - 1);
-  const maxCx = clamp(Math.floor((x + radius - terrain.origin[0]) / terrain.chunkSize), 0, chunksX - 1);
-  const minCz = clamp(Math.floor((z - radius - terrain.origin[2]) / terrain.chunkSize), 0, chunksZ - 1);
-  const maxCz = clamp(Math.floor((z + radius - terrain.origin[2]) / terrain.chunkSize), 0, chunksZ - 1);
-  for (let cz = minCz; cz <= maxCz; cz += 1) {
-    for (let cx = minCx; cx <= maxCx; cx += 1) {
-      const key = `${cx}:${cz}`;
-      const entry = terrain.buildSurfaceChunkGeometry(cx, cz, TERRAIN_RENDER_LOD);
-      const mesh = terrainMeshes.get(key);
-      if (mesh) engine.updateMesh(mesh, entry.geometry || entry);
-      else terrainMeshes.set(key, engine.addMesh(entry.geometry || entry));
-    }
+function lodSummary() {
+  const counts = new Map();
+  for (const section of terrainLodPlan.values()) {
+    counts.set(section.lodLevel, (counts.get(section.lodLevel) || 0) + 1);
   }
+  return [...counts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([level, count]) => `L${level}:${count}`)
+    .join(' ');
+}
+
+function updateTerrainLod(now = performance.now(), force = false) {
+  if (!engine || !terrain) return;
+  if (!force && now - lastTerrainLodRefresh < TERRAIN_LOD_REFRESH_MS) return;
+  lastTerrainLodRefresh = now;
+
+  const cameraX = Number(lastCameraPosition?.[0]);
+  const cameraZ = Number(lastCameraPosition?.[2]);
+  const nextPlan = terrain.planSectionLods(
+    Number.isFinite(cameraX) ? cameraX : player.x,
+    Number.isFinite(cameraZ) ? cameraZ : player.z
+  );
+
+  for (const section of nextPlan.values()) {
+    const neighbors = terrain.sectionNeighborLods(nextPlan, section.sectionX, section.sectionZ, section.lodStep);
+    const signature = sectionSignature(section, neighbors);
+    const existing = terrainMeshes.get(section.key);
+    if (force || !existing || existing.signature !== signature) buildTerrainSection(section, nextPlan, true);
+  }
+
+  terrainLodPlan = nextPlan;
+}
+
+function rebuildDirtyTerrainSections() {
+  if (!engine || !terrain) return;
+  if (!terrainLodPlan.size) terrainLodPlan = terrain.planSectionLods(player.x, player.z);
+  const dirty = terrain.consumeDirtySections();
+  for (const key of dirty) {
+    const section = terrainLodPlan.get(key);
+    if (section) buildTerrainSection(section, terrainLodPlan, true);
+  }
+}
+
+function rebuildTerrainArea(x, z, radius) {
+  if (!terrain) return;
+  terrain.markDirtyRegion(x, z, radius);
+  rebuildDirtyTerrainSections();
 }
 
 function snapPlayerToSupport() {
@@ -297,6 +367,7 @@ function frame(now) {
   if (freecamEnabled) updateFreecam(dt);
   else updatePlayer(dt);
   updateCamera();
+  updateTerrainLod(now);
   updateReticleTarget();
   engine.render();
 
@@ -640,11 +711,11 @@ function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately
   };
   if (brushMode === 'flatten') brush.targetHeight = Number.isFinite(flattenY) ? flattenY : reticleHit.y;
   terrain.applyBrush(brush);
-  rebuildTerrainArea(reticleHit.x, reticleHit.z, radius + terrain.sampleSpacing * 2);
+  rebuildDirtyTerrainSections();
   snapPlayerToSupport();
   updateReticleTarget();
   if (saveImmediately) saveDraftSilently();
-  terrainStatus.textContent = `640×640 blank terrain · edit revision ${terrain.revision}`;
+  terrainStatus.textContent = `640×640 · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
 }
 
 function moveReticleToClient(clientX, clientY) {
@@ -871,7 +942,7 @@ function resetTerrain() {
   rebuildTerrainMeshes();
   snapPlayerToSupport();
   updateReticleTarget();
-  terrainStatus.textContent = '640×640 blank terrain reset';
+  terrainStatus.textContent = `640×640 blank terrain reset · ${lodSummary() || 'adaptive LOD'}`;
   editorStatus.textContent = 'Back to a perfectly flat blank canvas.';
 }
 

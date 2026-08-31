@@ -6,8 +6,15 @@
   "units": "meters",
   "terrain": {
     "format": "rift-terrain-v1",
-    "origin": [0, 0, 0],
-    "size": [640, 640],
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "size": [
+      640,
+      640
+    ],
     "sampleSpacing": 1,
     "chunkSize": 64,
     "seed": 1,
@@ -16,10 +23,45 @@
     "layers": [],
     "holes": [],
     "caves": [],
-    "edits": []
+    "edits": [],
+    "sectionSize": 64,
+    "componentSize": 128,
+    "lod": {
+      "steps": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "distances": [
+        96,
+        192,
+        320,
+        480
+      ],
+      "neighborMaxLevelDelta": 1,
+      "refreshMs": 180,
+      "seamMode": "edge-morph"
+    },
+    "collision": {
+      "lodSteps": [
+        1,
+        2,
+        4
+      ],
+      "nearDistance": 128,
+      "mediumDistance": 256,
+      "authoritativeHeightfield": true
+    }
   },
   "anchors": {
-    "starter_spawn": {"x":320,"z":320,"facing":0,"terrainSnap":true}
+    "starter_spawn": {
+      "x": 320,
+      "z": 320,
+      "facing": 0,
+      "terrainSnap": true
+    }
   },
   "objects": [],
   "metadata": {
@@ -29,6 +71,9 @@
     "blankCanvas": true,
     "negativeWorldY": true,
     "lowerBarrier": false,
-    "description": "Blank continuous Rift Terrain canvas. Negative Y is valid world space. No generated hills, caves, roads, structures, props, map content or artificial lower barrier."
+    "description": "Blank continuous Rift Terrain canvas. Negative Y is valid world space. No generated hills, caves, roads, structures, props, map content or artificial lower barrier.",
+    "terrainOrganization": "128m components / 64m sections / 1m source samples",
+    "adaptiveLod": true,
+    "lodSeamStitching": true
   }
 }

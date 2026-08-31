@@ -1,9 +1,13 @@
 import { RiftCore } from './rift-core.js';
 
 const EPSILON = 1e-6;
-const DEFAULT_CHUNK_SIZE = 32;
+const DEFAULT_SECTION_SIZE = 64;
+const DEFAULT_COMPONENT_SIZE = 128;
 const DEFAULT_SAMPLE_SPACING = 1;
 const DEFAULT_MAX_WALK_SLOPE = 0.78;
+const DEFAULT_LOD_STEPS = Object.freeze([1, 2, 4, 8, 16]);
+const DEFAULT_LOD_DISTANCES = Object.freeze([96, 192, 320, 480]);
+const DEFAULT_COLLISION_LOD_STEPS = Object.freeze([1, 2, 4]);
 const NATIVE = RiftCore.exports;
 const MEMORY = RiftCore.memory;
 
@@ -46,8 +50,14 @@ export function validateRiftTerrainConfig(config) {
   if (!(Number(size[0]) > 0 && Number(size[1]) > 0)) failures.push('terrain size must be positive');
   const spacing = Number(config?.sampleSpacing ?? DEFAULT_SAMPLE_SPACING);
   if (!(spacing > 0 && spacing <= 4)) failures.push('sampleSpacing must be > 0 and <= 4 meters');
-  const chunkSize = Number(config?.chunkSize ?? DEFAULT_CHUNK_SIZE);
-  if (!(chunkSize >= spacing * 4 && chunkSize <= 128)) failures.push('chunkSize must contain at least 4 samples and be <= 128 meters');
+  const sectionSize = Number(config?.sectionSize ?? config?.chunkSize ?? DEFAULT_SECTION_SIZE);
+  const componentSize = Number(config?.componentSize ?? DEFAULT_COMPONENT_SIZE);
+  if (!(sectionSize >= spacing * 4 && sectionSize <= 128)) failures.push('sectionSize must contain at least 4 samples and be <= 128 meters');
+  if (!(componentSize >= sectionSize && componentSize <= 512 && componentSize % sectionSize === 0)) failures.push('componentSize must be an integer multiple of sectionSize');
+  const lodSteps = Array.isArray(config?.lod?.steps) ? config.lod.steps.map(Number) : [...DEFAULT_LOD_STEPS];
+  if (!lodSteps.length || lodSteps[0] !== 1 || lodSteps.some((step, index) => !Number.isInteger(step) || step < 1 || (index && step <= lodSteps[index - 1]) || Math.abs(sectionSize / (spacing * step) - Math.round(sectionSize / (spacing * step))) > EPSILON)) {
+    failures.push('LOD steps must start at 1, increase, and evenly divide each terrain section');
+  }
   const columns = Math.round(Number(size[0]) / spacing) + 1;
   const rows = Math.round(Number(size[1]) / spacing) + 1;
   if (columns > 1025 || rows > 1025) failures.push('native RiftCore currently supports up to 1025 samples per terrain axis');
@@ -63,7 +73,14 @@ export class RiftTerrain {
     this.width = Number(config.size[0]);
     this.depth = Number(config.size[1]);
     this.sampleSpacing = Number(config.sampleSpacing ?? DEFAULT_SAMPLE_SPACING);
-    this.chunkSize = Number(config.chunkSize ?? DEFAULT_CHUNK_SIZE);
+    this.sectionSize = Number(config.sectionSize ?? config.chunkSize ?? DEFAULT_SECTION_SIZE);
+    this.chunkSize = this.sectionSize; // compatibility alias: old "chunks" are now terrain sections.
+    this.componentSize = Number(config.componentSize ?? DEFAULT_COMPONENT_SIZE);
+    this.sectionsPerComponent = Math.max(1, Math.round(this.componentSize / this.sectionSize));
+    this.lodSteps = (Array.isArray(config.lod?.steps) ? config.lod.steps : DEFAULT_LOD_STEPS).map(Number);
+    this.lodDistances = (Array.isArray(config.lod?.distances) ? config.lod.distances : DEFAULT_LOD_DISTANCES).map(Number);
+    this.collisionLodSteps = (Array.isArray(config.collision?.lodSteps) ? config.collision.lodSteps : DEFAULT_COLLISION_LOD_STEPS).map(Number);
+    this._dirtySections = new Set();
     this.seed = Math.trunc(Number(config.seed) || 1337);
     this.baseHeight = Number(config.baseHeight) || 0;
     this.maxWalkSlope = clamp(Number(config.maxWalkSlope) || DEFAULT_MAX_WALK_SLOPE, 0.25, 2.5);
@@ -109,6 +126,189 @@ export class RiftTerrain {
 
   containsXZ(x, z) {
     return x >= this.origin[0] && z >= this.origin[2] && x <= this.origin[0] + this.width && z <= this.origin[2] + this.depth;
+  }
+
+  sectionCounts() {
+    return {
+      x: Math.ceil(this.width / this.sectionSize),
+      z: Math.ceil(this.depth / this.sectionSize)
+    };
+  }
+
+  componentCounts() {
+    return {
+      x: Math.ceil(this.width / this.componentSize),
+      z: Math.ceil(this.depth / this.componentSize)
+    };
+  }
+
+  sectionKey(sectionX, sectionZ) { return `${sectionX}:${sectionZ}`; }
+
+  sectionBounds(sectionX, sectionZ) {
+    const minX = this.origin[0] + sectionX * this.sectionSize;
+    const minZ = this.origin[2] + sectionZ * this.sectionSize;
+    return {
+      minX,
+      minZ,
+      maxX: Math.min(this.origin[0] + this.width, minX + this.sectionSize),
+      maxZ: Math.min(this.origin[2] + this.depth, minZ + this.sectionSize)
+    };
+  }
+
+  getSectionDescriptor(sectionX, sectionZ, lodStep = 1) {
+    const bounds = this.sectionBounds(sectionX, sectionZ);
+    const componentX = Math.floor(sectionX / this.sectionsPerComponent);
+    const componentZ = Math.floor(sectionZ / this.sectionsPerComponent);
+    return {
+      id: `section-${sectionX}-${sectionZ}`,
+      key: this.sectionKey(sectionX, sectionZ),
+      sectionX,
+      sectionZ,
+      componentX,
+      componentZ,
+      componentId: `component-${componentX}-${componentZ}`,
+      lodStep,
+      lodLevel: Math.max(0, this.lodSteps.indexOf(lodStep)),
+      bounds
+    };
+  }
+
+  getComponentDescriptor(componentX, componentZ) {
+    const minSectionX = componentX * this.sectionsPerComponent;
+    const minSectionZ = componentZ * this.sectionsPerComponent;
+    const counts = this.sectionCounts();
+    const sections = [];
+    for (let dz = 0; dz < this.sectionsPerComponent; dz += 1) {
+      for (let dx = 0; dx < this.sectionsPerComponent; dx += 1) {
+        const sectionX = minSectionX + dx;
+        const sectionZ = minSectionZ + dz;
+        if (sectionX < counts.x && sectionZ < counts.z) sections.push(this.getSectionDescriptor(sectionX, sectionZ));
+      }
+    }
+    return {
+      id: `component-${componentX}-${componentZ}`,
+      componentX,
+      componentZ,
+      size: this.componentSize,
+      sections
+    };
+  }
+
+  buildComponentIndex() {
+    const counts = this.componentCounts();
+    const components = [];
+    for (let z = 0; z < counts.z; z += 1) {
+      for (let x = 0; x < counts.x; x += 1) components.push(this.getComponentDescriptor(x, z));
+    }
+    return components;
+  }
+
+  _distanceToSection(x, z, bounds) {
+    const dx = x < bounds.minX ? bounds.minX - x : x > bounds.maxX ? x - bounds.maxX : 0;
+    const dz = z < bounds.minZ ? bounds.minZ - z : z > bounds.maxZ ? z - bounds.maxZ : 0;
+    return Math.hypot(dx, dz);
+  }
+
+  _desiredLodLevel(distance) {
+    let level = 0;
+    while (level < this.lodSteps.length - 1 && distance >= (this.lodDistances[level] ?? Infinity)) level += 1;
+    return level;
+  }
+
+  planSectionLods(cameraX, cameraZ) {
+    const counts = this.sectionCounts();
+    const levels = new Map();
+    for (let z = 0; z < counts.z; z += 1) {
+      for (let x = 0; x < counts.x; x += 1) {
+        const key = this.sectionKey(x, z);
+        const distance = this._distanceToSection(cameraX, cameraZ, this.sectionBounds(x, z));
+        levels.set(key, this._desiredLodLevel(distance));
+      }
+    }
+
+    // Unreal-style neighbor constraint: an edge may only cross one LOD level.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let z = 0; z < counts.z; z += 1) {
+        for (let x = 0; x < counts.x; x += 1) {
+          const key = this.sectionKey(x, z);
+          let level = levels.get(key);
+          for (const [nx, nz] of [[x, z - 1], [x + 1, z], [x, z + 1], [x - 1, z]]) {
+            if (nx < 0 || nz < 0 || nx >= counts.x || nz >= counts.z) continue;
+            const neighborKey = this.sectionKey(nx, nz);
+            const neighbor = levels.get(neighborKey);
+            if (level > neighbor + 1) {
+              level = neighbor + 1;
+              levels.set(key, level);
+              changed = true;
+            }
+          }
+        }
+      }
+    }
+
+    const plan = new Map();
+    for (let z = 0; z < counts.z; z += 1) {
+      for (let x = 0; x < counts.x; x += 1) {
+        const key = this.sectionKey(x, z);
+        const level = levels.get(key);
+        plan.set(key, {
+          ...this.getSectionDescriptor(x, z, this.lodSteps[level]),
+          lodLevel: level,
+          lodStep: this.lodSteps[level]
+        });
+      }
+    }
+    return plan;
+  }
+
+  sectionNeighborLods(plan, sectionX, sectionZ, fallbackStep = 1) {
+    const counts = this.sectionCounts();
+    const read = (x, z) => {
+      if (x < 0 || z < 0 || x >= counts.x || z >= counts.z) return fallbackStep;
+      return plan?.get(this.sectionKey(x, z))?.lodStep ?? fallbackStep;
+    };
+    return {
+      north: read(sectionX, sectionZ - 1),
+      east: read(sectionX + 1, sectionZ),
+      south: read(sectionX, sectionZ + 1),
+      west: read(sectionX - 1, sectionZ)
+    };
+  }
+
+  markDirtyRegion(x, z, radius = 0) {
+    const counts = this.sectionCounts();
+    const pad = Math.max(this.sampleSpacing * 2, Number(radius) || 0);
+    const minX = clamp(Math.floor((x - pad - this.origin[0]) / this.sectionSize) - 1, 0, counts.x - 1);
+    const maxX = clamp(Math.floor((x + pad - this.origin[0]) / this.sectionSize) + 1, 0, counts.x - 1);
+    const minZ = clamp(Math.floor((z - pad - this.origin[2]) / this.sectionSize) - 1, 0, counts.z - 1);
+    const maxZ = clamp(Math.floor((z + pad - this.origin[2]) / this.sectionSize) + 1, 0, counts.z - 1);
+    for (let sectionZ = minZ; sectionZ <= maxZ; sectionZ += 1) {
+      for (let sectionX = minX; sectionX <= maxX; sectionX += 1) {
+        this._dirtySections.add(this.sectionKey(sectionX, sectionZ));
+      }
+    }
+  }
+
+  markAllSectionsDirty() {
+    const counts = this.sectionCounts();
+    for (let z = 0; z < counts.z; z += 1) {
+      for (let x = 0; x < counts.x; x += 1) this._dirtySections.add(this.sectionKey(x, z));
+    }
+  }
+
+  consumeDirtySections() {
+    const result = [...this._dirtySections];
+    this._dirtySections.clear();
+    return result;
+  }
+
+  collisionLodStepForDistance(distance) {
+    const d = Math.max(0, Number(distance) || 0);
+    if (d < this.sectionSize * 2) return this.collisionLodSteps[0] ?? 1;
+    if (d < this.componentSize * 2) return this.collisionLodSteps[1] ?? this.collisionLodSteps[0] ?? 1;
+    return this.collisionLodSteps[2] ?? this.collisionLodSteps.at(-1) ?? 1;
   }
 
   sampleHeight(x, z) {
@@ -241,12 +441,14 @@ export class RiftTerrain {
     const strength = Number(brush.strength) || 1;
     const target = Number.isFinite(Number(brush.targetHeight)) ? Number(brush.targetHeight) : 0;
     assertNative(NATIVE.rift_terrain_apply_brush(mode, x, z, radius, strength, target), 'RiftCore brush failed.');
+    this.markDirtyRegion(x, z, radius);
     this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
     this.revision += 1;
   }
 
   rebuildFromManualDelta() {
     NATIVE.rift_terrain_rebuild_from_delta();
+    this.markAllSectionsDirty();
     this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
     this.revision += 1;
   }
@@ -268,12 +470,24 @@ export class RiftTerrain {
     return { x: view[0], y: view[1], z: view[2], distance: view[3] };
   }
 
-  buildSurfaceChunkGeometry(chunkX, chunkZ, lod = 1) {
-    const step = Math.max(1, Math.trunc(lod));
-    assertNative(
-      NATIVE.rift_terrain_build_chunk(Math.trunc(chunkX), Math.trunc(chunkZ), this.chunkSize, step),
-      `RiftCore could not build terrain chunk ${chunkX}:${chunkZ}.`
-    );
+  buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep = 1, neighborLods = null) {
+    const step = Math.max(1, Math.trunc(lodStep));
+    const neighbors = neighborLods || { north: step, east: step, south: step, west: step };
+    const build = NATIVE.rift_terrain_build_section || NATIVE.rift_terrain_build_chunk;
+    const ok = NATIVE.rift_terrain_build_section
+      ? build(
+          Math.trunc(sectionX),
+          Math.trunc(sectionZ),
+          this.sectionSize,
+          step,
+          Math.max(step, Math.trunc(neighbors.north || step)),
+          Math.max(step, Math.trunc(neighbors.east || step)),
+          Math.max(step, Math.trunc(neighbors.south || step)),
+          Math.max(step, Math.trunc(neighbors.west || step))
+        )
+      : build(Math.trunc(sectionX), Math.trunc(sectionZ), this.sectionSize, step);
+    assertNative(ok, `RiftCore could not build terrain section ${sectionX}:${sectionZ}.`);
+
     const vertexFloatCount = NATIVE.rift_mesh_vertex_float_count();
     const indexCount = NATIVE.rift_mesh_index_count();
     const vertexView = new Float32Array(MEMORY.buffer, NATIVE.rift_mesh_vertices_ptr(), vertexFloatCount);
@@ -282,21 +496,30 @@ export class RiftTerrain {
     const vertexCount = vertices.length / 9;
     const indices = vertexCount > 65535 ? new Uint32Array(indexView) : Uint16Array.from(indexView);
     return {
-      id: `terrain-${chunkX}-${chunkZ}`,
-      chunkX,
-      chunkZ,
+      id: `terrain-section-${sectionX}-${sectionZ}`,
+      sectionX,
+      sectionZ,
+      chunkX: sectionX,
+      chunkZ: sectionZ,
       lod: step,
+      lodStep: step,
+      neighborLods: { ...neighbors },
       geometry: { vertices, indices, vertexStride: 9 },
       triangles: indices.length / 3
     };
   }
 
+  buildSurfaceChunkGeometry(chunkX, chunkZ, lod = 1) {
+    return this.buildSurfaceSectionGeometry(chunkX, chunkZ, lod);
+  }
+
   buildSurfaceGeometries(lod = 1) {
-    const chunksX = Math.ceil(this.width / this.chunkSize);
-    const chunksZ = Math.ceil(this.depth / this.chunkSize);
+    const counts = this.sectionCounts();
     const result = [];
-    for (let cz = 0; cz < chunksZ; cz += 1) {
-      for (let cx = 0; cx < chunksX; cx += 1) result.push(this.buildSurfaceChunkGeometry(cx, cz, lod));
+    for (let sectionZ = 0; sectionZ < counts.z; sectionZ += 1) {
+      for (let sectionX = 0; sectionX < counts.x; sectionX += 1) {
+        result.push(this.buildSurfaceSectionGeometry(sectionX, sectionZ, lod));
+      }
     }
     return result;
   }
@@ -357,7 +580,10 @@ export class RiftTerrain {
   }
 
   getStats() {
-    const surfaceChunks = Math.ceil(this.width / this.chunkSize) * Math.ceil(this.depth / this.chunkSize);
+    const sections = this.sectionCounts();
+    const components = this.componentCounts();
+    const surfaceSections = sections.x * sections.z;
+    const componentCount = components.x * components.z;
     return {
       format: 'rift-terrain-v1',
       engine: 'rift-core-wasm',
@@ -366,8 +592,15 @@ export class RiftTerrain {
       depth: this.depth,
       sampleSpacing: this.sampleSpacing,
       samples: this.columns * this.rows,
-      chunkSize: this.chunkSize,
-      surfaceChunks,
+      sectionSize: this.sectionSize,
+      chunkSize: this.sectionSize,
+      componentSize: this.componentSize,
+      sectionsPerComponent: this.sectionsPerComponent,
+      surfaceSections,
+      surfaceChunks: surfaceSections,
+      components: componentCount,
+      lodSteps: [...this.lodSteps],
+      collisionLodSteps: [...this.collisionLodSteps],
       caves: this._caveCache.length,
       layers: this.layers.length,
       revision: this.revision

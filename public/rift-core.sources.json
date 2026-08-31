@@ -4,11 +4,11 @@
   "sources": [
     {
       "path": "native/include/rift/terrain.hpp",
-      "gitBlobSha": "d2e319a8e50bf2c33cab313ca0c259588f46ce3a"
+      "gitBlobSha": "978810f97e8a0138aebec732536e939e57d60ecc"
     },
     {
       "path": "native/src/terrain.cpp",
-      "gitBlobSha": "a488fe5fb15e88ad38c478bd08309787a4598619"
+      "gitBlobSha": "1794ea15fcf4e5caf6891612acab554d46883246"
     }
   ]
 }

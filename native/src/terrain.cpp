@@ -87,6 +87,40 @@ bool manualHole(float x,float z){
   return gHoles[cidx(gx,gz)]!=0;
 }
 
+
+float seamAlongX(float x,float z,int coarseStep){
+  if(coarseStep<=1) return sample(x,z);
+  float gx=clampf((x-gOriginX)/gSpacing,0.0f,(float)(gColumns-1));
+  int stride=coarseStep;
+  int i0=clampi((floori(gx/(float)stride))*stride,0,gColumns-1);
+  int i1=clampi(i0+stride,0,gColumns-1);
+  if(i1==i0) return sample(x,z);
+  float t=clampf((gx-(float)i0)/(float)(i1-i0),0.0f,1.0f);
+  return lerpf(sample(worldX(i0),z),sample(worldX(i1),z),t);
+}
+
+float seamAlongZ(float x,float z,int coarseStep){
+  if(coarseStep<=1) return sample(x,z);
+  float gz=clampf((z-gOriginZ)/gSpacing,0.0f,(float)(gRows-1));
+  int stride=coarseStep;
+  int i0=clampi((floori(gz/(float)stride))*stride,0,gRows-1);
+  int i1=clampi(i0+stride,0,gRows-1);
+  if(i1==i0) return sample(x,z);
+  float t=clampf((gz-(float)i0)/(float)(i1-i0),0.0f,1.0f);
+  return lerpf(sample(x,worldZ(i0)),sample(x,worldZ(i1)),t);
+}
+
+float stitchedHeight(float x,float z,int lod,int northLod,int eastLod,int southLod,int westLod,
+                     float minX,float maxX,float minZ,float maxZ){
+  float y=sample(x,z);
+  const float edgeEpsilon=maxf(0.0005f,gSpacing*0.001f);
+  if(absf(z-minZ)<=edgeEpsilon && northLod>lod) y=seamAlongX(x,z,northLod);
+  if(absf(x-maxX)<=edgeEpsilon && eastLod>lod) y=seamAlongZ(x,z,eastLod);
+  if(absf(z-maxZ)<=edgeEpsilon && southLod>lod) y=seamAlongX(x,z,southLod);
+  if(absf(x-minX)<=edgeEpsilon && westLod>lod) y=seamAlongZ(x,z,westLod);
+  return y;
+}
+
 void terrainColor(float y,const float* n,float* out){
   float slope=clampf(1.0f-n[1],0.0f,1.0f);
   const float low[3]={0.26f,0.39f,0.19f};
@@ -155,29 +189,49 @@ int rift_terrain_apply_brush(int mode,float x,float z,float radius,float strengt
   return 1;
 }
 
-int rift_terrain_build_chunk(int chunkX,int chunkZ,float chunkSize,int lod){
-  if(!ready()||chunkSize<=0.0f) return 0; int step=lod<1?1:lod;
+int rift_terrain_build_section(int sectionX,int sectionZ,float sectionSize,int lod,
+                               int northLod,int eastLod,int southLod,int westLod){
+  if(!ready()||sectionSize<=0.0f) return 0;
+  int step=lod<1?1:lod;
+  northLod=northLod<step?step:northLod;
+  eastLod=eastLod<step?step:eastLod;
+  southLod=southLod<step?step:southLod;
+  westLod=westLod<step?step:westLod;
+
   float width=(gColumns-1)*gSpacing, depth=(gRows-1)*gSpacing;
-  float startX=chunkX*chunkSize,startZ=chunkZ*chunkSize; if(startX>=width||startZ>=depth)return 0;
-  float endX=minf(width,startX+chunkSize),endZ=minf(depth,startZ+chunkSize),cellStep=gSpacing*(float)step;
-  int cellsX=(int)((endX-startX)/cellStep+0.5f); if(cellsX<1)cellsX=1; if(cellsX>kMaxChunkCells) return 0;
-  int cellsZ=(int)((endZ-startZ)/cellStep+0.5f); if(cellsZ<1)cellsZ=1; if(cellsZ>kMaxChunkCells) return 0;
+  float startX=sectionX*sectionSize,startZ=sectionZ*sectionSize;
+  if(startX>=width||startZ>=depth)return 0;
+  float endX=minf(width,startX+sectionSize),endZ=minf(depth,startZ+sectionSize),cellStep=gSpacing*(float)step;
+  int cellsX=ceili((endX-startX)/cellStep); if(cellsX<1)cellsX=1; if(cellsX>kMaxChunkCells) return 0;
+  int cellsZ=ceili((endZ-startZ)/cellStep); if(cellsZ<1)cellsZ=1; if(cellsZ>kMaxChunkCells) return 0;
   int vertsX=cellsX+1,vertsZ=cellsZ+1,vertex=0;
+  float worldMinX=gOriginX+startX, worldMaxX=gOriginX+endX;
+  float worldMinZ=gOriginZ+startZ, worldMaxZ=gOriginZ+endZ;
+
   for(int iz=0;iz<vertsZ;iz++){
     float z=gOriginZ+minf(endZ,startZ+(float)iz*cellStep);
     for(int ix=0;ix<vertsX;ix++){
-      float x=gOriginX+minf(endX,startX+(float)ix*cellStep), y=sample(x,z); if(y>1e20f)y=gBaseHeight;
+      float x=gOriginX+minf(endX,startX+(float)ix*cellStep);
+      float y=stitchedHeight(x,z,step,northLod,eastLod,southLod,westLod,worldMinX,worldMaxX,worldMinZ,worldMaxZ);
+      if(y>1e20f)y=gBaseHeight;
       float n[3], color[3]; normalAt(x,z,n); terrainColor(y,n,color); int o=vertex*kVertexStride;
       gMeshVertices[o]=x;gMeshVertices[o+1]=y;gMeshVertices[o+2]=z;gMeshVertices[o+3]=n[0];gMeshVertices[o+4]=n[1];gMeshVertices[o+5]=n[2];gMeshVertices[o+6]=color[0];gMeshVertices[o+7]=color[1];gMeshVertices[o+8]=color[2]; vertex++;
     }
   }
   int indexCount=0;
   for(int iz=0;iz<cellsZ;iz++)for(int ix=0;ix<cellsX;ix++){
-    float cx=gOriginX+startX+((float)ix+0.5f)*cellStep,cz=gOriginZ+startZ+((float)iz+0.5f)*cellStep; if(manualHole(cx,cz))continue;
+    float x0=minf(endX,startX+(float)ix*cellStep), x1=minf(endX,startX+(float)(ix+1)*cellStep);
+    float z0=minf(endZ,startZ+(float)iz*cellStep), z1=minf(endZ,startZ+(float)(iz+1)*cellStep);
+    float cx=gOriginX+(x0+x1)*0.5f,cz=gOriginZ+(z0+z1)*0.5f; if(manualHole(cx,cz))continue;
     unsigned int a=(unsigned int)(iz*vertsX+ix),b=a+1,c=a+(unsigned int)vertsX,d=c+1;
     gMeshIndices[indexCount++]=a;gMeshIndices[indexCount++]=c;gMeshIndices[indexCount++]=d;gMeshIndices[indexCount++]=a;gMeshIndices[indexCount++]=d;gMeshIndices[indexCount++]=b;
   }
   gMeshVertexFloats=vertex*kVertexStride; gMeshIndexCount=indexCount; return 1;
+}
+
+int rift_terrain_build_chunk(int chunkX,int chunkZ,float chunkSize,int lod){
+  int step=lod<1?1:lod;
+  return rift_terrain_build_section(chunkX,chunkZ,chunkSize,step,step,step,step,step);
 }
 unsigned int rift_mesh_vertices_ptr(){ return (unsigned int)(unsigned long)gMeshVertices; }
 int rift_mesh_vertex_float_count(){ return gMeshVertexFloats; }
