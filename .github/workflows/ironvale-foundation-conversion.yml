@@ -23,6 +23,25 @@ jobs:
           python scripts/apply-ironvale-foundation-backend.py
           python scripts/apply-ironvale-foundation-frontend.py
 
+      - name: Regenerate renamed BuildingProgram diagnostics
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { compileRiftBuildingProgram } from './public/rift-building-program.js';
+          const dir = path.resolve('public/rift-buildings');
+          for (const name of fs.readdirSync(dir).filter(name => name.endsWith('.json') && !name.endsWith('.report.json')).sort()) {
+            const sourcePath = path.join(dir, name);
+            const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+            if (!source.output?.report_path) continue;
+            const result = compileRiftBuildingProgram(source, { strict: true });
+            const reportPath = path.resolve(source.output.report_path);
+            fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+            fs.writeFileSync(reportPath, JSON.stringify(result.report, null, 2) + '\n');
+            console.log(`Regenerated ${path.relative(process.cwd(), reportPath)}`);
+          }
+          NODE
+
       - name: Verify conversion diff and syntax
         run: |
           git diff --check
