@@ -24,7 +24,7 @@ jobs:
         run: node scripts/apply-rift-native-v2-integration.mjs
 
       - name: Install Cloudflare Worker dependencies
-        run: bun install
+        run: npm install --no-audit --no-fund
 
       - name: Run full RiftCity build and native regressions
         run: npm run build
