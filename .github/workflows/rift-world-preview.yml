@@ -136,7 +136,7 @@ jobs:
           )
           "$CHROME" "${FLAGS[@]}" --dump-dom 'http://127.0.0.1:4173/inspection.html?view=top' > /tmp/rift-native-browser-dom.html
           grep -q 'data-rift-native-core="wasm"' /tmp/rift-native-browser-dom.html
-          grep -q 'data-rift-native-core-version="2"' /tmp/rift-native-browser-dom.html
+          grep -q 'data-rift-native-core-version="3"' /tmp/rift-native-browser-dom.html
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-world-previews/downtown-top.png 'http://127.0.0.1:4173/inspection.html?view=top'
           "$CHROME" "${FLAGS[@]}" --screenshot=rift-world-previews/downtown-birdseye.png 'http://127.0.0.1:4173/inspection.html?view=birdseye'
           test -s rift-world-previews/downtown-top.png
