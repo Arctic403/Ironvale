@@ -15,24 +15,9 @@ const ACTIVE_BLOCK_STORAGE_VERSION = 1;
 const ACTIVE_BLOCK_MAX_BYTES = 2 * 1024 * 1024;
 
 export function destroyDowntown3D() {
-  // Detach the global reference before running disposal. If one cleanup hook
-  // throws (WebGL/Safari can do this while a page is being replaced), the SPA
-  // must still be able to navigate and a later destroy call must not retry the
-  // same half-disposed foundation forever.
-  const foundation = activeFoundation;
+  activeFoundation?.destroy?.();
   activeFoundation = null;
-  try {
-    foundation?.destroy?.();
-  } catch (error) {
-    console.warn('Rift world foundation cleanup failed', error);
-  } finally {
-    document.body.classList.remove('world3d-game-mode');
-    const style = document.documentElement.style;
-    style.removeProperty('--rift-viewport-width');
-    style.removeProperty('--rift-viewport-height');
-    style.removeProperty('--rift-viewport-left');
-    style.removeProperty('--rift-viewport-top');
-  }
+  document.body.classList.remove('world3d-game-mode');
 }
 
 export async function renderDowntown3D(root) {
@@ -293,81 +278,130 @@ function createBlockImporterLab({ root, canvas, status }) {
     else thirdPersonCamera?.update(dt);
   };
 
-  const syncBuildUi = () => {
-    const buildMode = !!creative?.active;
-    root.classList.toggle('rift-build-active', buildMode);
-    shell?.classList.toggle('rift-build-active', buildMode);
-    const toggle = root.querySelector('#rift-creative-toggle');
-    if (toggle) {
-      toggle.classList.toggle('active', buildMode);
-      toggle.textContent = buildMode ? 'EXIT BUILD' : 'BUILD MODE';
+  const calculateCamera = () => {
+    if (!imported) return { target: [32, 4, 32], orthoSize: 76 };
+    const min = imported.worldBounds.min;
+    const max = imported.worldBounds.max;
+    const width = max[0] - min[0] + 1;
+    const depth = max[2] - min[2] + 1;
+    const height = max[1] - min[1] + 1;
+    return {
+      target: [imported.center[0], min[1] + Math.min(5, height * 0.28), imported.center[2]],
+      orthoSize: Math.max(28, Math.min(88, Math.max(width, depth) * 1.18 + height * 0.35))
+    };
+  };
+
+  const normalizeInspectionBounds = bounds => {
+    const fallback = imported?.worldBounds || { min: [0, 0, 0], max: [63, 16, 63] };
+    const source = bounds?.min && bounds?.max ? bounds : fallback;
+    const min = source.min.map(Number);
+    const max = source.max.map(Number);
+    return { min, max };
+  };
+
+  const setInspectionCamera = (mode = 'birdseye', bounds = null) => {
+    const next = String(mode || 'birdseye').toLowerCase();
+    if (next === 'first-person' || next === 'first' || next === 'fp') {
+      setFirstPerson(true);
+      return { mode: 'first-person', target: [...camera.target], position: [...camera.position] };
     }
-    const label = root.querySelector('#rift-mode-label');
-    if (label) label.textContent = buildMode ? 'BUILD' : 'PLAY';
-  };
+    if (next === 'third-person' || next === 'third' || next === 'player') {
+      setFirstPerson(false, { resetCamera: false });
+      topView = false;
+      resetPlayerCamera();
+      camera.updatePosition();
+      return { mode: 'third-person', target: [...camera.target], position: [...camera.position] };
+    }
+    if (firstPersonActive) setFirstPerson(false, { resetCamera: false });
 
-  const resetCamera = () => {
-    setFirstPerson(false, { resetCamera: false });
-    resetPlayerCamera();
-  };
+    const viewBounds = normalizeInspectionBounds(bounds);
+    const min = viewBounds.min;
+    const max = viewBounds.max;
+    const width = Math.max(1, max[0] - min[0] + 1);
+    const height = Math.max(1, max[1] - min[1] + 1);
+    const depth = Math.max(1, max[2] - min[2] + 1);
+    const center = [(min[0] + max[0] + 1) * 0.5, (min[1] + max[1] + 1) * 0.5, (min[2] + max[2] + 1) * 0.5];
+    const span = Math.max(width, depth);
+    topView = true;
+    camera.radius = Math.max(24, Math.min(150, span * 1.45 + height * 0.9));
+    camera.orthoSize = Math.max(12, Math.min(120, span * 1.28 + height * 0.22));
 
-  const setInspectionCamera = (view = 'top') => {
-    topView = false;
-    setFirstPerson(false, { resetCamera: false });
-    const bounds = imported?.worldBounds;
-    const minX = Number(bounds?.min?.[0]) || 0;
-    const minY = Number(bounds?.min?.[1]) || 0;
-    const minZ = Number(bounds?.min?.[2]) || 0;
-    const maxX = Number(bounds?.max?.[0]) || 64;
-    const maxY = Number(bounds?.max?.[1]) || 16;
-    const maxZ = Number(bounds?.max?.[2]) || 64;
-    const centerX = (minX + maxX) * 0.5;
-    const centerZ = (minZ + maxZ) * 0.5;
-    const spanX = Math.max(1, maxX - minX);
-    const spanZ = Math.max(1, maxZ - minZ);
-    const span = Math.max(spanX, spanZ);
-    camera.setProjection('orthographic');
-    camera.orthoSize = Math.max(24, span * 0.62);
-    camera.radius = Math.max(42, span * 0.95);
-    if (view === 'birdseye') {
-      camera.alpha = -Math.PI * 0.72;
-      camera.beta = 0.62;
-      camera.orthoSize = Math.max(24, span * 0.48);
-      camera.radius = Math.max(38, span * 0.78);
-    } else {
+    if (next === 'top') {
+      camera.setProjection('orthographic');
       camera.alpha = -Math.PI / 2;
-      camera.beta = 0.001;
+      camera.beta = 0.055;
+    } else if (next === 'north' || next === 'south' || next === 'east' || next === 'west') {
+      camera.setProjection('perspective');
+      camera.beta = 1.02;
+      camera.radius = Math.max(10, Math.min(100, span * 1.05 + height * 0.8));
+      camera.alpha = next === 'north' ? -Math.PI / 2 : next === 'south' ? Math.PI / 2 : next === 'east' ? 0 : Math.PI;
+    } else {
+      camera.setProjection('orthographic');
+      camera.alpha = -Math.PI / 4;
+      camera.beta = 0.68;
     }
-    camera.setTarget(centerX, Math.max(minY, Math.min(maxY, minY + 1.5)), centerZ);
+    camera.setTarget(...center);
+    camera.updatePosition();
+    topButton?.classList.toggle('active', true);
+    if (topButton) topButton.textContent = 'FOLLOW PLAYER';
     syncReticleUi();
+    return { mode: next === 'birdseye' ? 'birdseye' : next, target: [...camera.target], position: [...camera.position], bounds: viewBounds };
+  };
+
+  const captureCanvasPng = () => {
     engine.render(camera);
+    const gl = engine.gl;
+    const width = Math.max(1, canvas.width | 0);
+    const height = Math.max(1, canvas.height | 0);
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    const output = document.createElement('canvas');
+    output.width = width;
+    output.height = height;
+    const context = output.getContext('2d', { alpha: false });
+    const image = context.createImageData(width, height);
+    const stride = width * 4;
+    for (let y = 0; y < height; y += 1) {
+      const sourceStart = (height - 1 - y) * stride;
+      image.data.set(pixels.subarray(sourceStart, sourceStart + stride), y * stride);
+    }
+    context.putImageData(image, 0, 0);
+    return output.toDataURL('image/png');
   };
 
-  const captureCanvasPng = () => canvas.toDataURL('image/png');
-
-  const clearCurrentMeshes = () => {
-    for (const mesh of blockDrawables) engine.removeMesh(mesh);
-    blockDrawables = [];
+  const updateHud = () => {
+    if (!imported) return;
+    const stats = imported.stats;
+    if (nameLabel) nameLabel.textContent = imported.name.toUpperCase();
+    if (descriptionLabel) {
+      descriptionLabel.textContent = stats.blueprintObjects
+        ? `${imported.id} · ${stats.blueprintObjects} blueprint objects · ${stats.instances} prefab instances (${stats.nestedInstances} nested) · ${stats.anchors} named anchors · ${stats.visibilityStructures || 0} building metadata shells · ${stats.sections} RiftSections.`
+        : `${imported.id} · ${stats.sections} RiftSections · ${stats.visibilityStructures || 0} building metadata shells · legacy compact ops expanded into the proven full/slab/stair block vocabulary.`;
+    }
+    if (sourceMetric) sourceMetric.textContent = `ACTIVE ${imported.id.toUpperCase()} · ${persistenceLabel}`;
+    if (opsMetric) opsMetric.textContent = stats.blueprintObjects ? `OPS ${stats.operations} · OBJ ${stats.blueprintObjects}` : `OPS ${stats.operations}`;
+    if (cellsMetric) cellsMetric.textContent = `CELLS ${stats.cells.toLocaleString()}`;
+    if (partialMetric) partialMetric.textContent = `PARTIAL ${stats.partialCells}`;
+    if (sectionsMetric) sectionsMetric.textContent = `SECTIONS ${stats.sections}`;
+    if (memoryMetric) memoryMetric.textContent = `STATE ${Math.round(stats.stateBytes / 1024)} KB`;
+    if (trisMetric) trisMetric.textContent = `TRIS ${stats.triangles.toLocaleString()}`;
   };
 
-  const updateStats = compiled => {
-    if (!compiled) return;
-    if (nameLabel) nameLabel.textContent = String(compiled.name || compiled.id || 'IRONVALE FOUNDATION').toUpperCase();
-    if (descriptionLabel) descriptionLabel.textContent = compiled.description || 'Compiled Rift Engine JSON world block.';
-    if (sourceMetric) sourceMetric.textContent = sourceLabel;
-    if (opsMetric) opsMetric.textContent = `OPS ${compiled.operationCount ?? '--'}`;
-    if (cellsMetric) cellsMetric.textContent = `CELLS ${compiled.cellCount ?? '--'}`;
-    if (partialMetric) partialMetric.textContent = `PARTIAL ${compiled.partialCellCount ?? 0}`;
-    if (sectionsMetric) sectionsMetric.textContent = `SECTIONS ${compiled.sectionCount ?? '--'}`;
-    if (memoryMetric) memoryMetric.textContent = `STATE ${persistenceLabel}`;
-    if (trisMetric) trisMetric.textContent = `TRIS ${compiled.triangleCount ?? '--'}`;
-  };
-
-  const reportReady = compiled => {
-    if (!status || !validatorDebugEnabled()) return;
+  const showReady = (force = false) => {
+    if (!status || !imported) return;
+    if (!force && !validatorDebugEnabled()) {
+      status.classList.remove('ready');
+      status.classList.add('settled');
+      return;
+    }
+    const stats = imported.stats;
     status.classList.add('ready');
     status.classList.remove('error', 'settled');
-    status.innerHTML = `<strong>IRONVALE WORLD READY</strong><span>${escapeText(compiled?.name || compiled?.id || 'Foundation')} · ${compiled?.cellCount ?? 0} cells · ${compiled?.triangleCount ?? 0} triangles</span>`;
+    const blueprintSummary = stats.blueprintObjects
+      ? `${stats.blueprintObjects} blueprint objects (${stats.instances} prefab instances, ${stats.nestedInstances} nested, ${stats.roads} roads, ${stats.intersections} intersections) expanded into ${stats.operations} block operations. ${stats.anchors} anchors, ${stats.groups} groups and ${stats.connections} validated connections are available.`
+      : `${stats.operations} compact JSON operations were accepted.`;
+    const warningSummary = stats.warnings ? ` ${stats.warnings} non-fatal blueprint overlap warning${stats.warnings === 1 ? '' : 's'} reported.` : '';
+    status.innerHTML = `<strong>${escapeText(imported.name)} · IMPORT PASS</strong><span>${blueprintSummary} ${stats.cells.toLocaleString()} occupied cells across ${stats.sections} RiftSections; ${stats.triangles.toLocaleString()} triangles are live.${warningSummary}</span>`;
     window.setTimeout(() => status.classList.add('settled'), 2400);
   };
 
@@ -379,34 +413,60 @@ function createBlockImporterLab({ root, canvas, status }) {
     try {
       for (const mesh of compiled.meshes) {
         // H1.74: third-person camera collision owns visibility. Render each compiled
-        // chunk as a normal Rift mesh and let the camera/visibility systems decide.
-        const drawable = engine.createMesh(mesh.geometry, {
-          ...meshOptions,
-          name: mesh.name || `${compiled.id}-mesh`
-        });
+        // RiftSection as one complete mesh; camera position must never hide authored
+        // roof, wall, floor, slab or stair geometry.
+        const drawable = engine.addMesh(mesh.geometry, meshOptions);
+        drawable.doubleSided = !culling;
+        drawable.visible = true;
         nextDrawables.push(drawable);
       }
     } catch (error) {
-      for (const mesh of nextDrawables) engine.removeMesh(mesh);
+      engine.removeDrawables(nextDrawables);
       throw error;
     }
 
-    clearCurrentMeshes();
+    engine.removeDrawables(blockDrawables);
     blockDrawables = nextDrawables;
     imported = compiled;
     sourceLabel = label;
-    persistenceLabel = options.persistenceLabel || persistenceLabel;
-    updateStats(compiled);
-    playerController.setGrid?.(compiled.grid || null);
-    creative?.setGrid?.(compiled.grid || null, compiled);
-    resetCamera();
-    reportReady(compiled);
+    persistenceLabel = options.persistenceLabel || 'PREVIEW ONLY';
+
+    if (options.persist) {
+      const saved = persistActiveBlock({
+        document: compiled.document,
+        fileName: options.fileName || label,
+        id: compiled.id,
+        name: compiled.name
+      });
+      persistenceLabel = saved.mode;
+      if (!saved.ok && status) {
+        status.classList.add('error');
+        status.classList.remove('ready', 'settled');
+        status.innerHTML = `<strong>${escapeText(compiled.name)} · LOADED, NOT SAVED</strong><span>${escapeText(saved.error || 'Browser storage is unavailable in this preview, so this import will reset when the preview reloads.')}</span>`;
+      }
+    }
+
+    updateHud();
+    if (!options.preservePlayer) {
+      const preferredAnchor = compiled.blueprint?.anchors?.find(anchor => anchor.tags?.includes?.('public') || anchor.tags?.includes?.('entrance'));
+      const preferred = preferredAnchor?.at || [compiled.center[0], compiled.worldBounds.min[1] + 2, compiled.center[2]];
+      playerController.teleport(preferred);
+    } else {
+      // Build Mode and live Blueprint recompiles replace the authoritative grid
+      // underneath an already-positioned player. Revalidate immediately so a
+      // newly solid cell cannot embed the body and a removed support becomes a
+      // controlled fall/recovery rather than stale collision state.
+      playerController.revalidateWorld({ allowFall: true });
+    }
+    if (!options.preserveCamera) resetPlayerCamera(true);
+    creative?.onDocumentLoaded?.();
+    if (!(options.persist && persistenceLabel === 'UNSAVED')) showReady(options.forceStatus === true);
     return compiled;
   };
 
   const loadBundledBlock = async ({ reason = '' } = {}) => {
     if (status && validatorDebugEnabled()) {
-      status.classList.remove('error', 'settled');
+      status.classList.remove('ready', 'error', 'settled');
       status.innerHTML = '<strong>IMPORTING COMMERCE BLOCK 01…</strong><span>Fetching the bundled JSON, validating its contract, expanding compact operations and compiling cross-section block meshes.</span>';
     }
     const response = await fetch(DEFAULT_BLOCK_URL, { cache: 'no-store' });
@@ -418,98 +478,126 @@ function createBlockImporterLab({ root, canvas, status }) {
       status.classList.add('ready');
       status.classList.remove('error', 'settled');
       status.innerHTML = `<strong>DEFAULT BLOCK RESTORED</strong><span>${escapeText(reason)}</span>`;
-      window.setTimeout(() => status.classList.add('settled'), 2200);
     }
     return compiled;
   };
 
   const loadActiveBlock = async () => {
     const saved = readPersistedBlock();
-    if (saved?.document) {
-      try {
-        return loadDocument(saved.document, 'ACTIVE IMPORT', { persistenceLabel: saved.mode || 'PERSISTED' });
-      } catch (error) {
-        console.warn('Ignoring invalid persisted Ironvale block', error);
-        clearPersistedBlock();
-      }
+    if (!saved) return loadBundledBlock();
+
+    if (status && validatorDebugEnabled()) {
+      status.classList.remove('ready', 'error', 'settled');
+      status.innerHTML = `<strong>RESTORING ACTIVE IMPORT…</strong><span>${escapeText(saved.fileName || saved.name || saved.id || 'Saved city block')} was saved by the JSON importer in this browser preview.</span>`;
     }
-    return loadBundledBlock();
+
+    try {
+      return loadDocument(saved.document, saved.fileName || 'SAVED IMPORT', {
+        persistenceLabel: saved.mode === 'SESSION' ? 'SESSION SAVED' : 'PERSISTED'
+      });
+    } catch (error) {
+      console.warn('Saved RiftCity block could not be restored; falling back to bundled Block 001.', error);
+      clearPersistedBlock();
+      return loadBundledBlock({
+        reason: `The saved import could not be restored (${error?.message || 'invalid saved JSON'}), so RiftCity cleared it and loaded the bundled default.`
+      });
+    }
   };
 
-  const onImportClick = () => fileInput?.click();
-  const onFileChange = async event => {
-    const file = event.target.files?.[0];
+  const onImportClick = () => {
+    if (fileInput) fileInput.value = '';
+    fileInput?.click();
+  };
+  importButton?.addEventListener('click', onImportClick);
+
+  const onFileChange = async () => {
+    const file = fileInput?.files?.[0];
     if (!file) return;
-    try {
-      const text = await file.text();
-      const document = JSON.parse(text);
-      const compiled = loadDocument(document, 'LOCAL IMPORT', { persistenceLabel: 'SESSION' });
-      const saved = persistActiveBlock({ document, fileName: file.name, id: compiled.id, name: compiled.name });
-      persistenceLabel = saved.mode;
-      if (memoryMetric) memoryMetric.textContent = `STATE ${persistenceLabel}`;
-      if (!saved.ok && status && validatorDebugEnabled()) {
+    if (file.size > 2 * 1024 * 1024) {
+      if (status) {
         status.classList.add('error');
-        status.classList.remove('settled');
-        status.innerHTML = `<strong>WORLD LOADED, SAVE FAILED</strong><span>${escapeText(saved.error)}</span>`;
+        status.classList.remove('ready', 'settled');
+        status.innerHTML = '<strong>IMPORT REJECTED</strong><span>JSON test files are capped at 2 MB so a bad import cannot freeze the iPhone preview.</span>';
       }
+      fileInput.value = '';
+      return;
+    }
+    try {
+      if (status) {
+        status.classList.remove('ready', 'error', 'settled');
+        status.innerHTML = `<strong>IMPORTING ${escapeText(file.name)}…</strong><span>Validating JSON and compiling RiftSections.</span>`;
+      }
+      const text = await file.text();
+      loadDocument(JSON.parse(text), file.name.toUpperCase(), {
+        persist: true,
+        fileName: file.name,
+        forceStatus: true
+      });
     } catch (error) {
-      console.error(error);
-      if (status && validatorDebugEnabled()) {
+      console.error('RiftCity JSON block import rejected', error);
+      if (status) {
         status.classList.add('error');
-        status.classList.remove('settled');
-        status.innerHTML = `<strong>IMPORT FAILED</strong><span>${escapeText(error?.message || 'Invalid JSON world block.')}</span>`;
+        status.classList.remove('ready', 'settled');
+        const active = imported ? ` Current active block remains ${imported.name}.` : '';
+        status.innerHTML = `<strong>IMPORT REJECTED</strong><span>${escapeText(error?.message || 'Invalid RiftCity block JSON.')}${escapeText(active)}</span>`;
       }
     } finally {
-      event.target.value = '';
+      if (fileInput) fileInput.value = '';
     }
   };
+  fileInput?.addEventListener('change', onFileChange);
+
   const onResetBlock = async () => {
-    clearPersistedBlock();
-    persistenceLabel = 'BUNDLED';
-    await loadBundledBlock({ reason: 'Local active block cleared.' });
+    try {
+      clearPersistedBlock();
+      await loadBundledBlock({ reason: 'Saved imported-block state was cleared. Refreshes will now open the bundled default until another JSON block is imported.' });
+    } catch (error) {
+      if (status) {
+        status.classList.add('error');
+        status.classList.remove('ready', 'settled');
+        status.innerHTML = `<strong>BLOCK 001 RELOAD FAILED</strong><span>${escapeText(error?.message || 'Could not reload bundled block.')}</span>`;
+      }
+    }
   };
-  const onSpin = () => { spinning = !spinning; spinButton?.classList.toggle('active', spinning); };
+  resetButton?.addEventListener('click', onResetBlock);
+
+  const onSpin = () => {
+    spinning = !spinning;
+    spinButton?.classList.toggle('active', spinning);
+    if (spinButton) spinButton.textContent = spinning ? 'SPIN ON' : 'SPIN';
+  };
+  spinButton?.addEventListener('click', onSpin);
+
   const onCull = () => {
     culling = !culling;
+    for (const drawable of blockDrawables) drawable.doubleSided = !culling;
     cullButton?.classList.toggle('active', culling);
     if (cullButton) cullButton.textContent = culling ? 'CULL ON' : 'CULL OFF';
-    for (const mesh of blockDrawables) mesh.setCulling?.(culling);
   };
-  const onTop = () => {
-    topView = !topView;
-    if (topView) setInspectionCamera('top'); else resetPlayerCamera();
-    topButton?.classList.toggle('active', topView);
-    if (topButton) topButton.textContent = topView ? 'RETURN TO PLAYER' : 'WORLD OVERVIEW';
-  };
-  const onResetView = () => resetPlayerCamera();
-  const onFirstPersonButton = () => setFirstPerson(!firstPersonActive);
-  const onViewModeKey = event => {
-    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
-    if (event.key?.toLowerCase() !== 'v') return;
-    if (!document.body.classList.contains('rift-dev-mode')) return;
-    setFirstPerson(!firstPersonActive);
-  };
-  const onDevModeChange = () => {
-    if (!document.body.classList.contains('rift-dev-mode') && firstPersonActive) setFirstPerson(false);
-  };
-  const onValidatorDebugChange = () => {
-    if (!validatorDebugEnabled() && status) {
-      status.classList.remove('ready', 'error');
-      status.classList.add('settled');
-    } else if (validatorDebugEnabled() && imported) reportReady(imported);
-  };
-
-  importButton?.addEventListener('click', onImportClick);
-  fileInput?.addEventListener('change', onFileChange);
-  resetButton?.addEventListener('click', onResetBlock);
-  spinButton?.addEventListener('click', onSpin);
   cullButton?.addEventListener('click', onCull);
+
+  const onTop = () => {
+    if (!imported) return;
+    topView = !topView;
+    if (topView) {
+      if (firstPersonActive) setFirstPerson(false, { resetCamera: false });
+      const view = calculateCamera();
+      camera.setProjection('orthographic');
+      camera.alpha = -Math.PI / 2;
+      camera.beta = 0.10;
+      camera.orthoSize = view.orthoSize;
+      camera.setTarget(...view.target);
+    } else {
+      resetPlayerCamera();
+    }
+    camera.updatePosition();
+    topButton?.classList.toggle('active', topView);
+    if (topButton) topButton.textContent = topView ? 'FOLLOW PLAYER' : 'CITY OVERVIEW';
+    syncReticleUi();
+  };
   topButton?.addEventListener('click', onTop);
+  const onResetView = () => resetPlayerCamera();
   viewButton?.addEventListener('click', onResetView);
-  firstPersonButton?.addEventListener('click', onFirstPersonButton);
-  window.addEventListener('keydown', onViewModeKey);
-  window.addEventListener('riftdevmodechange', onDevModeChange);
-  window.addEventListener('riftvalidatordebugchange', onValidatorDebugChange);
 
   const orbit = setupThirdPersonCameraControls(canvas, camera, {
     isLocked: () => topView,
@@ -517,18 +605,55 @@ function createBlockImporterLab({ root, canvas, status }) {
   });
   creative = createRiftCreativeMode({
     root, canvas, engine, camera, player, playerController,
-    getGrid: () => imported?.grid || null,
-    getCompiled: () => imported,
-    onChanged: compiled => {
-      imported = compiled;
-      updateStats(compiled);
-    },
-    onModeChanged: syncBuildUi
+    getImported: () => imported,
+    loadDocument,
+    preparePlayerView: () => {
+      topView = false;
+      topButton?.classList.remove('active');
+      if (topButton) topButton.textContent = 'CITY OVERVIEW';
+      resetPlayerCamera();
+      syncReticleUi();
+    }
   });
-  thirdPersonCamera = createRiftThirdPersonCamera({ canvas, camera, player, playerController, getGrid: () => imported?.grid || null });
-  firstPersonCamera = createRiftFirstPersonCamera({ canvas, camera, player, playerController, getGrid: () => imported?.grid || null });
-  resetCamera();
-  syncBuildUi();
+  thirdPersonCamera = createRiftThirdPersonCamera({
+    camera,
+    getPlayerPosition: () => player.position,
+    getPlayerFacing: () => player.facing,
+    // Third-person free-look owns camera yaw. RiftPlayer facing is controlled
+    // independently by camera-relative movement in rift-player.js.
+    getGrid: () => imported?.grid || null,
+    isOverview: () => topView
+  });
+  firstPersonCamera = createRiftFirstPersonCamera({
+    camera,
+    getPlayerPosition: () => player.position,
+    getPlayerFacing: () => player.facing,
+    setPlayerFacing: angle => player.setFacingRadians(angle),
+    getEyeHeight: () => player.eyeHeight
+  });
+  syncFirstPersonUi();
+
+  const toggleFirstPerson = () => setFirstPerson(!firstPersonActive);
+  const onFirstPersonButton = () => toggleFirstPerson();
+  const onViewModeKey = event => {
+    if (event.code !== 'KeyV' || event.repeat) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    if (!document.body.classList.contains('rift-dev-mode')) return;
+    if (creative?.active) return;
+    event.preventDefault();
+    toggleFirstPerson();
+  };
+  const onDevModeChange = event => {
+    if (!event.detail?.enabled && firstPersonActive) setFirstPerson(false);
+  };
+  const onValidatorDebugChange = event => {
+    if (event.detail?.enabled) showReady(true);
+    else if (status && !status.classList.contains('error')) status.classList.add('settled');
+  };
+  firstPersonButton?.addEventListener('click', onFirstPersonButton);
+  window.addEventListener('keydown', onViewModeKey, { passive: false });
+  window.addEventListener('riftdevmodechange', onDevModeChange);
+  window.addEventListener('riftvalidatordebugchange', onValidatorDebugChange);
 
   let viewportSettleTimer = 0;
   let viewportFinalTimer = 0;
@@ -541,8 +666,9 @@ function createBlockImporterLab({ root, canvas, status }) {
     const style = document.documentElement.style;
     style.setProperty('--rift-viewport-width', `${width}px`);
     style.setProperty('--rift-viewport-height', `${height}px`);
-    style.setProperty('--rift-viewport-left', `${Math.round(Number(viewport?.offsetLeft) || 0)}px`);
-    style.setProperty('--rift-viewport-top', `${Math.round(Number(viewport?.offsetTop) || 0)}px`);
+    style.setProperty('--rift-viewport-left', `${Math.max(0, Number(viewport?.offsetLeft) || 0)}px`);
+    style.setProperty('--rift-viewport-top', `${Math.max(0, Number(viewport?.offsetTop) || 0)}px`);
+
     const target = coarsePointer ? 1.35 : 1.75;
     const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
     engine.resize(Math.min(deviceRatio, target));
@@ -555,7 +681,8 @@ function createBlockImporterLab({ root, canvas, status }) {
     clearTimeout(viewportSettleTimer);
     clearTimeout(viewportFinalTimer);
     // Mobile Safari/PWA viewport dimensions can settle after fullscreen chrome
-    // and orientation promises resolve. Sample again across that window.
+    // and orientation APIs finish. Re-measure twice so portrait fullscreen never
+    // keeps the pre-fullscreen canvas/HUD geometry.
     viewportSettleTimer = window.setTimeout(syncViewport, 80);
     viewportFinalTimer = window.setTimeout(syncViewport, 220);
   };
@@ -569,33 +696,40 @@ function createBlockImporterLab({ root, canvas, status }) {
   };
 
   const setGameMode = async enabled => {
-    gameMode = !!enabled;
-    document.body.classList.toggle('world3d-game-mode', gameMode);
-    settleViewport();
-    if (gameMode) {
-      try { await shell?.requestFullscreen?.({ navigationUI: 'hide' }); }
-      catch (_) {
-        try { await shell?.webkitRequestFullscreen?.(); } catch (_) {}
-      }
+    gameMode = enabled;
+    document.body.classList.toggle('world3d-game-mode', enabled);
+    fullscreenButton?.classList.toggle('active', enabled);
+    if (fullscreenButton) fullscreenButton.textContent = enabled ? 'WINDOW' : 'FULLSCREEN';
+    if (enabled) {
+      settleViewport();
+      try {
+        const request = shell?.requestFullscreen || shell?.webkitRequestFullscreen;
+        if (request && !document.fullscreenElement && !document.webkitFullscreenElement) await request.call(shell);
+      } catch (_) {}
       try { await screen.orientation?.lock?.('landscape'); } catch (_) {}
     } else {
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitFullscreenElement && document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      } catch (_) {}
       try { screen.orientation?.unlock?.(); } catch (_) {}
-      if (document.fullscreenElement) { try { await document.exitFullscreen?.(); } catch (_) {} }
-      else if (document.webkitFullscreenElement) { try { document.webkitExitFullscreen?.(); } catch (_) {} }
     }
     settleViewport();
   };
   const onFullscreenButton = () => setGameMode(!gameMode);
+  fullscreenButton?.addEventListener('click', onFullscreenButton);
+
   const onFullscreenChange = () => {
-    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
-    if (!fullscreenElement && gameMode) {
+    const nativeActive = document.fullscreenElement === shell || document.webkitFullscreenElement === shell;
+    if (gameMode && !nativeActive && (document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
       gameMode = false;
       document.body.classList.remove('world3d-game-mode');
-      try { screen.orientation?.unlock?.(); } catch (_) {}
+      fullscreenButton?.classList.remove('active');
+      if (fullscreenButton) fullscreenButton.textContent = 'FULLSCREEN';
     }
     settleViewport();
   };
-  fullscreenButton?.addEventListener('click', onFullscreenButton);
+
   document.addEventListener('fullscreenchange', onFullscreenChange);
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
   window.addEventListener('resize', settleViewport);
