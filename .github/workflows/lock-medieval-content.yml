@@ -1,0 +1,297 @@
+name: Lock Medieval Content Foundation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/lock-medieval-content.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  lock-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Ironvale
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch pinned Quaternius runtime sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/quaternius
+          git clone --filter=blob:none --no-checkout https://github.com/agentkaerf/FreeModels.git /tmp/quaternius
+          git -C /tmp/quaternius sparse-checkout init --cone
+          git -C /tmp/quaternius sparse-checkout set \
+            'Medieval Village MegaKit[Standard]' \
+            'Stylized Nature MegaKit[Standard]' \
+            'Fantasy Props MegaKit[Standard]' \
+            'Modular Character Outfits - Fantasy[Standard]' \
+            'Ultimate Animated Animals - July 2021'
+          git -C /tmp/quaternius checkout db3df04d1e4714298a09510b26fb6de6645138a2
+
+      - name: Fetch pinned KayKit dungeon source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kaykit
+          git clone --filter=blob:none --no-checkout https://github.com/KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0.git /tmp/kaykit
+          git -C /tmp/kaykit sparse-checkout init --cone
+          git -C /tmp/kaykit sparse-checkout set Assets LICENSE.txt README.md
+          git -C /tmp/kaykit checkout b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07
+
+      - name: Vendor runtime glTF assets and safe environment subsets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf vendor/assets
+          mkdir -p vendor/assets/packs
+          python3 <<'PY'
+          import json, re, shutil
+          from pathlib import Path
+
+          ROOT = Path('vendor/assets/packs')
+          Q = Path('/tmp/quaternius')
+          K = Path('/tmp/kaykit')
+          RUNTIME_EXT = {'.gltf','.glb','.bin','.png','.jpg','.jpeg','.webp'}
+
+          def copy_runtime_pack(src, dst):
+              src, dst = Path(src), Path(dst)
+              dst.mkdir(parents=True, exist_ok=True)
+              for p in src.rglob('*'):
+                  if not p.is_file():
+                      continue
+                  if p.suffix.lower() in RUNTIME_EXT or 'license' in p.name.lower():
+                      rel = p.relative_to(src)
+                      out = dst / rel
+                      out.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copy2(p, out)
+
+          def copy_gltf_with_refs(gltf, root, dst_root):
+              rel = gltf.relative_to(root)
+              out = dst_root / rel
+              out.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(gltf, out)
+              try:
+                  doc = json.loads(gltf.read_text(encoding='utf-8'))
+              except Exception:
+                  return
+              uris = []
+              for row in doc.get('buffers', []):
+                  uri = row.get('uri')
+                  if uri and not str(uri).startswith('data:'):
+                      uris.append(uri)
+              for row in doc.get('images', []):
+                  uri = row.get('uri')
+                  if uri and not str(uri).startswith('data:'):
+                      uris.append(uri)
+              for uri in uris:
+                  source = (gltf.parent / uri).resolve()
+                  try:
+                      rel_ref = source.relative_to(root.resolve())
+                  except Exception:
+                      continue
+                  if source.is_file():
+                      target = dst_root / rel_ref
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copy2(source, target)
+
+          # Full approved runtime-format packs.
+          copy_runtime_pack(Q / 'Medieval Village MegaKit[Standard]', ROOT / 'quaternius-medieval-village')
+          copy_runtime_pack(Q / 'Stylized Nature MegaKit[Standard]', ROOT / 'quaternius-stylized-nature')
+          copy_runtime_pack(Q / 'Modular Character Outfits - Fantasy[Standard]', ROOT / 'quaternius-fantasy-outfits')
+          copy_runtime_pack(Q / 'Ultimate Animated Animals - July 2021', ROOT / 'quaternius-animated-animals')
+
+          # Fantasy Props: intentionally curate environment/interior content only.
+          props_src = Q / 'Fantasy Props MegaKit[Standard]'
+          props_dst = ROOT / 'quaternius-fantasy-props-safe'
+          props_dst.mkdir(parents=True, exist_ok=True)
+          safe_props = re.compile(
+              r'(anvil|bag|banner|barrel|basket|bed|bench|book|bottle|bowl|bucket|cabinet|candle|carpet|cauldron|chair|chest|crate|cup|food|fruit|lantern|log|market|mug|mushroom|parchment|plate|potion|rope|sack|shelf|sign|stool|table|tent|torch|vegetable|wagon|wheel|wood|well|pot|pan|kettle|jar|broom|hay|bread|cheese|apple|carrot|pumpkin|tomato|cabbage|onion|garlic|herb|flower|box|cart|stall|camp|coal|forge|bell|door|window|fence|cloth|rug)',
+              re.I
+          )
+          for gltf in props_src.rglob('*.gltf'):
+              if safe_props.search(gltf.stem):
+                  copy_gltf_with_refs(gltf, props_src, props_dst)
+          for p in props_src.rglob('*'):
+              if p.is_file() and 'license' in p.name.lower():
+                  out = props_dst / p.relative_to(props_src)
+                  out.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(p, out)
+
+          # KayKit Dungeon: structural/interior environment subset only.
+          dungeon_dst = ROOT / 'kaykit-dungeon-environment'
+          dungeon_dst.mkdir(parents=True, exist_ok=True)
+          safe_dungeon = re.compile(
+              r'(wall|floor|pillar|column|stair|arch|door|gate|bars|chain|chandelier|torch|crate|barrel|chest|rubble|table|chair|bench|shelf|rug|carpet|banner|coffin|grave|prison|cage|fence|bridge|platform|debris|window|ceiling|corridor|room|brick|stone|book|candle|lantern)',
+              re.I
+          )
+          for gltf in K.rglob('*.gltf'):
+              if safe_dungeon.search(gltf.stem):
+                  copy_gltf_with_refs(gltf, K, dungeon_dst)
+          for glb in K.rglob('*.glb'):
+              if safe_dungeon.search(glb.stem):
+                  out = dungeon_dst / glb.relative_to(K)
+                  out.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(glb, out)
+          license_file = K / 'LICENSE.txt'
+          if license_file.exists():
+              shutil.copy2(license_file, dungeon_dst / 'LICENSE.txt')
+          PY
+
+      - name: Vendor CC0 terrain PBR surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p vendor/assets/packs/terrain-materials
+          declare -A SURFACES=(
+            [grass]='Grass001'
+            [dirt]='Ground071'
+            [soil]='Ground066'
+            [gravel]='Ground064'
+            [rock]='Rock051'
+            [path]='PavingStones131'
+          )
+          for layer in "${!SURFACES[@]}"; do
+            id="${SURFACES[$layer]}"
+            zip="/tmp/${id}_1K-JPG.zip"
+            dir="vendor/assets/packs/terrain-materials/${layer}"
+            rm -rf "$dir" && mkdir -p "$dir"
+            curl -fL --retry 4 --retry-delay 2 "https://ambientcg.com/get?file=${id}_1K-JPG.zip" -o "$zip"
+            unzip -q "$zip" -d "$dir"
+          done
+
+      - name: Write provenance lock and file hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          root = Path('vendor/assets')
+          packs = root / 'packs'
+          pack_rows = [
+            ('quaternius-medieval-village','Medieval Village MegaKit Standard','environment/buildings'),
+            ('quaternius-stylized-nature','Stylized Nature MegaKit Standard','environment/nature'),
+            ('quaternius-fantasy-props-safe','Fantasy Props MegaKit Standard — curated environment/interior subset','environment/props'),
+            ('kaykit-dungeon-environment','KayKit Dungeon Remastered 1.0 — curated environment subset','environment/dungeon'),
+            ('quaternius-fantasy-outfits','Modular Character Outfits - Fantasy Standard','character/outfits'),
+            ('quaternius-animated-animals','Ultimate Animated Animals','character/animals'),
+            ('terrain-materials','ambientCG 1K JPG PBR terrain palette','terrain/materials'),
+          ]
+          files = []
+          for p in sorted(packs.rglob('*')):
+              if not p.is_file():
+                  continue
+              h = hashlib.sha256()
+              with p.open('rb') as f:
+                  for chunk in iter(lambda: f.read(1024 * 1024), b''):
+                      h.update(chunk)
+              files.append({
+                  'path': p.as_posix(),
+                  'bytes': p.stat().st_size,
+                  'sha256': h.hexdigest(),
+              })
+          lock = {
+              'format':'ironvale-asset-lock-v1',
+              'licensePolicy':'CC0-1.0 runtime sources only',
+              'runtimeShippingPolicy':'vendored source is not automatically shipped; promote selected optimized assets into public through the Rift asset pipeline',
+              'sources':{
+                  'quaternius':{
+                      'creator':'Quaternius',
+                      'mirrorRepository':'agentkaerf/FreeModels',
+                      'commit':'db3df04d1e4714298a09510b26fb6de6645138a2',
+                      'license':'CC0-1.0',
+                  },
+                  'kaykitDungeon':{
+                      'creator':'Kay Lousberg / KayKit',
+                      'repository':'KayKit-Game-Assets/KayKit-Dungeon-Remastered-1.0',
+                      'commit':'b0ca9bd96a8072ab36a3a5464f00ed1e06a16d07',
+                      'license':'CC0-1.0',
+                  },
+                  'ambientCG':{
+                      'creator':'ambientCG',
+                      'license':'CC0-1.0',
+                      'resolution':'1K-JPG',
+                      'assets':{
+                          'grass':'Grass001','dirt':'Ground071','soil':'Ground066',
+                          'gravel':'Ground064','rock':'Rock051','path':'PavingStones131'
+                      }
+                  }
+              },
+              'packs':[{'id':pid,'title':title,'role':role,'root':f'vendor/assets/packs/{pid}'} for pid,title,role in pack_rows],
+              'files':files,
+          }
+          root.mkdir(parents=True, exist_ok=True)
+          (root / 'asset-lock.json').write_text(json.dumps(lock, indent=2) + '\n', encoding='utf-8')
+          (root / 'README.md').write_text(
+              '# Ironvale vendored content foundation\n\n'
+              'These are pinned CC0 runtime-format source assets approved for Ironvale world building. '
+              'They live outside `public/` intentionally so a normal Cloudflare deploy does not upload the entire source library.\n\n'
+              'Use `asset-lock.json` as the immutable provenance/hash index. Selected assets should be optimized and promoted into '
+              '`public/assets/` by the Rift asset pipeline when they are actually used by a map, character, prop, or biome.\n',
+              encoding='utf-8'
+          )
+          PY
+
+      - name: Verify locked content foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('vendor/assets/packs')
+          minimums = {
+            'quaternius-medieval-village': 100,
+            'quaternius-stylized-nature': 40,
+            'quaternius-fantasy-props-safe': 15,
+            'kaykit-dungeon-environment': 25,
+            'quaternius-fantasy-outfits': 20,
+            'quaternius-animated-animals': 10,
+          }
+          failures=[]
+          for pack, minimum in minimums.items():
+              folder=root/pack
+              models=list(folder.rglob('*.gltf'))+list(folder.rglob('*.glb'))
+              print(f'{pack}: {len(models)} model files')
+              if len(models)<minimum:
+                  failures.append(f'{pack} only has {len(models)} model files')
+          terrain=root/'terrain-materials'
+          layers=[p for p in terrain.iterdir() if p.is_dir()] if terrain.exists() else []
+          print('terrain material layers:', len(layers))
+          if len(layers)!=6:
+              failures.append(f'terrain materials expected 6 layers, got {len(layers)}')
+          too_large=[]
+          for p in Path('vendor/assets').rglob('*'):
+              if p.is_file() and p.stat().st_size>95*1024*1024:
+                  too_large.append(str(p))
+          if too_large:
+              failures.append('files over 95 MiB: '+', '.join(too_large))
+          lock=json.loads(Path('vendor/assets/asset-lock.json').read_text())
+          if lock.get('format')!='ironvale-asset-lock-v1' or not lock.get('files'):
+              failures.append('asset lock missing or empty')
+          if failures:
+              raise SystemExit('\n'.join(failures))
+          print('Locked files:', len(lock['files']))
+          PY
+          npm run build
+          du -sh vendor/assets
+
+      - name: Commit content foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add vendor/assets
+          if git diff --cached --quiet; then
+            echo 'No asset changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Lock medieval content foundation assets'
+          git push origin HEAD:main
