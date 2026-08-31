@@ -124,19 +124,19 @@
   "layout": [],
   "anchors": {
     "terrain_origin": {
-      "at": [160, 10, 160],
+      "at": [160, 0, 160],
       "facing": "north",
       "tags": ["terrain-origin", "bootstrap"]
     },
     "starter_spawn": {
-      "at": [160, 10, 160],
+      "at": [160, 0, 160],
       "facing": "north",
-      "tags": ["spawn", "bootstrap", "public"]
+      "tags": ["spawn", "bootstrap", "public", "terrain-snap-y"]
     },
     "blackstone_cave_mouth": {
-      "at": [228, 6, 154],
+      "at": [228, 0, 154],
       "facing": "east",
-      "tags": ["terrain", "cave", "entrance"]
+      "tags": ["terrain", "cave", "entrance", "terrain-snap-y"]
     }
   },
   "validation": {
@@ -148,6 +148,6 @@
     "compatibility_floor": "deep-safety-bedrock",
     "legacy_island": false,
     "buildings": false,
-    "purpose": "Rift Terrain v1 starter landscape: smooth layered heightfield terrain, component chunks, editable sculpt data, visibility holes and 3D cave geometry while RiftSections remain independent for structures and authored world objects."
+    "purpose": "Rift Terrain v1 starter landscape: smooth layered heightfield terrain, component chunks, editable sculpt data, visibility holes and 3D cave geometry while RiftSections remain independent for structures and authored world objects. Terrain-bound anchor Y values are resolved from Rift Terrain at runtime."
   }
 }
