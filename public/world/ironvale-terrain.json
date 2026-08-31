@@ -2,7 +2,7 @@
   "format": "rift-world-v1",
   "version": 1,
   "id": "ironvale-terrain",
-  "name": "Ironvale Terrain",
+  "name": "Ironvale Blank Terrain",
   "units": "meters",
   "terrain": {
     "format": "rift-terrain-v1",
@@ -10,45 +10,23 @@
     "size": [320, 320],
     "sampleSpacing": 1,
     "chunkSize": 32,
-    "seed": 1417,
-    "baseHeight": 8,
+    "seed": 1,
+    "baseHeight": 0,
     "maxWalkSlope": 0.82,
-    "layers": [
-      {"id":"broad-relief","type":"noise","strength":6.8,"frequency":0.0048,"octaves":3,"persistence":0.55,"lacunarity":2},
-      {"id":"lowland-undulation","type":"noise","strength":3.4,"frequency":0.014,"octaves":4,"persistence":0.5,"lacunarity":2},
-      {"id":"west-hill","type":"radial","x":72,"z":88,"radius":62,"strength":16,"falloff":1.2},
-      {"id":"north-east-hill","type":"radial","x":248,"z":78,"radius":72,"strength":20,"falloff":1.25},
-      {"id":"south-ridge","type":"ridge","a":[42,270],"b":[280,250],"radius":34,"strength":10,"falloff":1.4},
-      {"id":"central-valley","type":"channel","a":[18,208],"b":[304,222],"radius":30,"strength":-6.5,"falloff":1.1},
-      {"id":"spawn-meadow","type":"flatten","x":160,"z":160,"radius":20,"targetHeight":10,"strength":0.94}
-    ],
+    "layers": [],
     "holes": [],
-    "caves": [
-      {
-        "id": "blackstone-cave",
-        "radius": 5.5,
-        "entranceRadius": 6.5,
-        "sides": 20,
-        "points": [
-          {"x":228,"z":154,"depth":-4.2,"radius":5.2},
-          {"x":240,"z":158,"depth":-1,"radius":5.4},
-          {"x":254,"z":166,"depth":5.5,"radius":6},
-          {"x":270,"z":178,"depth":10.5,"radius":6.8},
-          {"x":287,"z":190,"depth":13.5,"radius":7.5}
-        ]
-      }
-    ],
+    "caves": [],
     "edits": []
   },
   "anchors": {
-    "starter_spawn": {"x":160,"z":160,"facing":0,"terrainSnap":true},
-    "blackstone_cave_mouth": {"x":228,"z":154,"facing":1.5707963267948966,"terrainSnap":true}
+    "starter_spawn": {"x":160,"z":160,"facing":0,"terrainSnap":true}
   },
   "objects": [],
   "metadata": {
     "worldFoundation": "rift-terrain-mesh",
     "legacyBlocks": false,
     "voxelGrid": false,
-    "description": "Continuous Rift Terrain world. Terrain chunks are render/streaming partitions only; no RiftBlock/RiftSection cell world exists."
+    "blankCanvas": true,
+    "description": "Blank continuous Rift Terrain canvas. No generated hills, caves, roads, structures, props or map content."
   }
 }
