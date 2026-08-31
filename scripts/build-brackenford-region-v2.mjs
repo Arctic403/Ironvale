@@ -10,11 +10,31 @@ const cut=(min,max,name)=>ops.push({op:'cut_box',min,max,...(name?{name}:{})});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const gauss=(x,z,cx,cz,sx,sz,a)=>a*Math.exp(-(((x-cx)/sx)**2+((z-cz)/sz)**2));
 const hash=(x,z)=>{const n=Math.sin(x*12.9898+z*78.233)*43758.5453;return n-Math.floor(n);};
-const coastNoise=(x,z)=>Math.sin(x/19)*5+Math.sin(z/23)*4+Math.sin((x+z)/31)*3+Math.cos((x-z)/27)*2;
+
+// Organic island silhouette. World bounds stay rectangular internally, but the land itself is not.
+// Harmonic radial variation creates rough natural coast; positive/negative lobes form capes, bays and coves.
 const islandField=(x,z)=>{
-  const dx=(x-160)/139,dz=(z-160)/132;
-  return 1-(dx*dx+dz*dz)+coastNoise(x,z)/95;
+  const dx=x-158,dz=(z-160)*1.04;
+  const a=Math.atan2(dz,dx),r=Math.hypot(dx,dz);
+  const coastR=111
+    +15*Math.sin(a*3+0.45)
+    +9*Math.sin(a*5-1.2)
+    +6*Math.cos(a*7+0.7)
+    +4*Math.sin(a*11-0.3);
+  let edge=coastR-r;
+  edge+=gauss(x,z,161,30,32,34,27);   // long north cape
+  edge+=gauss(x,z,260,77,39,37,34);   // Blackstone mountain peninsula
+  edge+=gauss(x,z,278,226,35,43,25);  // south-east peninsula
+  edge+=gauss(x,z,74,251,42,36,18);   // south-west shoulder
+  edge+=gauss(x,z,42,104,32,43,15);   // western headland
+  edge-=gauss(x,z,45,169,30,42,31);   // deep western bay
+  edge-=gauss(x,z,154,294,40,27,24);  // south-coast inlet
+  edge-=gauss(x,z,287,151,28,38,21);  // east-coast cove
+  edge-=gauss(x,z,99,42,26,29,13);    // north-west cove
+  edge+=Math.sin(x/8.5+z/13)*1.8+Math.sin(x/17-z/11)*1.3;
+  return edge/14;
 };
+
 const riverX=z=>132+(z-52)*0.19+Math.sin(z/22)*12+Math.sin(z/47)*7;
 const riverW=z=>3.5+(Math.sin(z/29)+1)*1.2;
 const roadX=z=>188+Math.sin((z-55)/26)*15+Math.sin(z/12)*3.5;
@@ -37,7 +57,7 @@ for(let z=0;z<D;z++)for(let x=0;x<W;x++){
   const b=basin(x,z);h=h*(1-b*0.68)+3.1*(b*0.68);
   const d=Math.abs(x-riverX(z)),rw=riverW(z);
   if(z>42&&z<287&&d<=rw)h=1;else if(z>42&&z<287&&d<=rw+5)h=Math.min(h,2+Math.floor((d-rw)/1.7));
-  const shore=clamp(coast*12,0,1);
+  const shore=clamp(coast*5.5,0,1);
   h=SEA+(h-SEA)*shore;
   height[z][x]=clamp(Math.round(h),2,34);
 }
@@ -147,16 +167,18 @@ const world={
     old_north_road:{at:[194,4,154],facing:'north',tags:['road']},
     western_questlands:{at:[84,6,207],facing:'east',tags:['future-quest-pocket','western-hills']},
     southern_lowlands:{at:[157,4,257],facing:'north',tags:['future-quest-pocket','south-valley']},
-    north_coast:{at:[160,3,28],facing:'south',tags:['coast','future-quest-pocket']}
+    north_coast:{at:[160,3,28],facing:'south',tags:['coast','future-quest-pocket']},
+    western_bay:{at:[57,3,171],facing:'east',tags:['coast','bay']},
+    southeast_peninsula:{at:[273,4,225],facing:'west',tags:['coast','peninsula']}
   },
   validation:{overlap_policy:'allow'},
-  metadata:{terrain_pass:'starter-island-v1',buildings:false,island:true,surrounded_by_water:true,features:['ocean','coastline','mountain','cave','river','rolling-hills','valleys','old-road','footpaths','woodland','central-settlement-basin','questland-reserves']}
+  metadata:{terrain_pass:'starter-island-v1',buildings:false,island:true,surrounded_by_water:true,coastline:'organic-multilobed',features:['ocean','irregular-coastline','bays','coves','peninsulas','mountain','cave','river','rolling-hills','valleys','old-road','footpaths','woodland','central-settlement-basin','questland-reserves']}
 };
 fs.writeFileSync(OUT,JSON.stringify(world,null,2)+'\n');
 
 let content=fs.readFileSync(CONTENT,'utf8');
 content=content.replace(/description: 'A broad river valley of rolling meadow, wooded hills and the Blackstone mountain ridge\. The settlement itself will be placed only after the natural terrain and travel routes are locked\.'/,
-  "description: 'A large Valeborn island surrounded by open water, with long coasts, wooded uplands, river valleys, rolling questlands and the Blackstone mountain dominating the east. Brackenford will be placed later inside the central meadow basin.'");
+  "description: 'A large Valeborn island surrounded by open water, with an irregular coast of bays and peninsulas, wooded uplands, river valleys, rolling questlands and the Blackstone mountain dominating the east. Brackenford will be placed later inside the central meadow basin.'");
 content=content.replace(/spawn: \{ id: 'valeborn-training-yard', position: \[[^\]]+\], facing: 0 \}/,"spawn: { id: 'valeborn-training-yard', position: [178, 4, 178], facing: 0 }");
 fs.writeFileSync(CONTENT,content);
-console.log(`[valeborn-island] ${W}x${D}; ops=${ops.length}; trees=${trees}; buildings=0`);
+console.log(`[valeborn-island] organic coastline ${W}x${D}; ops=${ops.length}; trees=${trees}; buildings=0`);
