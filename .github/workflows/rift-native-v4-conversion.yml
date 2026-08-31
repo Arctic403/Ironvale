@@ -158,8 +158,6 @@ jobs:
             scripts/check-rift-wasm-core.js \
             scripts/check-rift-native-integration.js \
             scripts/check-rift-native-v4.js \
-            package.json \
-            .github/workflows/rift-wasm-core.yml \
-            .github/workflows/rift-world-preview.yml
+            package.json
           git commit -m 'Upgrade Rift Native Core to v4 gameplay kernel'
           git push origin HEAD:main
