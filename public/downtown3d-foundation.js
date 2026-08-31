@@ -15,9 +15,22 @@ const ACTIVE_BLOCK_STORAGE_VERSION = 1;
 const ACTIVE_BLOCK_MAX_BYTES = 2 * 1024 * 1024;
 
 export function destroyDowntown3D() {
-  activeFoundation?.destroy?.();
+  // Detach first so a Safari/WebGL cleanup exception can never pin SPA navigation
+  // to the same half-disposed world foundation on every later route change.
+  const foundation = activeFoundation;
   activeFoundation = null;
-  document.body.classList.remove('world3d-game-mode');
+  try {
+    foundation?.destroy?.();
+  } catch (error) {
+    console.warn('Rift world foundation cleanup failed', error);
+  } finally {
+    document.body.classList.remove('world3d-game-mode');
+    const style = document.documentElement.style;
+    style.removeProperty('--rift-viewport-width');
+    style.removeProperty('--rift-viewport-height');
+    style.removeProperty('--rift-viewport-left');
+    style.removeProperty('--rift-viewport-top');
+  }
 }
 
 export async function renderDowntown3D(root) {
