@@ -48,10 +48,10 @@ jobs:
 
       - name: Guard terrain authority
         run: |
-          grep -q "createRiftTerrainFromDocument" public/downtown3d-foundation.js
-          grep -q "getTerrain: () => terrain" public/downtown3d-foundation.js
-          grep -q "terrain.supportCandidatesAt" public/rift-player.js
-          grep -q "rift-terrain-v1" public/rift-world-blocks/ironvale-terrain-bootstrap.json
+          grep -Fq "createRiftTerrainFromDocument" public/downtown3d-foundation.js
+          grep -Fq "getTerrain: () => terrain" public/downtown3d-foundation.js
+          grep -Fq "getTerrain?.()?.supportCandidatesAt?.(" public/rift-player.js
+          grep -Fq "rift-terrain-v1" public/rift-world-blocks/ironvale-terrain-bootstrap.json
           test -s public/rift-terrain.js
           test ! -e public/ironvale-smooth-terrain.js
           test ! -e public/ironvale-environment.js
