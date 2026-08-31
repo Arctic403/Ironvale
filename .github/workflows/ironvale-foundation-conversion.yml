@@ -21,6 +21,7 @@ jobs:
       - name: Apply Ironvale foundation
         run: |
           python scripts/apply-ironvale-foundation-backend.py
+          python scripts/apply-ironvale-authoring-schema.py
           python scripts/apply-ironvale-foundation-frontend.py
 
       - name: Regenerate renamed BuildingProgram diagnostics
@@ -45,7 +46,7 @@ jobs:
       - name: Verify conversion diff and syntax
         run: |
           git diff --check
-          python -m py_compile scripts/apply-ironvale-foundation-backend.py scripts/apply-ironvale-foundation-frontend.py
+          python -m py_compile scripts/apply-ironvale-foundation-backend.py scripts/apply-ironvale-authoring-schema.py scripts/apply-ironvale-foundation-frontend.py
           node --check src/index.js
           node --check src/ironvale/content.js
           node --check src/ironvale/api.js
