@@ -51,11 +51,16 @@ jobs:
           node scripts/apply-ironvale-h3-starter.mjs
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('src/ironvale/content.js')
-          text = path.read_text()
+          content = Path('src/ironvale/content.js')
+          text = content.read_text()
           text = text.replace("Knight's first combat action", "Knight\\'s first combat action")
           text = text.replace("Knight's basic Strike", "Knight\\'s basic Strike")
-          path.write_text(text)
+          content.write_text(text)
+
+          verifier = Path('scripts/check-ironvale-foundation.js')
+          check = verifier.read_text()
+          check = check.replace("ironvale:world:active-block:v1", "ironvale:world:active-block:v2")
+          verifier.write_text(check)
           PY
 
       - name: Verify JavaScript syntax and full Ironvale regression suite
