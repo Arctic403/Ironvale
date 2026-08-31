@@ -47,6 +47,7 @@ if (!app.includes('if (next && preserveCamera && !freecamEnabled) updateOrbitCam
 if (!app.includes('character fallback: ${characterError}')) failures.push('visible character fallback diagnostics');
 if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person RPG focus');
 if (!app.includes('const MOBILE_LANDSCAPE_DISTANCE = 6.2') || !app.includes('function applyViewportCameraProfile(') || !app.includes('isMobileLandscapeGameplay()')) failures.push('mobile landscape camera profile');
+if (!app.includes('const ORBIT_MIN_DISTANCE = 1.0') || !app.includes('const ORBIT_MAX_DISTANCE = 10.0') || !app.includes('const orbitTouches = new Map()') || !app.includes('beginPinchZoom') || !app.includes('updatePinchZoom') || !app.includes('ORBIT_PINCH_EXPONENT')) failures.push('third-person pinch zoom');
 if (!app.includes('function selectCombatTargetAtScreen(') || !app.includes('function performBasicAttack(') || !app.includes('window.IronvaleTargeting')) failures.push('tap-target RPG combat controls');
 if (!app.includes('function currentViewRay(') || !app.includes('terrain.raycast(ray.origin, ray.direction, 1800, .5)')) failures.push('center-view interaction ray');
 if (app.includes('reticleScreen') || app.includes('moveReticleToClient(') || app.includes('raycastTerrainAtScreen(')) failures.push('movable pointer reticle returned');

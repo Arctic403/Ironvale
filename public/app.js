@@ -58,6 +58,9 @@ const MOBILE_LANDSCAPE_DISTANCE = 6.2;
 const MOBILE_LANDSCAPE_FOV = 55 * Math.PI / 180;
 const MOBILE_LANDSCAPE_PITCH = .34;
 const DEFAULT_ORBIT_DISTANCE = 8.0;
+const ORBIT_MIN_DISTANCE = 1.0;
+const ORBIT_MAX_DISTANCE = 10.0;
+const ORBIT_PINCH_EXPONENT = 0.9;
 const TARGET_TAP_MAX_MS = 260;
 const TARGET_TAP_MAX_PX = 9;
 const TARGET_PICK_MAX_DISTANCE = 80;
@@ -721,6 +724,55 @@ function setupCanvasControls() {
   let orbitDownAt = 0;
   let orbitTravel = 0;
   let orbitLooking = false;
+  const orbitTouches = new Map();
+  let orbitPinch = null;
+  let orbitGestureWasPinch = false;
+
+  const beginOrbitPointer = (pointerId, x, y, { suppressTarget = false } = {}) => {
+    orbitPointerId = pointerId;
+    orbitLastX = orbitDownX = x;
+    orbitLastY = orbitDownY = y;
+    orbitDownAt = performance.now();
+    orbitTravel = suppressTarget ? LOOK_START_PX + 1 : 0;
+    orbitLooking = Boolean(suppressTarget);
+  };
+
+  const resetOrbitPointer = () => {
+    orbitPointerId = null;
+    orbitLooking = false;
+    orbitTravel = 0;
+    orbitGestureWasPinch = false;
+  };
+
+  const beginPinchZoom = () => {
+    if (freecamEnabled || orbitTouches.size < 2) return;
+    const points = [...orbitTouches.values()].slice(0, 2);
+    const span = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    if (span < 1) return;
+    orbitPinch = {
+      startSpan: span,
+      startDistance: orbitCamera.distance
+    };
+    orbitGestureWasPinch = true;
+    orbitPointerId = null;
+    orbitLooking = false;
+    orbitTravel = 0;
+  };
+
+  const updatePinchZoom = () => {
+    if (!orbitPinch || orbitTouches.size < 2 || freecamEnabled) return false;
+    const points = [...orbitTouches.values()].slice(0, 2);
+    const span = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    if (span < 1) return true;
+    const ratio = orbitPinch.startSpan / span;
+    orbitCamera.distance = clamp(
+      orbitPinch.startDistance * Math.pow(ratio, ORBIT_PINCH_EXPONENT),
+      ORBIT_MIN_DISTANCE,
+      ORBIT_MAX_DISTANCE
+    );
+    updateOrbitCamera();
+    return true;
+  };
 
   canvas.addEventListener('contextmenu', event => {
     if (freecamEnabled) event.preventDefault();
@@ -729,12 +781,21 @@ function setupCanvasControls() {
   canvas.addEventListener('pointerdown', event => {
     if (!freecamEnabled) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
-      orbitPointerId = event.pointerId;
-      orbitLastX = orbitDownX = event.clientX;
-      orbitLastY = orbitDownY = event.clientY;
-      orbitDownAt = performance.now();
-      orbitTravel = 0;
-      orbitLooking = false;
+
+      if (event.pointerType === 'touch') {
+        event.preventDefault();
+        orbitTouches.set(event.pointerId, { id: event.pointerId, x: event.clientX, y: event.clientY });
+        canvas.setPointerCapture(event.pointerId);
+        if (orbitTouches.size === 1) {
+          orbitGestureWasPinch = false;
+          beginOrbitPointer(event.pointerId, event.clientX, event.clientY);
+        } else if (orbitTouches.size === 2) {
+          beginPinchZoom();
+        }
+        return;
+      }
+
+      beginOrbitPointer(event.pointerId, event.clientX, event.clientY);
       canvas.setPointerCapture(event.pointerId);
       return;
     }
@@ -771,6 +832,12 @@ function setupCanvasControls() {
 
   canvas.addEventListener('pointermove', event => {
     if (!freecamEnabled) {
+      if (event.pointerType === 'touch' && orbitTouches.has(event.pointerId)) {
+        event.preventDefault();
+        orbitTouches.set(event.pointerId, { id: event.pointerId, x: event.clientX, y: event.clientY });
+        if (updatePinchZoom()) return;
+      }
+
       if (event.pointerId !== orbitPointerId) return;
       const dx = event.clientX - orbitLastX;
       const dy = event.clientY - orbitLastY;
@@ -813,15 +880,36 @@ function setupCanvasControls() {
 
   const finish = event => {
     if (!freecamEnabled) {
+      if (event.pointerType === 'touch' && orbitTouches.has(event.pointerId)) {
+        event.preventDefault();
+        const wasPinch = orbitGestureWasPinch;
+        orbitTouches.delete(event.pointerId);
+        if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture?.(event.pointerId);
+
+        if (orbitPinch && orbitTouches.size < 2) {
+          orbitPinch = null;
+          if (orbitTouches.size === 1) {
+            const remaining = orbitTouches.values().next().value;
+            beginOrbitPointer(remaining.id, remaining.x, remaining.y, { suppressTarget: true });
+          } else {
+            resetOrbitPointer();
+          }
+          return;
+        }
+
+        if (wasPinch) {
+          if (orbitTouches.size === 0) resetOrbitPointer();
+          return;
+        }
+      }
+
       if (event.pointerId !== orbitPointerId) return;
       const duration = performance.now() - orbitDownAt;
       const displacement = Math.hypot(event.clientX - orbitDownX, event.clientY - orbitDownY);
-      if (!orbitLooking && duration <= TARGET_TAP_MAX_MS && displacement <= TARGET_TAP_MAX_PX) {
+      if (!orbitGestureWasPinch && !orbitLooking && duration <= TARGET_TAP_MAX_MS && displacement <= TARGET_TAP_MAX_PX) {
         selectCombatTargetAtScreen(event.clientX, event.clientY);
       }
-      orbitPointerId = null;
-      orbitLooking = false;
-      orbitTravel = 0;
+      resetOrbitPointer();
       if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture?.(event.pointerId);
       return;
     }
@@ -851,14 +939,30 @@ function setupCanvasControls() {
 
   canvas.addEventListener('pointerup', finish);
   canvas.addEventListener('pointercancel', event => {
-    if (event.pointerId === orbitPointerId) { orbitPointerId = null; orbitLooking = false; orbitTravel = 0; }
+    if (!freecamEnabled && event.pointerType === 'touch' && orbitTouches.has(event.pointerId)) {
+      orbitTouches.delete(event.pointerId);
+      if (orbitTouches.size < 2) orbitPinch = null;
+      if (orbitTouches.size === 1) {
+        const remaining = orbitTouches.values().next().value;
+        orbitGestureWasPinch = true;
+        beginOrbitPointer(remaining.id, remaining.x, remaining.y, { suppressTarget: true });
+      } else if (orbitTouches.size === 0) {
+        resetOrbitPointer();
+      }
+      return;
+    }
+    if (event.pointerId === orbitPointerId) resetOrbitPointer();
     if (gesture && event.pointerId === gesture.pointerId) cancelGesture();
   });
 
   canvas.addEventListener('wheel', event => {
     event.preventDefault();
     if (freecamEnabled) return;
-    orbitCamera.distance = clamp(orbitCamera.distance + event.deltaY * .01, 3.5, 28);
+    orbitCamera.distance = clamp(
+      orbitCamera.distance + event.deltaY * .01,
+      ORBIT_MIN_DISTANCE,
+      ORBIT_MAX_DISTANCE
+    );
   }, { passive: false });
 }
 
