@@ -107,16 +107,16 @@ function stampTrail(points,name){
   }
 }
 stampTrail([[80,238],[102,224],[126,211],[151,197],[177,184],[198,171]],'Western meadow trail');
-stampTrail([[198,153],[216,136],[233,116],[247,96],[256,82],[263,72]],'Blackstone mountain trail');
+stampTrail([[198,153],[216,136],[233,116],[247,103],[254,96],[259,92]],'Blackstone mountain trail');
 stampTrail([[173,186],[164,205],[153,225],[143,245],[134,264]],'South valley trail');
 
-cut([257,4,66],[274,14,75],'Blackstone cave entrance cut');
-cut([265,4,58],[282,13,73],'Blackstone cave tunnel');
-cut([276,4,47],[296,16,70],'Blackstone cave chamber');
-fill('stone_dark',[257,3,68],[286,3,73],'Blackstone cave floor');
-fill('mossy_stone',[256,4,66],[257,11,66],'Blackstone cave mouth north pier');
-fill('mossy_stone',[256,4,75],[257,11,75],'Blackstone cave mouth south pier');
-fill('stone_dark',[257,11,67],[262,14,74],'Blackstone cave brow');
+cut([252,4,86],[262,13,98],'Blackstone cave entrance cut');
+cut([240,4,88],[258,12,96],'Blackstone cave tunnel');
+cut([226,4,82],[244,14,101],'Blackstone cave chamber');
+fill('stone_dark',[228,3,87],[260,3,97],'Blackstone cave floor');
+fill('mossy_stone',[258,4,85],[260,11,87],'Blackstone cave mouth north pier');
+fill('mossy_stone',[258,4,97],[260,11,99],'Blackstone cave mouth south pier');
+fill('stone_dark',[256,11,87],[260,14,97],'Blackstone cave brow');
 
 for(const [cx,cz,r] of [[273,86,5],[247,55,4],[231,122,4],[46,108,4],[78,69,3],[231,242,3],[83,254,3]]){
   for(let z=cz-r;z<=cz+r;z++)for(let x=cx-r;x<=cx+r;x++){
@@ -148,7 +148,7 @@ const world={
   palette:{air:{material_id:0,shape:'air',color:[0,0,0]}},ops,prefabs:{},layout:[],
   anchors:{
     future_settlement_basin:{at:[178,4,178],facing:'north',tags:['future-town','central-meadow']},
-    blackstone_cave:{at:[258,4,71],facing:'east',tags:['cave','mountain']},
+    blackstone_cave:{at:[259,4,92],facing:'east',tags:['cave','mountain']},
     river_crossing:{at:[155,3,181],facing:'east',tags:['river','future-crossing']},
     old_north_road:{at:[194,4,154],facing:'north',tags:['road']},
     western_questlands:{at:[84,6,207],facing:'east',tags:['future-quest-pocket','western-hills']},
@@ -158,7 +158,7 @@ const world={
     southeast_peninsula:{at:[273,4,225],facing:'west',tags:['coast','peninsula']}
   },
   validation:{overlap_policy:'allow'},
-  metadata:{terrain_pass:'starter-island-v1',buildings:false,island:true,surrounded_by_water:true,coastline:'organic-multilobed',features:['ocean','irregular-coastline','bays','coves','peninsulas','mountain','cave','river','rolling-hills','valleys','old-road','footpaths','woodland','central-settlement-basin','questland-reserves']}
+  metadata:{terrain_pass:'starter-island-v1',visual_surface:'smooth-terrain-v1',environment_pack:'quaternius-stylized-nature-standard',buildings:false,island:true,surrounded_by_water:true,coastline:'organic-multilobed',features:['ocean','irregular-coastline','bays','coves','peninsulas','mountain','cave','river','rolling-hills','valleys','old-road','footpaths','woodland','central-settlement-basin','questland-reserves']}
 };
 fs.writeFileSync(OUT,JSON.stringify(world,null,2)+'\n');
 

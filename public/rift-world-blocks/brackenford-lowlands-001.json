@@ -159721,36 +159721,6 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        233,
-        17,
-        114
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        234,
-        17,
-        114
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        235,
-        17,
-        114
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
         235,
         17,
         115
@@ -159771,9 +159741,19 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
+        235,
+        16,
+        117
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
         233,
         17,
-        113
+        114
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159782,8 +159762,8 @@
       "state": "dirt_dry",
       "at": [
         234,
-        18,
-        113
+        17,
+        114
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159792,18 +159772,8 @@
       "state": "dirt_dry",
       "at": [
         235,
-        18,
-        113
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        236,
-        18,
-        113
+        17,
+        114
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159831,9 +159801,19 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
+        236,
+        17,
+        116
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
         234,
         18,
-        112
+        113
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159843,7 +159823,7 @@
       "at": [
         235,
         18,
-        112
+        113
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159853,47 +159833,7 @@
       "at": [
         236,
         18,
-        112
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        235,
-        18,
-        111
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        236,
-        19,
-        111
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        237,
-        19,
-        111
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        237,
-        18,
-        112
+        113
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159911,9 +159851,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        236,
-        19,
-        110
+        237,
+        18,
+        114
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159922,8 +159862,8 @@
       "state": "dirt_dry",
       "at": [
         237,
-        19,
-        110
+        17,
+        115
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159931,9 +159871,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        238,
-        19,
-        110
+        235,
+        18,
+        112
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159941,9 +159881,19 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        238,
-        19,
-        111
+        236,
+        18,
+        112
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        237,
+        18,
+        112
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159961,9 +159911,29 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
+        238,
+        18,
+        113
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        238,
+        18,
+        114
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
         236,
         19,
-        109
+        111
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159973,7 +159943,7 @@
       "at": [
         237,
         19,
-        109
+        111
       ],
       "name": "Blackstone mountain trail"
     },
@@ -159982,28 +159952,8 @@
       "state": "dirt_dry",
       "at": [
         238,
-        20,
-        109
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        239,
-        20,
-        109
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        239,
         19,
-        110
+        111
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160021,9 +159971,79 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
+        239,
+        19,
+        112
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        239,
+        18,
+        113
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
         237,
-        20,
-        108
+        19,
+        110
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        238,
+        19,
+        110
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        239,
+        19,
+        110
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        240,
+        19,
+        110
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        240,
+        19,
+        111
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        240,
+        19,
+        112
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160033,7 +160053,7 @@
       "at": [
         238,
         20,
-        108
+        109
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160043,47 +160063,7 @@
       "at": [
         239,
         20,
-        108
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        238,
-        20,
-        107
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        239,
-        20,
-        107
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        240,
-        21,
-        107
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        240,
-        20,
-        108
+        109
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160101,9 +160081,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        238,
+        241,
         20,
-        106
+        109
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160111,9 +160091,19 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        239,
-        21,
-        106
+        241,
+        20,
+        110
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        241,
+        19,
+        111
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160122,28 +160112,8 @@
       "state": "dirt_dry",
       "at": [
         240,
-        21,
-        106
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        241,
-        21,
-        106
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        241,
-        21,
-        107
+        20,
+        108
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160161,9 +160131,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        239,
-        21,
-        105
+        242,
+        20,
+        108
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160171,9 +160141,19 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        240,
-        21,
-        105
+        242,
+        20,
+        109
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        242,
+        20,
+        110
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160183,7 +160163,7 @@
       "at": [
         241,
         21,
-        105
+        107
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160191,9 +160171,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        240,
+        242,
         21,
-        104
+        107
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160201,9 +160181,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        241,
-        22,
-        104
+        243,
+        21,
+        107
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160211,9 +160191,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        242,
-        22,
-        104
+        243,
+        21,
+        108
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160221,9 +160201,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        242,
-        22,
-        105
+        243,
+        20,
+        109
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160241,39 +160221,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        240,
-        22,
-        103
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        241,
-        22,
-        103
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        242,
-        22,
-        103
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
         243,
-        22,
-        103
+        21,
+        106
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160281,9 +160231,29 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        243,
-        22,
-        104
+        244,
+        21,
+        106
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        244,
+        21,
+        107
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        244,
+        21,
+        108
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160301,9 +160271,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        241,
+        244,
         22,
-        102
+        105
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160311,9 +160281,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        242,
+        245,
         22,
-        102
+        105
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160321,9 +160291,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        243,
+        245,
         22,
-        102
+        106
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160331,19 +160301,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        242,
-        22,
-        101
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        243,
-        22,
-        101
+        245,
+        21,
+        107
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160353,7 +160313,7 @@
       "at": [
         244,
         22,
-        101
+        104
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160361,9 +160321,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        244,
+        245,
         22,
-        102
+        104
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160371,7 +160331,37 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        244,
+        246,
+        22,
+        104
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        246,
+        22,
+        105
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        246,
+        22,
+        106
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        245,
         22,
         103
       ],
@@ -160381,9 +160371,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        243,
+        246,
         22,
-        100
+        103
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160391,9 +160381,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        244,
+        247,
         22,
-        100
+        103
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160401,9 +160391,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        247,
         22,
-        100
+        104
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160411,9 +160401,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        247,
         22,
-        101
+        105
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160421,7 +160411,7 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        246,
         22,
         102
       ],
@@ -160431,9 +160421,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        243,
+        247,
         22,
-        99
+        102
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160441,9 +160431,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        244,
+        248,
         22,
-        99
+        102
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160451,9 +160441,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        248,
         22,
-        99
+        103
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160461,9 +160451,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        248,
         22,
-        99
+        104
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160471,9 +160461,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        249,
         22,
-        100
+        102
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160481,7 +160471,27 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        249,
+        22,
+        103
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        249,
+        22,
+        104
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        247,
         22,
         101
       ],
@@ -160491,9 +160501,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        244,
+        248,
         22,
-        98
+        101
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160501,9 +160511,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        249,
         22,
-        98
+        101
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160511,9 +160521,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        250,
         22,
-        98
+        101
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160521,9 +160531,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        250,
         22,
-        97
+        102
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160531,9 +160541,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        250,
         22,
-        97
+        103
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160541,9 +160551,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        248,
         22,
-        97
+        100
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160551,9 +160561,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        249,
         22,
-        98
+        100
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160561,7 +160571,47 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        250,
+        22,
+        100
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        251,
+        22,
+        100
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        251,
+        22,
+        101
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        251,
+        22,
+        102
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        249,
         22,
         99
       ],
@@ -160571,9 +160621,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        245,
+        250,
         22,
-        96
+        99
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160581,9 +160631,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        251,
         22,
-        96
+        99
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160591,9 +160641,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        252,
         22,
-        96
+        99
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160601,9 +160651,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        252,
         22,
-        96
+        100
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160611,9 +160661,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        252,
         22,
-        97
+        101
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160621,7 +160671,7 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        250,
         22,
         98
       ],
@@ -160631,9 +160681,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        246,
+        251,
         22,
-        95
+        98
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160641,9 +160691,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        252,
         22,
-        95
+        98
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160651,9 +160701,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        253,
         22,
-        95
+        98
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160661,9 +160711,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        253,
         22,
-        94
+        99
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160671,9 +160721,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        253,
         22,
-        94
+        100
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160681,9 +160731,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        251,
         22,
-        94
+        97
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160691,9 +160741,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        252,
         22,
-        95
+        97
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160701,7 +160751,47 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        253,
+        22,
+        97
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        254,
+        22,
+        97
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        254,
+        22,
+        98
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        254,
+        22,
+        99
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        252,
         22,
         96
       ],
@@ -160711,9 +160801,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        247,
+        253,
         22,
-        93
+        96
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160721,9 +160811,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        254,
         22,
-        93
+        96
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160731,9 +160821,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        255,
         22,
-        93
+        96
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160741,9 +160831,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
+        255,
         22,
-        93
+        97
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160751,9 +160841,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
+        255,
         22,
-        94
+        98
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160761,7 +160851,7 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
+        253,
         22,
         95
       ],
@@ -160771,9 +160861,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        248,
+        254,
         22,
-        92
+        95
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160781,9 +160871,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        255,
         22,
-        92
+        95
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160791,9 +160881,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
+        256,
         22,
-        92
+        95
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160801,9 +160891,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        256,
         22,
-        91
+        96
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160811,9 +160901,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
+        256,
         22,
-        91
+        97
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160821,9 +160911,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        251,
+        254,
         22,
-        91
+        94
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160831,9 +160921,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        251,
+        255,
         22,
-        92
+        94
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160841,7 +160931,47 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        251,
+        256,
+        22,
+        94
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        257,
+        22,
+        94
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        257,
+        22,
+        95
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        257,
+        22,
+        96
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        255,
         22,
         93
       ],
@@ -160851,9 +160981,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        249,
+        256,
         22,
-        90
+        93
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160861,9 +160991,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
+        257,
         22,
-        90
+        93
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160871,9 +161001,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        251,
-        22,
-        90
+        258,
+        21,
+        93
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160881,9 +161011,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        252,
-        22,
-        90
+        258,
+        20,
+        94
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160891,9 +161021,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        252,
-        22,
-        91
+        258,
+        20,
+        95
       ],
       "name": "Blackstone mountain trail"
     },
@@ -160901,7 +161031,7 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        252,
+        257,
         22,
         92
       ],
@@ -160911,419 +161041,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        250,
-        22,
-        89
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        251,
-        22,
-        89
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        252,
-        22,
-        89
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        251,
-        22,
-        88
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        252,
-        22,
-        88
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        88
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        89
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        90
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        251,
-        22,
-        87
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        252,
-        22,
-        87
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        87
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        252,
-        22,
-        86
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        86
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        86
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        87
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        88
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        252,
-        22,
-        85
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        85
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        85
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        85
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        86
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        87
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        253,
-        22,
-        84
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        84
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        84
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        83
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        83
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        256,
-        22,
-        83
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        256,
-        22,
-        84
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        256,
-        22,
-        85
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        254,
-        22,
-        82
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        82
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        256,
-        22,
-        82
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        257,
-        22,
-        82
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        257,
-        22,
-        83
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        257,
-        22,
-        84
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        255,
-        22,
-        81
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        256,
-        22,
-        81
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        257,
-        22,
-        81
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        256,
-        22,
-        80
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        257,
-        21,
-        80
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
         258,
-        12,
-        80
+        22,
+        92
       ],
       "name": "Blackstone mountain trail"
     },
@@ -161331,19 +161051,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        258,
-        15,
-        81
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        258,
+        259,
         17,
-        82
+        92
       ],
       "name": "Blackstone mountain trail"
     },
@@ -161351,29 +161061,29 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        256,
+        259,
+        16,
+        93
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        259,
+        16,
+        94
+      ],
+      "name": "Blackstone mountain trail"
+    },
+    {
+      "op": "set",
+      "state": "dirt_dry",
+      "at": [
+        258,
         22,
-        79
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        257,
-        18,
-        79
-      ],
-      "name": "Blackstone mountain trail"
-    },
-    {
-      "op": "set",
-      "state": "dirt_dry",
-      "at": [
-        258,
-        8,
-        79
+        91
       ],
       "name": "Blackstone mountain trail"
     },
@@ -161382,8 +161092,8 @@
       "state": "dirt_dry",
       "at": [
         259,
-        2,
-        80
+        17,
+        91
       ],
       "name": "Blackstone mountain trail"
     },
@@ -161391,9 +161101,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        259,
-        6,
-        81
+        260,
+        11,
+        91
       ],
       "name": "Blackstone mountain trail"
     },
@@ -161401,9 +161111,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        257,
-        15,
-        78
+        260,
+        11,
+        92
       ],
       "name": "Blackstone mountain trail"
     },
@@ -161411,9 +161121,9 @@
       "op": "set",
       "state": "dirt_dry",
       "at": [
-        258,
-        5,
-        78
+        260,
+        11,
+        93
       ],
       "name": "Blackstone mountain trail"
     },
@@ -164780,42 +164490,42 @@
     {
       "op": "cut_box",
       "min": [
-        257,
+        252,
         4,
-        66
+        86
       ],
       "max": [
-        274,
-        14,
-        75
+        262,
+        13,
+        98
       ],
       "name": "Blackstone cave entrance cut"
     },
     {
       "op": "cut_box",
       "min": [
-        265,
+        240,
         4,
-        58
+        88
       ],
       "max": [
-        282,
-        13,
-        73
+        258,
+        12,
+        96
       ],
       "name": "Blackstone cave tunnel"
     },
     {
       "op": "cut_box",
       "min": [
-        276,
+        226,
         4,
-        47
+        82
       ],
       "max": [
-        296,
-        16,
-        70
+        244,
+        14,
+        101
       ],
       "name": "Blackstone cave chamber"
     },
@@ -164823,14 +164533,14 @@
       "op": "fill_box",
       "state": "stone_dark",
       "min": [
-        257,
+        228,
         3,
-        68
+        87
       ],
       "max": [
-        286,
+        260,
         3,
-        73
+        97
       ],
       "name": "Blackstone cave floor"
     },
@@ -164838,14 +164548,14 @@
       "op": "fill_box",
       "state": "mossy_stone",
       "min": [
-        256,
+        258,
         4,
-        66
+        85
       ],
       "max": [
-        257,
+        260,
         11,
-        66
+        87
       ],
       "name": "Blackstone cave mouth north pier"
     },
@@ -164853,14 +164563,14 @@
       "op": "fill_box",
       "state": "mossy_stone",
       "min": [
-        256,
+        258,
         4,
-        75
+        97
       ],
       "max": [
-        257,
+        260,
         11,
-        75
+        99
       ],
       "name": "Blackstone cave mouth south pier"
     },
@@ -164868,14 +164578,14 @@
       "op": "fill_box",
       "state": "stone_dark",
       "min": [
-        257,
+        256,
         11,
-        67
+        87
       ],
       "max": [
-        262,
+        260,
         14,
-        74
+        97
       ],
       "name": "Blackstone cave brow"
     },
@@ -173057,9 +172767,9 @@
     },
     "blackstone_cave": {
       "at": [
-        258,
+        259,
         4,
-        71
+        92
       ],
       "facing": "east",
       "tags": [
@@ -173156,6 +172866,8 @@
   },
   "metadata": {
     "terrain_pass": "starter-island-v1",
+    "visual_surface": "smooth-terrain-v1",
+    "environment_pack": "quaternius-stylized-nature-standard",
     "buildings": false,
     "island": true,
     "surrounded_by_water": true,

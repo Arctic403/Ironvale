@@ -8,6 +8,8 @@ import { createRiftPlayer, createRiftPlayerController } from './rift-player.js';
 import { createRiftCreativeMode } from './rift-creative-mode.js';
 import { createRiftThirdPersonCamera, createRiftFirstPersonCamera } from './rift-third-person-camera.js';
 import { createIronvaleStarterRuntime } from './ironvale-gameplay.js';
+import { createValebornSmoothTerrain } from './ironvale-smooth-terrain.js';
+import { createIronvaleNatureEnvironment } from './ironvale-environment.js';
 
 let activeFoundation = null;
 const DEFAULT_BLOCK_URL = new URL('./rift-world-blocks/brackenford-lowlands-001.json', import.meta.url);
@@ -204,6 +206,9 @@ function createBlockImporterLab({ root, canvas, status }) {
   let sourceLabel = 'BRACKENFORD LOWLANDS';
   let persistenceLabel = 'BUNDLED';
   let ironvaleGameplay = null;
+  let smoothTerrain = null;
+  let natureEnvironment = null;
+  let visualRevision = 0;
 
   const nameLabel = root.querySelector('#rift-import-name');
   const descriptionLabel = root.querySelector('#rift-import-description');
@@ -421,13 +426,28 @@ function createBlockImporterLab({ root, canvas, status }) {
     window.setTimeout(() => status.classList.add('settled'), 2400);
   };
 
+  const syncVisualEnvironment = async document => {
+    const revision = ++visualRevision;
+    natureEnvironment?.destroy?.(); natureEnvironment = null;
+    smoothTerrain?.destroy?.(); smoothTerrain = null;
+    if (document?.metadata?.visual_surface !== 'smooth-terrain-v1') return;
+    smoothTerrain = createValebornSmoothTerrain(engine, { chunkSize: 32, step: 2 });
+    try {
+      const environment = await createIronvaleNatureEnvironment(engine);
+      if (destroyed || revision !== visualRevision) { environment?.destroy?.(); return; }
+      natureEnvironment = environment;
+    } catch (error) {
+      console.warn('Ironvale nature environment could not finish loading', error);
+    }
+  };
+
   const loadDocument = (document, label = 'LOCAL JSON', options = {}) => {
     const compiled = compileRiftCityBlock(document);
     if (destroyed) return compiled;
 
     const nextDrawables = [];
     try {
-      for (const mesh of compiled.meshes) {
+      if (document?.metadata?.visual_surface !== 'smooth-terrain-v1') for (const mesh of compiled.meshes) {
         // H1.74: third-person camera collision owns visibility. Render each compiled
         // RiftSection as one complete mesh; camera position must never hide authored
         // roof, wall, floor, slab or stair geometry.
@@ -444,6 +464,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     engine.removeDrawables(blockDrawables);
     blockDrawables = nextDrawables;
     imported = compiled;
+    void syncVisualEnvironment(compiled.document);
     ironvaleGameplay?.onWorldChanged?.(compiled.document);
     sourceLabel = label;
     persistenceLabel = options.persistenceLabel || 'PREVIEW ONLY';
@@ -839,6 +860,9 @@ function createBlockImporterLab({ root, canvas, status }) {
       document.body.classList.remove('world3d-game-mode');
       ironvaleGameplay?.destroy?.();
       ironvaleGameplay = null;
+      visualRevision += 1;
+      natureEnvironment?.destroy?.(); natureEnvironment = null;
+      smoothTerrain?.destroy?.(); smoothTerrain = null;
       creative?.destroy?.();
       playerController.destroy();
       player.destroy();

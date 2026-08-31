@@ -93,7 +93,7 @@ export function validateValebornSmoothTerrain(){
   const failures=[];
   if(valebornIslandField(158,160)<=0)failures.push('island center');
   if(valebornIslandField(0,0)>0)failures.push('ocean corner');
-  if(valebornTerrainHeight(259,73)<12)failures.push('Blackstone mountain height');
+  if(valebornTerrainHeight(250,80)<12)failures.push('Blackstone mountain height');
   if(valebornTerrainHeight(178,178)>6)failures.push('central basin height');
   return {ok:failures.length===0,failures};
 }
