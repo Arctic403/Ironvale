@@ -53,11 +53,10 @@ jobs:
           test -s public/assets/quaternius/stylized-nature/Rock_Medium_1.gltf
           test -s native/rift-core.cpp
 
-      - name: Remove one-shot reset tooling
+      - name: Remove one-shot reset scripts
         run: |
           rm -f scripts/terrain-reset-cleanup.mjs
           rm -f scripts/terrain-reset-fix-verifiers.mjs
-          rm -f .github/workflows/ironvale-terrain-reset.yml
 
       - name: Commit verified terrain reset
         run: |
