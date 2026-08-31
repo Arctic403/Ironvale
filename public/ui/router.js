@@ -11,5 +11,15 @@ export function parseRoute() {
 
 export function go(route) {
   const target = String(route || 'world');
-  location.hash = target.startsWith('#') ? target : `#${target}`;
+  const nextHash = target.startsWith('#') ? target : `#${target}`;
+
+  // Setting location.hash to its current value does not fire hashchange. Force a
+  // local navigation event so the current page can always be re-rendered and a
+  // recovered Safari/PWA history state can never leave the UI pinned on a view.
+  if (location.hash === nextHash) {
+    window.dispatchEvent(new CustomEvent('ironvale:navigate', { detail: { hash: nextHash } }));
+    return;
+  }
+
+  location.hash = nextHash;
 }
