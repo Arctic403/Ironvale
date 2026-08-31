@@ -33,6 +33,9 @@ if (!app.includes('function rebuildDirtyTerrainSections(')) failures.push('dirty
 if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
 if (!app.includes('function applyBrushAtReticle(')) failures.push('reticle sculpt action');
+if (!app.includes('function applyCameraLookDelta(') || !app.includes('function cameraForward(') || !app.includes('function cameraAnglesFromDirection(')) failures.push('shared camera math');
+if (/orbitCamera\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app) || /freecam\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app)) failures.push('fixed-pixel camera yaw math returned');
+if (/orbitCamera\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app) || /freecam\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app)) failures.push('fixed-pixel camera pitch math returned');
 if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier still present');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
@@ -56,4 +59,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: 128m components + 64m sections + adaptive stitched LOD + dirty rebuilds + C++/WASM terrain core.');
+console.log('Ironvale core verified: stable viewport-normalized camera math + 128m components + 64m sections + adaptive stitched LOD + dirty rebuilds + C++/WASM terrain core.');

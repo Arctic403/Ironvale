@@ -34,6 +34,14 @@ const TAP_MAX_MS = 220;
 const TAP_MAX_PX = 7;
 const CONTINUOUS_BRUSH_MS = 75;
 const CONTINUOUS_STRENGTH_SCALE = 0.2;
+const CAMERA_REFERENCE_FOV = Math.PI / 3;
+const CAMERA_YAW_RADIANS_PER_VIEW = Math.PI * 0.70;
+const CAMERA_PITCH_RADIANS_PER_VIEW = Math.PI * 0.80;
+const CAMERA_MAX_EVENT_FRACTION = 0.22;
+const ORBIT_MIN_PITCH = -0.12;
+const ORBIT_MAX_PITCH = 1.05;
+const FREECAM_MIN_PITCH = -1.45;
+const FREECAM_MAX_PITCH = 1.45;
 
 let authMode = 'login';
 let engine = null;
@@ -178,7 +186,7 @@ async function bootSession() {
     player.y = finiteOr(saved.y, .9);
     player.z = finiteOr(saved.z, 320);
     player.yaw = finiteOr(saved.yaw, 0);
-    orbitCamera.yaw = player.yaw + Math.PI;
+    orbitCamera.yaw = wrapAngle(player.yaw + Math.PI);
     await startWorld(data.world?.url || '/world/ironvale-terrain.json');
   } catch (error) {
     console.error(error);
@@ -401,12 +409,9 @@ function updateKeyboardInput() {
 function updatePlayer(dt) {
   const moving = Math.abs(input.forward) + Math.abs(input.strafe) > .001;
   if (moving) {
-    const forwardX = -Math.sin(orbitCamera.yaw);
-    const forwardZ = -Math.cos(orbitCamera.yaw);
-    const rightX = Math.cos(orbitCamera.yaw);
-    const rightZ = -Math.sin(orbitCamera.yaw);
-    let dx = forwardX * input.forward + rightX * input.strafe;
-    let dz = forwardZ * input.forward + rightZ * input.strafe;
+    const basis = cameraGroundBasis(orbitCamera.yaw);
+    let dx = basis.forwardX * input.forward + basis.rightX * input.strafe;
+    let dz = basis.forwardZ * input.forward + basis.rightZ * input.strafe;
     const length = Math.hypot(dx, dz) || 1;
     dx /= length; dz /= length;
     const speed = 7.2;
@@ -444,12 +449,9 @@ function updatePlayer(dt) {
 
 function updateFreecam(dt) {
   const speed = Number(freecamSpeedInput.value) || 14;
-  const forwardX = -Math.sin(freecam.yaw);
-  const forwardZ = -Math.cos(freecam.yaw);
-  const rightX = Math.cos(freecam.yaw);
-  const rightZ = -Math.sin(freecam.yaw);
-  freecam.x += (forwardX * input.forward + rightX * input.strafe) * speed * dt;
-  freecam.z += (forwardZ * input.forward + rightZ * input.strafe) * speed * dt;
+  const basis = cameraGroundBasis(freecam.yaw);
+  freecam.x += (basis.forwardX * input.forward + basis.rightX * input.strafe) * speed * dt;
+  freecam.z += (basis.forwardZ * input.forward + basis.rightZ * input.strafe) * speed * dt;
 
   let vertical = freecamVertical;
   if (input.keys.has(' ') || input.keys.has('e')) vertical += 1;
@@ -475,14 +477,13 @@ function updateCamera() {
 
 function updateOrbitCamera() {
   if (!engine) return;
-  const targetY = player.y + .7;
-  const horizontal = Math.cos(orbitCamera.pitch) * orbitCamera.distance;
+  const target = [player.x, player.y + .7, player.z];
+  const forward = cameraForward(orbitCamera.yaw, orbitCamera.pitch);
   const position = [
-    player.x + Math.sin(orbitCamera.yaw) * horizontal,
-    targetY + Math.sin(orbitCamera.pitch) * orbitCamera.distance,
-    player.z + Math.cos(orbitCamera.yaw) * horizontal
+    target[0] - forward[0] * orbitCamera.distance,
+    target[1] - forward[1] * orbitCamera.distance,
+    target[2] - forward[2] * orbitCamera.distance
   ];
-  const target = [player.x, targetY, player.z];
   lastCameraPosition = position;
   lastCameraTarget = target;
   engine.setCamera({ position, target, fov: orbitCamera.fov, near: .08, far: 1000 });
@@ -501,8 +502,9 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
     freecam.x = lastCameraPosition[0];
     freecam.y = lastCameraPosition[1];
     freecam.z = lastCameraPosition[2];
-    freecam.yaw = Math.atan2(-direction[0], -direction[2]);
-    freecam.pitch = Math.asin(clamp(-direction[1], -1, 1));
+    const angles = cameraAnglesFromDirection(direction);
+    freecam.yaw = angles.yaw;
+    freecam.pitch = clamp(angles.pitch, FREECAM_MIN_PITCH, FREECAM_MAX_PITCH);
   }
   freecamEnabled = next;
   freecamVertical = 0;
@@ -581,8 +583,7 @@ function setupCanvasControls() {
       const dy = event.clientY - orbitLastY;
       orbitLastX = event.clientX;
       orbitLastY = event.clientY;
-      orbitCamera.yaw -= dx * .005;
-      orbitCamera.pitch = clamp(orbitCamera.pitch + dy * .004, -.12, 1.05);
+      applyCameraLookDelta(orbitCamera, dx, dy, ORBIT_MIN_PITCH, ORBIT_MAX_PITCH);
       return;
     }
 
@@ -600,8 +601,7 @@ function setupCanvasControls() {
     }
 
     if (gesture.mode === 'look') {
-      freecam.yaw -= dx * .005;
-      freecam.pitch = clamp(freecam.pitch + dy * .004, -1.48, 1.48);
+      applyCameraLookDelta(freecam, dx, dy, FREECAM_MIN_PITCH, FREECAM_MAX_PITCH);
       return;
     }
 
@@ -1040,13 +1040,56 @@ function setupJoystick() {
   stick.addEventListener('pointercancel', end);
 }
 
-function freecamForward() {
-  const cp = Math.cos(freecam.pitch);
+function wrapAngle(angle) {
+  if (!Number.isFinite(angle)) return 0;
+  let wrapped = (angle + Math.PI) % (Math.PI * 2);
+  if (wrapped < 0) wrapped += Math.PI * 2;
+  return wrapped - Math.PI;
+}
+
+function cameraForward(yaw, pitch) {
+  const cp = Math.cos(pitch);
   return normalize3(
-    -Math.sin(freecam.yaw) * cp,
-    -Math.sin(freecam.pitch),
-    -Math.cos(freecam.yaw) * cp
+    -Math.sin(yaw) * cp,
+    -Math.sin(pitch),
+    -Math.cos(yaw) * cp
   );
+}
+
+function cameraAnglesFromDirection(direction) {
+  const x = Number(direction?.[0]) || 0;
+  const y = Number(direction?.[1]) || 0;
+  const z = Number(direction?.[2]) || -1;
+  const horizontal = Math.hypot(x, z);
+  return {
+    yaw: wrapAngle(Math.atan2(-x, -z)),
+    pitch: Math.atan2(-y, Math.max(1e-6, horizontal))
+  };
+}
+
+function cameraGroundBasis(yaw) {
+  const wrapped = wrapAngle(yaw);
+  return {
+    forwardX: -Math.sin(wrapped),
+    forwardZ: -Math.cos(wrapped),
+    rightX: Math.cos(wrapped),
+    rightZ: -Math.sin(wrapped)
+  };
+}
+
+function applyCameraLookDelta(camera, dx, dy, minPitch, maxPitch) {
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Number(rect.width) || Number(canvas.clientWidth) || 1);
+  const height = Math.max(1, Number(rect.height) || Number(canvas.clientHeight) || 1);
+  const safeDx = clamp(Number(dx) || 0, -width * CAMERA_MAX_EVENT_FRACTION, width * CAMERA_MAX_EVENT_FRACTION);
+  const safeDy = clamp(Number(dy) || 0, -height * CAMERA_MAX_EVENT_FRACTION, height * CAMERA_MAX_EVENT_FRACTION);
+  const fovScale = clamp((Number(camera.fov) || CAMERA_REFERENCE_FOV) / CAMERA_REFERENCE_FOV, 0.55, 1.8);
+  camera.yaw = wrapAngle(camera.yaw - (safeDx / width) * CAMERA_YAW_RADIANS_PER_VIEW * fovScale);
+  camera.pitch = clamp(camera.pitch + (safeDy / height) * CAMERA_PITCH_RADIANS_PER_VIEW * fovScale, minPitch, maxPitch);
+}
+
+function freecamForward() {
+  return cameraForward(freecam.yaw, freecam.pitch);
 }
 
 function createRingGeometry(radius) {
