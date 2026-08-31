@@ -5,9 +5,15 @@ on:
     branches: [main, ai-static-world-builder]
     paths:
       - 'package.json'
+      - 'native/**/*.cpp'
+      - 'src/**/*.js'
+      - 'src/wasm/**/*.wasm'
+      - 'public/wasm/**/*.wasm'
+      - 'public/rift-wasm-core.js'
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
+      - 'public/index.html'
       - 'public/rift-world-inspection.js'
       - 'public/rift-world-composer.js'
       - 'public/rift-world-composition-runtime.js'
@@ -31,9 +37,15 @@ on:
     branches: [main]
     paths:
       - 'package.json'
+      - 'native/**/*.cpp'
+      - 'src/**/*.js'
+      - 'src/wasm/**/*.wasm'
+      - 'public/wasm/**/*.wasm'
+      - 'public/rift-wasm-core.js'
       - 'public/riftcity-blocks/**/*.json'
       - 'public/riftcity-buildings/**/*.json'
       - 'public/inspection.html'
+      - 'public/index.html'
       - 'public/rift-world-inspection.js'
       - 'public/rift-world-composer.js'
       - 'public/rift-world-composition-runtime.js'
@@ -61,13 +73,16 @@ permissions:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - name: Checkout RiftCity
         uses: actions/checkout@v4
 
       - name: Mirror Cloudflare build verification
         run: npm run build
+
+      - name: Verify Wrangler Worker + WASM bundle
+        run: npx --yes wrangler@4.127.1 deploy --dry-run --outdir=/tmp/rift-worker-dry
 
       - name: Start static RiftCity server
         run: |
