@@ -1,59 +1,31 @@
-import './rift-world-composition-runtime.js';
-import { $ } from './ui/helpers.js';
-import { state } from './ui/state.js';
-import { go } from './ui/router.js';
-import { initShell, refreshSession, submitAuth } from './ui/shell.js';
-import { renderCity, destroyCity2D } from './views/city.js';
-import { initPwaSupport } from './pwa.js';
-
-initShell(); initPwaSupport();
-$('#login-form').addEventListener('submit', event => { event.preventDefault(); submitAuth('/api/auth/login', event.currentTarget); });
-$('#register-form').addEventListener('submit', event => { event.preventDefault(); submitAuth('/api/auth/register', event.currentTarget); });
-
-let routeQueued = false;
-function scheduleRoute() {
-  if (routeQueued) return;
-  routeQueued = true;
-  queueMicrotask(() => { routeQueued = false; route().catch(error => console.error('Ironvale game mount failed', error)); });
-}
-window.addEventListener('hashchange', scheduleRoute);
-window.addEventListener('popstate', scheduleRoute);
-window.addEventListener('ironvale:navigate', scheduleRoute);
-
-let focusRefreshPending = false;
-window.addEventListener('focus', async () => {
-  if (!state.authenticated || focusRefreshPending) return;
-  focusRefreshPending = true;
-  try { await refreshSession({ navigate: false }); } catch (error) { console.warn('Ironvale session refresh failed', error); }
-  finally { focusRefreshPending = false; }
-});
-
-async function boot() {
-  const authenticated = await refreshSession();
-  if (!authenticated) return;
-  if (location.hash !== '#world') { history.replaceState(null, '', '#world'); }
-  await route();
-}
-
-function destroyWorldSafely() {
-  try { destroyCity2D(); } catch (error) { console.warn('Ironvale world teardown failed during remount', error); }
-}
-
-async function route() {
-  const request = ++state.activeRequest;
-  if (!state.authenticated) {
-    const ok = await refreshSession({ navigate: false });
-    if (!ok || request !== state.activeRequest) return;
-  }
-  if (location.hash !== '#world') { history.replaceState(null, '', '#world'); }
-  state.route = { name: 'world' };
-  const root = $('#game-root');
-  if (!root) return;
-  destroyWorldSafely();
-  const mount = document.createElement('div');
-  mount.className = 'ironvale-route-mount ironvale-world-mount';
-  root.replaceChildren(mount);
-  await renderCity(mount);
-}
-
-boot();
+import { RiftEngine } from './rift-engine.js';
+import { RiftTerrain } from './rift-terrain.js';
+const authScreen=document.querySelector('#auth-screen'),worldScreen=document.querySelector('#world-screen'),authForm=document.querySelector('#auth-form'),authStatus=document.querySelector('#auth-status'),authSubmit=document.querySelector('#auth-submit'),canvas=document.querySelector('#rift-canvas'),characterName=document.querySelector('#character-name'),terrainStatus=document.querySelector('#terrain-status'),coords=document.querySelector('#coords'),tools=document.querySelector('#terrain-tools');
+let authMode='login',engine=null,terrain=null,worldDocument=null,terrainMeshes=[],playerMesh=null,animationFrame=0,lastFrame=performance.now(),lastPositionSave=0;
+const player={x:160,y:11,z:160,yaw:0,vy:0,grounded:true},camera={yaw:Math.PI,pitch:.34,distance:9.5},input={forward:0,strafe:0,keys:new Set()};
+document.querySelectorAll('[data-auth-tab]').forEach(button=>button.addEventListener('click',()=>{authMode=button.dataset.authTab;document.querySelectorAll('[data-auth-tab]').forEach(tab=>tab.classList.toggle('active',tab===button));authSubmit.textContent=authMode==='register'?'Create account':'Enter Ironvale';authForm.password.autocomplete=authMode==='register'?'new-password':'current-password';setAuthStatus('')}));
+authForm.addEventListener('submit',async event=>{event.preventDefault();authSubmit.disabled=true;setAuthStatus(authMode==='register'?'Creating account…':'Signing in…');try{const result=await api(`/api/auth/${authMode}`,{method:'POST',body:{username:authForm.username.value,password:authForm.password.value}});if(!result.ok)throw new Error(result.error||'Authentication failed');authForm.reset();await bootSession()}catch(error){setAuthStatus(error.message,true)}finally{authSubmit.disabled=false}});
+document.querySelector('#logout-button').addEventListener('click',async()=>{await api('/api/auth/logout',{method:'POST'}).catch(()=>null);stopWorld();showAuth()});
+document.querySelector('#terrain-tools-button').addEventListener('click',()=>{tools.hidden=!tools.hidden});
+document.querySelectorAll('[data-brush]').forEach(button=>button.addEventListener('click',()=>{if(!terrain)return;const mode=button.dataset.brush,radius=Number(document.querySelector('#brush-radius').value),strength=Number(document.querySelector('#brush-strength').value),brush={mode,x:player.x,z:player.z,radius,strength};if(mode==='flatten')brush.targetHeight=terrain.sampleHeight(player.x,player.z);terrain.applyBrush(brush);rebuildTerrainMeshes();snapPlayerToSupport();terrainStatus.textContent=`Terrain revision ${terrain.revision} · ${terrainMeshes.length} meshes`}));
+document.querySelector('#reset-terrain').addEventListener('click',()=>{if(!worldDocument)return;terrain=new RiftTerrain(worldDocument.terrain);rebuildTerrainMeshes();snapPlayerToSupport();terrainStatus.textContent='Generated terrain reset'});
+window.addEventListener('keydown',event=>{if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;input.keys.add(event.key.toLowerCase())});window.addEventListener('keyup',event=>input.keys.delete(event.key.toLowerCase()));window.addEventListener('blur',()=>input.keys.clear());
+setupLookControls();setupJoystick();window.addEventListener('pagehide',()=>savePosition(true));window.addEventListener('beforeunload',()=>savePosition(true));bootSession();
+async function bootSession(){try{const data=await api('/api/bootstrap');if(!data.ok||!data.authenticated){showAuth();return}characterName.textContent=data.character.displayName||data.user.username;const saved=data.character.position||{};player.x=finiteOr(saved.x,160);player.y=finiteOr(saved.y,11);player.z=finiteOr(saved.z,160);player.yaw=finiteOr(saved.yaw,0);camera.yaw=player.yaw+Math.PI;await startWorld(data.world?.url||'/world/ironvale-terrain.json')}catch{showAuth()}}
+async function startWorld(url){stopWorld();authScreen.hidden=true;worldScreen.hidden=false;terrainStatus.textContent='Loading Rift Terrain…';const response=await fetch(url,{cache:'no-store'});if(!response.ok)throw new Error(`Terrain failed to load (${response.status})`);worldDocument=await response.json();terrain=new RiftTerrain(worldDocument.terrain);engine=new RiftEngine(canvas);rebuildTerrainMeshes();playerMesh=engine.addMesh(createCapsuleGeometry(),{position:[player.x,player.y,player.z]});snapPlayerToSupport();const stats=terrain.getStats?.()||{};terrainStatus.textContent=`${stats.surfaceChunks??terrainMeshes.length} chunks · smooth mesh terrain · ${terrain.caves?.length||0} cave`;lastFrame=performance.now();animationFrame=requestAnimationFrame(frame)}
+function stopWorld(){cancelAnimationFrame(animationFrame);animationFrame=0;if(engine)engine.destroy();engine=null;terrain=null;worldDocument=null;terrainMeshes=[];playerMesh=null;worldScreen.hidden=true}
+function showAuth(){authScreen.hidden=false;worldScreen.hidden=true;setAuthStatus('')}
+function rebuildTerrainMeshes(){if(!engine||!terrain)return;for(const mesh of terrainMeshes)engine.removeMesh(mesh);terrainMeshes=[];for(const entry of terrain.buildSurfaceGeometries(1))terrainMeshes.push(engine.addMesh(entry.geometry||entry));for(const entry of terrain.buildCaveGeometries())terrainMeshes.push(engine.addMesh(entry.geometry||entry))}
+function snapPlayerToSupport(){if(!terrain)return;const surface=terrain.supportAtPoint(player.x,player.z,player.y-.9,{maxRise:50,maxDrop:100});if(surface!=null){player.y=surface+.9;player.vy=0;player.grounded=true}if(playerMesh)playerMesh.position=[player.x,player.y,player.z]}
+function frame(now){if(!engine||!terrain)return;const dt=Math.min(.05,Math.max(.001,(now-lastFrame)/1000));lastFrame=now;updateKeyboardInput();updatePlayer(dt);updateCamera();engine.render();coords.textContent=`${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`;if(now-lastPositionSave>5000){lastPositionSave=now;savePosition()}animationFrame=requestAnimationFrame(frame)}
+function updateKeyboardInput(){let forward=0,strafe=0;if(input.keys.has('w')||input.keys.has('arrowup'))forward+=1;if(input.keys.has('s')||input.keys.has('arrowdown'))forward-=1;if(input.keys.has('d')||input.keys.has('arrowright'))strafe+=1;if(input.keys.has('a')||input.keys.has('arrowleft'))strafe-=1;if(forward||strafe){const length=Math.hypot(forward,strafe)||1;input.forward=forward/length;input.strafe=strafe/length}else if(!joystickActive){input.forward=0;input.strafe=0}}
+function updatePlayer(dt){const moving=Math.abs(input.forward)+Math.abs(input.strafe)>.001;if(moving){const forwardX=-Math.sin(camera.yaw),forwardZ=-Math.cos(camera.yaw),rightX=Math.cos(camera.yaw),rightZ=-Math.sin(camera.yaw);let dx=forwardX*input.forward+rightX*input.strafe,dz=forwardZ*input.forward+rightZ*input.strafe;const length=Math.hypot(dx,dz)||1;dx/=length;dz/=length;const speed=7.2,nextX=clamp(player.x+dx*speed*dt,terrain.origin[0]+.5,terrain.origin[0]+terrain.width-.5),nextZ=clamp(player.z+dz*speed*dt,terrain.origin[2]+.5,terrain.origin[2]+terrain.depth-.5),footY=player.y-.9,support=terrain.supportAtPoint(nextX,nextZ,footY,{maxRise:.9,maxDrop:3.2});player.x=nextX;player.z=nextZ;player.yaw=Math.atan2(dx,dz);if(support!=null){player.y=support+.9;player.vy=0;player.grounded=true}else player.grounded=false}if(!player.grounded){player.vy-=18*dt;player.y+=player.vy*dt;const support=terrain.supportAtPoint(player.x,player.z,player.y-.9,{maxRise:.35,maxDrop:1.5});if(support!=null&&player.y-.9<=support+.25){player.y=support+.9;player.vy=0;player.grounded=true}}if(player.y< -80){const spawn=worldDocument?.anchors?.starter_spawn||{x:160,z:160};player.x=spawn.x;player.z=spawn.z;player.y=(terrain.sampleHeight(player.x,player.z)??10)+.9;player.vy=0;player.grounded=true}if(playerMesh){playerMesh.position[0]=player.x;playerMesh.position[1]=player.y;playerMesh.position[2]=player.z;playerMesh.yaw=player.yaw}}
+function updateCamera(){const targetY=player.y+.7,horizontal=Math.cos(camera.pitch)*camera.distance,position=[player.x+Math.sin(camera.yaw)*horizontal,targetY+Math.sin(camera.pitch)*camera.distance,player.z+Math.cos(camera.yaw)*horizontal];engine.setCamera({position,target:[player.x,targetY,player.z],fov:Math.PI/3,near:.08,far:650})}
+async function savePosition(useKeepalive=false){if(!engine)return;try{await fetch('/api/character/position',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({x:player.x,y:player.y,z:player.z,yaw:player.yaw}),keepalive:useKeepalive})}catch{}}
+async function api(path,options={}){const request={method:options.method||'GET',headers:{}};if(options.body!==undefined){request.headers['Content-Type']='application/json';request.body=JSON.stringify(options.body)}const response=await fetch(path,request);let data={};try{data=await response.json()}catch{}if(!response.ok&&!data.error)data.error=`Request failed (${response.status})`;return data}
+function setAuthStatus(message,error=false){authStatus.textContent=message;authStatus.classList.toggle('error',error)}
+function setupLookControls(){let pointerId=null,lastX=0,lastY=0;canvas.addEventListener('pointerdown',event=>{if(event.pointerType==='mouse'&&event.button!==0)return;pointerId=event.pointerId;lastX=event.clientX;lastY=event.clientY;canvas.setPointerCapture(pointerId)});canvas.addEventListener('pointermove',event=>{if(event.pointerId!==pointerId)return;const dx=event.clientX-lastX,dy=event.clientY-lastY;lastX=event.clientX;lastY=event.clientY;camera.yaw-=dx*.005;camera.pitch=clamp(camera.pitch+dy*.004,-.12,1.05)});const end=event=>{if(event.pointerId===pointerId)pointerId=null};canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);canvas.addEventListener('wheel',event=>{event.preventDefault();camera.distance=clamp(camera.distance+event.deltaY*.01,3.5,18)},{passive:false})}
+let joystickActive=false;
+function setupJoystick(){const stick=document.querySelector('#joystick'),knob=document.querySelector('#joystick-knob');let pointerId=null;const max=34,update=event=>{const rect=stick.getBoundingClientRect();let dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2);const length=Math.hypot(dx,dy);if(length>max){dx*=max/length;dy*=max/length}knob.style.transform=`translate(${dx}px,${dy}px)`;input.strafe=dx/max;input.forward=-dy/max};stick.addEventListener('pointerdown',event=>{event.stopPropagation();pointerId=event.pointerId;joystickActive=true;stick.setPointerCapture(pointerId);update(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===pointerId)update(event)});const end=event=>{if(event.pointerId!==pointerId)return;pointerId=null;joystickActive=false;input.forward=0;input.strafe=0;knob.style.transform='translate(0,0)'};stick.addEventListener('pointerup',end);stick.addEventListener('pointercancel',end)}
+function createCapsuleGeometry(){const radial=12,rings=[],radius=.36,half=.48;for(let i=0;i<=4;i+=1){const angle=-Math.PI/2+(Math.PI/2)*(i/4);rings.push({y:-half+Math.sin(angle)*radius,r:Math.cos(angle)*radius,ny:Math.sin(angle),nr:Math.cos(angle)})}for(let i=1;i<=4;i+=1){const angle=(Math.PI/2)*(i/4);rings.push({y:half+Math.sin(angle)*radius,r:Math.cos(angle)*radius,ny:Math.sin(angle),nr:Math.cos(angle)})}const vertices=[],indices=[];for(const ring of rings)for(let side=0;side<radial;side+=1){const angle=side/radial*Math.PI*2,x=Math.cos(angle)*ring.r,z=Math.sin(angle)*ring.r,nx=Math.cos(angle)*ring.nr,nz=Math.sin(angle)*ring.nr;vertices.push(x,ring.y,z,nx,ring.ny,nz,.30,.43,.34)}for(let ring=0;ring<rings.length-1;ring+=1)for(let side=0;side<radial;side+=1){const next=(side+1)%radial,a=ring*radial+side,b=ring*radial+next,c=(ring+1)*radial+side,d=(ring+1)*radial+next;indices.push(a,c,b,b,c,d)}return{vertices:new Float32Array(vertices),indices:new Uint16Array(indices),vertexStride:9}}
+function finiteOr(value,fallback){const number=Number(value);return Number.isFinite(number)?number:fallback}function clamp(value,min,max){return Math.max(min,Math.min(max,value))}

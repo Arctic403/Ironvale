@@ -1,39 +1,16 @@
 {
-  "name": "ironvale-medieval-mmo",
-  "version": "0.1.0",
+  "name": "ironvale-core",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:ironvale && npm run verify:starter && npm run verify:wasm && npm run verify:native-integration && npm run verify:native-v4 && npm run verify:blueprints && npm run verify:building-pipeline && npm run verify:building-programs && npm run verify:interiors && npm run verify:inspection && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
+    "build": "node --check src/index.js && node --check public/app.js && node --check public/rift-engine.js && node --check public/rift-terrain.js && node scripts/check-core.js",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:create": "wrangler d1 create riftcity-v2",
     "db:migrate:local": "wrangler d1 execute riftcity-v2 --local --file=./schema.sql",
-    "db:migrate:remote": "wrangler d1 execute riftcity-v2 --remote --file=./schema.sql",
-    "verify:js-only": "node scripts/verify-js-only.js",
-    "verify:wasm": "node scripts/check-rift-wasm-core.js",
-    "verify:blueprints": "node scripts/check-rift-city-blueprints.js",
-    "verify:building-pipeline": "node scripts/check-rift-building-stage-pipeline.js",
-    "verify:building-programs": "node scripts/check-rift-building-programs.js",
-    "verify:interiors": "node scripts/check-rift-interior-architecture.js",
-    "verify:inspection": "node scripts/check-rift-inspection-pipeline.js",
-    "verify:world-composition": "node scripts/check-rift-downtown-composition.js",
-    "verify:player-physics": "node scripts/check-rift-player-physics.js",
-    "verify:building-visibility": "node scripts/check-rift-building-visibility.js",
-    "verify:smart-camera": "node scripts/check-rift-smart-camera.js",
-    "verify:third-person-camera": "node scripts/check-rift-third-person-camera.js",
-    "verify:ai-builder": "node scripts/check-rift-ai-builder.js",
-    "verify:native-integration": "node scripts/check-rift-native-integration.js",
-    "verify:ironvale": "node scripts/check-ironvale-foundation.js",
-    "verify:native-v4": "node scripts/check-rift-native-v4.js",
-    "verify:starter": "node scripts/check-ironvale-starter-game.js"
+    "db:migrate:remote": "wrangler d1 execute riftcity-v2 --remote --file=./schema.sql"
   },
   "devDependencies": {
     "wrangler": "^4.30.0"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/server": "2.0.0",
-    "agents": "0.21.0",
-    "zod": "^4.4.3"
   }
 }

@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Ironvale">
-  <rect width="1024" height="1024" rx="176" fill="#15130f"/>
-  <path d="M512 92 840 212v250c0 226-132 390-328 470C316 852 184 688 184 462V212L512 92Z" fill="#242019" stroke="#9d7b45" stroke-width="28"/>
-  <path d="M346 276h332v82H558v308h120v82H346v-82h120V358H346v-82Z" fill="#e8dfca"/>
-  <path d="M324 780h376" stroke="#9d7b45" stroke-width="32" stroke-linecap="round"/>
-</svg>

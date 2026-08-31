@@ -1,7 +1,6 @@
 name = "riftcityv1"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
-compatibility_flags = ["nodejs_compat"]
 
 assets = { directory = "./public", binding = "ASSETS" }
 
@@ -9,10 +8,3 @@ assets = { directory = "./public", binding = "ASSETS" }
 binding = "DB"
 database_name = "riftcity-v2"
 database_id = "118e392b-e9d4-4d81-9a4f-ee2a2b3865cc"
-
-[[r2_buckets]]
-binding = "RIFT_ASSETS"
-bucket_name = "riftcityassets"
-
-# H1.33: do not place CONFIG_SIGNING_SECRET in this file.
-# Configure it with: npx wrangler secret put CONFIG_SIGNING_SECRET
