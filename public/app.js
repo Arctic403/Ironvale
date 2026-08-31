@@ -26,7 +26,13 @@ const altitudeControls = $('#freecam-altitude');
 
 const TERRAIN_RENDER_LOD = 2;
 const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v2';
-const MAX_HISTORY = 16;
+const MAX_HISTORY = 10;
+const LONG_PRESS_MS = 260;
+const LOOK_START_PX = 9;
+const TAP_MAX_MS = 220;
+const TAP_MAX_PX = 7;
+const CONTINUOUS_BRUSH_MS = 75;
+const CONTINUOUS_STRENGTH_SCALE = 0.2;
 
 let authMode = 'login';
 let engine = null;
@@ -53,6 +59,11 @@ const input = { forward: 0, strafe: 0, keys: new Set() };
 const reticleScreen = { u: .5, v: .5 };
 const undoStack = [];
 const redoStack = [];
+
+let gesture = null;
+let longPressTimer = 0;
+let continuousBrushTimer = 0;
+let sculptFlattenY = null;
 
 document.querySelectorAll('[data-auth-tab]').forEach(button => button.addEventListener('click', () => {
   authMode = button.dataset.authTab;
@@ -140,7 +151,11 @@ window.addEventListener('keydown', event => {
   input.keys.add(key);
 });
 window.addEventListener('keyup', event => input.keys.delete(event.key.toLowerCase()));
-window.addEventListener('blur', () => { input.keys.clear(); freecamVertical = 0; });
+window.addEventListener('blur', () => {
+  input.keys.clear();
+  freecamVertical = 0;
+  cancelGesture();
+});
 window.addEventListener('pagehide', () => savePosition(true));
 window.addEventListener('beforeunload', () => savePosition(true));
 
@@ -199,6 +214,7 @@ async function startWorld(url) {
 }
 
 function stopWorld() {
+  cancelGesture();
   cancelAnimationFrame(animationFrame);
   animationFrame = 0;
   if (engine) engine.destroy();
@@ -404,6 +420,7 @@ function updateOrbitCamera() {
 function setFreecam(enabled, { preserveCamera = true } = {}) {
   const next = Boolean(enabled) && Boolean(terrain) && Boolean(engine);
   if (next === freecamEnabled) return;
+  cancelGesture();
   if (next && preserveCamera) {
     const direction = normalize3(
       lastCameraTarget[0] - lastCameraPosition[0],
@@ -432,17 +449,14 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
   reticleHit = null;
   if (brushMesh) brushMesh.visible = false;
   editorStatus.textContent = freecamEnabled
-    ? '1 finger moves the reticle. Tap to sculpt. 2 fingers rotate the camera. Joystick/WASD flies.'
-    : 'Turn Freecam ON to sculpt with the reticle.';
+    ? 'Swipe to look. Hold, then drag to sculpt continuously. Tap for one stamp.'
+    : 'Turn Freecam ON to sculpt terrain.';
 }
 
 function setupCanvasControls() {
-  const pointers = new Map();
   let orbitPointerId = null;
-  let orbitLastX = 0, orbitLastY = 0;
-  let lookCentroid = null;
-  let mouseLookId = null;
-  let mouseLookLastX = 0, mouseLookLastY = 0;
+  let orbitLastX = 0;
+  let orbitLastY = 0;
 
   canvas.addEventListener('contextmenu', event => {
     if (freecamEnabled) event.preventDefault();
@@ -458,37 +472,34 @@ function setupCanvasControls() {
       return;
     }
 
-    if (event.pointerType === 'mouse' && event.button === 2) {
-      event.preventDefault();
-      mouseLookId = event.pointerId;
-      mouseLookLastX = event.clientX;
-      mouseLookLastY = event.clientY;
-      canvas.setPointerCapture(event.pointerId);
-      return;
-    }
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-
-    const record = {
-      id: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      lastX: event.clientX,
-      lastY: event.clientY,
-      downX: event.clientX,
-      downY: event.clientY,
-      downAt: performance.now(),
-      travel: 0,
-      multiTouch: false,
-      pointerType: event.pointerType
-    };
-    pointers.set(event.pointerId, record);
+    if (gesture) return;
+    if (event.pointerType === 'mouse' && event.button !== 0 && event.button !== 2) return;
+    event.preventDefault();
     canvas.setPointerCapture(event.pointerId);
 
-    if (pointers.size === 1) {
-      moveReticleToClient(event.clientX, event.clientY);
-    } else {
-      for (const pointer of pointers.values()) pointer.multiTouch = true;
-      lookCentroid = pointerCentroid(pointers);
+    gesture = {
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      button: event.button,
+      mode: event.pointerType === 'mouse' && event.button === 2 ? 'look' : 'pending',
+      downAt: performance.now(),
+      downX: event.clientX,
+      downY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      travel: 0
+    };
+
+    moveReticleToClient(event.clientX, event.clientY);
+
+    if (gesture.mode === 'pending') {
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        if (!gesture || gesture.mode !== 'pending' || gesture.travel > LOOK_START_PX) return;
+        beginContinuousSculpt();
+      }, LONG_PRESS_MS);
     }
   });
 
@@ -504,78 +515,63 @@ function setupCanvasControls() {
       return;
     }
 
-    if (event.pointerType === 'mouse' && mouseLookId === event.pointerId) {
-      const dx = event.clientX - mouseLookLastX;
-      const dy = event.clientY - mouseLookLastY;
-      mouseLookLastX = event.clientX;
-      mouseLookLastY = event.clientY;
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const dx = event.clientX - gesture.lastX;
+    const dy = event.clientY - gesture.lastY;
+    gesture.travel += Math.hypot(dx, dy);
+    gesture.lastX = gesture.x = event.clientX;
+    gesture.lastY = gesture.y = event.clientY;
+
+    if (gesture.mode === 'pending' && gesture.travel > LOOK_START_PX) {
+      clearTimeout(longPressTimer);
+      longPressTimer = 0;
+      gesture.mode = 'look';
+    }
+
+    if (gesture.mode === 'look') {
       freecam.yaw -= dx * .005;
       freecam.pitch = clamp(freecam.pitch + dy * .004, -1.48, 1.48);
       return;
     }
 
-    const record = pointers.get(event.pointerId);
-    if (!record) {
-      if (event.pointerType === 'mouse') moveReticleToClient(event.clientX, event.clientY);
-      return;
+    if (gesture.mode === 'sculpt') {
+      moveReticleToClient(event.clientX, event.clientY);
+      applyContinuousBrushStamp();
     }
-
-    const dx = event.clientX - record.lastX;
-    const dy = event.clientY - record.lastY;
-    record.travel += Math.hypot(dx, dy);
-    record.lastX = record.x = event.clientX;
-    record.lastY = record.y = event.clientY;
-
-    if (pointers.size >= 2) {
-      for (const pointer of pointers.values()) pointer.multiTouch = true;
-      const centroid = pointerCentroid(pointers);
-      if (lookCentroid) {
-        const lookDx = centroid.x - lookCentroid.x;
-        const lookDy = centroid.y - lookCentroid.y;
-        freecam.yaw -= lookDx * .005;
-        freecam.pitch = clamp(freecam.pitch + lookDy * .004, -1.48, 1.48);
-      }
-      lookCentroid = centroid;
-      return;
-    }
-
-    moveReticleToClient(event.clientX, event.clientY);
   });
 
-  const finishPointer = event => {
+  const finish = event => {
     if (!freecamEnabled) {
       if (event.pointerId === orbitPointerId) orbitPointerId = null;
       return;
     }
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
 
-    if (event.pointerId === mouseLookId) {
-      mouseLookId = null;
-      return;
+    const endedGesture = gesture;
+    const duration = performance.now() - endedGesture.downAt;
+    const displacement = Math.hypot(event.clientX - endedGesture.downX, event.clientY - endedGesture.downY);
+
+    if (endedGesture.mode === 'pending' && duration <= TAP_MAX_MS && displacement <= TAP_MAX_PX) {
+      moveReticleToClient(event.clientX, event.clientY);
+      updateReticleTarget();
+      if (reticleHit) applySingleBrushStamp();
     }
 
-    const record = pointers.get(event.pointerId);
-    if (!record) return;
-    const wasOnlyPointer = pointers.size === 1;
-    const duration = performance.now() - record.downAt;
-    const displacement = Math.hypot(event.clientX - record.downX, event.clientY - record.downY);
-    const shouldSculpt = wasOnlyPointer && !record.multiTouch && duration < 500 && record.travel < 12 && displacement < 12;
-
-    if (wasOnlyPointer) moveReticleToClient(event.clientX, event.clientY);
-    pointers.delete(event.pointerId);
-    lookCentroid = pointers.size >= 2 ? pointerCentroid(pointers) : null;
-
-    if (shouldSculpt) {
-      updateReticleTarget(true);
-      if (reticleHit) applyReticleBrush();
+    const sculpted = endedGesture.mode === 'sculpt';
+    endContinuousSculpt();
+    gesture = null;
+    clearTimeout(longPressTimer);
+    longPressTimer = 0;
+    if (sculpted) {
+      saveDraftSilently();
+      editorStatus.textContent = `${brushModeLabel(brushMode)} stroke finished.`;
     }
   };
 
-  canvas.addEventListener('pointerup', finishPointer);
+  canvas.addEventListener('pointerup', finish);
   canvas.addEventListener('pointercancel', event => {
     if (event.pointerId === orbitPointerId) orbitPointerId = null;
-    if (event.pointerId === mouseLookId) mouseLookId = null;
-    pointers.delete(event.pointerId);
-    lookCentroid = pointers.size >= 2 ? pointerCentroid(pointers) : null;
+    if (gesture && event.pointerId === gesture.pointerId) cancelGesture();
   });
 
   canvas.addEventListener('wheel', event => {
@@ -585,6 +581,72 @@ function setupCanvasControls() {
   }, { passive: false });
 }
 
+function beginContinuousSculpt() {
+  if (!gesture || gesture.mode !== 'pending' || !terrain) return;
+  gesture.mode = 'sculpt';
+  moveReticleToClient(gesture.x, gesture.y);
+  updateReticleTarget();
+  if (!reticleHit) {
+    gesture.mode = 'pending';
+    return;
+  }
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  sculptFlattenY = brushMode === 'flatten' ? reticleHit.y : null;
+  editorStatus.textContent = `${brushModeLabel(brushMode)} painting… release to stop.`;
+  applyContinuousBrushStamp();
+  clearInterval(continuousBrushTimer);
+  continuousBrushTimer = setInterval(applyContinuousBrushStamp, CONTINUOUS_BRUSH_MS);
+}
+
+function endContinuousSculpt() {
+  clearInterval(continuousBrushTimer);
+  continuousBrushTimer = 0;
+  sculptFlattenY = null;
+}
+
+function cancelGesture() {
+  clearTimeout(longPressTimer);
+  longPressTimer = 0;
+  endContinuousSculpt();
+  gesture = null;
+}
+
+function applyContinuousBrushStamp() {
+  if (!gesture || gesture.mode !== 'sculpt' || !terrain) return;
+  moveReticleToClient(gesture.x, gesture.y);
+  updateReticleTarget();
+  if (!reticleHit) return;
+  applyBrushAtReticle(CONTINUOUS_STRENGTH_SCALE, sculptFlattenY, false);
+}
+
+function applySingleBrushStamp() {
+  if (!terrain || !reticleHit) return;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  applyBrushAtReticle(1, brushMode === 'flatten' ? reticleHit.y : null, true);
+  editorStatus.textContent = `${brushModeLabel(brushMode)} applied.`;
+}
+
+function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately = false) {
+  if (!terrain || !reticleHit) return;
+  const radius = Number(radiusInput.value);
+  const brush = {
+    mode: brushMode,
+    x: reticleHit.x,
+    z: reticleHit.z,
+    radius,
+    strength: Number(strengthInput.value) * strengthScale
+  };
+  if (brushMode === 'flatten') brush.targetHeight = Number.isFinite(flattenY) ? flattenY : reticleHit.y;
+  terrain.applyBrush(brush);
+  rebuildTerrainArea(reticleHit.x, reticleHit.z, radius + terrain.sampleSpacing * 2);
+  snapPlayerToSupport();
+  updateReticleTarget();
+  if (saveImmediately) saveDraftSilently();
+  terrainStatus.textContent = `640×640 blank terrain · edit revision ${terrain.revision}`;
+}
+
 function moveReticleToClient(clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   const safeX = clamp(clientX - rect.left, 18, Math.max(18, rect.width - 18));
@@ -592,7 +654,7 @@ function moveReticleToClient(clientX, clientY) {
   reticleScreen.u = safeX / Math.max(1, rect.width);
   reticleScreen.v = safeY / Math.max(1, rect.height);
   updateReticleVisual();
-  updateReticleTarget(true);
+  updateReticleTarget();
 }
 
 function updateReticleVisual() {
@@ -678,38 +740,6 @@ function raycastTerrainAtScreen(clientX, clientY) {
   return null;
 }
 
-function pointerCentroid(pointers) {
-  let x = 0, y = 0, count = 0;
-  for (const pointer of pointers.values()) {
-    x += pointer.x;
-    y += pointer.y;
-    count += 1;
-  }
-  return count ? { x: x / count, y: y / count } : null;
-}
-
-function applyReticleBrush() {
-  if (!terrain || !reticleHit) return;
-  pushUndo(captureTerrainState());
-  redoStack.length = 0;
-  const radius = Number(radiusInput.value);
-  const brush = {
-    mode: brushMode,
-    x: reticleHit.x,
-    z: reticleHit.z,
-    radius,
-    strength: Number(strengthInput.value)
-  };
-  if (brushMode === 'flatten') brush.targetHeight = reticleHit.y;
-  terrain.applyBrush(brush);
-  rebuildTerrainArea(reticleHit.x, reticleHit.z, radius + terrain.sampleSpacing * 2);
-  snapPlayerToSupport();
-  saveDraftSilently();
-  updateReticleTarget();
-  terrainStatus.textContent = `640×640 blank terrain · edit revision ${terrain.revision}`;
-  editorStatus.textContent = `${brushModeLabel(brushMode)} applied.`;
-}
-
 function captureTerrainState() {
   return {
     heights: new Float32Array(terrain.heights),
@@ -734,6 +764,7 @@ function pushUndo(state) {
   undoStack.push(state);
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
 }
+
 function undoTerrain() {
   if (!terrain || !undoStack.length) return;
   redoStack.push(captureTerrainState());
@@ -741,6 +772,7 @@ function undoTerrain() {
   saveDraftSilently();
   editorStatus.textContent = 'Undo';
 }
+
 function redoTerrain() {
   if (!terrain || !redoStack.length) return;
   pushUndo(captureTerrainState());
@@ -774,7 +806,8 @@ function applySerializedEdits(data) {
   if (Number(data.width) !== terrain.width || Number(data.depth) !== terrain.depth || Number(data.sampleSpacing) !== terrain.sampleSpacing) return false;
   terrain = new RiftTerrain(worldDocument.terrain);
   for (const entry of data.delta || []) {
-    const index = Number(entry[0]), value = Number(entry[1]);
+    const index = Number(entry[0]);
+    const value = Number(entry[1]);
     if (Number.isInteger(index) && index >= 0 && index < terrain.manualDelta.length && Number.isFinite(value)) {
       terrain.manualDelta[index] = value;
       terrain.heights[index] += value;
@@ -792,10 +825,12 @@ function saveDraft() {
   saveDraftSilently();
   editorStatus.textContent = 'Terrain draft saved on this device.';
 }
+
 function saveDraftSilently() {
   if (!terrain) return;
   try { localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(serializeTerrainEdits())); } catch {}
 }
+
 function restoreLocalDraft() {
   try {
     const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
@@ -828,6 +863,7 @@ async function exportDraft() {
 
 function resetTerrain() {
   if (!worldDocument || !terrain) return;
+  cancelGesture();
   pushUndo(captureTerrainState());
   redoStack.length = 0;
   terrain = new RiftTerrain(worldDocument.terrain);
@@ -945,24 +981,32 @@ function freecamForward() {
 function createRingGeometry(radius) {
   const segments = 64;
   const width = Math.max(.08, radius * .025);
-  const vertices = [], indices = [];
+  const vertices = [];
+  const indices = [];
   for (let i = 0; i < segments; i += 1) {
     const angle = i / segments * Math.PI * 2;
-    const c = Math.cos(angle), s = Math.sin(angle);
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
     for (const r of [Math.max(.05, radius - width), radius + width]) {
       vertices.push(c * r, 0, s * r, 0, 1, 0, .95, .72, .18);
     }
   }
   for (let i = 0; i < segments; i += 1) {
     const n = (i + 1) % segments;
-    const a = i * 2, b = a + 1, c = n * 2, d = c + 1;
+    const a = i * 2;
+    const b = a + 1;
+    const c = n * 2;
+    const d = c + 1;
     indices.push(a, c, b, b, c, d);
   }
   return { vertices: new Float32Array(vertices), indices: new Uint16Array(indices), vertexStride: 9 };
 }
 
 function createCapsuleGeometry() {
-  const radial = 12, rings = [], radius = .36, half = .48;
+  const radial = 12;
+  const rings = [];
+  const radius = .36;
+  const half = .48;
   for (let i = 0; i <= 4; i += 1) {
     const angle = -Math.PI / 2 + (Math.PI / 2) * (i / 4);
     rings.push({ y: -half + Math.sin(angle) * radius, r: Math.cos(angle) * radius, ny: Math.sin(angle), nr: Math.cos(angle) });
@@ -971,19 +1015,25 @@ function createCapsuleGeometry() {
     const angle = (Math.PI / 2) * (i / 4);
     rings.push({ y: half + Math.sin(angle) * radius, r: Math.cos(angle) * radius, ny: Math.sin(angle), nr: Math.cos(angle) });
   }
-  const vertices = [], indices = [];
+  const vertices = [];
+  const indices = [];
   for (const ring of rings) {
     for (let side = 0; side < radial; side += 1) {
       const angle = side / radial * Math.PI * 2;
-      const x = Math.cos(angle) * ring.r, z = Math.sin(angle) * ring.r;
-      const nx = Math.cos(angle) * ring.nr, nz = Math.sin(angle) * ring.nr;
+      const x = Math.cos(angle) * ring.r;
+      const z = Math.sin(angle) * ring.r;
+      const nx = Math.cos(angle) * ring.nr;
+      const nz = Math.sin(angle) * ring.nr;
       vertices.push(x, ring.y, z, nx, ring.ny, nz, .30, .43, .34);
     }
   }
   for (let ring = 0; ring < rings.length - 1; ring += 1) {
     for (let side = 0; side < radial; side += 1) {
       const next = (side + 1) % radial;
-      const a = ring * radial + side, b = ring * radial + next, c = (ring + 1) * radial + side, d = (ring + 1) * radial + next;
+      const a = ring * radial + side;
+      const b = ring * radial + next;
+      const c = (ring + 1) * radial + side;
+      const d = c + 1;
       indices.push(a, c, b, b, c, d);
     }
   }
@@ -994,6 +1044,7 @@ function normalize3(x, y, z) {
   const length = Math.hypot(x, y, z) || 1;
   return [x / length, y / length, z / length];
 }
+
 function cross3(a, b) {
   return [
     a[1] * b[2] - a[2] * b[1],
@@ -1001,10 +1052,12 @@ function cross3(a, b) {
     a[0] * b[1] - a[1] * b[0]
   ];
 }
+
 function finiteOr(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 }
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
