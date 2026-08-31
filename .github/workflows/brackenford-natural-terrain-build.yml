@@ -1,0 +1,58 @@
+name: Brackenford Natural Terrain Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build-brackenford-region-v2.mjs'
+      - 'scripts/check-ironvale-starter-game.js'
+      - '.github/workflows/brackenford-natural-terrain-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-terrain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Ironvale
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate natural Brackenford terrain
+        run: node scripts/build-brackenford-region-v2.mjs
+      - name: Verify terrain world compile
+        run: |
+          node --check scripts/build-brackenford-region-v2.mjs
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { compileRiftCityBlock } from './public/rift-city-block-importer.js';
+          const world=JSON.parse(fs.readFileSync('public/rift-world-blocks/brackenford-lowlands-001.json','utf8'));
+          const compiled=compileRiftCityBlock(world);
+          if(world.metadata?.terrain_pass!=='natural-v1') throw new Error('natural terrain metadata missing');
+          if(world.metadata?.buildings!==false) throw new Error('terrain pass unexpectedly contains buildings');
+          if(Object.keys(world.prefabs||{}).length || (world.layout||[]).length) throw new Error('town prefab/layout content remains');
+          if(!JSON.stringify(world).includes('Brackenford River')) throw new Error('river missing');
+          if(!JSON.stringify(world).includes('Blackstone cave chamber')) throw new Error('cave missing');
+          if(world.bounds.max[1] < 24) throw new Error('mountain vertical scale missing');
+          console.log('[natural-terrain] compile stats', compiled.stats);
+          NODE
+      - name: Full Ironvale build verification
+        run: npm run build
+      - name: Install Worker dependencies
+        run: npm install --no-save --no-package-lock wrangler@4.54.0
+      - name: Verify Worker and WASM bundle
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dryrun
+      - name: Guard generated diff
+        run: |
+          git diff --check
+          git diff --name-only | grep -qx 'public/rift-world-blocks/brackenford-lowlands-001.json'
+          git diff --name-only | grep -qx 'src/ironvale/content.js'
+          test "$(git diff --name-only | wc -l)" -eq 2
+      - name: Commit verified natural region
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/rift-world-blocks/brackenford-lowlands-001.json src/ironvale/content.js
+          git commit -m 'Replace Brackenford town pass with natural terrain foundation'
+          git push origin HEAD:main
