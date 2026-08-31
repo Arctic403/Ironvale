@@ -11,26 +11,20 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const gauss=(x,z,cx,cz,sx,sz,a)=>a*Math.exp(-(((x-cx)/sx)**2+((z-cz)/sz)**2));
 const hash=(x,z)=>{const n=Math.sin(x*12.9898+z*78.233)*43758.5453;return n-Math.floor(n);};
 
-// Organic island silhouette. World bounds stay rectangular internally, but the land itself is not.
-// Harmonic radial variation creates rough natural coast; positive/negative lobes form capes, bays and coves.
 const islandField=(x,z)=>{
   const dx=x-158,dz=(z-160)*1.04;
   const a=Math.atan2(dz,dx),r=Math.hypot(dx,dz);
-  const coastR=111
-    +15*Math.sin(a*3+0.45)
-    +9*Math.sin(a*5-1.2)
-    +6*Math.cos(a*7+0.7)
-    +4*Math.sin(a*11-0.3);
+  const coastR=111+15*Math.sin(a*3+0.45)+9*Math.sin(a*5-1.2)+6*Math.cos(a*7+0.7)+4*Math.sin(a*11-0.3);
   let edge=coastR-r;
-  edge+=gauss(x,z,161,30,32,34,27);   // long north cape
-  edge+=gauss(x,z,260,77,39,37,34);   // Blackstone mountain peninsula
-  edge+=gauss(x,z,278,226,35,43,25);  // south-east peninsula
-  edge+=gauss(x,z,74,251,42,36,18);   // south-west shoulder
-  edge+=gauss(x,z,42,104,32,43,15);   // western headland
-  edge-=gauss(x,z,45,169,30,42,31);   // deep western bay
-  edge-=gauss(x,z,154,294,40,27,24);  // south-coast inlet
-  edge-=gauss(x,z,287,151,28,38,21);  // east-coast cove
-  edge-=gauss(x,z,99,42,26,29,13);    // north-west cove
+  edge+=gauss(x,z,161,30,32,34,27);
+  edge+=gauss(x,z,260,77,39,37,34);
+  edge+=gauss(x,z,278,226,35,43,25);
+  edge+=gauss(x,z,74,251,42,36,18);
+  edge+=gauss(x,z,42,104,32,43,15);
+  edge-=gauss(x,z,45,169,30,42,31);
+  edge-=gauss(x,z,154,294,40,27,24);
+  edge-=gauss(x,z,287,151,28,38,21);
+  edge-=gauss(x,z,99,42,26,29,13);
   edge+=Math.sin(x/8.5+z/13)*1.8+Math.sin(x/17-z/11)*1.3;
   return edge/14;
 };
@@ -47,26 +41,24 @@ for(let z=0;z<D;z++)for(let x=0;x<W;x++){
   if(coast<=0){height[z][x]=0;continue;}
   land[z][x]=1;
   let h=3;
-  h+=gauss(x,z,259,73,39,34,26);      // Blackstone mountain
-  h+=gauss(x,z,235,111,55,29,10);     // eastern shoulder
-  h+=gauss(x,z,67,91,44,50,8);        // western hills
-  h+=gauss(x,z,71,248,52,40,6);       // south-west hills
-  h+=gauss(x,z,246,250,54,45,7);      // south-east uplands
-  h+=gauss(x,z,158,59,46,24,4);       // northern ridge
+  h+=gauss(x,z,259,73,39,34,26);
+  h+=gauss(x,z,235,111,55,29,10);
+  h+=gauss(x,z,67,91,44,50,8);
+  h+=gauss(x,z,71,248,52,40,6);
+  h+=gauss(x,z,246,250,54,45,7);
+  h+=gauss(x,z,158,59,46,24,4);
   h+=(Math.sin(x/18)+Math.cos(z/21)+Math.sin((x+z)/34))*0.7;
   const b=basin(x,z);h=h*(1-b*0.68)+3.1*(b*0.68);
   const d=Math.abs(x-riverX(z)),rw=riverW(z);
   if(z>42&&z<287&&d<=rw)h=1;else if(z>42&&z<287&&d<=rw+5)h=Math.min(h,2+Math.floor((d-rw)/1.7));
   const shore=clamp(coast*5.5,0,1);
   h=SEA+(h-SEA)*shore;
-  height[z][x]=clamp(Math.round(h),2,34);
+  height[z][x]=clamp(Math.round(h),2,22);
 }
 
-// Ocean floor + continuous sea first; terrain overwrites water wherever island land exists.
 fill('sand',[0,0,0],[W-1,0,D-1],'Valeborn sea floor');
 fill('water',[0,1,0],[W-1,SEA,D-1],'Valeborn surrounding sea');
 
-// Compact island terrain runs. Similar-height contiguous cells share one authoring op.
 for(let z=0;z<D;z++){
   let x=0;
   while(x<W){
@@ -80,7 +72,6 @@ for(let z=0;z<D;z++){
   }
 }
 
-// Main river cuts from the northern interior toward the southern coast.
 for(let z=44;z<286;z++){
   const cx=Math.round(riverX(z)),rw=Math.round(riverW(z));
   if(!land[z]?.[cx])continue;
@@ -91,7 +82,6 @@ for(let z=44;z<286;z++){
   if(land[z][r+1])set('gravel',[r+1,height[z][r+1],z],'River gravel bank');
 }
 
-// Main inland road; stops before the coasts so future ports/settlements remain design choices.
 for(let z=62;z<267;z++){
   const cx=Math.round(roadX(z));
   if(!land[z][cx])continue;
@@ -120,7 +110,6 @@ stampTrail([[80,238],[102,224],[126,211],[151,197],[177,184],[198,171]],'Western
 stampTrail([[198,153],[216,136],[233,116],[247,96],[256,82],[263,72]],'Blackstone mountain trail');
 stampTrail([[173,186],[164,205],[153,225],[143,245],[134,264]],'South valley trail');
 
-// Blackstone cave is carved into the east face of the mountain, not placed as a freestanding room.
 cut([257,4,66],[274,14,75],'Blackstone cave entrance cut');
 cut([265,4,58],[282,13,73],'Blackstone cave tunnel');
 cut([276,4,47],[296,16,70],'Blackstone cave chamber');
@@ -129,7 +118,6 @@ fill('mossy_stone',[256,4,66],[257,11,66],'Blackstone cave mouth north pier');
 fill('mossy_stone',[256,4,75],[257,11,75],'Blackstone cave mouth south pier');
 fill('stone_dark',[257,11,67],[262,14,74],'Blackstone cave brow');
 
-// Rock outcrops establish visual regions without placing buildings.
 for(const [cx,cz,r] of [[273,86,5],[247,55,4],[231,122,4],[46,108,4],[78,69,3],[231,242,3],[83,254,3]]){
   for(let z=cz-r;z<=cz+r;z++)for(let x=cx-r;x<=cx+r;x++){
     if(x<0||z<0||x>=W||z>=D||!land[z][x]||(x-cx)**2+(z-cz)**2>r*r)continue;
@@ -137,7 +125,6 @@ for(const [cx,cz,r] of [[273,86,5],[247,55,4],[231,122,4],[46,108,4],[78,69,3],[
   }
 }
 
-// Woodlands follow ridges/coastal uplands and leave the central basin open for later settlement authoring.
 let trees=0;
 for(let z=10;z<D-10;z+=6)for(let x=10;x<W-10;x+=6){
   if(!land[z][x])continue;
@@ -149,7 +136,6 @@ for(let z=10;z<D-10;z+=6)for(let x=10;x<W-10;x+=6){
   fill('grass_detail',[x-1,h+5,z-1],[x+1,h+6,z+1],'Tree crown detail');trees++;
 }
 
-// Sparse natural ground detail.
 for(let z=14;z<D-14;z+=7)for(let x=14;x<W-14;x+=7){
   if(!land[z][x])continue;
   const h=height[z][x];
@@ -158,7 +144,7 @@ for(let z=14;z<D-14;z+=7)for(let x=14;x<W-14;x+=7){
 
 const world={
   format:'riftcity-city-block',version:2,id:'brackenford-lowlands-001',name:'Valeborn Starter Island · Natural Terrain Pass',units:'meters',
-  grid:{cell_size:1,shape_increment:0.5},origin:[0,0,0],bounds:{min:[0,0,0],max:[319,47,319]},
+  grid:{cell_size:1,shape_increment:0.5},origin:[0,0,0],bounds:{min:[0,0,0],max:[319,28,319]},
   palette:{air:{material_id:0,shape:'air',color:[0,0,0]}},ops,prefabs:{},layout:[],
   anchors:{
     future_settlement_basin:{at:[178,4,178],facing:'north',tags:['future-town','central-meadow']},
