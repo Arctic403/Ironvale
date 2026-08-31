@@ -31,7 +31,33 @@ update('public/downtown3d-foundation.js',text=>{
   return text;
 });
 
+update('public/ironvale-smooth-terrain.js',text=>text.replace(
+  "valebornTerrainHeight(259,73)<12",
+  "valebornTerrainHeight(250,80)<12"
+));
+
 update('scripts/build-brackenford-region-v2.mjs',text=>{
+  text=text.replace(
+    "stampTrail([[198,153],[216,136],[233,116],[247,96],[256,82],[263,72]],'Blackstone mountain trail');",
+    "stampTrail([[198,153],[216,136],[233,116],[247,103],[254,96],[259,92]],'Blackstone mountain trail');"
+  );
+  text=text.replace(
+`cut([257,4,66],[274,14,75],'Blackstone cave entrance cut');
+cut([265,4,58],[282,13,73],'Blackstone cave tunnel');
+cut([276,4,47],[296,16,70],'Blackstone cave chamber');
+fill('stone_dark',[257,3,68],[286,3,73],'Blackstone cave floor');
+fill('mossy_stone',[256,4,66],[257,11,66],'Blackstone cave mouth north pier');
+fill('mossy_stone',[256,4,75],[257,11,75],'Blackstone cave mouth south pier');
+fill('stone_dark',[257,11,67],[262,14,74],'Blackstone cave brow');`,
+`cut([252,4,86],[262,13,98],'Blackstone cave entrance cut');
+cut([240,4,88],[258,12,96],'Blackstone cave tunnel');
+cut([226,4,82],[244,14,101],'Blackstone cave chamber');
+fill('stone_dark',[228,3,87],[260,3,97],'Blackstone cave floor');
+fill('mossy_stone',[258,4,85],[260,11,87],'Blackstone cave mouth north pier');
+fill('mossy_stone',[258,4,97],[260,11,99],'Blackstone cave mouth south pier');
+fill('stone_dark',[256,11,87],[260,14,97],'Blackstone cave brow');`
+  );
+  text=text.replace("blackstone_cave:{at:[258,4,71],facing:'east'","blackstone_cave:{at:[259,4,92],facing:'east'");
   const old="metadata:{terrain_pass:'starter-island-v1',buildings:false,island:true,surrounded_by_water:true,coastline:'organic-multilobed',features:";
   const next="metadata:{terrain_pass:'starter-island-v1',visual_surface:'smooth-terrain-v1',environment_pack:'quaternius-stylized-nature-standard',buildings:false,island:true,surrounded_by_water:true,coastline:'organic-multilobed',features:";
   return replaceOnce(text,old,next,'starter island visual metadata');
