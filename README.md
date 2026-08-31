@@ -8,7 +8,7 @@ Ironvale is intentionally a small browser game-engine core.
 - **Rift Web bridge (JavaScript):** touch/editor UI, PWA/browser integration, WebGL2 rendering and networking glue.
 - **Cloudflare Worker:** authentication, sessions, character persistence and future authoritative validation/sync. It does not run the real-time terrain engine.
 
-The committed `public/rift-core.wasm` is what players download. C++ is compiled ahead of time; players do not receive a compiler. Rebuild the native artifact with `npm run build:native` when changing `native/` sources.
+The committed `public/rift-core.wasm.gz` is what players download. C++ is compiled ahead of time; players do not receive a compiler. Rebuild the native artifact with `npm run build:native` when changing `native/` sources.
 
 The active world is a blank 640×640 continuous heightfield with 1 m authoring samples and 64 m render/streaming chunks. Terrain chunks are rendering partitions, not Minecraft-style cells. Negative world Y is valid.
 

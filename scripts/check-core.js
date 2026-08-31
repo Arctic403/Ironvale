@@ -8,7 +8,7 @@ const forbidden = [
 ];
 const failures = forbidden.filter(path => fs.existsSync(path));
 
-const nativeRequired = ['native/include/rift/terrain.hpp','native/src/terrain.cpp','public/rift-core.js','public/rift-core.wasm'];
+const nativeRequired = ['native/include/rift/terrain.hpp','native/src/terrain.cpp','public/rift-core.js','public/rift-core.wasm.gz'];
 for (const path of nativeRequired) if (!fs.existsSync(path)) failures.push(`missing ${path}`);
 
 const world = JSON.parse(fs.readFileSync('public/world/ironvale-terrain.json', 'utf8'));
