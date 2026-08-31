@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/apply-ironvale-h3-starter.mjs'
+      - 'scripts/ironvale-gameplay-h3.source'
       - '.github/workflows/ironvale-h3-starter-conversion.yml'
   workflow_dispatch:
 
@@ -24,8 +25,26 @@ jobs:
       - name: Guard source head
         run: |
           test -f scripts/apply-ironvale-h3-starter.mjs
+          test -f scripts/ironvale-gameplay-h3.source
           test -f native/rift-core.cpp
           grep -q "Rift Native Core v4" native/rift-core.cpp
+
+      - name: Prepare raw gameplay source handoff
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply-ironvale-h3-starter.mjs')
+          text = path.read_text()
+          start_marker = "write('public/ironvale-gameplay.js', `"
+          end_marker = "\n`);\n\n// ---------------------------------------------------------------------------\n// Build one actual starter zone"
+          start = text.find(start_marker)
+          end = text.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('gameplay template range not found')
+          replacement = "write('public/ironvale-gameplay.js', read('scripts/ironvale-gameplay-h3.source'));\n\n// ---------------------------------------------------------------------------\n// Build one actual starter zone"
+          path.write_text(text[:start] + replacement + text[end + len(end_marker):])
+          PY
+          node --check scripts/apply-ironvale-h3-starter.mjs
 
       - name: Apply H3 starter game conversion
         run: node scripts/apply-ironvale-h3-starter.mjs
