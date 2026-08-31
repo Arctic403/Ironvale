@@ -1,45 +1,24 @@
+import { RiftCore } from './rift-core.js';
+
 const EPSILON = 1e-6;
 const DEFAULT_CHUNK_SIZE = 32;
 const DEFAULT_SAMPLE_SPACING = 1;
 const DEFAULT_MAX_WALK_SLOPE = 0.78;
+const NATIVE = RiftCore.exports;
+const MEMORY = RiftCore.memory;
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 function lerp(a, b, t) { return a + (b - a) * t; }
-function smoothstep(t) { const x = clamp(t, 0, 1); return x * x * (3 - 2 * x); }
-function fade5(t) { const x = clamp(t, 0, 1); return x * x * x * (x * (x * 6 - 15) + 10); }
-function fract(value) { return value - Math.floor(value); }
-function hash2(x, z, seed = 0) {
-  const h = Math.sin((x * 127.1 + z * 311.7 + seed * 74.7) * 0.017453292519943295) * 43758.5453123;
-  return fract(h) * 2 - 1;
+function normalize3(x, y, z) {
+  const length = Math.hypot(x, y, z) || 1;
+  return [x / length, y / length, z / length];
 }
-function valueNoise2(x, z, seed = 0) {
-  const ix = Math.floor(x), iz = Math.floor(z);
-  const fx = x - ix, fz = z - iz;
-  const sx = fade5(fx), sz = fade5(fz);
-  const a = hash2(ix, iz, seed);
-  const b = hash2(ix + 1, iz, seed);
-  const c = hash2(ix, iz + 1, seed);
-  const d = hash2(ix + 1, iz + 1, seed);
-  return lerp(lerp(a, b, sx), lerp(c, d, sx), sz);
-}
-function fractalNoise2(x, z, options = {}) {
-  const octaves = clamp(Math.trunc(Number(options.octaves) || 4), 1, 8);
-  let frequency = Math.max(0.00001, Number(options.frequency) || 0.0125);
-  let amplitude = Number(options.amplitude) || 1;
-  const persistence = clamp(Number(options.persistence) || 0.5, 0.05, 0.95);
-  const lacunarity = clamp(Number(options.lacunarity) || 2, 1.1, 4);
-  const seed = Math.trunc(Number(options.seed) || 0);
-  const ridge = clamp(Number(options.ridge) || 0, 0, 1);
-  let sum = 0, norm = 0;
-  for (let octave = 0; octave < octaves; octave += 1) {
-    const raw = valueNoise2(x * frequency, z * frequency, seed + octave * 1013);
-    const shaped = lerp(raw, 1 - Math.abs(raw) * 2, ridge);
-    sum += shaped * amplitude;
-    norm += Math.abs(amplitude);
-    frequency *= lacunarity;
-    amplitude *= persistence;
-  }
-  return norm > EPSILON ? sum / norm : 0;
+function cross3(a, b) {
+  return [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0]
+  ];
 }
 function distanceToSegment2(px, pz, ax, az, bx, bz) {
   const abx = bx - ax, abz = bz - az;
@@ -55,50 +34,9 @@ function distanceToSegment3(px, py, pz, a, b) {
   const x = lerp(a.x, b.x, t), y = lerp(a.y, b.y, t), z = lerp(a.z, b.z, t);
   return { distance: Math.hypot(px - x, py - y, pz - z), t, x, y, z };
 }
-function normalize3(x, y, z) {
-  const len = Math.hypot(x, y, z) || 1;
-  return [x / len, y / len, z / len];
-}
-function cross3(a, b) {
-  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
 
-function layerDelta(layer, x, z, currentHeight, seed) {
-  if (!layer || layer.enabled === false) return 0;
-  const type = String(layer.type || 'noise').toLowerCase();
-  if (type === 'noise') {
-    return fractalNoise2(x, z, { ...layer, seed: (Number(layer.seed) || 0) + seed }) * (Number(layer.strength) || Number(layer.height) || 1);
-  }
-  if (type === 'radial' || type === 'hill' || type === 'depression') {
-    const cx = Number(layer.x) || 0, cz = Number(layer.z) || 0;
-    const radius = Math.max(0.001, Number(layer.radius) || 16);
-    const distance = Math.hypot(x - cx, z - cz);
-    if (distance >= radius) return 0;
-    const t = 1 - distance / radius;
-    const falloff = Math.pow(smoothstep(t), Math.max(0.2, Number(layer.falloff) || 1));
-    const strength = Number(layer.strength ?? layer.height ?? (type === 'depression' ? -4 : 4));
-    return falloff * strength;
-  }
-  if (type === 'ridge' || type === 'channel') {
-    const a = layer.a || [0, 0], b = layer.b || [1, 1];
-    const radius = Math.max(0.001, Number(layer.radius) || 12);
-    const hit = distanceToSegment2(x, z, Number(a[0]) || 0, Number(a[1]) || 0, Number(b[0]) || 0, Number(b[1]) || 0);
-    if (hit.distance >= radius) return 0;
-    const t = 1 - hit.distance / radius;
-    const strength = Number(layer.strength ?? (type === 'channel' ? -5 : 5));
-    return Math.pow(smoothstep(t), Math.max(0.2, Number(layer.falloff) || 1)) * strength;
-  }
-  if (type === 'flatten') {
-    const cx = Number(layer.x) || 0, cz = Number(layer.z) || 0;
-    const radius = Math.max(0.001, Number(layer.radius) || 12);
-    const distance = Math.hypot(x - cx, z - cz);
-    if (distance >= radius) return 0;
-    const target = Number(layer.targetHeight) || 0;
-    const strength = clamp(Number(layer.strength) || 1, 0, 1);
-    const t = smoothstep(1 - distance / radius) * strength;
-    return (target - currentHeight) * t;
-  }
-  return 0;
+function assertNative(ok, message) {
+  if (!ok) throw new Error(message);
 }
 
 export function validateRiftTerrainConfig(config) {
@@ -110,6 +48,9 @@ export function validateRiftTerrainConfig(config) {
   if (!(spacing > 0 && spacing <= 4)) failures.push('sampleSpacing must be > 0 and <= 4 meters');
   const chunkSize = Number(config?.chunkSize ?? DEFAULT_CHUNK_SIZE);
   if (!(chunkSize >= spacing * 4 && chunkSize <= 128)) failures.push('chunkSize must contain at least 4 samples and be <= 128 meters');
+  const columns = Math.round(Number(size[0]) / spacing) + 1;
+  const rows = Math.round(Number(size[1]) / spacing) + 1;
+  if (columns > 1025 || rows > 1025) failures.push('native RiftCore currently supports up to 1025 samples per terrain axis');
   return { ok: failures.length === 0, failures };
 }
 
@@ -128,15 +69,37 @@ export class RiftTerrain {
     this.maxWalkSlope = clamp(Number(config.maxWalkSlope) || DEFAULT_MAX_WALK_SLOPE, 0.25, 2.5);
     this.columns = Math.round(this.width / this.sampleSpacing) + 1;
     this.rows = Math.round(this.depth / this.sampleSpacing) + 1;
-    this.heights = new Float32Array(this.columns * this.rows);
-    this.manualDelta = new Float32Array(this.columns * this.rows);
-    this.manualHoles = new Uint8Array((this.columns - 1) * (this.rows - 1));
     this.layers = Array.isArray(config.layers) ? config.layers : [];
     this.holes = Array.isArray(config.holes) ? config.holes : [];
     this.caves = Array.isArray(config.caves) ? config.caves : [];
     this.revision = 1;
-    this._generateHeightfield();
+
+    assertNative(
+      NATIVE.rift_terrain_init(
+        this.columns,
+        this.rows,
+        this.sampleSpacing,
+        this.origin[0],
+        this.origin[2],
+        this.baseHeight,
+        this.maxWalkSlope
+      ),
+      'RiftCore rejected the terrain configuration.'
+    );
+    this._bindNativeViews();
+
+    if (this.layers.length) {
+      console.warn('RiftCore: procedural terrain layers are ignored by the native blank-canvas runtime. Author terrain with edit layers instead.');
+    }
     this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
+  }
+
+  _bindNativeViews() {
+    const samples = NATIVE.rift_terrain_sample_count();
+    const cells = NATIVE.rift_terrain_cell_count();
+    this.heights = new Float32Array(MEMORY.buffer, NATIVE.rift_terrain_heights_ptr(), samples);
+    this.manualDelta = new Float32Array(MEMORY.buffer, NATIVE.rift_terrain_delta_ptr(), samples);
+    this.manualHoles = new Uint8Array(MEMORY.buffer, NATIVE.rift_terrain_holes_ptr(), cells);
   }
 
   _heightIndex(ix, iz) { return iz * this.columns + ix; }
@@ -144,56 +107,32 @@ export class RiftTerrain {
   _worldX(ix) { return this.origin[0] + ix * this.sampleSpacing; }
   _worldZ(iz) { return this.origin[2] + iz * this.sampleSpacing; }
 
-  _generateHeightfield() {
-    for (let iz = 0; iz < this.rows; iz += 1) {
-      const z = this._worldZ(iz);
-      for (let ix = 0; ix < this.columns; ix += 1) {
-        const x = this._worldX(ix);
-        let height = this.baseHeight;
-        for (const layer of this.layers) height += layerDelta(layer, x, z, height, this.seed);
-        this.heights[this._heightIndex(ix, iz)] = height + this.manualDelta[this._heightIndex(ix, iz)];
-      }
-    }
-  }
-
   containsXZ(x, z) {
     return x >= this.origin[0] && z >= this.origin[2] && x <= this.origin[0] + this.width && z <= this.origin[2] + this.depth;
   }
 
   sampleHeight(x, z) {
     if (!this.containsXZ(x, z)) return null;
-    const gx = clamp((x - this.origin[0]) / this.sampleSpacing, 0, this.columns - 1);
-    const gz = clamp((z - this.origin[2]) / this.sampleSpacing, 0, this.rows - 1);
-    const x0 = Math.floor(gx), z0 = Math.floor(gz);
-    const x1 = Math.min(this.columns - 1, x0 + 1), z1 = Math.min(this.rows - 1, z0 + 1);
-    const tx = gx - x0, tz = gz - z0;
-    const a = this.heights[this._heightIndex(x0, z0)], b = this.heights[this._heightIndex(x1, z0)];
-    const c = this.heights[this._heightIndex(x0, z1)], d = this.heights[this._heightIndex(x1, z1)];
-    return lerp(lerp(a, b, tx), lerp(c, d, tx), tz);
+    const value = NATIVE.rift_terrain_sample_height(Number(x), Number(z));
+    return value > 1e20 ? null : value;
   }
 
   sampleNormal(x, z) {
-    const s = this.sampleSpacing;
-    const center = this.sampleHeight(x, z) ?? 0;
-    const hL = this.sampleHeight(x - s, z) ?? center;
-    const hR = this.sampleHeight(x + s, z) ?? center;
-    const hD = this.sampleHeight(x, z - s) ?? center;
-    const hU = this.sampleHeight(x, z + s) ?? center;
-    return normalize3(hL - hR, s * 2, hD - hU);
+    if (!NATIVE.rift_terrain_sample_normal(Number(x), Number(z))) return [0, 1, 0];
+    const view = new Float32Array(MEMORY.buffer, NATIVE.rift_terrain_normal_ptr(), 3);
+    return [view[0], view[1], view[2]];
   }
 
   slopeAt(x, z) {
-    const n = this.sampleNormal(x, z);
-    return Math.hypot(n[0], n[2]) / Math.max(0.001, n[1]);
+    const value = NATIVE.rift_terrain_slope_at(Number(x), Number(z));
+    return value > 1e20 ? Infinity : value;
   }
 
-  walkableAt(x, z) { return this.slopeAt(x, z) <= this.maxWalkSlope; }
+  walkableAt(x, z) { return Boolean(NATIVE.rift_terrain_walkable_at(Number(x), Number(z))); }
 
   isHoleAt(x, z) {
     if (!this.containsXZ(x, z)) return false;
-    const gx = Math.floor((x - this.origin[0]) / this.sampleSpacing);
-    const gz = Math.floor((z - this.origin[2]) / this.sampleSpacing);
-    if (gx >= 0 && gz >= 0 && gx < this.columns - 1 && gz < this.rows - 1 && this.manualHoles[this._cellIndex(gx, gz)]) return true;
+    if (NATIVE.rift_terrain_is_manual_hole_at(Number(x), Number(z))) return true;
     for (const hole of this.holes) {
       if (hole?.enabled === false) continue;
       const radius = Math.max(0.001, Number(hole.radius) || 3);
@@ -292,116 +231,73 @@ export class RiftTerrain {
   }
 
   applyBrush(brush = {}) {
-    const mode = String(brush.mode || 'raise').toLowerCase();
-    const x = Number(brush.x) || 0, z = Number(brush.z) || 0;
+    const modes = { raise: 0, lower: 1, flatten: 2, smooth: 3, hole: 4, unhole: 5 };
+    const modeName = String(brush.mode || 'raise').toLowerCase();
+    const mode = modes[modeName];
+    if (mode == null) return;
+    const x = Number(brush.x) || 0;
+    const z = Number(brush.z) || 0;
     const radius = Math.max(this.sampleSpacing, Number(brush.radius) || 6);
     const strength = Number(brush.strength) || 1;
-    const minX = clamp(Math.floor((x - radius - this.origin[0]) / this.sampleSpacing), 0, this.columns - 1);
-    const maxX = clamp(Math.ceil((x + radius - this.origin[0]) / this.sampleSpacing), 0, this.columns - 1);
-    const minZ = clamp(Math.floor((z - radius - this.origin[2]) / this.sampleSpacing), 0, this.rows - 1);
-    const maxZ = clamp(Math.ceil((z + radius - this.origin[2]) / this.sampleSpacing), 0, this.rows - 1);
-
-    if (mode === 'hole' || mode === 'unhole') {
-      for (let iz = Math.max(0, minZ); iz < Math.min(this.rows - 1, maxZ + 1); iz += 1) {
-        for (let ix = Math.max(0, minX); ix < Math.min(this.columns - 1, maxX + 1); ix += 1) {
-          const cx = this._worldX(ix) + this.sampleSpacing * 0.5, cz = this._worldZ(iz) + this.sampleSpacing * 0.5;
-          if (Math.hypot(cx - x, cz - z) <= radius) this.manualHoles[this._cellIndex(ix, iz)] = mode === 'hole' ? 1 : 0;
-        }
-      }
-      this.revision += 1;
-      return;
-    }
-
-    const target = Number(brush.targetHeight);
-    const original = new Float32Array(this.heights);
-    for (let iz = minZ; iz <= maxZ; iz += 1) {
-      for (let ix = minX; ix <= maxX; ix += 1) {
-        const wx = this._worldX(ix), wz = this._worldZ(iz);
-        const distance = Math.hypot(wx - x, wz - z);
-        if (distance > radius) continue;
-        const weight = smoothstep(1 - distance / radius);
-        const index = this._heightIndex(ix, iz);
-        let next = original[index];
-        if (mode === 'raise') next += Math.abs(strength) * weight;
-        else if (mode === 'lower') next -= Math.abs(strength) * weight;
-        else if (mode === 'flatten' && Number.isFinite(target)) next = lerp(next, target, clamp(Math.abs(strength) * weight, 0, 1));
-        else if (mode === 'smooth') {
-          let sum = 0, count = 0;
-          for (let oz = -1; oz <= 1; oz += 1) for (let ox = -1; ox <= 1; ox += 1) {
-            const sx = clamp(ix + ox, 0, this.columns - 1), sz = clamp(iz + oz, 0, this.rows - 1);
-            sum += original[this._heightIndex(sx, sz)]; count += 1;
-          }
-          next = lerp(next, sum / count, clamp(Math.abs(strength) * weight, 0, 1));
-        }
-        const delta = next - original[index];
-        this.manualDelta[index] += delta;
-        this.heights[index] = next;
-      }
-    }
+    const target = Number.isFinite(Number(brush.targetHeight)) ? Number(brush.targetHeight) : 0;
+    assertNative(NATIVE.rift_terrain_apply_brush(mode, x, z, radius, strength, target), 'RiftCore brush failed.');
     this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
     this.revision += 1;
   }
 
-  _terrainColor(x, y, z, normal) {
-    const slope = clamp(1 - normal[1], 0, 1);
-    const low = [0.26, 0.39, 0.19];
-    const grass = [0.32, 0.48, 0.22];
-    const rock = [0.42, 0.40, 0.35];
-    const elevation = clamp((y - this.baseHeight) / 22, -1, 1);
-    const grassMix = clamp(0.65 + elevation * 0.18, 0.3, 0.9);
-    const base = [lerp(low[0], grass[0], grassMix), lerp(low[1], grass[1], grassMix), lerp(low[2], grass[2], grassMix)];
-    const rockMix = smoothstep(clamp((slope - 0.18) / 0.45, 0, 1));
-    return [lerp(base[0], rock[0], rockMix), lerp(base[1], rock[1], rockMix), lerp(base[2], rock[2], rockMix)];
+  rebuildFromManualDelta() {
+    NATIVE.rift_terrain_rebuild_from_delta();
+    this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
+    this.revision += 1;
+  }
+
+  raycast(origin, direction, maxDistance = 1800, step = 1) {
+    const dx = Number(direction?.[0]) || 0;
+    const dy = Number(direction?.[1]) || 0;
+    const dz = Number(direction?.[2]) || 0;
+    const hit = NATIVE.rift_terrain_raycast(
+      Number(origin?.[0]) || 0,
+      Number(origin?.[1]) || 0,
+      Number(origin?.[2]) || 0,
+      dx, dy, dz,
+      Math.max(0.1, Number(maxDistance) || 1800),
+      Math.max(0.05, Number(step) || 1)
+    );
+    if (!hit) return null;
+    const view = new Float32Array(MEMORY.buffer, NATIVE.rift_raycast_ptr(), 4);
+    return { x: view[0], y: view[1], z: view[2], distance: view[3] };
   }
 
   buildSurfaceChunkGeometry(chunkX, chunkZ, lod = 1) {
     const step = Math.max(1, Math.trunc(lod));
-    const startX = chunkX * this.chunkSize;
-    const startZ = chunkZ * this.chunkSize;
-    const endX = Math.min(this.width, startX + this.chunkSize);
-    const endZ = Math.min(this.depth, startZ + this.chunkSize);
-    const cellStep = this.sampleSpacing * step;
-    const cellsX = Math.max(1, Math.round((endX - startX) / cellStep));
-    const cellsZ = Math.max(1, Math.round((endZ - startZ) / cellStep));
-    const vertsX = cellsX + 1, vertsZ = cellsZ + 1;
-    const vertices = new Float32Array(vertsX * vertsZ * 9);
-    const indices = [];
-    let vertex = 0;
-    for (let iz = 0; iz < vertsZ; iz += 1) {
-      const z = this.origin[2] + Math.min(endZ, startZ + iz * cellStep);
-      for (let ix = 0; ix < vertsX; ix += 1) {
-        const x = this.origin[0] + Math.min(endX, startX + ix * cellStep);
-        const y = this.sampleHeight(x, z) ?? this.baseHeight;
-        const normal = this.sampleNormal(x, z);
-        const color = this._terrainColor(x, y, z, normal);
-        const offset = vertex * 9;
-        vertices[offset] = x; vertices[offset + 1] = y; vertices[offset + 2] = z;
-        vertices[offset + 3] = normal[0]; vertices[offset + 4] = normal[1]; vertices[offset + 5] = normal[2];
-        vertices[offset + 6] = color[0]; vertices[offset + 7] = color[1]; vertices[offset + 8] = color[2];
-        vertex += 1;
-      }
-    }
-    for (let iz = 0; iz < cellsZ; iz += 1) {
-      for (let ix = 0; ix < cellsX; ix += 1) {
-        const centerX = this.origin[0] + startX + (ix + 0.5) * cellStep;
-        const centerZ = this.origin[2] + startZ + (iz + 0.5) * cellStep;
-        if (this.isHoleAt(centerX, centerZ)) continue;
-        const a = iz * vertsX + ix, b = a + 1, c = a + vertsX, d = c + 1;
-        indices.push(a, c, d, a, d, b);
-      }
-    }
+    assertNative(
+      NATIVE.rift_terrain_build_chunk(Math.trunc(chunkX), Math.trunc(chunkZ), this.chunkSize, step),
+      `RiftCore could not build terrain chunk ${chunkX}:${chunkZ}.`
+    );
+    const vertexFloatCount = NATIVE.rift_mesh_vertex_float_count();
+    const indexCount = NATIVE.rift_mesh_index_count();
+    const vertexView = new Float32Array(MEMORY.buffer, NATIVE.rift_mesh_vertices_ptr(), vertexFloatCount);
+    const indexView = new Uint32Array(MEMORY.buffer, NATIVE.rift_mesh_indices_ptr(), indexCount);
+    const vertices = new Float32Array(vertexView);
+    const vertexCount = vertices.length / 9;
+    const indices = vertexCount > 65535 ? new Uint32Array(indexView) : Uint16Array.from(indexView);
     return {
       id: `terrain-${chunkX}-${chunkZ}`,
-      chunkX, chunkZ, lod: step,
-      geometry: { vertices, indices: vertices.length / 9 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices), vertexStride: 9 },
+      chunkX,
+      chunkZ,
+      lod: step,
+      geometry: { vertices, indices, vertexStride: 9 },
       triangles: indices.length / 3
     };
   }
 
   buildSurfaceGeometries(lod = 1) {
-    const chunksX = Math.ceil(this.width / this.chunkSize), chunksZ = Math.ceil(this.depth / this.chunkSize);
+    const chunksX = Math.ceil(this.width / this.chunkSize);
+    const chunksZ = Math.ceil(this.depth / this.chunkSize);
     const result = [];
-    for (let cz = 0; cz < chunksZ; cz += 1) for (let cx = 0; cx < chunksX; cx += 1) result.push(this.buildSurfaceChunkGeometry(cx, cz, lod));
+    for (let cz = 0; cz < chunksZ; cz += 1) {
+      for (let cx = 0; cx < chunksX; cx += 1) result.push(this.buildSurfaceChunkGeometry(cx, cz, lod));
+    }
     return result;
   }
 
@@ -442,7 +338,11 @@ export class RiftTerrain {
     }
     return {
       id: cave.id,
-      geometry: { vertices, indices: vertices.length / 9 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices), vertexStride: 9 },
+      geometry: {
+        vertices,
+        indices: vertices.length / 9 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices),
+        vertexStride: 9
+      },
       triangles: indices.length / 3
     };
   }
@@ -459,10 +359,18 @@ export class RiftTerrain {
   getStats() {
     const surfaceChunks = Math.ceil(this.width / this.chunkSize) * Math.ceil(this.depth / this.chunkSize);
     return {
-      format: 'rift-terrain-v1', width: this.width, depth: this.depth,
-      sampleSpacing: this.sampleSpacing, samples: this.columns * this.rows,
-      chunkSize: this.chunkSize, surfaceChunks, caves: this._caveCache.length,
-      layers: this.layers.length, revision: this.revision
+      format: 'rift-terrain-v1',
+      engine: 'rift-core-wasm',
+      nativeAbi: RiftCore.abi,
+      width: this.width,
+      depth: this.depth,
+      sampleSpacing: this.sampleSpacing,
+      samples: this.columns * this.rows,
+      chunkSize: this.chunkSize,
+      surfaceChunks,
+      caves: this._caveCache.length,
+      layers: this.layers.length,
+      revision: this.revision
     };
   }
 }
