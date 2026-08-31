@@ -53,6 +53,18 @@ jobs:
           test -s public/assets/quaternius/stylized-nature/Rock_Medium_1.gltf
           test -s native/rift-core.cpp
 
+      - name: Upload verified cleanup payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironvale-terrain-reset-payload
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            public/downtown3d-foundation.js
+            src/ironvale/content.js
+            scripts/check-ironvale-starter-game.js
+            public/rift-world-blocks/ironvale-terrain-bootstrap.json
+
       - name: Remove one-shot reset scripts
         run: |
           rm -f scripts/terrain-reset-cleanup.mjs
