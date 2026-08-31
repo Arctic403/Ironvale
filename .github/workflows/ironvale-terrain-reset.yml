@@ -63,6 +63,7 @@ jobs:
             public/downtown3d-foundation.js
             src/ironvale/content.js
             scripts/check-ironvale-starter-game.js
+            scripts/check-ironvale-foundation.js
             public/rift-world-blocks/ironvale-terrain-bootstrap.json
 
       - name: Remove one-shot reset scripts
