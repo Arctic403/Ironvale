@@ -229,9 +229,9 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   let stepAssist = null;
   const touch = { x: 0, z: 0, run: false, jump: false, down: false };
 
-  // Native Core v3 keeps hot RiftSections resident in WASM. Player collision
-  // still owns its mature JS state machine, but repeated block-state probes no
-  // longer have to decode section coordinates and typed arrays on every sample.
+  // Native Core v4 owns the whole hot physics step whenever the loaded RiftSectionGrid
+  // fits resident WASM memory. The mature JS state machine below remains the exact
+  // fallback for synthetic/oversized/non-resident worlds.
   const nativeGrid = createRiftNativeGridAccelerator(() => getGrid?.());
   const getState = (x, y, z) => nativeGrid.getBlockWorld(Math.floor(x), Math.floor(y), Math.floor(z)) || 0;
   const surfaces = createRiftPlayerSurfaceSampler({ getState, getWorldBounds });
@@ -954,6 +954,45 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
     const vx = (forward[0] * inputZ + right[0] * inputX) * speed;
     const vz = (forward[2] * inputZ + right[2] * inputX) * speed;
     let nextX = pos[0], nextY = pos[1], nextZ = pos[2];
+
+    // v4 performs horizontal sweep/step-up, support ownership, gravity, landing,
+    // depenetration and the final no-solid-overlap invariant in one WASM call.
+    // Synthetic test grids and oversized streamed worlds deliberately fall back
+    // to the mature JavaScript solver below.
+    if (!(creative && flying)) {
+      const bounds = getWorldBounds?.();
+      const nativeStep = nativeGrid.playerStep({
+        position: pos,
+        verticalVelocity: jumpVelocity,
+        dx: vx * dt,
+        dz: vz * dt,
+        dt,
+        radius: player.radius,
+        height: player.height,
+        stepUp: RIFT_PLAYER_STEP_UP,
+        snapDown: RIFT_PLAYER_GROUND_SNAP_DOWN,
+        gravity: 12.5,
+        stepAssistY: stepAssist?.y,
+        grounded,
+        bounds
+      });
+      if (nativeStep.native) {
+        if (Math.hypot(vx, vz) > .01) targetFacing = Math.atan2(vx, vz);
+        if (nativeStep.recovery) {
+          recoverToSafeGround('native-solid-penetration-invariant');
+          return;
+        }
+        grounded = nativeStep.grounded;
+        jumpVelocity = nativeStep.verticalVelocity;
+        stepAssist = nativeStep.stepAssistY == null ? null : { y: nativeStep.stepAssistY };
+        const turnSin = Math.sin(targetFacing - player.facing);
+        const turnCos = Math.cos(targetFacing - player.facing);
+        if (Math.hypot(vx, vz) > .01) player.setFacingRadians(player.facing + Math.atan2(turnSin, turnCos) * Math.min(1, dt * 10));
+        player.setPosition(...nativeStep.position);
+        if (grounded) rememberSafeGrounded(...nativeStep.position);
+        return;
+      }
+    }
 
     if (creative && flying) {
       const vertical = (keys.has('Space') || touch.jump ? 1 : 0) - (keys.has('KeyQ') || touch.down ? 1 : 0);

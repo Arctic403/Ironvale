@@ -1,8 +1,7 @@
-// RiftCity Native Core browser/Node bridge v3.
-// v3 keeps RiftSections resident in WASM memory, emits full-block section meshes
-// natively, batches resident-world collision queries and exposes voxel DDA
-// raycasting. JavaScript fallbacks remain authoritative whenever a native path
-// cannot preserve the existing world semantics.
+// Rift Native Core browser/Node bridge v4.
+// v4 adds shape-aware meshing, whole-step resident-world player physics,
+// mutations, pathfinding, spatial/agent kernels and deterministic combat while
+// keeping JavaScript fallbacks for unsupported or non-resident worlds.
 
 const CORE_URL = new URL('./wasm/rift-core.wasm', import.meta.url);
 const IS_BROWSER = typeof window !== 'undefined' && typeof document !== 'undefined';
@@ -33,7 +32,15 @@ const bridgeMetrics = {
   batchCalls: 0,
   batchCells: 0,
   raycasts: 0,
-  raycastFallbacks: 0
+  raycastFallbacks: 0,
+  playerSteps: 0,
+  playerStepFallbacks: 0,
+  pathfinds: 0,
+  pathfindFallbacks: 0,
+  mutations: 0,
+  spatialQueries: 0,
+  agentSteps: 0,
+  combatResolves: 0
 };
 
 function nowMs() {
@@ -184,14 +191,14 @@ export async function initializeRiftWasmCore() {
   if (nativeExports) return nativeExports;
   try {
     const exports = await instantiateCore();
-    if (exports.rift_core_version?.() !== 3) throw new Error('Rift native core version mismatch.');
+    if (exports.rift_core_version?.() !== 4) throw new Error('Rift native core version mismatch.');
     if (exports.rift_section_index?.(15, 15, 15) !== 4095) throw new Error('Rift native section-index self-test failed.');
     if (exports.rift_floor_div?.(-17, 16) !== -2) throw new Error('Rift native negative-coordinate self-test failed.');
     if (exports.rift_ground_step_classify?.(1, 1.7, 0.58, 0.72) !== 2) throw new Error('Rift native player-kernel self-test failed.');
     if (!(exports.memory instanceof WebAssembly.Memory)) throw new Error('Rift native memory export missing.');
     if ((exports.rift_section_slot_capacity?.() || 0) < 16) throw new Error('Rift native persistent section slots missing.');
-    if (!exports.rift_build_section_mesh || !exports.rift_batch_query_world || !exports.rift_raycast_world) {
-      throw new Error('Rift native v3 mesh/query/raycast exports missing.');
+    if (!exports.rift_build_section_mesh || !exports.rift_batch_query_world || !exports.rift_raycast_world || !exports.rift_player_step_world || !exports.rift_pathfind_world || !exports.rift_spatial_query_sphere || !exports.rift_combat_resolve) {
+      throw new Error('Rift native v4 gameplay exports missing.');
     }
     initializeSlotManager(exports);
     nativeExports = exports;
@@ -200,7 +207,7 @@ export async function initializeRiftWasmCore() {
   } catch (error) {
     state = 'javascript-fallback';
     lastError = error;
-    console.warn('RiftCity native core unavailable; deterministic JavaScript fallback remains active.', error);
+    console.warn('Rift native core unavailable; deterministic JavaScript fallback remains active.', error);
   }
   updateBrowserDiagnostics();
   if (IS_BROWSER) window.dispatchEvent(new CustomEvent('riftnativecorechange', { detail: getRiftNativeCoreStatus() }));
@@ -217,7 +224,15 @@ function nativeMetricSnapshot() {
     batchCalls: api?.rift_metric_batch_calls?.() >>> 0 || 0,
     batchCells: api?.rift_metric_batch_cells?.() >>> 0 || 0,
     raycasts: api?.rift_metric_raycasts?.() >>> 0 || 0,
-    raycastSteps: api?.rift_metric_raycast_steps?.() >>> 0 || 0
+    raycastSteps: api?.rift_metric_raycast_steps?.() >>> 0 || 0,
+    playerSteps: api?.rift_metric_player_steps?.() >>> 0 || 0,
+    collisionProbes: api?.rift_metric_collision_probes?.() >>> 0 || 0,
+    mutations: api?.rift_metric_mutations?.() >>> 0 || 0,
+    pathfinds: api?.rift_metric_pathfinds?.() >>> 0 || 0,
+    pathNodes: api?.rift_metric_path_nodes?.() >>> 0 || 0,
+    spatialQueries: api?.rift_metric_spatial_queries?.() >>> 0 || 0,
+    agentSteps: api?.rift_metric_agent_steps?.() >>> 0 || 0,
+    combatResolves: api?.rift_metric_combat_resolves?.() >>> 0 || 0
   };
 }
 
@@ -431,7 +446,8 @@ function prepareMaterialTable(section, getBlockColor) {
   const used = new Map();
   for (let i=0;i<section.states.length;i+=1) {
     const packed = section.states[i]; if (!packed) continue;
-    if ((packed & PARTIAL_SHAPE_MASK) !== 0) return false;
+    const shape = (packed >> 8) & 7;
+    if (shape > 3) return false;
     const material = packed & 255;
     if (!used.has(material)) used.set(material, packed);
   }
@@ -481,6 +497,10 @@ export function buildRiftNativeSectionMesh(section, {
   const elapsed = Math.max(0, nowMs() - started);
   if (faceCount < 0) { bridgeMetrics.nativeMeshFallbacks += 1; return null; }
   const blocks = nativeExports.rift_mesh_block_count();
+  const partialBlocks = nativeExports.rift_mesh_partial_block_count?.() || 0;
+  const occupiedMicrovoxels = nativeExports.rift_mesh_occupied_microvoxels?.() || 0;
+  const visibleMicroFaces = nativeExports.rift_mesh_visible_microfaces?.() || 0;
+  const culledMicroFaces = nativeExports.rift_mesh_culled_microfaces?.() || 0;
   const vertexCount = nativeExports.rift_mesh_vertex_count();
   const indexCount = nativeExports.rift_mesh_index_count();
   const vertexPtr = nativeExports.rift_mesh_vertices_ptr() >>> 0;
@@ -498,7 +518,13 @@ export function buildRiftNativeSectionMesh(section, {
     indices,
     blocks,
     visibleFaces: faceCount,
-    culledFaces: blocks * 6 - faceCount,
+    culledFaces: partialBlocks ? culledMicroFaces : blocks * 6 - faceCount,
+    occupiedMicrovoxels,
+    visibleMicroFaces,
+    culledMicroFaces,
+    shapeAware: partialBlocks > 0,
+    visibleSurfaceTiles: partialBlocks ? visibleMicroFaces : undefined,
+    culledSurfaceTiles: partialBlocks ? culledMicroFaces : undefined,
     vertexCount,
     triangles: faceCount * 2,
     section: [section.sx, section.sy, section.sz],
@@ -594,23 +620,93 @@ export function createRiftNativeGridAccelerator(getGrid) {
     const data=new Int32Array(nativeExports.memory.buffer,ptr,5);
     return { native:true, hit:[data[0],data[1],data[2]], face:data[3], state:data[4]>>>0, distance:nativeExports.rift_raycast_distance() };
   }
+
+  function setBlockWorld(x,y,z,state=0) {
+    const g=grid();const wx=Math.floor(Number(x)||0),wy=Math.floor(Number(y)||0),wz=Math.floor(Number(z)||0),packed=Math.max(0,Math.min(65535,Math.trunc(Number(state)||0)));
+    if (!g?.setBlockWorld) return { changed:false, native:false };
+    const result=g.setBlockWorld(wx,wy,wz,packed);
+    if (!result?.changed) return { ...result, native:Boolean(nativeExports) };
+    const section=result.section;const sync=section?syncSection(section):null;
+    if (sync?.native && nativeExports?.rift_set_block_world) {
+      nativeExports.rift_set_block_world(worldId,wx,wy,wz,packed);bridgeMetrics.mutations+=1;
+    }
+    return { ...result, native:Boolean(sync?.native) };
+  }
+  function playerStep(options={}) {
+    const g=grid(),bounds=options.bounds;
+    if (!nativeExports?.rift_player_step_world || !g?.getSection || !bounds?.min || !bounds?.max || !syncAll()) { bridgeMetrics.playerStepFallbacks+=1; return { native:false }; }
+    const p=options.position||[0,0,0];
+    const ok=nativeExports.rift_player_step_world(
+      worldId, Number(p[0])||0, Number(p[1])||0, Number(p[2])||0,
+      Number(options.verticalVelocity)||0, Number(options.dx)||0, Number(options.dz)||0,
+      Math.max(0,Number(options.dt)||0), Math.max(0.05,Number(options.radius)||0.28), Math.max(0.5,Number(options.height)||1.8),
+      Math.max(0,Number(options.stepUp)||0.58), Math.max(0,Number(options.snapDown)||0.72), Math.max(0,Number(options.gravity)||12.5),
+      Number.isFinite(options.stepAssistY)?Number(options.stepAssistY):-1e20, options.grounded?1:0,
+      Number(bounds.min[0])||0,Number(bounds.min[1])||0,Number(bounds.min[2])||0,
+      Number(bounds.max[0])||0,Number(bounds.max[1])||0,Number(bounds.max[2])||0
+    );
+    const result=new Float32Array(nativeExports.memory.buffer,nativeExports.rift_player_result_ptr()>>>0,5);
+    const flags=new Int32Array(nativeExports.memory.buffer,nativeExports.rift_player_flags_ptr()>>>0,4);
+    bridgeMetrics.playerSteps+=1;
+    return { native:true, ok:Boolean(ok), position:[result[0],result[1],result[2]], verticalVelocity:result[3], stepAssistY:result[4] <= -1e19 ? null : result[4], grounded:Boolean(flags[0]), collided:Boolean(flags[1]), stepped:Boolean(flags[2]), recovery:Boolean(flags[3]) };
+  }
+  function findPath(start,goal,options={}) {
+    if (!nativeExports?.rift_pathfind_world || !syncAll()) { bridgeMetrics.pathfindFallbacks+=1; return { native:false, points:[] }; }
+    const count=nativeExports.rift_pathfind_world(worldId,
+      Math.floor(start?.[0]||0),Math.floor(start?.[1]||0),Math.floor(start?.[2]||0),
+      Math.floor(goal?.[0]||0),Math.floor(goal?.[1]||0),Math.floor(goal?.[2]||0),
+      Math.max(1,Math.min(4096,Math.trunc(options.maxNodes||2048))),Math.max(.05,Number(options.radius)||.28),Math.max(.5,Number(options.height)||1.8),Math.max(0,Number(options.stepUp)||.58),Math.max(.1,Number(options.maxDrop)||1.5));
+    bridgeMetrics.pathfinds+=1;if(count<=0)return { native:true, points:[] };
+    const raw=new Int32Array(nativeExports.memory.buffer,nativeExports.rift_path_points_ptr()>>>0,count*3),points=[];
+    for(let i=0;i<count;i+=1)points.push([raw[i*3]+.5,raw[i*3+1]/1000,raw[i*3+2]+.5]);
+    return { native:true, points };
+  }
+
   function dispose() {
     for (const record of ownedRecords) releaseSlot(record);
     ownedRecords.clear(); currentGrid=null;
   }
-  return Object.freeze({ worldId, getBlockWorld, batchGetBlockWorld, raycast, syncAll, dispose });
+  return Object.freeze({ worldId, getBlockWorld, batchGetBlockWorld, setBlockWorld, playerStep, findPath, raycast, syncAll, dispose });
+}
+
+
+export function riftNativeSpatialQuery(entities=[], center=[0,0,0], radius=0, categoryMask=0xffffffff) {
+  const api=nativeExports, count=Math.min(entities.length,api?.rift_spatial_capacity?.()||0);
+  if (!api || !count) return entities.filter(entity=>{const dx=(entity.x||0)-(center[0]||0),dy=(entity.y||0)-(center[1]||0),dz=(entity.z||0)-(center[2]||0),rr=Math.max(0,Number(radius)||0)+Math.max(0,Number(entity.radius)||0);return (!categoryMask||((entity.mask??0xffffffff)&categoryMask))&&dx*dx+dy*dy+dz*dz<=rr*rr;}).map(entity=>entity.id);
+  const data=new Float32Array(api.memory.buffer,api.rift_spatial_entities_ptr()>>>0,count*4),meta=new Int32Array(api.memory.buffer,api.rift_spatial_meta_ptr()>>>0,count*2);
+  for(let i=0;i<count;i+=1){const e=entities[i]||{};data[i*4]=Number(e.x)||0;data[i*4+1]=Number(e.y)||0;data[i*4+2]=Number(e.z)||0;data[i*4+3]=Math.max(0,Number(e.radius)||0);meta[i*2]=Math.trunc(Number(e.id)||i);meta[i*2+1]=Math.trunc(Number(e.mask??0xffffffff));}
+  const found=api.rift_spatial_query_sphere(count,Number(center[0])||0,Number(center[1])||0,Number(center[2])||0,Math.max(0,Number(radius)||0,Math.trunc(categoryMask)>>>0));
+  bridgeMetrics.spatialQueries+=1;return [...new Int32Array(api.memory.buffer,api.rift_spatial_results_ptr()>>>0,found)];
+}
+
+export function riftNativeSimulateAgents(agents=[], dt=0) {
+  const api=nativeExports,count=Math.min(agents.length,api?.rift_agent_capacity?.()||0);if(!api||!count)return agents.map(agent=>({...agent}));
+  const data=new Float32Array(api.memory.buffer,api.rift_agent_data_ptr()>>>0,count*8);
+  for(let i=0;i<count;i+=1){const a=agents[i]||{},t=a.target||[a.x||0,a.y||0,a.z||0];data.set([Number(a.x)||0,Number(a.y)||0,Number(a.z)||0,Number(t[0])||0,Number(t[1])||0,Number(t[2])||0,Math.max(0,Number(a.speed)||0),Math.max(0,Number(a.radius)||0)],i*8);}
+  api.rift_simulate_agents(count,Math.max(0,Number(dt)||0));bridgeMetrics.agentSteps+=count;
+  return agents.slice(0,count).map((agent,i)=>({...agent,x:data[i*8],y:data[i*8+1],z:data[i*8+2]}));
+}
+
+export function riftNativeResolveCombat(options={}) {
+  const api=nativeExports;if(!api?.rift_combat_resolve){return { native:false, hit:true, damage:Math.max(1,(Number(options.weaponMin)||1)+(Number(options.attackerPower)||0)-(Number(options.defenderArmor)||0)/2), critical:false };}
+  api.rift_combat_resolve(Math.trunc(options.attackerPower||0),Math.trunc(options.attackerAccuracy||0),Math.trunc(options.defenderArmor||0),Math.trunc(options.defenderEvasion||0),Math.trunc(options.weaponMin||0),Math.trunc(options.weaponMax??options.weaponMin??0),Math.max(0,Math.min(1000,Math.trunc(options.critPermille||0))),Math.trunc(options.seed||0)>>>0);
+  const r=new Int32Array(api.memory.buffer,api.rift_combat_result_ptr()>>>0,6);bridgeMetrics.combatResolves+=1;
+  return { native:true, hit:Boolean(r[0]), damage:r[1], critical:Boolean(r[2]), hitRoll:r[3], damageRoll:r[4], seed:r[5]>>>0 };
 }
 
 await initializeRiftWasmCore();
 
 const publicBridge = Object.freeze({
-  version: 'native-core-browser-v3',
+  version: 'native-core-browser-v4',
   get exports() { return getRiftNativeCore(); },
   get status() { return getRiftNativeCoreStatus(); },
   initialize: initializeRiftWasmCore,
   buildSectionFaceMasks: buildRiftNativeSectionFaceMasks,
   buildSectionMesh: buildRiftNativeSectionMesh,
   createGridAccelerator: createRiftNativeGridAccelerator,
+  spatialQuery: riftNativeSpatialQuery,
+  simulateAgents: riftNativeSimulateAgents,
+  resolveCombat: riftNativeResolveCombat,
   resetMetrics: resetRiftNativeCoreMetrics
 });
-if (IS_BROWSER) window.RiftCityNativeCore = publicBridge;
+if (IS_BROWSER) window.RiftNativeCore = publicBridge;

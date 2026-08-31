@@ -35,7 +35,7 @@ const near = (actual, expected, tolerance = 1e-5) => Math.abs(actual - expected)
 resetRiftNativeCoreMetrics();
 
 const status = getRiftNativeCoreStatus();
-ok(status.wasm && status.version === 3, `Node engine bridge is not using native v3: ${JSON.stringify(status)}`);
+ok(status.wasm && status.version === 4, `Node engine bridge is not using native v4: ${JSON.stringify(status)}`);
 ok(status.residentSlotCapacity >= 64, `native resident slot capacity too small: ${status.residentSlotCapacity}`);
 
 // v2 compatibility mask API is still present for partial/dynamic fallbacks.
@@ -96,12 +96,12 @@ ok(ray.native && ray.hit?.join(',') === '15,1,1' && ray.face === 1 && ray.state 
   `native DDA raycast mismatch: ${JSON.stringify(ray)}`);
 accelerator.dispose();
 
-// Partial shape sections preserve the established shape-aware JavaScript geometry path.
+// v4 routes static-color slabs/stairs through native shape-aware micro-occlusion.
 const slab = new RiftBlockSection();
 slab.setBlock(2, 2, 2, encodeRiftBlockState({ material: 1, shape: RIFT_BLOCK_SHAPES.bottomSlab }));
 const slabGeometry = slab.buildGeometry();
-ok(slabGeometry.shapeAware === true && slabGeometry.nativeMesh !== true,
-  'partial-shape section failed to preserve shape-aware JS geometry path');
+ok(slabGeometry.shapeAware === true && slabGeometry.nativeMesh === true && slabGeometry.visibleFaces === 6,
+  'partial-shape section did not use native shape-aware mesh path');
 
 const negative = riftWorldCellToSection(-17);
 ok(negative.section === -2 && negative.local === 15,
@@ -148,4 +148,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('[rift-native-integration] PASS · C++ v3 owns resident RiftSections, full-block mesh emission, cross-section borders, batched world queries and creative-mode DDA raycasts; partial/dynamic paths remain safe in JS.');
+console.log('[rift-native-integration] PASS · C++ v4 owns resident RiftSections, full/slab/stair mesh emission, world queries, player-step/path/spatial gameplay kernels and creative DDA; dynamic face-classified rendering remains safely in JS.');

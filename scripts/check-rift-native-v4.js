@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import { createRiftNativeGridAccelerator, getRiftNativeCoreStatus, riftNativeResolveCombat, riftNativeSimulateAgents, riftNativeSpatialQuery } from '../public/rift-wasm-core.js';
+import { RiftBlockSection, RiftSectionGrid, RIFT_SECTION_SOLID } from '../public/rift-block-section.js';
+import { encodeRiftBlockState, RIFT_BLOCK_SHAPES, RIFT_BLOCK_ROTATIONS } from '../public/rift-block-shapes.js';
+
+const status=getRiftNativeCoreStatus();
+assert.equal(status.wasm,true);assert.equal(status.version,4);
+const grid=new RiftSectionGrid();const section=grid.addSection(new RiftBlockSection({sx:0,sy:0,sz:0}));section.fillBox(0,0,0,15,0,15,RIFT_SECTION_SOLID);
+const accelerator=createRiftNativeGridAccelerator(()=>grid);
+assert.equal(accelerator.syncAll(),true);
+const step=accelerator.playerStep({position:[2,1,2],verticalVelocity:0,dx:.1,dz:0,dt:1/120,radius:.28,height:1.8,stepUp:.58,snapDown:.72,gravity:12.5,grounded:true,bounds:{min:[0,0,0],max:[15,15,15]}});
+assert.equal(step.native,true);assert.equal(step.grounded,true);assert.ok(step.position[0]>2);assert.ok(Math.abs(step.position[1]-1)<1e-4);
+const path=accelerator.findPath([1,1,1],[8,1,8],{maxNodes:2048});assert.equal(path.native,true);assert.ok(path.points.length>1);
+const mutate=accelerator.setBlockWorld(5,1,5,RIFT_SECTION_SOLID);assert.equal(mutate.changed,true);assert.equal(accelerator.getBlockWorld(5,1,5),RIFT_SECTION_SOLID);
+const ids=riftNativeSpatialQuery([{id:10,x:0,y:0,z:0,radius:.2,mask:1},{id:20,x:20,y:0,z:0,radius:.2,mask:1}],[0,0,0],2,1);assert.deepEqual(ids,[10]);
+const agents=riftNativeSimulateAgents([{id:1,x:0,y:0,z:0,target:[10,0,0],speed:2,radius:.3}],.5);assert.ok(agents[0].x>.45&&agents[0].x<.55);
+const combat=riftNativeResolveCombat({attackerPower:10,attackerAccuracy:20,defenderArmor:4,defenderEvasion:5,weaponMin:3,weaponMax:7,critPermille:100,seed:12345});assert.equal(combat.native,true);assert.ok(combat.damage>=0);
+const slab=new RiftBlockSection();slab.setBlock(1,1,1,encodeRiftBlockState({material:1,shape:RIFT_BLOCK_SHAPES.bottomSlab}));const slabMesh=slab.buildGeometry();assert.equal(slabMesh.nativeMesh,true);assert.equal(slabMesh.shapeAware,true);assert.equal(slabMesh.visibleFaces,6);
+const stair=new RiftBlockSection();stair.setBlock(1,1,1,encodeRiftBlockState({material:1,shape:RIFT_BLOCK_SHAPES.stair,rotation:RIFT_BLOCK_ROTATIONS.east}));const stairMesh=stair.buildGeometry();assert.equal(stairMesh.nativeMesh,true);assert.equal(stairMesh.visibleFaces,10);
+accelerator.dispose();
+console.log('[rift-native-v4] PASS · whole-step physics, partial meshing, resident mutation, A*, spatial/agent and combat kernels execute in C++/WASM.');

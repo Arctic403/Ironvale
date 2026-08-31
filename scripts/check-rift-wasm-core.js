@@ -14,7 +14,7 @@ const ok = (value, message) => { if (!value) failures.push(message); };
 const near = (actual, expected, tolerance = 1e-5) => Math.abs(actual - expected) <= tolerance;
 const index = (x, y, z) => (y << 8) | (z << 4) | x;
 
-ok(api.rift_core_version?.() === 3, 'core version export mismatch');
+ok(api.rift_core_version?.() === 4, 'core version export mismatch');
 ok(api.rift_section_index?.(0, 0, 0) === 0, 'section index origin mismatch');
 ok(api.rift_section_index?.(15, 15, 15) === 4095, 'section index max-cell mismatch');
 ok(api.rift_section_index?.(16, 0, 0) === -1, 'section index out-of-bounds guard mismatch');
@@ -46,7 +46,7 @@ ok(api.memory instanceof WebAssembly.Memory, 'WASM memory export missing');
 const memory = api.memory;
 const slotCapacity = api.rift_section_slot_capacity?.() || 0;
 ok(slotCapacity === 128, `persistent section slot capacity ${slotCapacity} != 128`);
-ok((memory?.buffer?.byteLength || 0) >= 5 * 1024 * 1024, 'native v3 workspace memory is unexpectedly small');
+ok((memory?.buffer?.byteLength || 0) >= 5 * 1024 * 1024, 'native v4 workspace memory is unexpectedly small');
 
 if (memory instanceof WebAssembly.Memory) {
   // Legacy v2 face-mask compatibility remains intact on reserved slot 0.
@@ -99,11 +99,15 @@ if (memory instanceof WebAssembly.Memory) {
   faces = api.rift_build_section_mesh(slot);
   ok(faces === 5, `native border culling faces ${faces} != 5`);
 
-  // Partial shapes reject the native full-block mesh and preserve JS fallback semantics.
+  // v4 emits partial shapes natively with the same merged half-meter geometry contract.
   slotStates.fill(0);
   slotStates[index(4,4,4)] = 1 | (1 << 8);
   borders.fill(0);
-  ok(api.rift_build_section_mesh(slot) === -1, 'partial-shape native mesh guard mismatch');
+  ok(api.rift_build_section_mesh(slot) === 6, 'bottom-slab native mesh quad count mismatch');
+  ok(api.rift_mesh_partial_block_count() === 1 && api.rift_mesh_occupied_microvoxels() === 4, 'partial mesh diagnostics mismatch');
+  slotStates.fill(0);
+  slotStates[index(4,4,4)] = 1 | (3 << 8) | (1 << 11);
+  ok(api.rift_build_section_mesh(slot) === 10, 'east-stair native mesh quad count mismatch');
 
   // Batched world queries across two resident sections, including negative coordinates.
   const slot2 = 2;
@@ -140,4 +144,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`[rift-wasm-core] PASS · ${bytes.length} bytes · C++ core v${api.rift_core_version()} · persistent sections + native meshes + batch queries + DDA raycast verified.`);
+console.log(`[rift-wasm-core] PASS · ${bytes.length} bytes · C++ core v${api.rift_core_version()} · shape meshes + physics + path/spatial/agent/combat kernels verified.`);

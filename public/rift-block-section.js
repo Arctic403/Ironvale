@@ -184,10 +184,9 @@ export class RiftBlockSection {
   buildGeometry({ getOutsideBlock = null, getBlockColor = null, classifyBlockFace = null, nativeNeighbors = null } = {}) {
     const origin = this.origin();
 
-    // Native Core v3 owns the full-block fast path end-to-end: persistent
-    // section residency, cross-section border culling, vertex/normal/material
-    // emission and index generation. Dynamic face classifiers and partial
-    // shapes deliberately fall through to the proven JavaScript pipeline.
+    // Native Core v4 owns static-color full/slab/stair section meshing end-to-end:
+    // persistent residency, micro-occlusion, cross-section culling and indexed
+    // geometry emission. Dynamic face classifiers deliberately keep the JS path.
     if (typeof classifyBlockFace !== 'function') {
       const nativeMesh = buildRiftNativeSectionMesh(this, {
         neighbors: nativeNeighbors,
@@ -204,8 +203,8 @@ export class RiftBlockSection {
     // H1.56 shape-aware path. Legacy material-only states still use the proven
     // full-block fast path below, so the street renderer keeps its exact face
     // counts/performance until a section actually contains a slab or stair.
-    // If v3 intentionally declines the mesh (partial shape, dynamic face color,
-    // or unavailable WASM), its compact compatibility culler still preserves the
+    // If v4 intentionally declines the mesh (dynamic face classification/color or
+    // unavailable/unknown future WASM shape), its compatibility culler preserves the
     // previous fast full-block path before JavaScript emits any fallback faces.
     const nativeSectionAnalysis = buildRiftNativeSectionFaceMasks(this.states);
     const containsPartialShape = nativeSectionAnalysis.partial;
