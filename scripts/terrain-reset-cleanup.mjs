@@ -89,8 +89,7 @@ for(const path of [
   'public/ironvale-environment.js',
   'scripts/apply-ironvale-smooth-terrain.mjs',
   'scripts/build-brackenford-region-v2.mjs',
-  'public/rift-world-blocks/brackenford-lowlands-001.json',
-  '.github/workflows/ironvale-smooth-terrain-build.yml'
+  'public/rift-world-blocks/brackenford-lowlands-001.json'
 ]) removeIfExists(path);
 
 console.log('[terrain-reset] legacy terrain stripped; native terrain bootstrap ready');
