@@ -1,0 +1,63 @@
+name: Rift C++ WASM Core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'native/**/*.cpp'
+      - 'scripts/check-rift-wasm-core.js'
+      - '.github/workflows/rift-wasm-core.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Checkout RiftCity
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compile shared C++ core
+        run: |
+          clang++ --version
+          mkdir -p public/wasm src/wasm
+          clang++ \
+            --target=wasm32 \
+            -O3 \
+            -nostdlib \
+            -fno-exceptions \
+            -fno-rtti \
+            -Wl,--no-entry \
+            -Wl,--strip-all \
+            -Wl,--export=rift_core_version \
+            -Wl,--export=rift_section_index \
+            -Wl,--export=rift_floor_div \
+            -Wl,--export=rift_positive_mod \
+            -Wl,--export=rift_aabb_intersects \
+            -Wl,--export=rift_distance_sq3 \
+            -Wl,--export=rift_hash3 \
+            native/rift-core.cpp \
+            -o public/wasm/rift-core.wasm
+          cp public/wasm/rift-core.wasm src/wasm/rift-core.wasm
+
+      - name: Verify generated WASM
+        run: node scripts/check-rift-wasm-core.js
+
+      - name: Commit generated WASM
+        run: |
+          if git diff --quiet -- public/wasm/rift-core.wasm src/wasm/rift-core.wasm && \
+             git ls-files --error-unmatch public/wasm/rift-core.wasm >/dev/null 2>&1 && \
+             git ls-files --error-unmatch src/wasm/rift-core.wasm >/dev/null 2>&1; then
+            echo 'Generated WASM is already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/wasm/rift-core.wasm src/wasm/rift-core.wasm
+          git commit -m 'Build Rift C++ WASM core [skip ci]'
+          git push origin HEAD:main
