@@ -1,0 +1,266 @@
+name: Wire Animated Textured Character
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-character-runtime.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  character-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Ironvale
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wire character runtime into gameplay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+
+          app_path = Path('public/app.js')
+          app = app_path.read_text()
+
+          replacements = []
+          replacements.append((
+            "import { loadRiggedCharacterGeometry } from './rift-character.js';",
+            "import { loadRiggedCharacterAsset } from './rift-character.js';"
+          ))
+          replacements.append((
+            "let playerMesh = null;\nlet playerVisualFeetAnchored = false;\nlet playerRig = null;",
+            "let playerMesh = null;\nlet playerCharacter = null;\nlet playerVisualFeetAnchored = false;\nlet playerVisualFeetOffset = 0;\nlet playerRig = null;\nlet playerMoving = false;"
+          ))
+          replacements.append((
+            "  playerVisualFeetAnchored = false;\n  playerRig = null;\n  playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });",
+            "  playerCharacter = null;\n  playerVisualFeetAnchored = false;\n  playerVisualFeetOffset = 0;\n  playerRig = null;\n  playerMoving = false;\n  playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });"
+          ))
+          replacements.append((
+            "  playerMesh = null;\n  playerVisualFeetAnchored = false;\n  playerRig = null;",
+            "  playerMesh = null;\n  playerCharacter = null;\n  playerVisualFeetAnchored = false;\n  playerVisualFeetOffset = 0;\n  playerRig = null;\n  playerMoving = false;"
+          ))
+
+          old_character_block = '''function updatePlayerVisualTransform() {
+  if (!playerMesh) return;
+  playerMesh.position[0] = player.x;
+  playerMesh.position[1] = playerVisualFeetAnchored ? player.y - PLAYER_COLLIDER_HALF_HEIGHT : player.y;
+  playerMesh.position[2] = player.z;
+  playerMesh.yaw = player.yaw;
+}
+
+async function installRiggedPlayerVisual() {
+  if (!engine || !playerMesh) return;
+  const activeEngine = engine;
+  const fallbackMesh = playerMesh;
+  try {
+    const asset = await loadRiggedCharacterGeometry('/assets/characters/quaternius/universal-base-male.glb');
+    if (!engine || engine !== activeEngine || playerMesh !== fallbackMesh) return;
+    const human = engine.addMesh(asset.geometry, {
+      position: [player.x, player.y - PLAYER_COLLIDER_HALF_HEIGHT, player.z],
+      yaw: player.yaw
+    });
+    human.rig = asset.rig;
+    human.characterAsset = 'quaternius-universal-base-male';
+    engine.removeMesh(fallbackMesh);
+    playerMesh = human;
+    playerVisualFeetAnchored = true;
+    playerRig = asset.rig;
+    updatePlayerVisualTransform();
+    const jointText = Number(asset.rig?.jointCount) || 0;
+    terrainStatus.textContent = `${terrainStatus.textContent} · humanoid ${jointText}-joint rig`;
+    console.info('Rift character visual loaded', asset.rig);
+  } catch (error) {
+    console.warn('Rigged humanoid failed to load; keeping capsule fallback.', error);
+  }
+}
+'''
+
+          new_character_block = '''function updatePlayerVisualTransform() {
+  if (!playerMesh) return;
+  const feetY = playerVisualFeetAnchored
+    ? player.y - PLAYER_COLLIDER_HALF_HEIGHT + playerVisualFeetOffset
+    : player.y;
+  if (playerCharacter?.meshes?.length) {
+    for (const mesh of playerCharacter.meshes) {
+      mesh.position[0] = player.x;
+      mesh.position[1] = feetY;
+      mesh.position[2] = player.z;
+      mesh.yaw = player.yaw;
+    }
+    return;
+  }
+  playerMesh.position[0] = player.x;
+  playerMesh.position[1] = feetY;
+  playerMesh.position[2] = player.z;
+  playerMesh.yaw = player.yaw;
+}
+
+function closeDecodedCharacterImages(asset) {
+  const images = new Set((asset?.primitives || []).map(entry => entry?.material?.baseColorImage).filter(Boolean));
+  for (const image of images) image.close?.();
+}
+
+async function installRiggedPlayerVisual() {
+  if (!engine || !playerMesh) return;
+  const activeEngine = engine;
+  const fallbackMesh = playerMesh;
+  let skin = null;
+  const meshes = [];
+  const textures = new Map();
+  let asset = null;
+  try {
+    asset = await loadRiggedCharacterAsset(
+      '/assets/characters/quaternius/universal-base-male.glb',
+      '/assets/characters/quaternius/universal-animation-library.glb'
+    );
+    if (!engine || engine !== activeEngine || playerMesh !== fallbackMesh) {
+      closeDecodedCharacterImages(asset);
+      return;
+    }
+
+    skin = activeEngine.createSkin(asset.rig.jointCount);
+    const initialMatrices = asset.runtime.getSkinMatrices(0);
+    if (!initialMatrices) throw new Error('Character runtime did not produce skin matrices.');
+    activeEngine.updateSkin(skin, initialMatrices);
+
+    const renderScale = Number(asset.rig.renderScale) || 1;
+    for (const primitive of asset.primitives) {
+      const textureIndex = primitive.material?.baseColorTextureIndex;
+      let texture = null;
+      if (Number.isInteger(textureIndex) && primitive.material?.baseColorImage) {
+        if (!textures.has(textureIndex)) textures.set(textureIndex, activeEngine.createTexture(primitive.material.baseColorImage));
+        texture = textures.get(textureIndex);
+      }
+      const human = activeEngine.addMesh(primitive.geometry, {
+        position: [player.x, player.y - PLAYER_COLLIDER_HALF_HEIGHT, player.z],
+        yaw: player.yaw,
+        scale: [renderScale, renderScale, renderScale],
+        baseColorFactor: primitive.material?.baseColorFactor || [1, 1, 1, 1],
+        texture,
+        skin: primitive.skinIndex == null ? null : skin
+      });
+      human.rig = asset.rig;
+      human.characterAsset = 'quaternius-universal-base-male';
+      meshes.push(human);
+    }
+    if (!meshes.length) throw new Error('Character runtime produced no renderable primitives.');
+
+    closeDecodedCharacterImages(asset);
+    activeEngine.removeMesh(fallbackMesh);
+    playerCharacter = { asset, meshes, skin, textures: [...textures.values()] };
+    playerMesh = meshes[0];
+    playerVisualFeetAnchored = true;
+    playerVisualFeetOffset = -(Number(asset.rig.feetAtY) || 0);
+    playerRig = asset.rig;
+    updatePlayerVisualTransform();
+    const jointText = Number(asset.rig?.jointCount) || 0;
+    const clipText = Number(asset.rig?.animationClipCount) || asset.clips?.length || 0;
+    terrainStatus.textContent = `${terrainStatus.textContent} · textured animated humanoid · ${jointText} joints · ${clipText} clips`;
+    console.info('Rift character visual loaded', { rig: asset.rig, clips: asset.clips, defaults: asset.defaultClips });
+  } catch (error) {
+    closeDecodedCharacterImages(asset);
+    if (engine === activeEngine) {
+      for (const mesh of meshes) activeEngine.removeMesh(mesh);
+      for (const texture of textures.values()) activeEngine.destroyTexture(texture);
+      if (skin) activeEngine.destroySkin(skin);
+    }
+    console.warn('Rigged humanoid failed to load; keeping capsule fallback.', error);
+  }
+}
+
+function updatePlayerCharacterAnimation(dt) {
+  if (!playerCharacter?.asset || !playerCharacter.skin || !engine) return;
+  const { asset, skin } = playerCharacter;
+  const clip = (!freecamEnabled && playerMoving) ? asset.defaultClips.walk : asset.defaultClips.idle;
+  asset.runtime.update(dt, clip);
+  const matrices = asset.runtime.getSkinMatrices(0);
+  if (matrices) engine.updateSkin(skin, matrices);
+}
+'''
+          replacements.append((old_character_block, new_character_block))
+          replacements.append((
+            "  if (freecamEnabled) updateFreecam(dt);\n  else updatePlayer(dt);\n  updateCamera();",
+            "  if (freecamEnabled) updateFreecam(dt);\n  else updatePlayer(dt);\n  updatePlayerCharacterAnimation(dt);\n  updateCamera();"
+          ))
+          replacements.append((
+            "function updatePlayer(dt) {\n  const moving = Math.abs(input.forward) + Math.abs(input.strafe) > .001;\n  if (moving) {",
+            "function updatePlayer(dt) {\n  const moving = Math.abs(input.forward) + Math.abs(input.strafe) > .001;\n  playerMoving = moving;\n  if (moving) {"
+          ))
+
+          for old, new in replacements:
+            if old not in app:
+              raise SystemExit('Expected app.js block not found:\n' + old[:180])
+            app = app.replace(old, new, 1)
+          app_path.write_text(app)
+
+          check_path = Path('scripts/check-core.js')
+          check = check_path.read_text()
+          old = "if (!app.includes(\"import { loadRiggedCharacterGeometry } from './rift-character.js'\") || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(')) failures.push('rigged humanoid controller hookup');"
+          new = "if (!app.includes(\"import { loadRiggedCharacterAsset } from './rift-character.js'\") || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(') || !app.includes('function updatePlayerCharacterAnimation(')) failures.push('animated textured humanoid controller hookup');"
+          if old not in check: raise SystemExit('check-core character hookup assertion not found')
+          check = check.replace(old, new, 1)
+          marker = "const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');"
+          insert = """const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
+if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
+const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');
+if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTexture') || !renderer.includes('createSkin(') || !renderer.includes('createTexture(')) failures.push('GPU character skinning/texturing');
+
+"""
+          if marker not in check: raise SystemExit('check-core terrain marker not found')
+          check = check.replace(marker, insert + marker, 1)
+          check = check.replace(
+            "console.log('Ironvale core verified: centered-reticle RPG camera + stable viewport camera math + adaptive stitched terrain LOD + C++/WASM terrain core.');",
+            "console.log('Ironvale core verified: textured animated humanoid + centered-reticle RPG camera + adaptive stitched terrain LOD + C++/WASM terrain core.');"
+          )
+          check_path.write_text(check)
+
+          package_path = Path('package.json')
+          package = json.loads(package_path.read_text())
+          build = package['scripts']['build']
+          needle = 'node --check public/app.js && '
+          if 'node --check public/rift-character.js' not in build:
+            if needle not in build: raise SystemExit('package build insertion point not found')
+            build = build.replace(needle, needle + 'node --check public/rift-character.js && ', 1)
+          package['scripts']['build'] = build
+          package_path.write_text(json.dumps(package, indent=2) + '\n')
+
+          audit_path = Path('public/assets/characters/quaternius/character-audit.json')
+          audit = json.loads(audit_path.read_text())
+          audit['animationLibrary']['status'] = 'integrated into locomotion runtime'
+          audit['runtime'] = {
+            'skinning': 'WebGL2 GPU joint-matrix texture',
+            'materials': 'embedded glTF base-color textures + baseColorFactor',
+            'locomotion': ['idle', 'walk'],
+            'fallback': 'capsule remains active if character loading fails'
+          }
+          audit_path.write_text(json.dumps(audit, indent=2) + '\n')
+          PY
+
+      - name: Verify character and engine build
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check public/rift-character.js
+          node --check public/rift-engine.js
+          node --check public/app.js
+          npm run build
+
+      - name: Commit animated textured character
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/rift-character.js public/rift-engine.js public/assets/characters/quaternius/character-audit.json scripts/check-core.js package.json
+          if git diff --cached --quiet; then
+            echo 'No character runtime changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Animate and texture the player character'
+          git push origin HEAD:main
