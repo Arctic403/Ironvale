@@ -1,4 +1,10 @@
 import { decodeRiftBlockState, RIFT_BLOCK_SHAPES, RIFT_BLOCK_ROTATIONS } from './rift-block-shapes.js';
+import {
+  riftNativeCrossedSupport,
+  riftNativeGroundStepClassify,
+  riftNativeStairTop,
+  riftNativeStateShapeTop
+} from './rift-wasm-core.js';
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 
@@ -42,7 +48,7 @@ export function riftPlayerCrossedSupport(previousY, candidateY, supportY, tolera
   if (![previousY, candidateY, supportY].every(Number.isFinite)) return false;
   const contactTolerance = Math.max(0, Number(tolerance) || 0);
   const startTolerance = Math.max(0, Number(previousTolerance) || 0);
-  return candidateY <= supportY + contactTolerance && previousY >= supportY - startTolerance;
+  return riftNativeCrossedSupport(previousY, candidateY, supportY, contactTolerance, startTolerance);
 }
 
 export function createRiftPlayer(engine, options = {}) {
@@ -113,19 +119,9 @@ export const RIFT_PLAYER_STEP_UP = 0.58;
 export const RIFT_PLAYER_GROUND_SNAP_DOWN = 0.72;
 
 export function riftPlayerStairTop(decoded, localX, localZ) {
-  let t = 0;
-  switch (decoded.rotation) {
-    case RIFT_BLOCK_ROTATIONS.north: t = 1 - localZ; break;
-    case RIFT_BLOCK_ROTATIONS.east: t = localX; break;
-    case RIFT_BLOCK_ROTATIONS.south: t = localZ; break;
-    case RIFT_BLOCK_ROTATIONS.west: t = 1 - localX; break;
-    default: t = 0;
-  }
-  // H1.71: rendering keeps the authored two-step stair mesh, but player
-  // collision/support rides an invisible full-cell ramp. That makes a stair
-  // connect continuously from the floor at its low edge (0 m) to the next
-  // full-block level at its high edge (1 m), independent of the visual treads.
-  return clamp(t, 0, 1);
+  // H1.71's smooth collision ramp now runs through the shared C++ kernel. The
+  // authored two-tread visual mesh is unchanged.
+  return riftNativeStairTop(decoded?.rotation ?? RIFT_BLOCK_ROTATIONS.north, localX, localZ);
 }
 
 export function riftPlayerVisibleStairTop(decoded, localX, localZ) {
@@ -148,26 +144,17 @@ export function riftPlayerStairVisualOffset(state, worldX, physicsY, worldZ, cel
 
 export function riftPlayerShapeTopAt(state, worldX, worldZ) {
   if (!state) return 0;
-  const decoded = decodeRiftBlockState(state);
-  const localX = worldX - Math.floor(worldX);
-  const localZ = worldZ - Math.floor(worldZ);
-  switch (decoded.shape) {
-    case RIFT_BLOCK_SHAPES.bottomSlab: return 0.5;
-    case RIFT_BLOCK_SHAPES.topSlab: return 1;
-    case RIFT_BLOCK_SHAPES.stair: return riftPlayerStairTop(decoded, localX, localZ);
-    case RIFT_BLOCK_SHAPES.full:
-    default: return 1;
-  }
+  // Packed state decode + negative-coordinate fractional math is native here;
+  // this helper sits in the deepest support/body-probe loops.
+  return riftNativeStateShapeTop(state, worldX, worldZ);
 }
 
 export function classifyRiftPlayerGroundStep(currentY, targetSupportY, options = {}) {
   const stepUp = Number(options.stepUp ?? RIFT_PLAYER_STEP_UP);
   const snapDown = Number(options.snapDown ?? RIFT_PLAYER_GROUND_SNAP_DOWN);
   if (targetSupportY == null || !Number.isFinite(targetSupportY)) return 'drop';
-  const delta = targetSupportY - currentY;
-  if (delta > stepUp + 0.0001) return 'blocked';
-  if (delta < -snapDown - 0.0001) return 'drop';
-  return 'grounded';
+  const code = riftNativeGroundStepClassify(currentY, targetSupportY, stepUp, snapDown);
+  return code === 2 ? 'blocked' : code === 1 ? 'grounded' : 'drop';
 }
 
 export function createRiftPlayerSurfaceSampler({ getState, getWorldBounds }) {

@@ -238,7 +238,16 @@ export function riftNativeShapeTop(shape, rotation, localX, localZ) {
 }
 
 export function riftNativeStateShapeTop(state, worldX, worldZ) {
-  return getRiftNativeCore().rift_state_shape_top(Math.trunc(Number(state) || 0) >>> 0, worldX, worldZ);
+  const packed = Math.trunc(Number(state) || 0) >>> 0;
+  if (!packed) return 0;
+  const shape = (packed >> 8) & 7;
+  const rotation = (packed >> 11) & 3;
+  // Preserve the browser's f64 cell ownership before crossing the WASM f32
+  // boundary. Values such as 3.999999... must remain local≈1 instead of being
+  // rounded to worldX=4 and wrapped to local=0 on west/north stair edges.
+  const localX = fraction(worldX);
+  const localZ = fraction(worldZ);
+  return getRiftNativeCore().rift_shape_top(shape, rotation, localX, localZ);
 }
 
 export function buildRiftNativeSectionFaceMasks(source) {

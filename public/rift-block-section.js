@@ -1,5 +1,10 @@
 import { RIFT_BLOCK_FACE_DEFS } from './rift-block-world.js';
 import { buildRiftPartialShapeGeometry, riftBlockStateHasPartialShape } from './rift-block-shapes.js';
+import {
+  buildRiftNativeSectionFaceMasks,
+  riftNativeSectionIndex,
+  riftNativeWorldCellToSection
+} from './rift-wasm-core.js';
 
 export const RIFT_SECTION_SIZE = 16;
 export const RIFT_SECTION_VOLUME = RIFT_SECTION_SIZE ** 3;
@@ -7,11 +12,7 @@ export const RIFT_SECTION_AIR = 0;
 export const RIFT_SECTION_SOLID = 1;
 
 export function riftSectionIndex(x, y, z) {
-  x = Math.trunc(x); y = Math.trunc(y); z = Math.trunc(z);
-  if (x < 0 || x >= RIFT_SECTION_SIZE || y < 0 || y >= RIFT_SECTION_SIZE || z < 0 || z >= RIFT_SECTION_SIZE) {
-    return -1;
-  }
-  return (y << 8) | (z << 4) | x;
+  return riftNativeSectionIndex(x, y, z);
 }
 
 const RIFT_SECTION_VERTEX_STRIDE = 9;
@@ -185,13 +186,11 @@ export class RiftBlockSection {
     // H1.56 shape-aware path. Legacy material-only states still use the proven
     // full-block fast path below, so the street renderer keeps its exact face
     // counts/performance until a section actually contains a slab or stair.
-    let containsPartialShape = false;
-    for (let i = 0; i < this.states.length; i += 1) {
-      if (riftBlockStateHasPartialShape(this.states[i])) {
-        containsPartialShape = true;
-        break;
-      }
-    }
+    // Native Core v2 copies this section's compact 8 KiB state array once and
+    // returns both partial-shape detection and full-block visibility masks. This
+    // replaces up to 24,576 JS neighbor checks per dirty full-block section.
+    const nativeSectionAnalysis = buildRiftNativeSectionFaceMasks(this.states);
+    const containsPartialShape = nativeSectionAnalysis.partial;
 
     if (containsPartialShape) {
       const cells = [];
@@ -251,37 +250,36 @@ export class RiftBlockSection {
 
     const buffer = { vertices: [], indices: [] };
     const layerBuffers = typeof classifyBlockFace === 'function' ? new Map() : null;
-    let blocks = 0;
+    let blocks = nativeSectionAnalysis.blocks;
     let visibleFaces = 0;
     let culledFaces = 0;
 
     for (let y = 0; y < RIFT_SECTION_SIZE; y += 1) {
       for (let z = 0; z < RIFT_SECTION_SIZE; z += 1) {
         for (let x = 0; x < RIFT_SECTION_SIZE; x += 1) {
-          const state = this.getBlock(x, y, z);
+          const index = riftSectionIndex(x, y, z);
+          const state = this.states[index];
           if (state === RIFT_SECTION_AIR) continue;
-          blocks += 1;
+          const faceMask = nativeSectionAnalysis.masks[index];
 
-          for (const face of RIFT_BLOCK_FACE_DEFS) {
+          for (let faceIndex = 0; faceIndex < RIFT_BLOCK_FACE_DEFS.length; faceIndex += 1) {
+            if ((faceMask & (1 << faceIndex)) === 0) continue;
+            const face = RIFT_BLOCK_FACE_DEFS[faceIndex];
             const nx = x + face.d[0];
             const ny = y + face.d[1];
             const nz = z + face.d[2];
-            let neighbor = RIFT_SECTION_AIR;
 
-            if (this.inBounds(nx, ny, nz)) {
-              neighbor = this.getBlock(nx, ny, nz);
-            } else if (typeof getOutsideBlock === 'function') {
-              neighbor = Math.trunc(Number(getOutsideBlock(
+            // C++ owns every in-section neighbor test. Cross-section visibility
+            // remains a JS grid callback so streamed/loading neighbor semantics
+            // stay byte-for-byte compatible with the existing world pipeline.
+            if (!this.inBounds(nx, ny, nz) && typeof getOutsideBlock === 'function') {
+              const neighbor = Math.trunc(Number(getOutsideBlock(
                 origin.x + nx,
                 origin.y + ny,
                 origin.z + nz,
                 face
               )) || 0);
-            }
-
-            if (neighbor !== RIFT_SECTION_AIR) {
-              culledFaces += 1;
-              continue;
+              if (neighbor !== RIFT_SECTION_AIR) continue;
             }
 
             const worldX = origin.x + x;
@@ -333,6 +331,7 @@ export class RiftBlockSection {
       }
     }
 
+    culledFaces = blocks * 6 - visibleFaces;
     const vertexCount = visibleFaces * 4;
     const IndexArray = vertexCount > 65535 ? Uint32Array : Uint16Array;
     this.meshRevision = this.revision;
@@ -351,7 +350,8 @@ export class RiftBlockSection {
       triangles: visibleFaces * 2,
       revision: this.revision,
       stateBytes: this.states.byteLength,
-      visibilityLayers: finalizeSectionVisibilityLayers(layerBuffers)
+      visibilityLayers: finalizeSectionVisibilityLayers(layerBuffers),
+      nativeFaceCulling: nativeSectionAnalysis.native
     };
   }
 }
@@ -371,12 +371,7 @@ export function riftSectionKey(sx = 0, sy = 0, sz = 0) {
 }
 
 export function riftWorldCellToSection(value = 0) {
-  const cell = Math.trunc(Number(value) || 0);
-  const section = Math.floor(cell / RIFT_SECTION_SIZE);
-  return {
-    section,
-    local: cell - section * RIFT_SECTION_SIZE
-  };
+  return riftNativeWorldCellToSection(value, RIFT_SECTION_SIZE);
 }
 
 export class RiftSectionGrid {
