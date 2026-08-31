@@ -1,0 +1,65 @@
+name: Ironvale Terrain Reset
+
+on:
+  push:
+    branches: [ironvale-terrain-reset-staging]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout reset branch
+        uses: actions/checkout@v4
+        with:
+          ref: ironvale-terrain-reset-staging
+          fetch-depth: 0
+
+      - name: Strip legacy terrain
+        run: node scripts/terrain-reset-cleanup.mjs
+
+      - name: Verify starter contract
+        run: node scripts/check-ironvale-starter-game.js
+
+      - name: Full Ironvale build verification
+        run: npm run build
+
+      - name: Install Worker bundle dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Worker and WASM bundle
+        run: npx wrangler deploy --dry-run --outdir=/tmp/rift-worker-dry
+
+      - name: Guard legacy terrain removal
+        run: |
+          test ! -e public/ironvale-smooth-terrain.js
+          test ! -e public/ironvale-environment.js
+          test ! -e scripts/build-brackenford-region-v2.mjs
+          test ! -e scripts/apply-ironvale-smooth-terrain.mjs
+          test ! -e public/rift-world-blocks/brackenford-lowlands-001.json
+          test -s public/rift-world-blocks/ironvale-terrain-bootstrap.json
+          grep -q 'rift-terrain-native-pending' public/rift-world-blocks/ironvale-terrain-bootstrap.json
+          grep -q 'ironvale:world:active-block:v3' public/downtown3d-foundation.js
+          ! grep -q 'createValebornSmoothTerrain' public/downtown3d-foundation.js
+          ! grep -q 'createIronvaleNatureEnvironment' public/downtown3d-foundation.js
+          test -s public/rift-gltf.js
+          test -s public/assets/quaternius/stylized-nature/Rock_Medium_1.gltf
+          test -s native/rift-core.cpp
+
+      - name: Remove one-shot reset tooling
+        run: |
+          rm -f scripts/terrain-reset-cleanup.mjs
+          rm -f .github/workflows/ironvale-terrain-reset.yml
+
+      - name: Commit verified terrain reset
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'Retire legacy terrain and reset Rift Terrain foundation [skip ci]'
+          git push origin HEAD:ironvale-terrain-reset-staging
