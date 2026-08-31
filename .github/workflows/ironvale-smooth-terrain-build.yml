@@ -1,0 +1,104 @@
+name: Ironvale Smooth Terrain + Quaternius Build
+
+on:
+  push:
+    branches: [ironvale-smooth-terrain-staging]
+    paths:
+      - '.github/workflows/ironvale-smooth-terrain-build.yml'
+      - 'public/rift-gltf.js'
+      - 'public/ironvale-smooth-terrain.js'
+      - 'public/ironvale-environment.js'
+      - 'public/assets/quaternius/stylized-nature/SOURCE.md'
+      - 'scripts/apply-ironvale-smooth-terrain.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: ironvale-smooth-terrain-staging
+          fetch-depth: 0
+
+      - name: Apply renderer and world integration
+        run: node scripts/apply-ironvale-smooth-terrain.mjs
+
+      - name: Vendor curated Quaternius Standard models
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEST='public/assets/quaternius/stylized-nature'
+          BASE='https://raw.githubusercontent.com/agentkaerf/FreeModels/main/Stylized%20Nature%20MegaKit%5BStandard%5D'
+          mkdir -p "$DEST"
+          curl -fL --retry 3 "$BASE/License_Standard.txt" -o "$DEST/LICENSE.txt"
+          for name in Rock_Medium_1 Rock_Medium_2 Rock_Medium_3 CommonTree_1 Pine_1; do
+            curl -fL --retry 3 "$BASE/glTF/${name}.gltf" -o "$DEST/${name}.gltf"
+            curl -fL --retry 3 "$BASE/glTF/${name}.bin" -o "$DEST/${name}.bin"
+            test -s "$DEST/${name}.gltf"
+            test -s "$DEST/${name}.bin"
+          done
+          test -s "$DEST/LICENSE.txt"
+
+      - name: Rebuild island collision world with smooth visual metadata
+        run: node scripts/build-brackenford-region-v2.mjs
+
+      - name: Validate JavaScript modules and asset contracts
+        run: |
+          node --check public/rift-gltf.js
+          node --check public/ironvale-smooth-terrain.js
+          node --check public/ironvale-environment.js
+          node --check public/downtown3d-foundation.js
+          node --input-type=module <<'NODE'
+          import { validateValebornSmoothTerrain } from './public/ironvale-smooth-terrain.js';
+          import { validateRiftGltfLoader } from './public/rift-gltf.js';
+          import { validateIronvaleNatureEnvironment } from './public/ironvale-environment.js';
+          for (const [name,result] of [['terrain',validateValebornSmoothTerrain()],['gltf',validateRiftGltfLoader()],['environment',validateIronvaleNatureEnvironment()]]) {
+            if (!result.ok) throw new Error(name+': '+result.failures.join(', '));
+            console.log('[smooth-terrain]',name,'PASS');
+          }
+          NODE
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const root='public/assets/quaternius/stylized-nature';
+          for (const name of ['Rock_Medium_1','Rock_Medium_2','Rock_Medium_3','CommonTree_1','Pine_1']) {
+            const gltf=JSON.parse(fs.readFileSync(`${root}/${name}.gltf`,'utf8'));
+            const expected=gltf.buffers?.[0]?.byteLength||0;
+            const actual=fs.statSync(`${root}/${name}.bin`).size;
+            if (!expected || actual < expected) throw new Error(`${name} buffer incomplete: ${actual}/${expected}`);
+            if (!gltf.meshes?.length) throw new Error(`${name} has no mesh`);
+            console.log('[quaternius]',name,'mesh OK',actual,'bytes');
+          }
+          NODE
+
+      - name: Verify Ironvale starter game contract
+        run: node scripts/check-ironvale-starter-game.js
+
+      - name: Full Ironvale build verification
+        run: npm run build
+
+      - name: Install Worker bundle dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Worker and WASM bundle
+        run: npx wrangler deploy --dry-run --outdir=/tmp/ironvale-smooth-terrain-worker
+
+      - name: Guard patch scope
+        run: |
+          git status --short
+          test -n "$(git status --porcelain)"
+          git diff -- public/downtown3d-foundation.js scripts/build-brackenford-region-v2.mjs scripts/check-ironvale-starter-game.js public/rift-world-blocks/brackenford-lowlands-001.json src/ironvale/content.js > /tmp/smooth-terrain.diff
+          grep -q "smooth-terrain-v1" /tmp/smooth-terrain.diff
+          grep -q "createValebornSmoothTerrain" /tmp/smooth-terrain.diff
+
+      - name: Commit verified smooth terrain patch to staging
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/downtown3d-foundation.js public/rift-gltf.js public/ironvale-smooth-terrain.js public/ironvale-environment.js public/assets/quaternius/stylized-nature scripts/apply-ironvale-smooth-terrain.mjs scripts/build-brackenford-region-v2.mjs scripts/check-ironvale-starter-game.js public/rift-world-blocks/brackenford-lowlands-001.json src/ironvale/content.js
+          git commit -m 'Render Valeborn with smooth terrain and Quaternius nature [skip ci]'
+          git push origin HEAD:ironvale-smooth-terrain-staging
