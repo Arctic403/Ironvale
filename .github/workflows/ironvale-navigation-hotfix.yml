@@ -1,0 +1,86 @@
+name: Ironvale Navigation Hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ironvale-navigation-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Ironvale
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply narrow world teardown guard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('public/downtown3d-foundation.js')
+          text = path.read_text(encoding='utf-8')
+          old = """export function destroyDowntown3D() {
+            activeFoundation?.destroy?.();
+            activeFoundation = null;
+            document.body.classList.remove('world3d-game-mode');
+          }
+          """
+          old = old.replace('          ', '')
+          new = """export function destroyDowntown3D() {
+            // Detach first so a Safari/WebGL cleanup exception can never pin SPA navigation
+            // to the same half-disposed world foundation on every later route change.
+            const foundation = activeFoundation;
+            activeFoundation = null;
+            try {
+              foundation?.destroy?.();
+            } catch (error) {
+              console.warn('Rift world foundation cleanup failed', error);
+            } finally {
+              document.body.classList.remove('world3d-game-mode');
+              const style = document.documentElement.style;
+              style.removeProperty('--rift-viewport-width');
+              style.removeProperty('--rift-viewport-height');
+              style.removeProperty('--rift-viewport-left');
+              style.removeProperty('--rift-viewport-top');
+            }
+          }
+          """
+          new = new.replace('          ', '')
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected exactly one destroyDowntown3D target, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Verify navigation syntax and diff
+        run: |
+          git diff --check
+          node --check public/app.js
+          node --check public/ui/router.js
+          node --check public/downtown3d-foundation.js
+          git diff -- public/downtown3d-foundation.js
+
+      - name: Run full Ironvale and Rift Engine regression suite
+        run: npm run build
+
+      - name: Install Worker dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Cloudflare Worker and WASM bundle
+        run: npx wrangler deploy --dry-run --outdir=/tmp/ironvale-navigation-worker
+
+      - name: Commit only verified production teardown guard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -- package-lock.json 2>/dev/null || rm -f package-lock.json
+          rm -rf node_modules
+          git add public/downtown3d-foundation.js
+          git diff --cached --check
+          git commit -m "Prevent world teardown from pinning Ironvale navigation"
+          git push origin HEAD:main
