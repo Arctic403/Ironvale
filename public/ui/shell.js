@@ -10,16 +10,31 @@ let syncTimer = null;
 let syncPending = false;
 let syncAfterMutation = null;
 
+function setDrawerOpen(open) {
+  const drawer = $('#game-drawer');
+  const button = $('#menu-button');
+  const nextOpen = Boolean(open);
+  drawer?.classList.toggle('open', nextOpen);
+  drawer?.setAttribute('aria-hidden', String(!nextOpen));
+  button?.setAttribute('aria-expanded', String(nextOpen));
+  document.body.classList.toggle('drawer-open', nextOpen);
+}
+
 export function initShell() {
-  $('#menu-button')?.addEventListener('click', () => $('#game-drawer')?.classList.toggle('open'));
-  $('#drawer-close')?.addEventListener('click', () => $('#game-drawer')?.classList.remove('open'));
-  $('#drawer-backdrop')?.addEventListener('click', () => $('#game-drawer')?.classList.remove('open'));
+  // Never inherit a visually open drawer from cached/restored mobile Safari state.
+  setDrawerOpen(false);
+  $('#menu-button')?.addEventListener('click', () => setDrawerOpen(!$('#game-drawer')?.classList.contains('open')));
+  $('#drawer-close')?.addEventListener('click', () => setDrawerOpen(false));
+  $('#drawer-backdrop')?.addEventListener('click', () => setDrawerOpen(false));
   $('#logout-btn')?.addEventListener('click', logout);
   document.addEventListener('click', event => {
     const nav = event.target.closest('[data-route]');
     if (!nav) return;
-    event.preventDefault(); $('#game-drawer')?.classList.remove('open'); go(nav.dataset.route);
+    event.preventDefault(); setDrawerOpen(false); go(nav.dataset.route);
   });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') setDrawerOpen(false); });
+  window.addEventListener('pageshow', () => setDrawerOpen(false));
+  window.addEventListener('orientationchange', () => setDrawerOpen(false));
   window.addEventListener('riftapi:mutation', scheduleMutationSync);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && state.authenticated) syncNow(); });
   renderDrawer(); renderBottomNav();
@@ -71,7 +86,7 @@ export async function refreshSession({ navigate = true } = {}) {
   setSessionStatus('Checking Ironvale session…');
   const result = await api('/api/ironvale/bootstrap', { riftCacheTtl: 1000 });
   if (!result.ok || !result.authenticated) {
-    clearState(); $('#auth-grid')?.classList.remove('hidden'); $('#game-root')?.classList.add('hidden'); $('#hud-shell')?.classList.add('hidden'); $('#mobile-nav')?.classList.add('hidden');
+    clearState(); setDrawerOpen(false); $('#auth-grid')?.classList.remove('hidden'); $('#game-root')?.classList.add('hidden'); $('#hud-shell')?.classList.add('hidden'); $('#mobile-nav')?.classList.add('hidden');
     setSessionStatus('Not signed in.'); stopSync();
     if (navigate && location.hash && !['','#world'].includes(location.hash)) history.replaceState(null, '', '#world');
     return false;
@@ -93,7 +108,7 @@ function scheduleMutationSync() { clearTimeout(syncAfterMutation); syncAfterMuta
 
 async function logout() {
   const result = await api('/api/auth/logout', { method: 'POST' });
-  if (result.ok) { clearState(); stopSync(); showToast('Logged out.'); await refreshSession(); }
+  if (result.ok) { clearState(); setDrawerOpen(false); stopSync(); showToast('Logged out.'); await refreshSession(); }
 }
 export async function submitAuth(path, form) {
   const data = new FormData(form);
