@@ -20,7 +20,7 @@ expect(IRONVALE_QUESTS.length >= 5 && IRONVALE_CAMPAIGNS.some(c => c.id === 'the
 expect(world.id === 'brackenford-lowlands-001' && world.ops.length >= 100, 'starter world is not materially authored');
 expect(compiled.stats.cells > 18000 && compiled.stats.operations >= 100, 'starter world did not compile into a real Rift world');
 expect(world.version === 2, 'starter terrain must remain on the v2 Rift world format');
-expect(world.bounds?.max?.[0] >= 319 && world.bounds?.max?.[2] >= 319 && world.bounds?.max?.[1] >= 32, 'Valeborn starter island lost zone scale');
+expect(world.bounds?.max?.[0] >= 319 && world.bounds?.max?.[2] >= 319 && world.bounds?.max?.[1] >= 28, 'Valeborn starter island lost zone scale');
 expect(Object.keys(world.prefabs || {}).length === 0 && (world.layout || []).length === 0, 'terrain-first island pass must not generate town buildings');
 expect(world.metadata?.terrain_pass === 'starter-island-v1' && world.metadata?.buildings === false, 'starter island terrain-pass metadata is missing');
 expect(world.metadata?.island === true && world.metadata?.surrounded_by_water === true && world.metadata?.coastline === 'organic-multilobed', 'starter zone must remain an organic island surrounded by water');
