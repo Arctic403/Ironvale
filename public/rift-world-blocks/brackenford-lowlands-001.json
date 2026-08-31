@@ -1,8 +1,8 @@
 {
   "format": "riftcity-city-block",
-  "version": 1,
+  "version": 2,
   "id": "brackenford-lowlands-001",
-  "name": "Brackenford Lowlands · Valeborn Start",
+  "name": "Brackenford Lowlands · Valeborn Start v2",
   "units": "meters",
   "grid": {
     "cell_size": 1,
@@ -20,9 +20,9 @@
       0
     ],
     "max": [
-      95,
-      15,
-      95
+      159,
+      23,
+      159
     ]
   },
   "palette": {
@@ -33,6 +33,6994 @@
         0,
         0,
         0
+      ]
+    },
+    "aged_roof_e": {
+      "material_id": 253,
+      "shape": "stair",
+      "rotation": "east",
+      "color": [
+        0.996078431372549,
+        0.043137254901960784,
+        0.00392156862745098
+      ],
+      "texture": "aged_wood"
+    },
+    "aged_roof_w": {
+      "material_id": 253,
+      "shape": "stair",
+      "rotation": "west",
+      "color": [
+        0.996078431372549,
+        0.043137254901960784,
+        0.00392156862745098
+      ],
+      "texture": "aged_wood"
+    },
+    "aged_roof_n": {
+      "material_id": 253,
+      "shape": "stair",
+      "rotation": "north",
+      "color": [
+        0.996078431372549,
+        0.043137254901960784,
+        0.00392156862745098
+      ],
+      "texture": "aged_wood"
+    },
+    "aged_roof_s": {
+      "material_id": 253,
+      "shape": "stair",
+      "rotation": "south",
+      "color": [
+        0.996078431372549,
+        0.043137254901960784,
+        0.00392156862745098
+      ],
+      "texture": "aged_wood"
+    },
+    "stone_slab": {
+      "material_id": 246,
+      "shape": "slab_bottom",
+      "color": [
+        0.996078431372549,
+        0.01568627450980392,
+        0.00392156862745098
+      ],
+      "texture": "stone"
+    },
+    "barley": {
+      "material_id": 237,
+      "shape": "grass_detail",
+      "kind": "detail",
+      "color": [
+        0.58,
+        0.49,
+        0.18
+      ],
+      "texture": "barley",
+      "height": 0.82,
+      "width": 0.34
+    }
+  },
+  "prefabs": {
+    "cottage": {
+      "kind": "home",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          15,
+          11,
+          13
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            11,
+            0,
+            9
+          ],
+          "name": "Cottage main foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            11,
+            2,
+            9
+          ],
+          "name": "Cottage main lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            3,
+            1
+          ],
+          "max": [
+            11,
+            5,
+            9
+          ],
+          "name": "Cottage main upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            10,
+            5,
+            8
+          ],
+          "name": "Cottage main clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            5,
+            1
+          ],
+          "name": "Cottage main timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            11,
+            1,
+            1
+          ],
+          "max": [
+            11,
+            5,
+            1
+          ],
+          "name": "Cottage main timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            9
+          ],
+          "max": [
+            1,
+            5,
+            9
+          ],
+          "name": "Cottage main timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            11,
+            1,
+            9
+          ],
+          "max": [
+            11,
+            5,
+            9
+          ],
+          "name": "Cottage main timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            5,
+            1,
+            1
+          ],
+          "max": [
+            6,
+            3,
+            1
+          ],
+          "name": "Cottage main door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            2,
+            9
+          ],
+          "max": [
+            4,
+            3,
+            9
+          ],
+          "name": "Cottage main window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            8,
+            2,
+            9
+          ],
+          "max": [
+            9,
+            3,
+            9
+          ],
+          "name": "Cottage main window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            4
+          ],
+          "max": [
+            1,
+            3,
+            5
+          ],
+          "name": "Cottage main window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            6,
+            1
+          ],
+          "max": [
+            1,
+            6,
+            9
+          ],
+          "name": "Cottage main west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            6,
+            1
+          ],
+          "max": [
+            11,
+            6,
+            9
+          ],
+          "name": "Cottage main east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            7,
+            1
+          ],
+          "max": [
+            2,
+            7,
+            9
+          ],
+          "name": "Cottage main west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            10,
+            7,
+            1
+          ],
+          "max": [
+            10,
+            7,
+            9
+          ],
+          "name": "Cottage main east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            8,
+            1
+          ],
+          "max": [
+            3,
+            8,
+            9
+          ],
+          "name": "Cottage main west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            9,
+            8,
+            1
+          ],
+          "max": [
+            9,
+            8,
+            9
+          ],
+          "name": "Cottage main east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            9,
+            1
+          ],
+          "max": [
+            4,
+            9,
+            9
+          ],
+          "name": "Cottage main west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            8,
+            9,
+            1
+          ],
+          "max": [
+            8,
+            9,
+            9
+          ],
+          "name": "Cottage main east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            10,
+            1
+          ],
+          "max": [
+            5,
+            10,
+            9
+          ],
+          "name": "Cottage main west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            7,
+            10,
+            1
+          ],
+          "max": [
+            7,
+            10,
+            9
+          ],
+          "name": "Cottage main east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            11,
+            1
+          ],
+          "max": [
+            6,
+            11,
+            9
+          ],
+          "name": "Cottage main west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            6,
+            11,
+            1
+          ],
+          "max": [
+            6,
+            11,
+            9
+          ],
+          "name": "Cottage main east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            8,
+            0,
+            7
+          ],
+          "max": [
+            15,
+            0,
+            13
+          ],
+          "name": "Cottage side wing foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            8,
+            1,
+            7
+          ],
+          "max": [
+            15,
+            2,
+            13
+          ],
+          "name": "Cottage side wing lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            8,
+            3,
+            7
+          ],
+          "max": [
+            15,
+            4,
+            13
+          ],
+          "name": "Cottage side wing upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            9,
+            1,
+            8
+          ],
+          "max": [
+            14,
+            4,
+            12
+          ],
+          "name": "Cottage side wing clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            8,
+            1,
+            7
+          ],
+          "max": [
+            8,
+            4,
+            7
+          ],
+          "name": "Cottage side wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            15,
+            1,
+            7
+          ],
+          "max": [
+            15,
+            4,
+            7
+          ],
+          "name": "Cottage side wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            8,
+            1,
+            13
+          ],
+          "max": [
+            8,
+            4,
+            13
+          ],
+          "name": "Cottage side wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            15,
+            1,
+            13
+          ],
+          "max": [
+            15,
+            4,
+            13
+          ],
+          "name": "Cottage side wing timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            1,
+            9
+          ],
+          "max": [
+            15,
+            3,
+            10
+          ],
+          "name": "Cottage side wing door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            11,
+            2,
+            13
+          ],
+          "max": [
+            12,
+            3,
+            13
+          ],
+          "name": "Cottage side wing window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            5,
+            7
+          ],
+          "max": [
+            8,
+            5,
+            13
+          ],
+          "name": "Cottage side wing west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            5,
+            7
+          ],
+          "max": [
+            15,
+            5,
+            13
+          ],
+          "name": "Cottage side wing east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            9,
+            6,
+            7
+          ],
+          "max": [
+            9,
+            6,
+            13
+          ],
+          "name": "Cottage side wing west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            6,
+            7
+          ],
+          "max": [
+            14,
+            6,
+            13
+          ],
+          "name": "Cottage side wing east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            10,
+            7,
+            7
+          ],
+          "max": [
+            10,
+            7,
+            13
+          ],
+          "name": "Cottage side wing west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            7,
+            7
+          ],
+          "max": [
+            13,
+            7,
+            13
+          ],
+          "name": "Cottage side wing east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            11,
+            8,
+            7
+          ],
+          "max": [
+            11,
+            8,
+            13
+          ],
+          "name": "Cottage side wing west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            8,
+            7
+          ],
+          "max": [
+            12,
+            8,
+            13
+          ],
+          "name": "Cottage side wing east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone_dark",
+          "min": [
+            9,
+            5,
+            6
+          ],
+          "max": [
+            10,
+            9,
+            7
+          ],
+          "name": "Cottage chimney"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            3,
+            1,
+            0
+          ],
+          "max": [
+            8,
+            1,
+            0
+          ],
+          "name": "Cottage porch deck"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            3,
+            5,
+            0
+          ],
+          "max": [
+            8,
+            5,
+            0
+          ],
+          "name": "Cottage porch awning"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            3,
+            2,
+            0
+          ],
+          "max": [
+            3,
+            4,
+            0
+          ],
+          "name": "Cottage porch post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            8,
+            2,
+            0
+          ],
+          "max": [
+            8,
+            4,
+            0
+          ],
+          "name": "Cottage porch post"
+        }
+      ],
+      "anchors": {
+        "door": {
+          "at": [
+            5,
+            1,
+            1
+          ],
+          "facing": "south"
+        }
+      }
+    },
+    "farmhouse": {
+      "kind": "farm-home",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          20,
+          14,
+          16
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            15,
+            0,
+            11
+          ],
+          "name": "Farmhouse main foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            15,
+            2,
+            11
+          ],
+          "name": "Farmhouse main lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            3,
+            1
+          ],
+          "max": [
+            15,
+            6,
+            11
+          ],
+          "name": "Farmhouse main upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            14,
+            6,
+            10
+          ],
+          "name": "Farmhouse main clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            6,
+            1
+          ],
+          "name": "Farmhouse main timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            15,
+            1,
+            1
+          ],
+          "max": [
+            15,
+            6,
+            1
+          ],
+          "name": "Farmhouse main timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            11
+          ],
+          "max": [
+            1,
+            6,
+            11
+          ],
+          "name": "Farmhouse main timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            15,
+            1,
+            11
+          ],
+          "max": [
+            15,
+            6,
+            11
+          ],
+          "name": "Farmhouse main timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            7,
+            1,
+            1
+          ],
+          "max": [
+            9,
+            3,
+            1
+          ],
+          "name": "Farmhouse main door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            2,
+            11
+          ],
+          "max": [
+            5,
+            3,
+            11
+          ],
+          "name": "Farmhouse main window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            11,
+            2,
+            11
+          ],
+          "max": [
+            13,
+            3,
+            11
+          ],
+          "name": "Farmhouse main window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            4
+          ],
+          "max": [
+            1,
+            3,
+            6
+          ],
+          "name": "Farmhouse main window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            2,
+            5
+          ],
+          "max": [
+            15,
+            3,
+            7
+          ],
+          "name": "Farmhouse main window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            7,
+            1
+          ],
+          "max": [
+            1,
+            7,
+            11
+          ],
+          "name": "Farmhouse main west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            7,
+            1
+          ],
+          "max": [
+            15,
+            7,
+            11
+          ],
+          "name": "Farmhouse main east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            8,
+            1
+          ],
+          "max": [
+            2,
+            8,
+            11
+          ],
+          "name": "Farmhouse main west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            8,
+            1
+          ],
+          "max": [
+            14,
+            8,
+            11
+          ],
+          "name": "Farmhouse main east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            9,
+            1
+          ],
+          "max": [
+            3,
+            9,
+            11
+          ],
+          "name": "Farmhouse main west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            9,
+            1
+          ],
+          "max": [
+            13,
+            9,
+            11
+          ],
+          "name": "Farmhouse main east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            10,
+            1
+          ],
+          "max": [
+            4,
+            10,
+            11
+          ],
+          "name": "Farmhouse main west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            10,
+            1
+          ],
+          "max": [
+            12,
+            10,
+            11
+          ],
+          "name": "Farmhouse main east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            11,
+            1
+          ],
+          "max": [
+            5,
+            11,
+            11
+          ],
+          "name": "Farmhouse main west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            11,
+            1
+          ],
+          "max": [
+            11,
+            11,
+            11
+          ],
+          "name": "Farmhouse main east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            12,
+            1
+          ],
+          "max": [
+            6,
+            12,
+            11
+          ],
+          "name": "Farmhouse main west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            10,
+            12,
+            1
+          ],
+          "max": [
+            10,
+            12,
+            11
+          ],
+          "name": "Farmhouse main east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            13,
+            1
+          ],
+          "max": [
+            7,
+            13,
+            11
+          ],
+          "name": "Farmhouse main west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            9,
+            13,
+            1
+          ],
+          "max": [
+            9,
+            13,
+            11
+          ],
+          "name": "Farmhouse main east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            14,
+            1
+          ],
+          "max": [
+            8,
+            14,
+            11
+          ],
+          "name": "Farmhouse main west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            8,
+            14,
+            1
+          ],
+          "max": [
+            8,
+            14,
+            11
+          ],
+          "name": "Farmhouse main east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            11,
+            0,
+            8
+          ],
+          "max": [
+            20,
+            0,
+            16
+          ],
+          "name": "Farmhouse kitchen wing foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            11,
+            1,
+            8
+          ],
+          "max": [
+            20,
+            2,
+            16
+          ],
+          "name": "Farmhouse kitchen wing lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            11,
+            3,
+            8
+          ],
+          "max": [
+            20,
+            5,
+            16
+          ],
+          "name": "Farmhouse kitchen wing upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            12,
+            1,
+            9
+          ],
+          "max": [
+            19,
+            5,
+            15
+          ],
+          "name": "Farmhouse kitchen wing clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            11,
+            1,
+            8
+          ],
+          "max": [
+            11,
+            5,
+            8
+          ],
+          "name": "Farmhouse kitchen wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            20,
+            1,
+            8
+          ],
+          "max": [
+            20,
+            5,
+            8
+          ],
+          "name": "Farmhouse kitchen wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            11,
+            1,
+            16
+          ],
+          "max": [
+            11,
+            5,
+            16
+          ],
+          "name": "Farmhouse kitchen wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            20,
+            1,
+            16
+          ],
+          "max": [
+            20,
+            5,
+            16
+          ],
+          "name": "Farmhouse kitchen wing timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            20,
+            1,
+            11
+          ],
+          "max": [
+            20,
+            3,
+            12
+          ],
+          "name": "Farmhouse kitchen wing door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            14,
+            2,
+            16
+          ],
+          "max": [
+            16,
+            3,
+            16
+          ],
+          "name": "Farmhouse kitchen wing window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            11,
+            6,
+            8
+          ],
+          "max": [
+            11,
+            6,
+            16
+          ],
+          "name": "Farmhouse kitchen wing west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            20,
+            6,
+            8
+          ],
+          "max": [
+            20,
+            6,
+            16
+          ],
+          "name": "Farmhouse kitchen wing east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            12,
+            7,
+            8
+          ],
+          "max": [
+            12,
+            7,
+            16
+          ],
+          "name": "Farmhouse kitchen wing west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            19,
+            7,
+            8
+          ],
+          "max": [
+            19,
+            7,
+            16
+          ],
+          "name": "Farmhouse kitchen wing east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            13,
+            8,
+            8
+          ],
+          "max": [
+            13,
+            8,
+            16
+          ],
+          "name": "Farmhouse kitchen wing west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            18,
+            8,
+            8
+          ],
+          "max": [
+            18,
+            8,
+            16
+          ],
+          "name": "Farmhouse kitchen wing east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            14,
+            9,
+            8
+          ],
+          "max": [
+            14,
+            9,
+            16
+          ],
+          "name": "Farmhouse kitchen wing west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            17,
+            9,
+            8
+          ],
+          "max": [
+            17,
+            9,
+            16
+          ],
+          "name": "Farmhouse kitchen wing east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            15,
+            10,
+            8
+          ],
+          "max": [
+            15,
+            10,
+            16
+          ],
+          "name": "Farmhouse kitchen wing west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            16,
+            10,
+            8
+          ],
+          "max": [
+            16,
+            10,
+            16
+          ],
+          "name": "Farmhouse kitchen wing east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            4,
+            1,
+            0
+          ],
+          "max": [
+            11,
+            1,
+            0
+          ],
+          "name": "Farmhouse porch"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            4,
+            5,
+            0
+          ],
+          "max": [
+            11,
+            5,
+            0
+          ],
+          "name": "Farmhouse porch roof"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone_dark",
+          "min": [
+            13,
+            6,
+            7
+          ],
+          "max": [
+            14,
+            11,
+            8
+          ],
+          "name": "Farmhouse chimney"
+        }
+      ],
+      "anchors": {}
+    },
+    "barn": {
+      "kind": "farm",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          23,
+          17,
+          14
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            18,
+            0,
+            13
+          ],
+          "name": "Barn stone footing"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            18,
+            7,
+            13
+          ],
+          "name": "Barn shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            17,
+            7,
+            12
+          ],
+          "name": "Barn tall interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            7,
+            1
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            13
+          ],
+          "max": [
+            1,
+            7,
+            13
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            6,
+            1,
+            1
+          ],
+          "max": [
+            6,
+            7,
+            1
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            6,
+            1,
+            13
+          ],
+          "max": [
+            6,
+            7,
+            13
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            12,
+            1,
+            1
+          ],
+          "max": [
+            12,
+            7,
+            1
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            12,
+            1,
+            13
+          ],
+          "max": [
+            12,
+            7,
+            13
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            18,
+            1,
+            1
+          ],
+          "max": [
+            18,
+            7,
+            1
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            18,
+            1,
+            13
+          ],
+          "max": [
+            18,
+            7,
+            13
+          ],
+          "name": "Barn frame"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            7,
+            1,
+            1
+          ],
+          "max": [
+            12,
+            6,
+            1
+          ],
+          "name": "Barn wagon doors"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            4,
+            13
+          ],
+          "max": [
+            5,
+            6,
+            13
+          ],
+          "name": "Barn rear vent"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            14,
+            4,
+            13
+          ],
+          "max": [
+            16,
+            6,
+            13
+          ],
+          "name": "Barn rear vent"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            2,
+            6,
+            2
+          ],
+          "max": [
+            17,
+            6,
+            6
+          ],
+          "name": "Barn partial hay loft"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            0,
+            8,
+            0
+          ],
+          "max": [
+            0,
+            8,
+            14
+          ],
+          "name": "Barn west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            19,
+            8,
+            0
+          ],
+          "max": [
+            19,
+            8,
+            14
+          ],
+          "name": "Barn east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            9,
+            0
+          ],
+          "max": [
+            1,
+            9,
+            14
+          ],
+          "name": "Barn west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            18,
+            9,
+            0
+          ],
+          "max": [
+            18,
+            9,
+            14
+          ],
+          "name": "Barn east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            10,
+            0
+          ],
+          "max": [
+            2,
+            10,
+            14
+          ],
+          "name": "Barn west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            17,
+            10,
+            0
+          ],
+          "max": [
+            17,
+            10,
+            14
+          ],
+          "name": "Barn east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            11,
+            0
+          ],
+          "max": [
+            3,
+            11,
+            14
+          ],
+          "name": "Barn west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            16,
+            11,
+            0
+          ],
+          "max": [
+            16,
+            11,
+            14
+          ],
+          "name": "Barn east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            12,
+            0
+          ],
+          "max": [
+            4,
+            12,
+            14
+          ],
+          "name": "Barn west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            12,
+            0
+          ],
+          "max": [
+            15,
+            12,
+            14
+          ],
+          "name": "Barn east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            13,
+            0
+          ],
+          "max": [
+            5,
+            13,
+            14
+          ],
+          "name": "Barn west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            13,
+            0
+          ],
+          "max": [
+            14,
+            13,
+            14
+          ],
+          "name": "Barn east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            14,
+            0
+          ],
+          "max": [
+            6,
+            14,
+            14
+          ],
+          "name": "Barn west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            14,
+            0
+          ],
+          "max": [
+            13,
+            14,
+            14
+          ],
+          "name": "Barn east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            15,
+            0
+          ],
+          "max": [
+            7,
+            15,
+            14
+          ],
+          "name": "Barn west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            15,
+            0
+          ],
+          "max": [
+            12,
+            15,
+            14
+          ],
+          "name": "Barn east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            16,
+            0
+          ],
+          "max": [
+            8,
+            16,
+            14
+          ],
+          "name": "Barn west roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            16,
+            0
+          ],
+          "max": [
+            11,
+            16,
+            14
+          ],
+          "name": "Barn east roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            9,
+            17,
+            0
+          ],
+          "max": [
+            9,
+            17,
+            14
+          ],
+          "name": "Barn west roof 9"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            10,
+            17,
+            0
+          ],
+          "max": [
+            10,
+            17,
+            14
+          ],
+          "name": "Barn east roof 9"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            18,
+            1,
+            5
+          ],
+          "max": [
+            23,
+            1,
+            13
+          ],
+          "name": "Barn lean-to floor"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            23,
+            2,
+            5
+          ],
+          "max": [
+            23,
+            5,
+            5
+          ],
+          "name": "Barn lean-to post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            23,
+            2,
+            13
+          ],
+          "max": [
+            23,
+            5,
+            13
+          ],
+          "name": "Barn lean-to post"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            18,
+            6,
+            4
+          ],
+          "max": [
+            23,
+            6,
+            14
+          ],
+          "name": "Barn lean-to roof"
+        }
+      ],
+      "anchors": {}
+    },
+    "trainingHall": {
+      "kind": "training",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          27,
+          16,
+          20
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            20,
+            0,
+            12
+          ],
+          "name": "Warden hall foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            20,
+            2,
+            12
+          ],
+          "name": "Warden hall lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            3,
+            1
+          ],
+          "max": [
+            20,
+            6,
+            12
+          ],
+          "name": "Warden hall upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            19,
+            6,
+            11
+          ],
+          "name": "Warden hall clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            6,
+            1
+          ],
+          "name": "Warden hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            20,
+            1,
+            1
+          ],
+          "max": [
+            20,
+            6,
+            1
+          ],
+          "name": "Warden hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            12
+          ],
+          "max": [
+            1,
+            6,
+            12
+          ],
+          "name": "Warden hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            20,
+            1,
+            12
+          ],
+          "max": [
+            20,
+            6,
+            12
+          ],
+          "name": "Warden hall timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            8,
+            1,
+            1
+          ],
+          "max": [
+            11,
+            3,
+            1
+          ],
+          "name": "Warden hall door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            2,
+            12
+          ],
+          "max": [
+            5,
+            3,
+            12
+          ],
+          "name": "Warden hall window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            2,
+            12
+          ],
+          "max": [
+            17,
+            3,
+            12
+          ],
+          "name": "Warden hall window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            4
+          ],
+          "max": [
+            1,
+            3,
+            6
+          ],
+          "name": "Warden hall window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            7,
+            1
+          ],
+          "max": [
+            1,
+            7,
+            12
+          ],
+          "name": "Warden hall west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            20,
+            7,
+            1
+          ],
+          "max": [
+            20,
+            7,
+            12
+          ],
+          "name": "Warden hall east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            8,
+            1
+          ],
+          "max": [
+            2,
+            8,
+            12
+          ],
+          "name": "Warden hall west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            19,
+            8,
+            1
+          ],
+          "max": [
+            19,
+            8,
+            12
+          ],
+          "name": "Warden hall east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            9,
+            1
+          ],
+          "max": [
+            3,
+            9,
+            12
+          ],
+          "name": "Warden hall west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            18,
+            9,
+            1
+          ],
+          "max": [
+            18,
+            9,
+            12
+          ],
+          "name": "Warden hall east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            10,
+            1
+          ],
+          "max": [
+            4,
+            10,
+            12
+          ],
+          "name": "Warden hall west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            17,
+            10,
+            1
+          ],
+          "max": [
+            17,
+            10,
+            12
+          ],
+          "name": "Warden hall east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            11,
+            1
+          ],
+          "max": [
+            5,
+            11,
+            12
+          ],
+          "name": "Warden hall west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            16,
+            11,
+            1
+          ],
+          "max": [
+            16,
+            11,
+            12
+          ],
+          "name": "Warden hall east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            12,
+            1
+          ],
+          "max": [
+            6,
+            12,
+            12
+          ],
+          "name": "Warden hall west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            12,
+            1
+          ],
+          "max": [
+            15,
+            12,
+            12
+          ],
+          "name": "Warden hall east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            13,
+            1
+          ],
+          "max": [
+            7,
+            13,
+            12
+          ],
+          "name": "Warden hall west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            13,
+            1
+          ],
+          "max": [
+            14,
+            13,
+            12
+          ],
+          "name": "Warden hall east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            14,
+            1
+          ],
+          "max": [
+            8,
+            14,
+            12
+          ],
+          "name": "Warden hall west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            14,
+            1
+          ],
+          "max": [
+            13,
+            14,
+            12
+          ],
+          "name": "Warden hall east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            9,
+            15,
+            1
+          ],
+          "max": [
+            9,
+            15,
+            12
+          ],
+          "name": "Warden hall west roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            15,
+            1
+          ],
+          "max": [
+            12,
+            15,
+            12
+          ],
+          "name": "Warden hall east roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            10,
+            16,
+            1
+          ],
+          "max": [
+            10,
+            16,
+            12
+          ],
+          "name": "Warden hall west roof 9"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            16,
+            1
+          ],
+          "max": [
+            11,
+            16,
+            12
+          ],
+          "name": "Warden hall east roof 9"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            15,
+            0,
+            10
+          ],
+          "max": [
+            27,
+            0,
+            20
+          ],
+          "name": "Armory wing foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            15,
+            1,
+            10
+          ],
+          "max": [
+            27,
+            2,
+            20
+          ],
+          "name": "Armory wing lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            15,
+            3,
+            10
+          ],
+          "max": [
+            27,
+            5,
+            20
+          ],
+          "name": "Armory wing upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            16,
+            1,
+            11
+          ],
+          "max": [
+            26,
+            5,
+            19
+          ],
+          "name": "Armory wing clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            15,
+            1,
+            10
+          ],
+          "max": [
+            15,
+            5,
+            10
+          ],
+          "name": "Armory wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            27,
+            1,
+            10
+          ],
+          "max": [
+            27,
+            5,
+            10
+          ],
+          "name": "Armory wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            15,
+            1,
+            20
+          ],
+          "max": [
+            15,
+            5,
+            20
+          ],
+          "name": "Armory wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            27,
+            1,
+            20
+          ],
+          "max": [
+            27,
+            5,
+            20
+          ],
+          "name": "Armory wing timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            27,
+            1,
+            14
+          ],
+          "max": [
+            27,
+            3,
+            16
+          ],
+          "name": "Armory wing door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            19,
+            2,
+            20
+          ],
+          "max": [
+            21,
+            3,
+            20
+          ],
+          "name": "Armory wing window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            15,
+            6,
+            10
+          ],
+          "max": [
+            15,
+            6,
+            20
+          ],
+          "name": "Armory wing west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            27,
+            6,
+            10
+          ],
+          "max": [
+            27,
+            6,
+            20
+          ],
+          "name": "Armory wing east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            16,
+            7,
+            10
+          ],
+          "max": [
+            16,
+            7,
+            20
+          ],
+          "name": "Armory wing west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            26,
+            7,
+            10
+          ],
+          "max": [
+            26,
+            7,
+            20
+          ],
+          "name": "Armory wing east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            17,
+            8,
+            10
+          ],
+          "max": [
+            17,
+            8,
+            20
+          ],
+          "name": "Armory wing west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            25,
+            8,
+            10
+          ],
+          "max": [
+            25,
+            8,
+            20
+          ],
+          "name": "Armory wing east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            18,
+            9,
+            10
+          ],
+          "max": [
+            18,
+            9,
+            20
+          ],
+          "name": "Armory wing west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            24,
+            9,
+            10
+          ],
+          "max": [
+            24,
+            9,
+            20
+          ],
+          "name": "Armory wing east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            19,
+            10,
+            10
+          ],
+          "max": [
+            19,
+            10,
+            20
+          ],
+          "name": "Armory wing west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            23,
+            10,
+            10
+          ],
+          "max": [
+            23,
+            10,
+            20
+          ],
+          "name": "Armory wing east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            20,
+            11,
+            10
+          ],
+          "max": [
+            20,
+            11,
+            20
+          ],
+          "name": "Armory wing west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            22,
+            11,
+            10
+          ],
+          "max": [
+            22,
+            11,
+            20
+          ],
+          "name": "Armory wing east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            21,
+            12,
+            10
+          ],
+          "max": [
+            21,
+            12,
+            20
+          ],
+          "name": "Armory wing west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            21,
+            12,
+            10
+          ],
+          "max": [
+            21,
+            12,
+            20
+          ],
+          "name": "Armory wing east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            2,
+            1,
+            0
+          ],
+          "max": [
+            14,
+            1,
+            0
+          ],
+          "name": "Training arcade deck"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            2,
+            5,
+            0
+          ],
+          "max": [
+            14,
+            5,
+            0
+          ],
+          "name": "Training arcade roof"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            2,
+            2,
+            0
+          ],
+          "max": [
+            2,
+            4,
+            0
+          ],
+          "name": "Training arcade post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            6,
+            2,
+            0
+          ],
+          "max": [
+            6,
+            4,
+            0
+          ],
+          "name": "Training arcade post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            10,
+            2,
+            0
+          ],
+          "max": [
+            10,
+            4,
+            0
+          ],
+          "name": "Training arcade post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            14,
+            2,
+            0
+          ],
+          "max": [
+            14,
+            4,
+            0
+          ],
+          "name": "Training arcade post"
+        }
+      ],
+      "anchors": {}
+    },
+    "reeveHall": {
+      "kind": "civic",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          28,
+          17,
+          22
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            20,
+            0,
+            14
+          ],
+          "name": "Reeve great hall foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            20,
+            2,
+            14
+          ],
+          "name": "Reeve great hall lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            3,
+            1
+          ],
+          "max": [
+            20,
+            7,
+            14
+          ],
+          "name": "Reeve great hall upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            19,
+            7,
+            13
+          ],
+          "name": "Reeve great hall clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            7,
+            1
+          ],
+          "name": "Reeve great hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            20,
+            1,
+            1
+          ],
+          "max": [
+            20,
+            7,
+            1
+          ],
+          "name": "Reeve great hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            14
+          ],
+          "max": [
+            1,
+            7,
+            14
+          ],
+          "name": "Reeve great hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            20,
+            1,
+            14
+          ],
+          "max": [
+            20,
+            7,
+            14
+          ],
+          "name": "Reeve great hall timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            8,
+            1,
+            1
+          ],
+          "max": [
+            11,
+            3,
+            1
+          ],
+          "name": "Reeve great hall door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            4,
+            2,
+            14
+          ],
+          "max": [
+            6,
+            3,
+            14
+          ],
+          "name": "Reeve great hall window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            2,
+            14
+          ],
+          "max": [
+            17,
+            3,
+            14
+          ],
+          "name": "Reeve great hall window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            5
+          ],
+          "max": [
+            1,
+            3,
+            7
+          ],
+          "name": "Reeve great hall window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            8,
+            1
+          ],
+          "max": [
+            1,
+            8,
+            14
+          ],
+          "name": "Reeve great hall west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            20,
+            8,
+            1
+          ],
+          "max": [
+            20,
+            8,
+            14
+          ],
+          "name": "Reeve great hall east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            9,
+            1
+          ],
+          "max": [
+            2,
+            9,
+            14
+          ],
+          "name": "Reeve great hall west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            19,
+            9,
+            1
+          ],
+          "max": [
+            19,
+            9,
+            14
+          ],
+          "name": "Reeve great hall east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            10,
+            1
+          ],
+          "max": [
+            3,
+            10,
+            14
+          ],
+          "name": "Reeve great hall west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            18,
+            10,
+            1
+          ],
+          "max": [
+            18,
+            10,
+            14
+          ],
+          "name": "Reeve great hall east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            11,
+            1
+          ],
+          "max": [
+            4,
+            11,
+            14
+          ],
+          "name": "Reeve great hall west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            17,
+            11,
+            1
+          ],
+          "max": [
+            17,
+            11,
+            14
+          ],
+          "name": "Reeve great hall east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            12,
+            1
+          ],
+          "max": [
+            5,
+            12,
+            14
+          ],
+          "name": "Reeve great hall west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            16,
+            12,
+            1
+          ],
+          "max": [
+            16,
+            12,
+            14
+          ],
+          "name": "Reeve great hall east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            13,
+            1
+          ],
+          "max": [
+            6,
+            13,
+            14
+          ],
+          "name": "Reeve great hall west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            13,
+            1
+          ],
+          "max": [
+            15,
+            13,
+            14
+          ],
+          "name": "Reeve great hall east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            14,
+            1
+          ],
+          "max": [
+            7,
+            14,
+            14
+          ],
+          "name": "Reeve great hall west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            14,
+            1
+          ],
+          "max": [
+            14,
+            14,
+            14
+          ],
+          "name": "Reeve great hall east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            15,
+            1
+          ],
+          "max": [
+            8,
+            15,
+            14
+          ],
+          "name": "Reeve great hall west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            15,
+            1
+          ],
+          "max": [
+            13,
+            15,
+            14
+          ],
+          "name": "Reeve great hall east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            9,
+            16,
+            1
+          ],
+          "max": [
+            9,
+            16,
+            14
+          ],
+          "name": "Reeve great hall west roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            16,
+            1
+          ],
+          "max": [
+            12,
+            16,
+            14
+          ],
+          "name": "Reeve great hall east roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            10,
+            17,
+            1
+          ],
+          "max": [
+            10,
+            17,
+            14
+          ],
+          "name": "Reeve great hall west roof 9"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            17,
+            1
+          ],
+          "max": [
+            11,
+            17,
+            14
+          ],
+          "name": "Reeve great hall east roof 9"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            14,
+            0,
+            12
+          ],
+          "max": [
+            28,
+            0,
+            22
+          ],
+          "name": "Reeve office wing foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            14,
+            1,
+            12
+          ],
+          "max": [
+            28,
+            2,
+            22
+          ],
+          "name": "Reeve office wing lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            14,
+            3,
+            12
+          ],
+          "max": [
+            28,
+            5,
+            22
+          ],
+          "name": "Reeve office wing upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            1,
+            13
+          ],
+          "max": [
+            27,
+            5,
+            21
+          ],
+          "name": "Reeve office wing clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            14,
+            1,
+            12
+          ],
+          "max": [
+            14,
+            5,
+            12
+          ],
+          "name": "Reeve office wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            28,
+            1,
+            12
+          ],
+          "max": [
+            28,
+            5,
+            12
+          ],
+          "name": "Reeve office wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            14,
+            1,
+            22
+          ],
+          "max": [
+            14,
+            5,
+            22
+          ],
+          "name": "Reeve office wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            28,
+            1,
+            22
+          ],
+          "max": [
+            28,
+            5,
+            22
+          ],
+          "name": "Reeve office wing timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            28,
+            1,
+            16
+          ],
+          "max": [
+            28,
+            3,
+            18
+          ],
+          "name": "Reeve office wing door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            18,
+            2,
+            22
+          ],
+          "max": [
+            20,
+            3,
+            22
+          ],
+          "name": "Reeve office wing window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            28,
+            2,
+            14
+          ],
+          "max": [
+            28,
+            3,
+            15
+          ],
+          "name": "Reeve office wing window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            14,
+            6,
+            12
+          ],
+          "max": [
+            14,
+            6,
+            22
+          ],
+          "name": "Reeve office wing west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            28,
+            6,
+            12
+          ],
+          "max": [
+            28,
+            6,
+            22
+          ],
+          "name": "Reeve office wing east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            15,
+            7,
+            12
+          ],
+          "max": [
+            15,
+            7,
+            22
+          ],
+          "name": "Reeve office wing west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            27,
+            7,
+            12
+          ],
+          "max": [
+            27,
+            7,
+            22
+          ],
+          "name": "Reeve office wing east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            16,
+            8,
+            12
+          ],
+          "max": [
+            16,
+            8,
+            22
+          ],
+          "name": "Reeve office wing west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            26,
+            8,
+            12
+          ],
+          "max": [
+            26,
+            8,
+            22
+          ],
+          "name": "Reeve office wing east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            17,
+            9,
+            12
+          ],
+          "max": [
+            17,
+            9,
+            22
+          ],
+          "name": "Reeve office wing west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            25,
+            9,
+            12
+          ],
+          "max": [
+            25,
+            9,
+            22
+          ],
+          "name": "Reeve office wing east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            18,
+            10,
+            12
+          ],
+          "max": [
+            18,
+            10,
+            22
+          ],
+          "name": "Reeve office wing west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            24,
+            10,
+            12
+          ],
+          "max": [
+            24,
+            10,
+            22
+          ],
+          "name": "Reeve office wing east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            19,
+            11,
+            12
+          ],
+          "max": [
+            19,
+            11,
+            22
+          ],
+          "name": "Reeve office wing west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            23,
+            11,
+            12
+          ],
+          "max": [
+            23,
+            11,
+            22
+          ],
+          "name": "Reeve office wing east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            20,
+            12,
+            12
+          ],
+          "max": [
+            20,
+            12,
+            22
+          ],
+          "name": "Reeve office wing west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            22,
+            12,
+            12
+          ],
+          "max": [
+            22,
+            12,
+            22
+          ],
+          "name": "Reeve office wing east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            21,
+            13,
+            12
+          ],
+          "max": [
+            21,
+            13,
+            22
+          ],
+          "name": "Reeve office wing west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            21,
+            13,
+            12
+          ],
+          "max": [
+            21,
+            13,
+            22
+          ],
+          "name": "Reeve office wing east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            4,
+            1,
+            0
+          ],
+          "max": [
+            14,
+            1,
+            0
+          ],
+          "name": "Reeve entrance terrace"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            4,
+            6,
+            0
+          ],
+          "max": [
+            14,
+            6,
+            0
+          ],
+          "name": "Reeve covered entrance"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            4,
+            2,
+            0
+          ],
+          "max": [
+            4,
+            5,
+            0
+          ],
+          "name": "Reeve entrance post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            9,
+            2,
+            0
+          ],
+          "max": [
+            9,
+            5,
+            0
+          ],
+          "name": "Reeve entrance post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            14,
+            2,
+            0
+          ],
+          "max": [
+            14,
+            5,
+            0
+          ],
+          "name": "Reeve entrance post"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone_dark",
+          "min": [
+            17,
+            7,
+            11
+          ],
+          "max": [
+            18,
+            12,
+            12
+          ],
+          "name": "Reeve chimney"
+        }
+      ],
+      "anchors": {}
+    },
+    "smithy": {
+      "kind": "craft",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          23,
+          12,
+          19
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            13,
+            0,
+            10
+          ],
+          "name": "Smith dwelling foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            13,
+            2,
+            10
+          ],
+          "name": "Smith dwelling lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            3,
+            1
+          ],
+          "max": [
+            13,
+            5,
+            10
+          ],
+          "name": "Smith dwelling upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            12,
+            5,
+            9
+          ],
+          "name": "Smith dwelling clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            5,
+            1
+          ],
+          "name": "Smith dwelling timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            13,
+            1,
+            1
+          ],
+          "max": [
+            13,
+            5,
+            1
+          ],
+          "name": "Smith dwelling timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            10
+          ],
+          "max": [
+            1,
+            5,
+            10
+          ],
+          "name": "Smith dwelling timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            13,
+            1,
+            10
+          ],
+          "max": [
+            13,
+            5,
+            10
+          ],
+          "name": "Smith dwelling timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            5,
+            1,
+            1
+          ],
+          "max": [
+            7,
+            3,
+            1
+          ],
+          "name": "Smith dwelling door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            2,
+            10
+          ],
+          "max": [
+            4,
+            3,
+            10
+          ],
+          "name": "Smith dwelling window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            5
+          ],
+          "max": [
+            1,
+            3,
+            6
+          ],
+          "name": "Smith dwelling window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            6,
+            1
+          ],
+          "max": [
+            1,
+            6,
+            10
+          ],
+          "name": "Smith dwelling west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            6,
+            1
+          ],
+          "max": [
+            13,
+            6,
+            10
+          ],
+          "name": "Smith dwelling east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            7,
+            1
+          ],
+          "max": [
+            2,
+            7,
+            10
+          ],
+          "name": "Smith dwelling west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            7,
+            1
+          ],
+          "max": [
+            12,
+            7,
+            10
+          ],
+          "name": "Smith dwelling east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            8,
+            1
+          ],
+          "max": [
+            3,
+            8,
+            10
+          ],
+          "name": "Smith dwelling west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            8,
+            1
+          ],
+          "max": [
+            11,
+            8,
+            10
+          ],
+          "name": "Smith dwelling east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            9,
+            1
+          ],
+          "max": [
+            4,
+            9,
+            10
+          ],
+          "name": "Smith dwelling west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            10,
+            9,
+            1
+          ],
+          "max": [
+            10,
+            9,
+            10
+          ],
+          "name": "Smith dwelling east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            10,
+            1
+          ],
+          "max": [
+            5,
+            10,
+            10
+          ],
+          "name": "Smith dwelling west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            9,
+            10,
+            1
+          ],
+          "max": [
+            9,
+            10,
+            10
+          ],
+          "name": "Smith dwelling east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            11,
+            1
+          ],
+          "max": [
+            6,
+            11,
+            10
+          ],
+          "name": "Smith dwelling west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            8,
+            11,
+            1
+          ],
+          "max": [
+            8,
+            11,
+            10
+          ],
+          "name": "Smith dwelling east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            12,
+            1
+          ],
+          "max": [
+            7,
+            12,
+            10
+          ],
+          "name": "Smith dwelling west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            7,
+            12,
+            1
+          ],
+          "max": [
+            7,
+            12,
+            10
+          ],
+          "name": "Smith dwelling east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            10,
+            0,
+            8
+          ],
+          "max": [
+            23,
+            0,
+            19
+          ],
+          "name": "Forge yard paving"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            11,
+            1,
+            10
+          ],
+          "max": [
+            11,
+            5,
+            10
+          ],
+          "name": "Forge shed post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            22,
+            1,
+            10
+          ],
+          "max": [
+            22,
+            5,
+            10
+          ],
+          "name": "Forge shed post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            11,
+            1,
+            18
+          ],
+          "max": [
+            11,
+            5,
+            18
+          ],
+          "name": "Forge shed post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            22,
+            1,
+            18
+          ],
+          "max": [
+            22,
+            5,
+            18
+          ],
+          "name": "Forge shed post"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            10,
+            6,
+            9
+          ],
+          "max": [
+            23,
+            6,
+            19
+          ],
+          "name": "Forge shed roof"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone_dark",
+          "min": [
+            14,
+            1,
+            13
+          ],
+          "max": [
+            18,
+            3,
+            16
+          ],
+          "name": "Forge hearth"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone_dark",
+          "min": [
+            17,
+            4,
+            15
+          ],
+          "max": [
+            18,
+            10,
+            16
+          ],
+          "name": "Forge chimney"
+        }
+      ],
+      "anchors": {}
+    },
+    "chapel": {
+      "kind": "religious",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          24,
+          16,
+          24
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            2,
+            0,
+            1
+          ],
+          "max": [
+            15,
+            0,
+            21
+          ],
+          "name": "Chapel foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "mossy_stone",
+          "min": [
+            2,
+            1,
+            1
+          ],
+          "max": [
+            15,
+            8,
+            21
+          ],
+          "name": "Chapel nave shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            1,
+            2
+          ],
+          "max": [
+            14,
+            8,
+            20
+          ],
+          "name": "Chapel tall nave"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            7,
+            1,
+            1
+          ],
+          "max": [
+            10,
+            5,
+            1
+          ],
+          "name": "Chapel doors"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            3,
+            6
+          ],
+          "max": [
+            2,
+            6,
+            8
+          ],
+          "name": "Chapel west lancet"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            3,
+            13
+          ],
+          "max": [
+            15,
+            6,
+            15
+          ],
+          "name": "Chapel east lancet"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            9,
+            0
+          ],
+          "max": [
+            1,
+            9,
+            22
+          ],
+          "name": "Chapel nave west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            16,
+            9,
+            0
+          ],
+          "max": [
+            16,
+            9,
+            22
+          ],
+          "name": "Chapel nave east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            10,
+            0
+          ],
+          "max": [
+            2,
+            10,
+            22
+          ],
+          "name": "Chapel nave west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            10,
+            0
+          ],
+          "max": [
+            15,
+            10,
+            22
+          ],
+          "name": "Chapel nave east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            11,
+            0
+          ],
+          "max": [
+            3,
+            11,
+            22
+          ],
+          "name": "Chapel nave west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            11,
+            0
+          ],
+          "max": [
+            14,
+            11,
+            22
+          ],
+          "name": "Chapel nave east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            12,
+            0
+          ],
+          "max": [
+            4,
+            12,
+            22
+          ],
+          "name": "Chapel nave west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            12,
+            0
+          ],
+          "max": [
+            13,
+            12,
+            22
+          ],
+          "name": "Chapel nave east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            13,
+            0
+          ],
+          "max": [
+            5,
+            13,
+            22
+          ],
+          "name": "Chapel nave west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            13,
+            0
+          ],
+          "max": [
+            12,
+            13,
+            22
+          ],
+          "name": "Chapel nave east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            14,
+            0
+          ],
+          "max": [
+            6,
+            14,
+            22
+          ],
+          "name": "Chapel nave west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            14,
+            0
+          ],
+          "max": [
+            11,
+            14,
+            22
+          ],
+          "name": "Chapel nave east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            15,
+            0
+          ],
+          "max": [
+            7,
+            15,
+            22
+          ],
+          "name": "Chapel nave west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            10,
+            15,
+            0
+          ],
+          "max": [
+            10,
+            15,
+            22
+          ],
+          "name": "Chapel nave east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            16,
+            0
+          ],
+          "max": [
+            8,
+            16,
+            22
+          ],
+          "name": "Chapel nave west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            9,
+            16,
+            0
+          ],
+          "max": [
+            9,
+            16,
+            22
+          ],
+          "name": "Chapel nave east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            14,
+            0,
+            15
+          ],
+          "max": [
+            24,
+            0,
+            24
+          ],
+          "name": "Chapel records foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "mossy_stone",
+          "min": [
+            14,
+            1,
+            15
+          ],
+          "max": [
+            24,
+            2,
+            24
+          ],
+          "name": "Chapel records lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            14,
+            3,
+            15
+          ],
+          "max": [
+            24,
+            5,
+            24
+          ],
+          "name": "Chapel records upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            15,
+            1,
+            16
+          ],
+          "max": [
+            23,
+            5,
+            23
+          ],
+          "name": "Chapel records clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            14,
+            1,
+            15
+          ],
+          "max": [
+            14,
+            5,
+            15
+          ],
+          "name": "Chapel records timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            24,
+            1,
+            15
+          ],
+          "max": [
+            24,
+            5,
+            15
+          ],
+          "name": "Chapel records timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            14,
+            1,
+            24
+          ],
+          "max": [
+            14,
+            5,
+            24
+          ],
+          "name": "Chapel records timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            24,
+            1,
+            24
+          ],
+          "max": [
+            24,
+            5,
+            24
+          ],
+          "name": "Chapel records timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            24,
+            1,
+            18
+          ],
+          "max": [
+            24,
+            3,
+            20
+          ],
+          "name": "Chapel records door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            18,
+            2,
+            24
+          ],
+          "max": [
+            20,
+            3,
+            24
+          ],
+          "name": "Chapel records window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            14,
+            6,
+            15
+          ],
+          "max": [
+            14,
+            6,
+            24
+          ],
+          "name": "Chapel records west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            24,
+            6,
+            15
+          ],
+          "max": [
+            24,
+            6,
+            24
+          ],
+          "name": "Chapel records east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            15,
+            7,
+            15
+          ],
+          "max": [
+            15,
+            7,
+            24
+          ],
+          "name": "Chapel records west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            23,
+            7,
+            15
+          ],
+          "max": [
+            23,
+            7,
+            24
+          ],
+          "name": "Chapel records east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            16,
+            8,
+            15
+          ],
+          "max": [
+            16,
+            8,
+            24
+          ],
+          "name": "Chapel records west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            22,
+            8,
+            15
+          ],
+          "max": [
+            22,
+            8,
+            24
+          ],
+          "name": "Chapel records east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            17,
+            9,
+            15
+          ],
+          "max": [
+            17,
+            9,
+            24
+          ],
+          "name": "Chapel records west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            21,
+            9,
+            15
+          ],
+          "max": [
+            21,
+            9,
+            24
+          ],
+          "name": "Chapel records east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            18,
+            10,
+            15
+          ],
+          "max": [
+            18,
+            10,
+            24
+          ],
+          "name": "Chapel records west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            20,
+            10,
+            15
+          ],
+          "max": [
+            20,
+            10,
+            24
+          ],
+          "name": "Chapel records east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            19,
+            11,
+            15
+          ],
+          "max": [
+            19,
+            11,
+            24
+          ],
+          "name": "Chapel records west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            19,
+            11,
+            15
+          ],
+          "max": [
+            19,
+            11,
+            24
+          ],
+          "name": "Chapel records east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            0,
+            1,
+            14
+          ],
+          "max": [
+            6,
+            12,
+            21
+          ],
+          "name": "Bell tower shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            15
+          ],
+          "max": [
+            5,
+            11,
+            20
+          ],
+          "name": "Bell tower interior"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            7,
+            14
+          ],
+          "max": [
+            4,
+            10,
+            14
+          ],
+          "name": "Bell opening"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            0,
+            13,
+            14
+          ],
+          "max": [
+            6,
+            13,
+            21
+          ],
+          "name": "Bell tower roof"
+        }
+      ],
+      "anchors": {}
+    },
+    "inn": {
+      "kind": "inn",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          27,
+          15,
+          20
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            1,
+            0,
+            1
+          ],
+          "max": [
+            18,
+            0,
+            12
+          ],
+          "name": "Wayfarer inn hall foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            18,
+            2,
+            12
+          ],
+          "name": "Wayfarer inn hall lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            1,
+            3,
+            1
+          ],
+          "max": [
+            18,
+            6,
+            12
+          ],
+          "name": "Wayfarer inn hall upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            2,
+            1,
+            2
+          ],
+          "max": [
+            17,
+            6,
+            11
+          ],
+          "name": "Wayfarer inn hall clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            1
+          ],
+          "max": [
+            1,
+            6,
+            1
+          ],
+          "name": "Wayfarer inn hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            18,
+            1,
+            1
+          ],
+          "max": [
+            18,
+            6,
+            1
+          ],
+          "name": "Wayfarer inn hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            1,
+            1,
+            12
+          ],
+          "max": [
+            1,
+            6,
+            12
+          ],
+          "name": "Wayfarer inn hall timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            18,
+            1,
+            12
+          ],
+          "max": [
+            18,
+            6,
+            12
+          ],
+          "name": "Wayfarer inn hall timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            8,
+            1,
+            1
+          ],
+          "max": [
+            10,
+            3,
+            1
+          ],
+          "name": "Wayfarer inn hall door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            3,
+            2,
+            12
+          ],
+          "max": [
+            5,
+            3,
+            12
+          ],
+          "name": "Wayfarer inn hall window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            13,
+            2,
+            12
+          ],
+          "max": [
+            15,
+            3,
+            12
+          ],
+          "name": "Wayfarer inn hall window"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            1,
+            2,
+            5
+          ],
+          "max": [
+            1,
+            3,
+            7
+          ],
+          "name": "Wayfarer inn hall window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            1,
+            7,
+            1
+          ],
+          "max": [
+            1,
+            7,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            18,
+            7,
+            1
+          ],
+          "max": [
+            18,
+            7,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            2,
+            8,
+            1
+          ],
+          "max": [
+            2,
+            8,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            17,
+            8,
+            1
+          ],
+          "max": [
+            17,
+            8,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            3,
+            9,
+            1
+          ],
+          "max": [
+            3,
+            9,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            16,
+            9,
+            1
+          ],
+          "max": [
+            16,
+            9,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            4,
+            10,
+            1
+          ],
+          "max": [
+            4,
+            10,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            15,
+            10,
+            1
+          ],
+          "max": [
+            15,
+            10,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            5,
+            11,
+            1
+          ],
+          "max": [
+            5,
+            11,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            14,
+            11,
+            1
+          ],
+          "max": [
+            14,
+            11,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            6,
+            12,
+            1
+          ],
+          "max": [
+            6,
+            12,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            13,
+            12,
+            1
+          ],
+          "max": [
+            13,
+            12,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            7,
+            13,
+            1
+          ],
+          "max": [
+            7,
+            13,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            12,
+            13,
+            1
+          ],
+          "max": [
+            12,
+            13,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            8,
+            14,
+            1
+          ],
+          "max": [
+            8,
+            14,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            11,
+            14,
+            1
+          ],
+          "max": [
+            11,
+            14,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            9,
+            15,
+            1
+          ],
+          "max": [
+            9,
+            15,
+            12
+          ],
+          "name": "Wayfarer inn hall west roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            10,
+            15,
+            1
+          ],
+          "max": [
+            10,
+            15,
+            12
+          ],
+          "name": "Wayfarer inn hall east roof 8"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            13,
+            0,
+            10
+          ],
+          "max": [
+            27,
+            0,
+            20
+          ],
+          "name": "Inn kitchen stable wing foundation"
+        },
+        {
+          "op": "fill_box",
+          "state": "cobblestone",
+          "min": [
+            13,
+            1,
+            10
+          ],
+          "max": [
+            27,
+            2,
+            20
+          ],
+          "name": "Inn kitchen stable wing lower shell"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            13,
+            3,
+            10
+          ],
+          "max": [
+            27,
+            5,
+            20
+          ],
+          "name": "Inn kitchen stable wing upper shell"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            14,
+            1,
+            11
+          ],
+          "max": [
+            26,
+            5,
+            19
+          ],
+          "name": "Inn kitchen stable wing clear interior"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            13,
+            1,
+            10
+          ],
+          "max": [
+            13,
+            5,
+            10
+          ],
+          "name": "Inn kitchen stable wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            27,
+            1,
+            10
+          ],
+          "max": [
+            27,
+            5,
+            10
+          ],
+          "name": "Inn kitchen stable wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            13,
+            1,
+            20
+          ],
+          "max": [
+            13,
+            5,
+            20
+          ],
+          "name": "Inn kitchen stable wing timber post"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            27,
+            1,
+            20
+          ],
+          "max": [
+            27,
+            5,
+            20
+          ],
+          "name": "Inn kitchen stable wing timber post"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            27,
+            1,
+            14
+          ],
+          "max": [
+            27,
+            3,
+            17
+          ],
+          "name": "Inn kitchen stable wing door"
+        },
+        {
+          "op": "cut_box",
+          "min": [
+            18,
+            2,
+            20
+          ],
+          "max": [
+            20,
+            3,
+            20
+          ],
+          "name": "Inn kitchen stable wing window"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            13,
+            6,
+            10
+          ],
+          "max": [
+            13,
+            6,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            27,
+            6,
+            10
+          ],
+          "max": [
+            27,
+            6,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 0"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            14,
+            7,
+            10
+          ],
+          "max": [
+            14,
+            7,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            26,
+            7,
+            10
+          ],
+          "max": [
+            26,
+            7,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 1"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            15,
+            8,
+            10
+          ],
+          "max": [
+            15,
+            8,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            25,
+            8,
+            10
+          ],
+          "max": [
+            25,
+            8,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 2"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            16,
+            9,
+            10
+          ],
+          "max": [
+            16,
+            9,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            24,
+            9,
+            10
+          ],
+          "max": [
+            24,
+            9,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 3"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            17,
+            10,
+            10
+          ],
+          "max": [
+            17,
+            10,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            23,
+            10,
+            10
+          ],
+          "max": [
+            23,
+            10,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 4"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            18,
+            11,
+            10
+          ],
+          "max": [
+            18,
+            11,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            22,
+            11,
+            10
+          ],
+          "max": [
+            22,
+            11,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 5"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            19,
+            12,
+            10
+          ],
+          "max": [
+            19,
+            12,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            21,
+            12,
+            10
+          ],
+          "max": [
+            21,
+            12,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 6"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_e",
+          "min": [
+            20,
+            13,
+            10
+          ],
+          "max": [
+            20,
+            13,
+            20
+          ],
+          "name": "Inn kitchen stable wing west roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_roof_w",
+          "min": [
+            20,
+            13,
+            10
+          ],
+          "max": [
+            20,
+            13,
+            20
+          ],
+          "name": "Inn kitchen stable wing east roof 7"
+        },
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            3,
+            1,
+            0
+          ],
+          "max": [
+            14,
+            1,
+            0
+          ],
+          "name": "Inn porch"
+        },
+        {
+          "op": "fill_box",
+          "state": "aged_wood",
+          "min": [
+            3,
+            5,
+            0
+          ],
+          "max": [
+            14,
+            5,
+            0
+          ],
+          "name": "Inn porch roof"
+        },
+        {
+          "op": "fill_box",
+          "state": "stone_dark",
+          "min": [
+            15,
+            6,
+            8
+          ],
+          "max": [
+            16,
+            12,
+            9
+          ],
+          "name": "Inn chimney"
+        }
+      ],
+      "anchors": {}
+    },
+    "tree": {
+      "kind": "vegetation",
+      "bounds": {
+        "min": [
+          0,
+          0,
+          0
+        ],
+        "max": [
+          4,
+          7,
+          4
+        ]
+      },
+      "ops": [
+        {
+          "op": "fill_box",
+          "state": "oak_wood",
+          "min": [
+            2,
+            0,
+            2
+          ],
+          "max": [
+            2,
+            5,
+            2
+          ],
+          "name": "Tree trunk"
+        },
+        {
+          "op": "fill_box",
+          "state": "grass_block",
+          "min": [
+            1,
+            5,
+            1
+          ],
+          "max": [
+            3,
+            7,
+            3
+          ],
+          "name": "Tree crown"
+        },
+        {
+          "op": "fill_box",
+          "state": "grass_block",
+          "min": [
+            0,
+            6,
+            2
+          ],
+          "max": [
+            4,
+            6,
+            2
+          ],
+          "name": "Tree crown spread"
+        },
+        {
+          "op": "fill_box",
+          "state": "grass_block",
+          "min": [
+            2,
+            6,
+            0
+          ],
+          "max": [
+            2,
+            6,
+            4
+          ],
+          "name": "Tree crown spread"
+        }
+      ],
+      "anchors": {}
+    }
+  },
+  "layout": [
+    {
+      "type": "instance",
+      "id": "warden-training-hall",
+      "prefab": "trainingHall",
+      "origin": [
+        40,
+        2,
+        49
+      ],
+      "rotation": "east",
+      "tags": [
+        "town",
+        "training"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "reeve-hall",
+      "prefab": "reeveHall",
+      "origin": [
+        70,
+        2,
+        48
+      ],
+      "rotation": "south",
+      "tags": [
+        "town",
+        "civic"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "brackenford-smithy",
+      "prefab": "smithy",
+      "origin": [
+        94,
+        2,
+        57
+      ],
+      "rotation": "west",
+      "tags": [
+        "town",
+        "craft"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "saint-orin-chapel",
+      "prefab": "chapel",
+      "origin": [
+        46,
+        2,
+        82
+      ],
+      "rotation": "east",
+      "tags": [
+        "town",
+        "religious"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "wayfarer-inn",
+      "prefab": "inn",
+      "origin": [
+        80,
+        2,
+        77
+      ],
+      "rotation": "north",
+      "tags": [
+        "town",
+        "inn"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-west-1",
+      "prefab": "cottage",
+      "origin": [
+        40,
+        2,
+        75
+      ],
+      "rotation": "east",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-west-2",
+      "prefab": "cottage",
+      "origin": [
+        38,
+        2,
+        98
+      ],
+      "rotation": "south",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-west-3",
+      "prefab": "cottage",
+      "origin": [
+        57,
+        2,
+        104
+      ],
+      "rotation": "west",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-east-1",
+      "prefab": "cottage",
+      "origin": [
+        109,
+        2,
+        73
+      ],
+      "rotation": "west",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-east-2",
+      "prefab": "cottage",
+      "origin": [
+        111,
+        2,
+        94
+      ],
+      "rotation": "north",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-north-1",
+      "prefab": "cottage",
+      "origin": [
+        74,
+        2,
+        101
+      ],
+      "rotation": "east",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "cottage-south-1",
+      "prefab": "cottage",
+      "origin": [
+        58,
+        2,
+        43
+      ],
+      "rotation": "south",
+      "tags": [
+        "town",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "farmhouse",
+      "prefab": "farmhouse",
+      "origin": [
+        20,
+        5,
+        127
+      ],
+      "rotation": "east",
+      "tags": [
+        "farm",
+        "home"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "barn",
+      "prefab": "barn",
+      "origin": [
+        43,
+        5,
+        126
+      ],
+      "rotation": "south",
+      "tags": [
+        "farm",
+        "barn"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-0",
+      "prefab": "tree",
+      "origin": [
+        11,
+        2,
+        18
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-1",
+      "prefab": "tree",
+      "origin": [
+        20,
+        2,
+        29
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-2",
+      "prefab": "tree",
+      "origin": [
+        31,
+        2,
+        19
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-3",
+      "prefab": "tree",
+      "origin": [
+        38,
+        2,
+        31
+      ],
+      "rotation": "west",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-4",
+      "prefab": "tree",
+      "origin": [
+        17,
+        2,
+        72
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-5",
+      "prefab": "tree",
+      "origin": [
+        27,
+        2,
+        84
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-6",
+      "prefab": "tree",
+      "origin": [
+        32,
+        2,
+        104
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-7",
+      "prefab": "tree",
+      "origin": [
+        116,
+        2,
+        91
+      ],
+      "rotation": "west",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-8",
+      "prefab": "tree",
+      "origin": [
+        124,
+        2,
+        97
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-9",
+      "prefab": "tree",
+      "origin": [
+        134,
+        2,
+        87
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-10",
+      "prefab": "tree",
+      "origin": [
+        143,
+        2,
+        78
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-11",
+      "prefab": "tree",
+      "origin": [
+        149,
+        2,
+        66
+      ],
+      "rotation": "west",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-12",
+      "prefab": "tree",
+      "origin": [
+        123,
+        2,
+        107
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-13",
+      "prefab": "tree",
+      "origin": [
+        133,
+        2,
+        113
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-14",
+      "prefab": "tree",
+      "origin": [
+        144,
+        2,
+        121
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-15",
+      "prefab": "tree",
+      "origin": [
+        151,
+        2,
+        129
+      ],
+      "rotation": "west",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-16",
+      "prefab": "tree",
+      "origin": [
+        119,
+        2,
+        12
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-17",
+      "prefab": "tree",
+      "origin": [
+        109,
+        2,
+        23
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-18",
+      "prefab": "tree",
+      "origin": [
+        151,
+        2,
+        99
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-19",
+      "prefab": "tree",
+      "origin": [
+        9,
+        2,
+        101
+      ],
+      "rotation": "west",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-20",
+      "prefab": "tree",
+      "origin": [
+        18,
+        2,
+        109
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-21",
+      "prefab": "tree",
+      "origin": [
+        86,
+        2,
+        21
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-22",
+      "prefab": "tree",
+      "origin": [
+        96,
+        2,
+        31
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-23",
+      "prefab": "tree",
+      "origin": [
+        71,
+        2,
+        20
+      ],
+      "rotation": "west",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-24",
+      "prefab": "tree",
+      "origin": [
+        63,
+        2,
+        27
+      ],
+      "rotation": "north",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-25",
+      "prefab": "tree",
+      "origin": [
+        35,
+        2,
+        55
+      ],
+      "rotation": "east",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    },
+    {
+      "type": "instance",
+      "id": "tree-26",
+      "prefab": "tree",
+      "origin": [
+        120,
+        2,
+        64
+      ],
+      "rotation": "south",
+      "tags": [
+        "vegetation"
+      ],
+      "allow_overlap": true
+    }
+  ],
+  "validation": {
+    "overlap_policy": "allow",
+    "max_validation_cells": 3000000
+  },
+  "anchors": {
+    "valeborn-spawn": {
+      "at": [
+        62,
+        2,
+        64
+      ],
+      "facing": "north",
+      "tags": [
+        "spawn",
+        "valeborn"
+      ]
+    },
+    "farmstead": {
+      "at": [
+        38,
+        5,
+        136
+      ],
+      "facing": "east",
+      "tags": [
+        "farm"
+      ]
+    },
+    "blackstone-cave": {
+      "at": [
+        130,
+        2,
+        35
+      ],
+      "facing": "east",
+      "tags": [
+        "cave",
+        "dungeon-future"
       ]
     }
   },
@@ -46,11 +7034,11 @@
         0
       ],
       "max": [
-        95,
+        159,
         0,
-        95
+        159
       ],
-      "name": "Lowland soil"
+      "name": "Deep lowland soil"
     },
     {
       "op": "fill_box",
@@ -61,821 +7049,1930 @@
         0
       ],
       "max": [
-        95,
+        159,
         1,
-        95
+        159
       ],
-      "name": "Lowland grass"
+      "name": "Brackenford lowland turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        2,
+        2,
+        12
+      ],
+      "max": [
+        30,
+        2,
+        50
+      ],
+      "name": "West hill earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        2,
+        3,
+        12
+      ],
+      "max": [
+        30,
+        3,
+        50
+      ],
+      "name": "West hill turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        6,
+        2,
+        16
+      ],
+      "max": [
+        27,
+        4,
+        47
+      ],
+      "name": "West hill earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        6,
+        5,
+        16
+      ],
+      "max": [
+        27,
+        5,
+        47
+      ],
+      "name": "West hill turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        11,
+        2,
+        20
+      ],
+      "max": [
+        24,
+        6,
+        43
+      ],
+      "name": "West hill earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        11,
+        7,
+        20
+      ],
+      "max": [
+        24,
+        7,
+        43
+      ],
+      "name": "West hill turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        16,
+        2,
+        25
+      ],
+      "max": [
+        22,
+        8,
+        38
+      ],
+      "name": "West hill earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        16,
+        9,
+        25
+      ],
+      "max": [
+        22,
+        9,
+        38
+      ],
+      "name": "West hill turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        116,
+        2,
+        10
+      ],
+      "max": [
+        154,
+        2,
+        56
+      ],
+      "name": "Blackstone ridge earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        116,
+        3,
+        10
+      ],
+      "max": [
+        154,
+        3,
+        56
+      ],
+      "name": "Blackstone ridge turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        120,
+        2,
+        14
+      ],
+      "max": [
+        151,
+        4,
+        53
+      ],
+      "name": "Blackstone ridge earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        120,
+        5,
+        14
+      ],
+      "max": [
+        151,
+        5,
+        53
+      ],
+      "name": "Blackstone ridge turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        124,
+        2,
+        18
+      ],
+      "max": [
+        148,
+        6,
+        49
+      ],
+      "name": "Blackstone ridge earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        124,
+        7,
+        18
+      ],
+      "max": [
+        148,
+        7,
+        49
+      ],
+      "name": "Blackstone ridge turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        129,
+        2,
+        23
+      ],
+      "max": [
+        144,
+        8,
+        44
+      ],
+      "name": "Blackstone ridge earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        129,
+        9,
+        23
+      ],
+      "max": [
+        144,
+        9,
+        44
+      ],
+      "name": "Blackstone ridge turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        133,
+        2,
+        27
+      ],
+      "max": [
+        141,
+        10,
+        40
+      ],
+      "name": "Blackstone ridge earth"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        133,
+        11,
+        27
+      ],
+      "max": [
+        141,
+        11,
+        40
+      ],
+      "name": "Blackstone ridge turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        128,
+        2,
+        27
+      ],
+      "max": [
+        153,
+        9,
+        42
+      ],
+      "name": "Blackstone cave rock core"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        127,
+        2,
+        33
+      ],
+      "max": [
+        143,
+        6,
+        37
+      ],
+      "name": "Blackstone cave tunnel"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        139,
+        2,
+        29
+      ],
+      "max": [
+        149,
+        7,
+        41
+      ],
+      "name": "Blackstone cave chamber"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        127,
+        2,
+        34
+      ],
+      "max": [
+        132,
+        6,
+        36
+      ],
+      "name": "Blackstone cave mouth"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        127,
+        2,
+        31
+      ],
+      "max": [
+        129,
+        7,
+        33
+      ],
+      "name": "Cave mouth west shoulder"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        127,
+        2,
+        37
+      ],
+      "max": [
+        129,
+        7,
+        39
+      ],
+      "name": "Cave mouth east shoulder"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        127,
+        7,
+        32
+      ],
+      "max": [
+        129,
+        8,
+        38
+      ],
+      "name": "Cave mouth lintel"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        0,
+        2,
+        117
+      ],
+      "max": [
+        78,
+        3,
+        159
+      ],
+      "name": "Southern farm rise"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        0,
+        4,
+        117
+      ],
+      "max": [
+        78,
+        4,
+        159
+      ],
+      "name": "Southern farm turf"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt_dry",
+      "min": [
+        5,
+        4,
+        124
+      ],
+      "max": [
+        28,
+        4,
+        153
+      ],
+      "name": "West barley soil"
+    },
+    {
+      "op": "fill_box",
+      "state": "barley",
+      "min": [
+        6,
+        5,
+        125
+      ],
+      "max": [
+        27,
+        5,
+        152
+      ],
+      "name": "West barley"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt_dry",
+      "min": [
+        54,
+        4,
+        123
+      ],
+      "max": [
+        75,
+        4,
+        152
+      ],
+      "name": "East barley soil"
+    },
+    {
+      "op": "fill_box",
+      "state": "barley",
+      "min": [
+        55,
+        5,
+        124
+      ],
+      "max": [
+        74,
+        5,
+        151
+      ],
+      "name": "East barley"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        5,
+        4,
+        126
+      ],
+      "max": [
+        28,
+        4,
+        126
+      ],
+      "name": "West field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        5,
+        4,
+        133
+      ],
+      "max": [
+        28,
+        4,
+        133
+      ],
+      "name": "West field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        5,
+        4,
+        140
+      ],
+      "max": [
+        28,
+        4,
+        140
+      ],
+      "name": "West field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        5,
+        4,
+        147
+      ],
+      "max": [
+        28,
+        4,
+        147
+      ],
+      "name": "West field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        4,
+        125
+      ],
+      "max": [
+        75,
+        4,
+        125
+      ],
+      "name": "East field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        4,
+        132
+      ],
+      "max": [
+        75,
+        4,
+        132
+      ],
+      "name": "East field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        4,
+        139
+      ],
+      "max": [
+        75,
+        4,
+        139
+      ],
+      "name": "East field row"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        4,
+        146
+      ],
+      "max": [
+        75,
+        4,
+        146
+      ],
+      "name": "East field row"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        6,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        6,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        9,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        9,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        12,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        12,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        15,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        15,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        18,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        18,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        21,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        21,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        24,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        24,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        27,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        27,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        30,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        30,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        33,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        33,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        36,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        36,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        39,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        39,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        42,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        42,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        45,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        45,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        48,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        48,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        51,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        51,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        54,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        54,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        57,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        57,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        60,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        60,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        63,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        63,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        66,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        66,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        69,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        69,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        72,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        72,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        75,
+        5,
+        120
+      ],
+      "name": "Farm north fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        75,
+        5,
+        156
+      ],
+      "name": "Farm south fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        121
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        121
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        124
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        124
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        127
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        127
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        130
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        130
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        133
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        133
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        136
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        136
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        139
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        139
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        142
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        142
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        145
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        145
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        148
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        148
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        151
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        151
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        3,
+        5,
+        154
+      ],
+      "name": "Farm west fence"
+    },
+    {
+      "op": "set",
+      "state": "oak_wood",
+      "at": [
+        77,
+        5,
+        154
+      ],
+      "name": "Farm east fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        76,
+        1,
+        43
+      ],
+      "max": [
+        80,
+        1,
+        58
+      ],
+      "name": "South approach"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        72,
+        1,
+        56
+      ],
+      "max": [
+        78,
+        1,
+        60
+      ],
+      "name": "South bend"
     },
     {
       "op": "fill_box",
       "state": "cobblestone",
       "min": [
-        45,
+        70,
         1,
-        0
+        58
       ],
       "max": [
-        50,
+        74,
         1,
-        95
+        72
       ],
-      "name": "Old North Road"
+      "name": "Lower High Lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "cobblestone",
+      "min": [
+        72,
+        1,
+        69
+      ],
+      "max": [
+        86,
+        1,
+        74
+      ],
+      "name": "Market bend west"
+    },
+    {
+      "op": "fill_box",
+      "state": "cobblestone",
+      "min": [
+        84,
+        1,
+        72
+      ],
+      "max": [
+        88,
+        1,
+        84
+      ],
+      "name": "Market bend north"
+    },
+    {
+      "op": "fill_box",
+      "state": "cobblestone",
+      "min": [
+        86,
+        1,
+        82
+      ],
+      "max": [
+        97,
+        1,
+        86
+      ],
+      "name": "Upper Market Lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "cobblestone",
+      "min": [
+        75,
+        1,
+        66
+      ],
+      "max": [
+        88,
+        1,
+        77
+      ],
+      "name": "Irregular market court"
     },
     {
       "op": "fill_box",
       "state": "gravel",
       "min": [
-        10,
+        89,
         1,
-        34
+        79
+      ],
+      "max": [
+        102,
+        1,
+        88
+      ],
+      "name": "Smiths court"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        1,
+        61
+      ],
+      "max": [
+        68,
+        1,
+        74
+      ],
+      "name": "Warden court"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        61,
+        1,
+        74
+      ],
+      "max": [
+        63,
+        1,
+        91
+      ],
+      "name": "West residential lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        1,
+        90
+      ],
+      "max": [
+        62,
+        1,
+        92
+      ],
+      "name": "West lane dogleg"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        53,
+        1,
+        91
+      ],
+      "max": [
+        55,
+        1,
+        105
+      ],
+      "name": "Abbey lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        97,
+        1,
+        83
+      ],
+      "max": [
+        108,
+        1,
+        85
+      ],
+      "name": "East residential lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        107,
+        1,
+        84
+      ],
+      "max": [
+        109,
+        1,
+        101
+      ],
+      "name": "East lane turn"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        84,
+        1,
+        84
+      ],
+      "max": [
+        87,
+        1,
+        102
+      ],
+      "name": "North lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        86,
+        1,
+        100
+      ],
+      "max": [
+        93,
+        1,
+        103
+      ],
+      "name": "North road first bend"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        91,
+        1,
+        102
+      ],
+      "max": [
+        94,
+        1,
+        118
+      ],
+      "name": "Old North Road lower"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        93,
+        1,
+        116
+      ],
+      "max": [
+        103,
+        1,
+        119
+      ],
+      "name": "Old North Road second bend"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        101,
+        1,
+        118
+      ],
+      "max": [
+        104,
+        1,
+        145
+      ],
+      "name": "Old North Road upper"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        43,
+        1,
+        104
+      ],
+      "max": [
+        54,
+        1,
+        106
+      ],
+      "name": "Farm lane west"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        42,
+        1,
+        105
+      ],
+      "max": [
+        44,
+        1,
+        122
+      ],
+      "name": "Farm lane south"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        108,
+        1,
+        83
+      ],
+      "max": [
+        118,
+        1,
+        85
+      ],
+      "name": "East ridge lane"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        117,
+        1,
+        57
+      ],
+      "max": [
+        119,
+        1,
+        84
+      ],
+      "name": "East ridge turn"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        118,
+        1,
+        56
+      ],
+      "max": [
+        130,
+        1,
+        58
+      ],
+      "name": "Cave trail east"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        129,
+        1,
+        36
+      ],
+      "max": [
+        131,
+        1,
+        57
+      ],
+      "name": "Cave approach"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        54,
+        1,
+        55
       ],
       "max": [
         70,
         1,
-        40
+        68
       ],
-      "name": "Brackenford crossroad"
+      "name": "Warden drill yard"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        55,
+        2,
+        56
+      ],
+      "max": [
+        55,
+        3,
+        67
+      ],
+      "name": "Warden yard rail"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        69,
+        2,
+        56
+      ],
+      "max": [
+        69,
+        3,
+        67
+      ],
+      "name": "Warden yard rail"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        55,
+        2,
+        56
+      ],
+      "max": [
+        69,
+        3,
+        56
+      ],
+      "name": "Warden yard rail"
     },
     {
       "op": "fill_box",
       "state": "gravel",
       "min": [
-        14,
-        1,
-        14
-      ],
-      "max": [
-        35,
-        1,
-        31
-      ],
-      "name": "Knight training yard"
-    },
-    {
-      "op": "fill_box",
-      "state": "dirt_dry",
-      "min": [
-        6,
-        1,
-        70
-      ],
-      "max": [
-        38,
-        1,
-        91
-      ],
-      "name": "South barley field"
-    },
-    {
-      "op": "fill_box",
-      "state": "dirt_dry",
-      "min": [
-        55,
-        1,
-        50
-      ],
-      "max": [
-        92,
-        1,
-        66
-      ],
-      "name": "East fallow field"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        14,
-        2,
-        14
-      ],
-      "max": [
-        14,
+        31,
         4,
-        31
-      ],
-      "name": "Training hall west wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        35,
-        2,
-        14
-      ],
-      "max": [
-        35,
-        4,
-        31
-      ],
-      "name": "Training hall east wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        14,
-        2,
-        14
-      ],
-      "max": [
-        20,
-        4,
-        14
-      ],
-      "name": "Training hall south wall A"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        23,
-        2,
-        14
-      ],
-      "max": [
-        35,
-        4,
-        14
-      ],
-      "name": "Training hall south wall B"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        14,
-        2,
-        31
-      ],
-      "max": [
-        35,
-        4,
-        31
-      ],
-      "name": "Training hall north wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "aged_wood",
-      "min": [
-        14,
-        5,
-        14
-      ],
-      "max": [
-        35,
-        5,
-        31
-      ],
-      "name": "Training hall roof"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        36,
-        2,
-        27
-      ],
-      "max": [
-        36,
-        5,
-        43
-      ],
-      "name": "Reeve hall west wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        52,
-        2,
-        27
+        125
       ],
       "max": [
         52,
-        5,
-        43
-      ],
-      "name": "Reeve hall east wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        36,
-        2,
-        27
-      ],
-      "max": [
-        43,
-        5,
-        27
-      ],
-      "name": "Reeve hall south wall A"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        46,
-        2,
-        27
-      ],
-      "max": [
-        52,
-        5,
-        27
-      ],
-      "name": "Reeve hall south wall B"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        36,
-        2,
-        43
-      ],
-      "max": [
-        52,
-        5,
-        43
-      ],
-      "name": "Reeve hall north wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "aged_wood",
-      "min": [
-        36,
-        6,
-        27
-      ],
-      "max": [
-        52,
-        6,
-        43
-      ],
-      "name": "Reeve hall roof"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        54,
-        2,
-        24
-      ],
-      "max": [
-        54,
         4,
-        38
+        146
       ],
-      "name": "Smithy west wall"
+      "name": "Farmstead yard"
     },
     {
       "op": "fill_box",
-      "state": "stone",
+      "state": "dirt",
       "min": [
-        66,
+        95,
         2,
-        24
+        133
       ],
       "max": [
-        66,
+        113,
         4,
-        38
+        152
       ],
-      "name": "Smithy east wall"
+      "name": "North Watch hill"
     },
     {
       "op": "fill_box",
-      "state": "stone",
+      "state": "grass_block",
       "min": [
-        54,
-        2,
-        24
-      ],
-      "max": [
-        58,
-        4,
-        24
-      ],
-      "name": "Smithy south A"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        61,
-        2,
-        24
-      ],
-      "max": [
-        66,
-        4,
-        24
-      ],
-      "name": "Smithy south B"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        54,
-        2,
-        38
-      ],
-      "max": [
-        66,
-        4,
-        38
-      ],
-      "name": "Smithy north wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "aged_wood",
-      "min": [
-        54,
+        95,
         5,
-        24
+        133
       ],
       "max": [
-        66,
+        113,
         5,
-        38
+        152
       ],
-      "name": "Smithy roof"
+      "name": "North Watch turf"
     },
     {
       "op": "fill_box",
       "state": "stone_dark",
       "min": [
-        63,
-        5,
-        34
+        99,
+        6,
+        136
       ],
       "max": [
-        64,
+        110,
+        12,
+        148
+      ],
+      "name": "North Watch ruin shell"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        100,
+        6,
+        137
+      ],
+      "max": [
+        109,
+        12,
+        147
+      ],
+      "name": "North Watch ruined interior"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        103,
+        6,
+        136
+      ],
+      "max": [
+        106,
+        10,
+        138
+      ],
+      "name": "North Watch door breach"
+    },
+    {
+      "op": "cut_box",
+      "min": [
+        99,
+        10,
+        141
+      ],
+      "max": [
+        102,
+        12,
+        145
+      ],
+      "name": "North Watch collapsed west wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        96,
+        6,
+        135
+      ],
+      "max": [
+        100,
+        7,
+        139
+      ],
+      "name": "North Watch rubble"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        108,
+        6,
+        146
+      ],
+      "max": [
+        113,
         8,
-        35
+        150
       ],
-      "name": "Smithy chimney"
+      "name": "North Watch rubble"
     },
     {
       "op": "fill_box",
       "state": "mossy_stone",
       "min": [
-        14,
+        94,
         2,
-        50
+        111
       ],
       "max": [
-        14,
-        5,
-        68
-      ],
-      "name": "Abbey west wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        30,
-        2,
-        50
-      ],
-      "max": [
-        30,
-        5,
-        68
-      ],
-      "name": "Abbey east wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        14,
-        2,
-        50
-      ],
-      "max": [
-        20,
-        5,
-        50
-      ],
-      "name": "Abbey south A"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        23,
-        2,
-        50
-      ],
-      "max": [
-        30,
-        5,
-        50
-      ],
-      "name": "Abbey south B"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        14,
-        2,
-        68
-      ],
-      "max": [
-        30,
-        5,
-        68
-      ],
-      "name": "Abbey north wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "aged_wood",
-      "min": [
-        14,
-        6,
-        50
-      ],
-      "max": [
-        30,
-        6,
-        68
-      ],
-      "name": "Abbey roof"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        9,
-        2,
-        9
-      ],
-      "max": [
-        9,
-        3,
-        72
-      ],
-      "name": "West palisade"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        71,
-        2,
-        9
-      ],
-      "max": [
-        71,
-        3,
-        33
-      ],
-      "name": "East palisade south"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        71,
-        2,
-        41
-      ],
-      "max": [
-        71,
-        3,
-        72
-      ],
-      "name": "East palisade north"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        9,
-        2,
-        9
-      ],
-      "max": [
-        44,
-        3,
-        9
-      ],
-      "name": "South palisade west"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        51,
-        2,
-        9
-      ],
-      "max": [
-        71,
-        3,
-        9
-      ],
-      "name": "South palisade east"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        9,
-        2,
-        72
-      ],
-      "max": [
-        44,
-        3,
-        72
-      ],
-      "name": "North palisade west"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        51,
-        2,
-        72
-      ],
-      "max": [
-        71,
-        3,
-        72
-      ],
-      "name": "North palisade east"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        48,
-        2,
-        52
-      ],
-      "max": [
-        48,
-        3,
-        52
+        94,
+        4,
+        111
       ],
       "name": "Broken North Road milestone"
     },
     {
       "op": "fill_box",
-      "state": "stone_dark",
+      "state": "stone_slab",
       "min": [
-        72,
-        2,
-        70
-      ],
-      "max": [
-        72,
-        8,
-        78
-      ],
-      "name": "North Watch west wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone_dark",
-      "min": [
-        80,
-        2,
-        70
-      ],
-      "max": [
-        80,
-        8,
-        78
-      ],
-      "name": "North Watch east wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone_dark",
-      "min": [
-        72,
-        2,
-        70
-      ],
-      "max": [
-        75,
-        8,
-        70
-      ],
-      "name": "North Watch south A"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone_dark",
-      "min": [
-        78,
-        2,
-        70
-      ],
-      "max": [
-        80,
-        8,
-        70
-      ],
-      "name": "North Watch south B"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone_dark",
-      "min": [
-        72,
-        2,
-        78
-      ],
-      "max": [
-        80,
-        8,
-        78
-      ],
-      "name": "North Watch north wall"
-    },
-    {
-      "op": "fill_box",
-      "state": "aged_wood",
-      "min": [
-        72,
-        9,
-        70
-      ],
-      "max": [
-        80,
-        9,
-        78
-      ],
-      "name": "North Watch roof"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        74,
-        2,
-        72
-      ],
-      "max": [
-        78,
-        2,
-        76
-      ],
-      "name": "North Watch floor"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
+        94,
         5,
-        2,
-        69
+        111
       ],
       "max": [
-        39,
-        2,
-        69
-      ],
-      "name": "Barley field north fence"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        39,
-        2,
-        69
-      ],
-      "max": [
-        39,
-        2,
-        92
-      ],
-      "name": "Barley field east fence"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
+        94,
         5,
-        2,
-        92
+        111
       ],
-      "max": [
-        39,
-        2,
-        92
-      ],
-      "name": "Barley field south fence"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        54,
-        2,
-        49
-      ],
-      "max": [
-        93,
-        2,
-        49
-      ],
-      "name": "Fallow field south fence"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        93,
-        2,
-        49
-      ],
-      "max": [
-        93,
-        2,
-        67
-      ],
-      "name": "Fallow field east fence"
-    },
-    {
-      "op": "fill_box",
-      "state": "oak_wood",
-      "min": [
-        54,
-        2,
-        67
-      ],
-      "max": [
-        93,
-        2,
-        67
-      ],
-      "name": "Fallow field north fence"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        47,
-        2,
-        61
-      ],
-      "max": [
-        47,
-        2,
-        61
-      ],
-      "name": "North road marker one"
-    },
-    {
-      "op": "fill_box",
-      "state": "mossy_stone",
-      "min": [
-        49,
-        2,
-        66
-      ],
-      "max": [
-        49,
-        2,
-        66
-      ],
-      "name": "North road marker two"
-    },
-    {
-      "op": "fill_box",
-      "state": "stone",
-      "min": [
-        47,
-        2,
-        82
-      ],
-      "max": [
-        48,
-        3,
-        83
-      ],
-      "name": "Old patrol cairn"
+      "name": "Milestone cap"
     }
   ]
 }

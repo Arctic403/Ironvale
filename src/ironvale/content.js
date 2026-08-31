@@ -51,21 +51,21 @@ export const IRONVALE_ZONES = Object.freeze([
   {
     id: 'brackenford-lowlands', name: 'Brackenford Lowlands', levelMin: 1, levelMax: 10, kind: 'starter-zone',
     worldId: 'brackenford-lowlands-001', worldUrl: '/rift-world-blocks/brackenford-lowlands-001.json',
-    description: 'Fields, training yards, workshops and old military roads surrounding the walled village of Brackenford.',
-    spawn: { id: 'valeborn-training-yard', position: [20, 2, 22], facing: 0 },
+    description: 'A broad working lowland of crooked medieval lanes, irregular timber-and-stone buildings, farms, wooded hills, an abandoned watch and the Blackstone cave ridge around Brackenford.',
+    spawn: { id: 'valeborn-training-yard', position: [62, 2, 64], facing: 0 },
     campaignId: 'the-broken-oath', chapterId: 'ash-on-the-road'
   }
 ]);
 
 export const IRONVALE_SETTLEMENTS = Object.freeze([
-  { id: 'brackenford', name: 'Brackenford', zoneId: 'brackenford-lowlands', kind: 'walled-village', position: [43, 2, 34], description: 'A walled market village built where the Old North Road meets the farms of the southern Marches.' }
+  { id: 'brackenford', name: 'Brackenford', zoneId: 'brackenford-lowlands', kind: 'walled-village', position: [80, 2, 69], description: 'A walled market village built where the Old North Road meets the farms of the southern Marches.' }
 ]);
 
 export const IRONVALE_POINTS_OF_INTEREST = Object.freeze([
-  { id: 'training-dummy', name: 'Training Dummy', zoneId: 'brackenford-lowlands', kind: 'training-target', position: [30, 2, 22], interactRange: 3.2 },
-  { id: 'old-north-road', name: 'Broken North Road Milestone', zoneId: 'brackenford-lowlands', kind: 'quest-object', position: [48, 2, 52], interactRange: 2.8 },
-  { id: 'brackenford-watch', name: 'Abandoned North Watch', zoneId: 'brackenford-lowlands', kind: 'quest-object', position: [75, 2, 73], interactRange: 4.5 },
-  { id: 'blackstone-barrow-mouth', name: 'Blackstone Barrow', zoneId: 'brackenford-lowlands', kind: 'future-dungeon-entrance', position: [88, 2, 84], interactRange: 4 }
+  { id: 'training-dummy', name: 'Training Dummy', zoneId: 'brackenford-lowlands', kind: 'training-target', position: [65, 2, 62], interactRange: 3.2 },
+  { id: 'old-north-road', name: 'Broken North Road Milestone', zoneId: 'brackenford-lowlands', kind: 'quest-object', position: [94, 2, 111], interactRange: 2.8 },
+  { id: 'brackenford-watch', name: 'Abandoned North Watch', zoneId: 'brackenford-lowlands', kind: 'quest-object', position: [104, 6, 142], interactRange: 4.5 },
+  { id: 'blackstone-barrow-mouth', name: 'Blackstone Barrow', zoneId: 'brackenford-lowlands', kind: 'future-dungeon-entrance', position: [130, 2, 35], interactRange: 4 }
 ]);
 
 export const IRONVALE_FACTIONS = Object.freeze([
@@ -74,10 +74,10 @@ export const IRONVALE_FACTIONS = Object.freeze([
 ]);
 
 export const IRONVALE_NPCS = Object.freeze([
-  { id: 'ser-rowan-vale', name: 'Ser Rowan Vale', zoneId: 'brackenford-lowlands', role: 'Knight Trainer', factionId: 'vale-wardens', position: [22, 2, 22], color: '#66778b', dialogue: 'Steel is useful. Discipline is what keeps you alive long enough to use it.' },
-  { id: 'edric-hale', name: 'Reeve Edric Hale', zoneId: 'brackenford-lowlands', role: 'Reeve of Brackenford', factionId: 'vale-wardens', position: [44, 2, 34], color: '#765f3f', dialogue: 'Brackenford has survived worse years than this one. I would prefer not to prove it again.' },
-  { id: 'maera-voss', name: 'Maera Voss', zoneId: 'brackenford-lowlands', role: 'Blacksmith', factionId: null, position: [58, 2, 30], color: '#794b37', dialogue: 'If it bends, I can straighten it. If it breaks, you paid too little for it.' },
-  { id: 'brother-alden', name: 'Brother Alden', zoneId: 'brackenford-lowlands', role: 'Keeper of Records', factionId: 'orin-abbey', position: [22, 2, 58], color: '#716a59', dialogue: 'History is rarely lost by accident. More often, someone decides what the next generation is allowed to remember.' }
+  { id: 'ser-rowan-vale', name: 'Ser Rowan Vale', zoneId: 'brackenford-lowlands', role: 'Knight Trainer', factionId: 'vale-wardens', position: [59, 2, 63], color: '#66778b', dialogue: 'Steel is useful. Discipline is what keeps you alive long enough to use it.' },
+  { id: 'edric-hale', name: 'Reeve Edric Hale', zoneId: 'brackenford-lowlands', role: 'Reeve of Brackenford', factionId: 'vale-wardens', position: [82, 2, 68], color: '#765f3f', dialogue: 'Brackenford has survived worse years than this one. I would prefer not to prove it again.' },
+  { id: 'maera-voss', name: 'Maera Voss', zoneId: 'brackenford-lowlands', role: 'Blacksmith', factionId: null, position: [101, 2, 69], color: '#794b37', dialogue: 'If it bends, I can straighten it. If it breaks, you paid too little for it.' },
+  { id: 'brother-alden', name: 'Brother Alden', zoneId: 'brackenford-lowlands', role: 'Keeper of Records', factionId: 'orin-abbey', position: [61, 2, 91], color: '#716a59', dialogue: 'History is rarely lost by accident. More often, someone decides what the next generation is allowed to remember.' }
 ]);
 
 export const IRONVALE_CREATURES = Object.freeze([

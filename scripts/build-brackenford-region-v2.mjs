@@ -59,7 +59,7 @@ function farmhouse(){
   shellWing(p,'Farmhouse kitchen wing',{minX:11,minZ:8,maxX:20,maxZ:16,wallTop:5,lower:'stone',door:['east',11,12],windows:[['north',14,16]]});
   p.push({op:'fill_box',state:'oak_wood',min:[4,1,0],max:[11,1,0],name:'Farmhouse porch'});p.push({op:'fill_box',state:'aged_wood',min:[4,5,0],max:[11,5,0],name:'Farmhouse porch roof'});
   p.push({op:'fill_box',state:'stone_dark',min:[13,6,7],max:[14,11,8],name:'Farmhouse chimney'});
-  return makePrefab('farm-home',{min:[0,0,0],max:[20,13,16]},p);
+  return makePrefab('farm-home',{min:[0,0,0],max:[20,14,16]},p);
 }
 function barn(){
   const p=[];const f=(s,a,b,n)=>p.push({op:'fill_box',state:s,min:a,max:b,name:n});const c=(a,b,n)=>p.push({op:'cut_box',min:a,max:b,name:n});
@@ -68,14 +68,14 @@ function barn(){
   c([7,1,1],[12,6,1],'Barn wagon doors');c([3,4,13],[5,6,13],'Barn rear vent');c([14,4,13],[16,6,13],'Barn rear vent');
   f('oak_wood',[2,6,2],[17,6,6],'Barn partial hay loft');gableRoof(p,'Barn',0,19,0,14,8);
   f('oak_wood',[18,1,5],[23,1,13],'Barn lean-to floor');f('oak_wood',[23,2,5],[23,5,5],'Barn lean-to post');f('oak_wood',[23,2,13],[23,5,13],'Barn lean-to post');f('aged_wood',[18,6,4],[23,6,14],'Barn lean-to roof');
-  return makePrefab('farm',{min:[0,0,0],max:[23,18,14]},p);
+  return makePrefab('farm',{min:[0,0,0],max:[23,17,14]},p);
 }
 function trainingHall(){
   const p=[];shellWing(p,'Warden hall',{minX:1,minZ:1,maxX:20,maxZ:12,wallTop:6,door:['south',8,11],windows:[['north',3,5],['north',15,17],['west',4,6]]});
   shellWing(p,'Armory wing',{minX:15,minZ:10,maxX:27,maxZ:20,wallTop:5,lower:'stone',door:['east',14,16],windows:[['north',19,21]]});
   p.push({op:'fill_box',state:'oak_wood',min:[2,1,0],max:[14,1,0],name:'Training arcade deck'});p.push({op:'fill_box',state:'aged_wood',min:[2,5,0],max:[14,5,0],name:'Training arcade roof'});
   for(const x of [2,6,10,14])p.push({op:'fill_box',state:'oak_wood',min:[x,2,0],max:[x,4,0],name:'Training arcade post'});
-  return makePrefab('training',{min:[0,0,0],max:[27,15,20]},p);
+  return makePrefab('training',{min:[0,0,0],max:[27,16,20]},p);
 }
 function reeveHall(){
   const p=[];shellWing(p,'Reeve great hall',{minX:1,minZ:1,maxX:20,maxZ:14,wallTop:7,door:['south',8,11],windows:[['north',4,6],['north',15,17],['west',5,7]]});
@@ -102,9 +102,9 @@ function chapel(){
   f('cobblestone',[2,0,1],[15,0,21],'Chapel foundation');f('mossy_stone',[2,1,1],[15,8,21],'Chapel nave shell');c([3,1,2],[14,8,20],'Chapel tall nave');c([7,1,1],[10,5,1],'Chapel doors');c([2,3,6],[2,6,8],'Chapel west lancet');c([15,3,13],[15,6,15],'Chapel east lancet');gableRoof(p,'Chapel nave',1,16,0,22,9);
   shellWing(p,'Chapel records',{minX:14,minZ:15,maxX:24,maxZ:24,wallTop:5,lower:'mossy_stone',upper:'stone',door:['east',18,20],windows:[['north',18,20]]});
   f('stone',[0,1,14],[6,12,21],'Bell tower shell');c([1,2,15],[5,11,20],'Bell tower interior');c([2,7,14],[4,10,14],'Bell opening');f('aged_wood',[0,13,14],[6,13,21],'Bell tower roof');
-  return makePrefab('religious',{min:[0,0,0],max:[24,18,24]},p);
+  return makePrefab('religious',{min:[0,0,0],max:[24,16,24]},p);
 }
-function tree(){return makePrefab('vegetation',{min:[0,0,0],max:[4,8,4]},[{op:'fill_box',state:'oak_wood',min:[2,0,2],max:[2,5,2],name:'Tree trunk'},{op:'fill_box',state:'grass_block',min:[1,5,1],max:[3,7,3],name:'Tree crown'},{op:'fill_box',state:'grass_block',min:[0,6,2],max:[4,6,2],name:'Tree crown spread'},{op:'fill_box',state:'grass_block',min:[2,6,0],max:[2,6,4],name:'Tree crown spread'}]);}
+function tree(){return makePrefab('vegetation',{min:[0,0,0],max:[4,7,4]},[{op:'fill_box',state:'oak_wood',min:[2,0,2],max:[2,5,2],name:'Tree trunk'},{op:'fill_box',state:'grass_block',min:[1,5,1],max:[3,7,3],name:'Tree crown'},{op:'fill_box',state:'grass_block',min:[0,6,2],max:[4,6,2],name:'Tree crown spread'},{op:'fill_box',state:'grass_block',min:[2,6,0],max:[2,6,4],name:'Tree crown spread'}]);}
 
 prefabs.cottage=cottage();prefabs.farmhouse=farmhouse();prefabs.barn=barn();prefabs.trainingHall=trainingHall();prefabs.reeveHall=reeveHall();prefabs.smithy=smithy();prefabs.chapel=chapel();prefabs.inn=inn();prefabs.tree=tree();
 
