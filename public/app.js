@@ -1,5 +1,5 @@
 import { RiftEngine } from './rift-engine.js?v=20260831-character-freecam-r2';
-import { RiftTerrain } from './rift-terrain.js?v=20260831-character-freecam-r2';
+import { RiftLandscape } from './rift-landscape.js?v=20260831-rift-landscape-v2';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';
 
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
@@ -25,6 +25,8 @@ const strengthValue = $('#strength-value');
 const freecamButton = $('#freecam-button');
 const freecamSpeedInput = $('#freecam-speed');
 const freecamSpeedValue = $('#freecam-speed-value');
+const editLayerSelect = $('#terrain-edit-layer');
+const addEditLayerButton = $('#add-terrain-edit-layer');
 const reticle = $('#terrain-reticle');
 const altitudeControls = $('#freecam-altitude');
 const combatHud = $('#combat-hud');
@@ -36,7 +38,8 @@ const lookHint = $('.look-hint');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
-const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v2';
+const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v3';
+const LEGACY_LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v2';
 const MAX_HISTORY = 10;
 const LONG_PRESS_MS = 260;
 const LOOK_START_PX = 9;
@@ -155,6 +158,17 @@ document.querySelectorAll('[data-brush]').forEach(button => button.addEventListe
 radiusInput.addEventListener('input', () => { refreshEditorLabels(); rebuildBrushMarker(); });
 strengthInput.addEventListener('input', refreshEditorLabels);
 freecamSpeedInput.addEventListener('input', refreshEditorLabels);
+editLayerSelect?.addEventListener('change', () => {
+  if (!terrain?.setActiveEditLayer(editLayerSelect.value)) return;
+  refreshTerrainLayerControls();
+  editorStatus.textContent = `Editing terrain layer: ${terrain.activeEditLayer?.name || editLayerSelect.value}.`;
+});
+addEditLayerButton?.addEventListener('click', () => {
+  if (!terrain?.createEditLayer) return;
+  const created = terrain.createEditLayer(`Layer ${terrain.listEditLayers().length + 1}`);
+  refreshTerrainLayerControls();
+  editorStatus.textContent = `Created non-destructive terrain layer: ${created?.name || 'Layer'}.`;
+});
 $('#undo-terrain').addEventListener('click', undoTerrain);
 $('#redo-terrain').addEventListener('click', redoTerrain);
 $('#save-terrain').addEventListener('click', saveDraft);
@@ -238,8 +252,9 @@ async function startWorld(url) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Terrain failed to load (${response.status})`);
   worldDocument = await response.json();
-  terrain = new RiftTerrain(worldDocument.terrain);
+  terrain = new RiftLandscape(worldDocument.terrain);
   restoreLocalDraft();
+  refreshTerrainLayerControls();
   engine = new RiftEngine(canvas);
   engine.environment.fogNear = 320;
   engine.environment.fogFar = 1200;
@@ -266,7 +281,7 @@ async function startWorld(url) {
   updateReticleVisual();
   updateReticleTarget();
   const stats = terrain.getStats?.() || {};
-  terrainStatus.textContent = `640×640 · ${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · adaptive LOD`;
+  terrainStatus.textContent = `RiftLandscape · 640×640 · ${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · ${stats.editLayers ?? 1} edit layer${(stats.editLayers ?? 1) === 1 ? '' : 's'} · adaptive LOD`;
   lastFrame = performance.now();
   animationFrame = requestAnimationFrame(frame);
 }
@@ -385,7 +400,8 @@ function updateTerrainLod(now = performance.now(), force = false) {
   const cameraZ = Number(lastCameraPosition?.[2]);
   const nextPlan = terrain.planSectionLods(
     Number.isFinite(cameraX) ? cameraX : player.x,
-    Number.isFinite(cameraZ) ? cameraZ : player.z
+    Number.isFinite(cameraZ) ? cameraZ : player.z,
+    terrainLodPlan
   );
 
   for (const section of nextPlan.values()) {
@@ -1028,7 +1044,7 @@ function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately
   snapPlayerToSupport();
   updateReticleTarget();
   if (saveImmediately) saveDraftSilently();
-  terrainStatus.textContent = `640×640 · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
+  terrainStatus.textContent = `RiftLandscape · ${terrain.activeEditLayer?.name || 'Sculpt'} · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
 }
 
 function updateReticleVisual() {
@@ -1317,23 +1333,15 @@ window.IronvaleTargeting = Object.freeze({
 });
 
 function captureTerrainState() {
-  return {
-    heights: new Float32Array(terrain.heights),
-    manualDelta: new Float32Array(terrain.manualDelta),
-    manualHoles: new Uint8Array(terrain.manualHoles),
-    revision: terrain.revision
-  };
+  return terrain?.captureEditState?.() || null;
 }
 
 function restoreTerrainState(state) {
-  if (!terrain || !state) return;
-  terrain.heights.set(state.heights);
-  terrain.manualDelta.set(state.manualDelta);
-  terrain.manualHoles.set(state.manualHoles);
-  terrain.revision = state.revision + 1;
+  if (!terrain || !state || !terrain.restoreEditState?.(state)) return;
   rebuildTerrainMeshes();
   snapPlayerToSupport();
   updateReticleTarget();
+  refreshTerrainLayerControls();
 }
 
 function pushUndo(state) {
@@ -1358,43 +1366,15 @@ function redoTerrain() {
 }
 
 function serializeTerrainEdits() {
-  const delta = [];
-  for (let i = 0; i < terrain.manualDelta.length; i += 1) {
-    const value = terrain.manualDelta[i];
-    if (Math.abs(value) > .0001) delta.push([i, Number(value.toFixed(4))]);
-  }
-  const holes = [];
-  for (let i = 0; i < terrain.manualHoles.length; i += 1) if (terrain.manualHoles[i]) holes.push(i);
-  return {
-    format: 'rift-terrain-edit-v2',
-    worldId: worldDocument?.id || 'ironvale-terrain',
-    width: terrain.width,
-    depth: terrain.depth,
-    sampleSpacing: terrain.sampleSpacing,
-    savedAt: Date.now(),
-    delta,
-    holes
-  };
+  if (!terrain?.serializeLandscapeEdits) return null;
+  return terrain.serializeLandscapeEdits({ worldId: worldDocument?.id || 'ironvale-terrain' });
 }
 
 function applySerializedEdits(data) {
-  if (!terrain || !data || data.format !== 'rift-terrain-edit-v2') return false;
-  if (Number(data.width) !== terrain.width || Number(data.depth) !== terrain.depth || Number(data.sampleSpacing) !== terrain.sampleSpacing) return false;
-  terrain = new RiftTerrain(worldDocument.terrain);
-  for (const entry of data.delta || []) {
-    const index = Number(entry[0]);
-    const value = Number(entry[1]);
-    if (Number.isInteger(index) && index >= 0 && index < terrain.manualDelta.length && Number.isFinite(value)) {
-      terrain.manualDelta[index] = value;
-      terrain.heights[index] += value;
-    }
-  }
-  for (const indexValue of data.holes || []) {
-    const index = Number(indexValue);
-    if (Number.isInteger(index) && index >= 0 && index < terrain.manualHoles.length) terrain.manualHoles[index] = 1;
-  }
-  terrain.revision += 1;
-  return true;
+  if (!terrain || !data) return false;
+  if (data.format === 'rift-landscape-edits-v1') return terrain.applySerializedLandscapeEdits?.(data) === true;
+  if (data.format === 'rift-terrain-edit-v2') return terrain.importLegacyManualEdits?.(data) === true;
+  return false;
 }
 
 function saveDraft() {
@@ -1404,13 +1384,18 @@ function saveDraft() {
 
 function saveDraftSilently() {
   if (!terrain) return;
-  try { localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(serializeTerrainEdits())); } catch {}
+  try {
+    const serialized = serializeTerrainEdits();
+    if (serialized) localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(serialized));
+  } catch {}
 }
 
 function restoreLocalDraft() {
   try {
-    const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
-    if (raw) applySerializedEdits(JSON.parse(raw));
+    const current = localStorage.getItem(LOCAL_DRAFT_KEY);
+    if (current && applySerializedEdits(JSON.parse(current))) return;
+    const legacy = localStorage.getItem(LEGACY_LOCAL_DRAFT_KEY);
+    if (legacy && applySerializedEdits(JSON.parse(legacy))) saveDraftSilently();
   } catch {}
 }
 
@@ -1418,7 +1403,7 @@ async function exportDraft() {
   if (!terrain) return;
   const text = JSON.stringify(serializeTerrainEdits(), null, 2);
   try {
-    const file = new File([text], 'ironvale-terrain-edits.json', { type: 'application/json' });
+    const file = new File([text], 'ironvale-landscape-edits.json', { type: 'application/json' });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: 'Ironvale Terrain Edits' });
       editorStatus.textContent = 'Terrain draft shared.';
@@ -1429,7 +1414,7 @@ async function exportDraft() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'ironvale-terrain-edits.json';
+  link.download = 'ironvale-landscape-edits.json';
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -1442,13 +1427,28 @@ function resetTerrain() {
   cancelGesture();
   pushUndo(captureTerrainState());
   redoStack.length = 0;
-  terrain = new RiftTerrain(worldDocument.terrain);
-  try { localStorage.removeItem(LOCAL_DRAFT_KEY); } catch {}
+  terrain = new RiftLandscape(worldDocument.terrain);
+  try { localStorage.removeItem(LOCAL_DRAFT_KEY); localStorage.removeItem(LEGACY_LOCAL_DRAFT_KEY); } catch {}
   rebuildTerrainMeshes();
   snapPlayerToSupport();
   updateReticleTarget();
+  refreshTerrainLayerControls();
   terrainStatus.textContent = `640×640 blank terrain reset · ${lodSummary() || 'adaptive LOD'}`;
   editorStatus.textContent = 'Back to a perfectly flat blank canvas.';
+}
+
+function refreshTerrainLayerControls() {
+  if (!editLayerSelect) return;
+  const layers = terrain?.listEditLayers?.() || [];
+  editLayerSelect.replaceChildren(...layers.map(layer => {
+    const option = document.createElement('option');
+    option.value = layer.id;
+    option.textContent = `${layer.name}${layer.locked ? ' 🔒' : ''}`;
+    option.disabled = layer.locked;
+    return option;
+  }));
+  if (terrain?.activeEditLayerId) editLayerSelect.value = terrain.activeEditLayerId;
+  addEditLayerButton.disabled = !terrain?.createEditLayer;
 }
 
 function refreshEditorLabels() {

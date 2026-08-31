@@ -29,12 +29,19 @@ if (world.terrain?.chunkSize !== 64 || world.terrain?.sectionSize !== 64) failur
 if (world.terrain?.componentSize !== 128) failures.push('terrain components must be 128m');
 if (JSON.stringify(world.terrain?.lod?.steps) !== JSON.stringify([1,2,4,8,16])) failures.push('adaptive terrain LOD steps');
 if (world.terrain?.lod?.neighborMaxLevelDelta !== 1 || world.terrain?.lod?.seamMode !== 'edge-morph') failures.push('terrain LOD seam contract');
+if (world.terrain?.landscape?.format !== 'rift-landscape-v2') failures.push('RiftLandscape v2 config');
+if (!Array.isArray(world.terrain?.landscape?.editLayers) || world.terrain.landscape.editLayers[0]?.id !== 'sculpt') failures.push('landscape edit layers');
+if (!Array.isArray(world.terrain?.landscape?.materialLayers) || world.terrain.landscape.materialLayers.length < 4) failures.push('landscape material weight layers');
+if (!(Number(world.terrain?.landscape?.lodHysteresis) > 0)) failures.push('landscape LOD hysteresis');
 if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
 if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
 if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
 
 const app = fs.readFileSync('public/app.js', 'utf8');
 if (!app.includes('function updateTerrainLod(') || !app.includes('terrain.planSectionLods(')) failures.push('adaptive terrain LOD controller');
+if (!app.includes("import { RiftLandscape } from './rift-landscape.js?v=") || !app.includes('new RiftLandscape(worldDocument.terrain)')) failures.push('RiftLandscape runtime integration');
+if (!app.includes("ironvale:terrain:draft:v3") || !app.includes('serializeLandscapeEdits') || !app.includes('captureEditState')) failures.push('layer-aware terrain persistence/undo');
+if (!app.includes('refreshTerrainLayerControls') || !app.includes("$('#terrain-edit-layer')")) failures.push('terrain edit layer controls');
 if (!app.includes('function rebuildDirtyTerrainSections(')) failures.push('dirty terrain section rebuilds');
 if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
@@ -59,6 +66,7 @@ if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier 
 const indexHtml = fs.readFileSync('public/index.html', 'utf8');
 const styles = fs.readFileSync('public/styles.css', 'utf8');
 if (!indexHtml.includes('id="combat-hud"') || !indexHtml.includes('id="rotate-device"') || !indexHtml.includes('data-ability-slot="1"')) failures.push('landscape RPG HUD markup');
+if (!indexHtml.includes('id="terrain-edit-layer"') || !indexHtml.includes('id="add-terrain-edit-layer"')) failures.push('RiftLandscape edit-layer UI');
 if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
@@ -69,6 +77,12 @@ const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');
 if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTexture') || !renderer.includes('createSkin(') || !renderer.includes('createTexture(')) failures.push('GPU character skinning/texturing');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
+const landscape = fs.readFileSync('public/rift-landscape.js', 'utf8');
+if (!landscape.includes('class RiftLandscape extends RiftTerrain') || !landscape.includes('recomposeEditLayers(') || !landscape.includes('paintMaterial(')) failures.push('RiftLandscape edit/weight architecture');
+if (!landscape.includes('captureEditState(') || !landscape.includes('serializeLandscapeEdits(') || !landscape.includes('importLegacyManualEdits(')) failures.push('RiftLandscape persistence architecture');
+if (!landscape.includes('planSectionLods(cameraX, cameraZ, previousPlan') || !landscape.includes('lodHysteresis')) failures.push('RiftLandscape LOD hysteresis');
+if (!landscape.includes('consumeDirtyComponents(') || !landscape.includes('streamKey')) failures.push('RiftLandscape component streaming hooks');
+if (!landscape.includes('setSpline(') || !landscape.includes('removeSpline(')) failures.push('RiftLandscape spline data hooks');
 if (!terrain.includes("import { RiftCore } from './rift-core.js'")) failures.push('terrain is not backed by RiftCore WASM');
 if (!terrain.includes('NATIVE.rift_terrain_apply_brush')) failures.push('terrain brush not native');
 if (!terrain.includes('NATIVE.rift_terrain_build_section')) failures.push('section meshing/stitching not native');
@@ -89,4 +103,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: textured animated humanoid + landscape RPG tap-target controls + Freecam reticle tools + adaptive stitched terrain LOD + C++/WASM terrain core.');
+console.log('Ironvale core verified: RiftLandscape v2 edit layers + material weights + component LOD hysteresis/streaming hooks + C++/WASM terrain + mobile RPG camera/character runtime.');

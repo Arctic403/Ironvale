@@ -53,6 +53,59 @@
       "nearDistance": 128,
       "mediumDistance": 256,
       "authoritativeHeightfield": true
+    },
+    "landscape": {
+      "format": "rift-landscape-v2",
+      "editLayers": [
+        {
+          "id": "sculpt",
+          "name": "Sculpt",
+          "enabled": true,
+          "locked": false,
+          "opacity": 1
+        }
+      ],
+      "activeEditLayer": "sculpt",
+      "baseMaterialLayer": "grass",
+      "materialLayers": [
+        {
+          "id": "grass",
+          "name": "Grass",
+          "defaultWeight": 255
+        },
+        {
+          "id": "dirt",
+          "name": "Dirt",
+          "defaultWeight": 0
+        },
+        {
+          "id": "rock",
+          "name": "Rock",
+          "defaultWeight": 0
+        },
+        {
+          "id": "gravel",
+          "name": "Gravel",
+          "defaultWeight": 0
+        },
+        {
+          "id": "mud",
+          "name": "Mud",
+          "defaultWeight": 0
+        },
+        {
+          "id": "path",
+          "name": "Path",
+          "defaultWeight": 0
+        }
+      ],
+      "splines": [],
+      "lodHysteresis": 0.12,
+      "streaming": {
+        "enabled": true,
+        "componentRadius": 3,
+        "preloadRing": 1
+      }
     }
   },
   "anchors": {
@@ -65,15 +118,18 @@
   },
   "objects": [],
   "metadata": {
-    "worldFoundation": "rift-terrain-mesh",
+    "worldFoundation": "rift-landscape-v2",
     "legacyBlocks": false,
     "voxelGrid": false,
     "blankCanvas": true,
     "negativeWorldY": true,
     "lowerBarrier": false,
     "description": "Blank continuous Rift Terrain canvas. Negative Y is valid world space. No generated hills, caves, roads, structures, props, map content or artificial lower barrier.",
-    "terrainOrganization": "128m components / 64m sections / 1m source samples",
+    "terrainOrganization": "RiftLandscape: 128m components / 64m sections / 1m source samples / non-destructive edit layers",
     "adaptiveLod": true,
-    "lodSeamStitching": true
+    "lodSeamStitching": true,
+    "nonDestructiveTerrainLayers": true,
+    "materialWeightmaps": true,
+    "landscapeSplineHooks": true
   }
 }

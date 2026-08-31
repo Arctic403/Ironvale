@@ -175,7 +175,8 @@ async function bootstrap(request, env) {
     world: {
       id: 'ironvale-terrain',
       url: '/world/ironvale-terrain.json',
-      foundation: 'rift-terrain-v1',
+      foundation: 'rift-landscape-v2',
+      terrainFormat: 'rift-terrain-v1',
       size: [640, 640],
       negativeWorldY: true
     }

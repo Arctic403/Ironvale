@@ -15,3 +15,12 @@ The active world is a blank 640×640 continuous heightfield with 1 m authoring s
 Sculpting marks only overlapping/adjacent terrain sections dirty, so edits rebuild localized meshes instead of the whole world. Collision continues to query the full native heightfield near gameplay while exposing distance-based collision-LOD hooks for future broad-phase/streaming work.
 
 The former RiftBlock/RiftSection voxel world, Downtown tile worlds, Blueprint/building pipelines, legacy editors/builders, AI Builder, combat, inventory, quests, codex and other old gameplay systems are not part of this branch.
+
+
+## RiftLandscape v2
+
+Ironvale's terrain management layer is now `RiftLandscape`, an Unreal-Landscape-inspired architecture over the existing RiftCore native heightfield. The native C++/WASM core still owns height sampling, sculpt math, collision queries, raycasts, section mesh generation and stitched LOD edges; RiftLandscape adds higher-level authoring and streaming state without moving hot terrain math back into JavaScript.
+
+RiftLandscape organizes the world as **128 m components → 64 m render sections → 1 m source samples**. Sculpting writes into an active non-destructive edit layer, and enabled layers are composited back into the native heightfield. Layer enable/disable, ordering, locking, undo/redo snapshots and sparse draft serialization are first-class. Legacy `rift-terrain-edit-v2` drafts migrate into the default Sculpt layer.
+
+The landscape also owns sparse material weightmaps (grass/dirt/rock/gravel/mud/path slots), spline metadata hooks for future roads/rivers, dirty-component tracking, component streaming keys, collision-LOD policy hooks, and LOD hysteresis so section detail does not flap at distance thresholds. Material weight data and splines are foundation data in this milestone; terrain shader blending and spline deformation come on top of this architecture rather than replacing it.
