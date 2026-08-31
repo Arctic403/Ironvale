@@ -27,10 +27,10 @@ expect(manifest.name === 'Ironvale' && manifest.start_url === '/#world' && manif
 expect(manifest.icons?.[0]?.src === '/ironvale-icon.svg' && exists('public/ironvale-icon.svg'), 'Ironvale icon must be installed');
 expect(!exists('public/riftcity-icon.svg'), 'old RiftCity icon must be removed');
 expect(router.includes("'world'") && !router.includes("casino:'casino'") && !router.includes("police:'law'"), 'router must expose the new RPG surface');
-expect(app.includes('renderJournal') && app.includes('renderCodex') && !app.includes('renderCrimes') && !app.includes('renderService'), 'active app must route to Ironvale views only');
-expect(app.includes('createRouteMount') && app.includes("window.addEventListener('popstate'") && app.includes("window.addEventListener('ironvale:navigate'"), 'Ironvale SPA navigation must keep isolated route mounts and history recovery listeners');
-expect(app.includes('request !== state.activeRequest') && app.includes('mount.isConnected'), 'stale async route renders must be prevented from replacing the active page');
-expect(router.includes("location.hash === nextHash") && router.includes("CustomEvent('ironvale:navigate'"), 'same-route navigation must be able to recover a pinned/restored Safari view');
+expect(app.includes('renderCity') && !app.includes('renderCharacter') && !app.includes('renderJournal') && !app.includes('renderCodex') && !app.includes('renderCrimes') && !app.includes('renderService'), 'active app must mount the 3D Ironvale game only');
+expect(app.includes("window.addEventListener('popstate'") && app.includes("window.addEventListener('ironvale:navigate'") && app.includes("location.hash !== '#world'"), 'Ironvale shell must recover directly into the 3D world route');
+expect(app.includes('request !== state.activeRequest') || app.includes('const request = ++state.activeRequest'), '3D game remounts must retain request sequencing');
+expect(router.includes("CustomEvent('ironvale:navigate'"), 'world navigation recovery event must remain available');
 expect(worldShell.includes('const foundation = activeFoundation;') && worldShell.includes('activeFoundation = null;') && worldShell.includes("console.warn('Rift world foundation cleanup failed'"), 'world teardown must detach its global foundation before best-effort cleanup');
 expect(index.includes('id="hud-shell" class="hud-shell hidden"') && index.includes('<footer><button id="logout-btn"'), 'legacy stat strip must stay hidden and logout must live in the drawer');
 expect(shell.includes('function retireLegacyHud()') && !shell.includes("$('#hud-shell')?.classList.remove('hidden')"), 'session/bootstrap code must never revive the legacy global character HUD');
@@ -48,6 +48,6 @@ for (const table of ['ironvale_characters','ironvale_inventory','ironvale_equipm
 for (const legacy of ['player_crime_progress','crime_history','player_casino','player_law','player_bank_accounts']) expect(!schema.includes(legacy), `fresh schema still contains ${legacy}`);
 for (const token of ['IRONVALE_QUESTS','IRONVALE_NPCS','IRONVALE_FACTIONS','IRONVALE_CREATURES','IRONVALE_DUNGEONS','blackstone-barrow','brackenford']) expect(content.includes(token), `content foundation missing ${token}`);
 expect(api.includes("/api/ironvale/bootstrap") && api.includes("/api/ironvale/sync") && api.includes("/api/ironvale/quests/accept"), 'Ironvale API foundation incomplete');
-expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v1"), '3D world shell must be Ironvale-branded');
+expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v2"), '3D world shell must be Ironvale-branded');
 
-console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v4, authoring, Cloudflare, resilient SPA navigation and route-scoped character UI foundations remain intact.');
+console.log('[ironvale-foundation] PASS · Ironvale owns a game-first 3D MMO surface while Rift Engine, Native Core v4, authoring and Cloudflare foundations remain intact.');

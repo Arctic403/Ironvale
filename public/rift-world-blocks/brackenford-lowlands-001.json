@@ -1,0 +1,881 @@
+{
+  "format": "riftcity-city-block",
+  "version": 1,
+  "id": "brackenford-lowlands-001",
+  "name": "Brackenford Lowlands · Valeborn Start",
+  "units": "meters",
+  "grid": {
+    "cell_size": 1,
+    "shape_increment": 0.5
+  },
+  "origin": [
+    0,
+    0,
+    0
+  ],
+  "bounds": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      95,
+      15,
+      95
+    ]
+  },
+  "palette": {
+    "air": {
+      "material_id": 0,
+      "shape": "air",
+      "color": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "ops": [
+    {
+      "op": "fill_box",
+      "state": "dirt",
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        95,
+        0,
+        95
+      ],
+      "name": "Lowland soil"
+    },
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        0,
+        1,
+        0
+      ],
+      "max": [
+        95,
+        1,
+        95
+      ],
+      "name": "Lowland grass"
+    },
+    {
+      "op": "fill_box",
+      "state": "cobblestone",
+      "min": [
+        45,
+        1,
+        0
+      ],
+      "max": [
+        50,
+        1,
+        95
+      ],
+      "name": "Old North Road"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        10,
+        1,
+        34
+      ],
+      "max": [
+        70,
+        1,
+        40
+      ],
+      "name": "Brackenford crossroad"
+    },
+    {
+      "op": "fill_box",
+      "state": "gravel",
+      "min": [
+        14,
+        1,
+        14
+      ],
+      "max": [
+        35,
+        1,
+        31
+      ],
+      "name": "Knight training yard"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt_dry",
+      "min": [
+        6,
+        1,
+        70
+      ],
+      "max": [
+        38,
+        1,
+        91
+      ],
+      "name": "South barley field"
+    },
+    {
+      "op": "fill_box",
+      "state": "dirt_dry",
+      "min": [
+        55,
+        1,
+        50
+      ],
+      "max": [
+        92,
+        1,
+        66
+      ],
+      "name": "East fallow field"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        14,
+        2,
+        14
+      ],
+      "max": [
+        14,
+        4,
+        31
+      ],
+      "name": "Training hall west wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        35,
+        2,
+        14
+      ],
+      "max": [
+        35,
+        4,
+        31
+      ],
+      "name": "Training hall east wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        14,
+        2,
+        14
+      ],
+      "max": [
+        20,
+        4,
+        14
+      ],
+      "name": "Training hall south wall A"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        23,
+        2,
+        14
+      ],
+      "max": [
+        35,
+        4,
+        14
+      ],
+      "name": "Training hall south wall B"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        14,
+        2,
+        31
+      ],
+      "max": [
+        35,
+        4,
+        31
+      ],
+      "name": "Training hall north wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "aged_wood",
+      "min": [
+        14,
+        5,
+        14
+      ],
+      "max": [
+        35,
+        5,
+        31
+      ],
+      "name": "Training hall roof"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        36,
+        2,
+        27
+      ],
+      "max": [
+        36,
+        5,
+        43
+      ],
+      "name": "Reeve hall west wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        52,
+        2,
+        27
+      ],
+      "max": [
+        52,
+        5,
+        43
+      ],
+      "name": "Reeve hall east wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        36,
+        2,
+        27
+      ],
+      "max": [
+        43,
+        5,
+        27
+      ],
+      "name": "Reeve hall south wall A"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        46,
+        2,
+        27
+      ],
+      "max": [
+        52,
+        5,
+        27
+      ],
+      "name": "Reeve hall south wall B"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        36,
+        2,
+        43
+      ],
+      "max": [
+        52,
+        5,
+        43
+      ],
+      "name": "Reeve hall north wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "aged_wood",
+      "min": [
+        36,
+        6,
+        27
+      ],
+      "max": [
+        52,
+        6,
+        43
+      ],
+      "name": "Reeve hall roof"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        54,
+        2,
+        24
+      ],
+      "max": [
+        54,
+        4,
+        38
+      ],
+      "name": "Smithy west wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        66,
+        2,
+        24
+      ],
+      "max": [
+        66,
+        4,
+        38
+      ],
+      "name": "Smithy east wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        54,
+        2,
+        24
+      ],
+      "max": [
+        58,
+        4,
+        24
+      ],
+      "name": "Smithy south A"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        61,
+        2,
+        24
+      ],
+      "max": [
+        66,
+        4,
+        24
+      ],
+      "name": "Smithy south B"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        54,
+        2,
+        38
+      ],
+      "max": [
+        66,
+        4,
+        38
+      ],
+      "name": "Smithy north wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "aged_wood",
+      "min": [
+        54,
+        5,
+        24
+      ],
+      "max": [
+        66,
+        5,
+        38
+      ],
+      "name": "Smithy roof"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        63,
+        5,
+        34
+      ],
+      "max": [
+        64,
+        8,
+        35
+      ],
+      "name": "Smithy chimney"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        14,
+        2,
+        50
+      ],
+      "max": [
+        14,
+        5,
+        68
+      ],
+      "name": "Abbey west wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        30,
+        2,
+        50
+      ],
+      "max": [
+        30,
+        5,
+        68
+      ],
+      "name": "Abbey east wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        14,
+        2,
+        50
+      ],
+      "max": [
+        20,
+        5,
+        50
+      ],
+      "name": "Abbey south A"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        23,
+        2,
+        50
+      ],
+      "max": [
+        30,
+        5,
+        50
+      ],
+      "name": "Abbey south B"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        14,
+        2,
+        68
+      ],
+      "max": [
+        30,
+        5,
+        68
+      ],
+      "name": "Abbey north wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "aged_wood",
+      "min": [
+        14,
+        6,
+        50
+      ],
+      "max": [
+        30,
+        6,
+        68
+      ],
+      "name": "Abbey roof"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        9,
+        2,
+        9
+      ],
+      "max": [
+        9,
+        3,
+        72
+      ],
+      "name": "West palisade"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        71,
+        2,
+        9
+      ],
+      "max": [
+        71,
+        3,
+        33
+      ],
+      "name": "East palisade south"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        71,
+        2,
+        41
+      ],
+      "max": [
+        71,
+        3,
+        72
+      ],
+      "name": "East palisade north"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        9,
+        2,
+        9
+      ],
+      "max": [
+        44,
+        3,
+        9
+      ],
+      "name": "South palisade west"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        51,
+        2,
+        9
+      ],
+      "max": [
+        71,
+        3,
+        9
+      ],
+      "name": "South palisade east"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        9,
+        2,
+        72
+      ],
+      "max": [
+        44,
+        3,
+        72
+      ],
+      "name": "North palisade west"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        51,
+        2,
+        72
+      ],
+      "max": [
+        71,
+        3,
+        72
+      ],
+      "name": "North palisade east"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        48,
+        2,
+        52
+      ],
+      "max": [
+        48,
+        3,
+        52
+      ],
+      "name": "Broken North Road milestone"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        72,
+        2,
+        70
+      ],
+      "max": [
+        72,
+        8,
+        78
+      ],
+      "name": "North Watch west wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        80,
+        2,
+        70
+      ],
+      "max": [
+        80,
+        8,
+        78
+      ],
+      "name": "North Watch east wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        72,
+        2,
+        70
+      ],
+      "max": [
+        75,
+        8,
+        70
+      ],
+      "name": "North Watch south A"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        78,
+        2,
+        70
+      ],
+      "max": [
+        80,
+        8,
+        70
+      ],
+      "name": "North Watch south B"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone_dark",
+      "min": [
+        72,
+        2,
+        78
+      ],
+      "max": [
+        80,
+        8,
+        78
+      ],
+      "name": "North Watch north wall"
+    },
+    {
+      "op": "fill_box",
+      "state": "aged_wood",
+      "min": [
+        72,
+        9,
+        70
+      ],
+      "max": [
+        80,
+        9,
+        78
+      ],
+      "name": "North Watch roof"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        74,
+        2,
+        72
+      ],
+      "max": [
+        78,
+        2,
+        76
+      ],
+      "name": "North Watch floor"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        5,
+        2,
+        69
+      ],
+      "max": [
+        39,
+        2,
+        69
+      ],
+      "name": "Barley field north fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        39,
+        2,
+        69
+      ],
+      "max": [
+        39,
+        2,
+        92
+      ],
+      "name": "Barley field east fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        5,
+        2,
+        92
+      ],
+      "max": [
+        39,
+        2,
+        92
+      ],
+      "name": "Barley field south fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        54,
+        2,
+        49
+      ],
+      "max": [
+        93,
+        2,
+        49
+      ],
+      "name": "Fallow field south fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        93,
+        2,
+        49
+      ],
+      "max": [
+        93,
+        2,
+        67
+      ],
+      "name": "Fallow field east fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "oak_wood",
+      "min": [
+        54,
+        2,
+        67
+      ],
+      "max": [
+        93,
+        2,
+        67
+      ],
+      "name": "Fallow field north fence"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        47,
+        2,
+        61
+      ],
+      "max": [
+        47,
+        2,
+        61
+      ],
+      "name": "North road marker one"
+    },
+    {
+      "op": "fill_box",
+      "state": "mossy_stone",
+      "min": [
+        49,
+        2,
+        66
+      ],
+      "max": [
+        49,
+        2,
+        66
+      ],
+      "name": "North road marker two"
+    },
+    {
+      "op": "fill_box",
+      "state": "stone",
+      "min": [
+        47,
+        2,
+        82
+      ],
+      "max": [
+        48,
+        3,
+        83
+      ],
+      "name": "Old patrol cairn"
+    }
+  ]
+}

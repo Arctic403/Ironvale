@@ -7,11 +7,12 @@ import { assertMeterScale } from './rift-world-scale.js';
 import { createRiftPlayer, createRiftPlayerController } from './rift-player.js';
 import { createRiftCreativeMode } from './rift-creative-mode.js';
 import { createRiftThirdPersonCamera, createRiftFirstPersonCamera } from './rift-third-person-camera.js';
+import { createIronvaleStarterRuntime } from './ironvale-gameplay.js';
 
 let activeFoundation = null;
-const DEFAULT_BLOCK_URL = new URL('./rift-world-blocks/ironvale-foundation-001.json', import.meta.url);
-const ACTIVE_BLOCK_STORAGE_KEY = 'ironvale:world:active-block:v1';
-const ACTIVE_BLOCK_STORAGE_VERSION = 1;
+const DEFAULT_BLOCK_URL = new URL('./rift-world-blocks/brackenford-lowlands-001.json', import.meta.url);
+const ACTIVE_BLOCK_STORAGE_KEY = 'ironvale:world:active-block:v2';
+const ACTIVE_BLOCK_STORAGE_VERSION = 2;
 const ACTIVE_BLOCK_MAX_BYTES = 2 * 1024 * 1024;
 
 export function destroyDowntown3D() {
@@ -125,6 +126,7 @@ export async function renderDowntown3D(root) {
     const foundation = createBlockImporterLab({ root, canvas, status });
     activeFoundation = foundation;
     await foundation.loadActiveBlock();
+    await foundation.startGameplay?.();
     return foundation;
   } catch (error) {
     console.error('Ironvale Rift Engine world failed to start', error);
@@ -199,8 +201,9 @@ function createBlockImporterLab({ root, canvas, status }) {
   let topView = false;
   let gameMode = false;
   let destroyed = false;
-  let sourceLabel = 'IRONVALE FOUNDATION';
+  let sourceLabel = 'BRACKENFORD LOWLANDS';
   let persistenceLabel = 'BUNDLED';
+  let ironvaleGameplay = null;
 
   const nameLabel = root.querySelector('#rift-import-name');
   const descriptionLabel = root.querySelector('#rift-import-description');
@@ -257,7 +260,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     if (firstPersonActive) {
       topView = false;
       topButton?.classList.remove('active');
-      if (topButton) topButton.textContent = 'CITY OVERVIEW';
+      if (topButton) topButton.textContent = 'WORLD OVERVIEW';
       if (resetCamera) firstPersonCamera?.reset({ immediate: true });
     } else if (resetCamera) {
       thirdPersonCamera?.reset({ immediate: true });
@@ -269,7 +272,7 @@ function createBlockImporterLab({ root, canvas, status }) {
   const resetPlayerCamera = () => {
     topView = false;
     topButton?.classList.remove('active');
-    if (topButton) topButton.textContent = 'CITY OVERVIEW';
+    if (topButton) topButton.textContent = 'WORLD OVERVIEW';
     if (firstPersonActive && firstPersonCamera) {
       firstPersonCamera.reset({ immediate: true });
     } else if (thirdPersonCamera) {
@@ -441,6 +444,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     engine.removeDrawables(blockDrawables);
     blockDrawables = nextDrawables;
     imported = compiled;
+    ironvaleGameplay?.onWorldChanged?.(compiled.document);
     sourceLabel = label;
     persistenceLabel = options.persistenceLabel || 'PREVIEW ONLY';
 
@@ -509,10 +513,10 @@ function createBlockImporterLab({ root, canvas, status }) {
         persistenceLabel: saved.mode === 'SESSION' ? 'SESSION SAVED' : 'PERSISTED'
       });
     } catch (error) {
-      console.warn('Saved RiftCity block could not be restored; falling back to bundled Block 001.', error);
+      console.warn('Saved Rift world block could not be restored; falling back to bundled Block 001.', error);
       clearPersistedBlock();
       return loadBundledBlock({
-        reason: `The saved import could not be restored (${error?.message || 'invalid saved JSON'}), so RiftCity cleared it and loaded the bundled default.`
+        reason: `The saved import could not be restored (${error?.message || 'invalid saved JSON'}), so Ironvale cleared it and loaded the bundled default.`
       });
     }
   };
@@ -605,7 +609,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     }
     camera.updatePosition();
     topButton?.classList.toggle('active', topView);
-    if (topButton) topButton.textContent = topView ? 'FOLLOW PLAYER' : 'CITY OVERVIEW';
+    if (topButton) topButton.textContent = topView ? 'FOLLOW PLAYER' : 'WORLD OVERVIEW';
     syncReticleUi();
   };
   topButton?.addEventListener('click', onTop);
@@ -623,7 +627,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     preparePlayerView: () => {
       topView = false;
       topButton?.classList.remove('active');
-      if (topButton) topButton.textContent = 'CITY OVERVIEW';
+      if (topButton) topButton.textContent = 'WORLD OVERVIEW';
       resetPlayerCamera();
       syncReticleUi();
     }
@@ -760,6 +764,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
     lastFrame = now;
     playerController.update(dt);
+    ironvaleGameplay?.update?.(dt);
     updatePlayerCamera(dt);
     if (creative?.active) creative.update(dt);
     engine.render(camera);
@@ -799,6 +804,11 @@ function createBlockImporterLab({ root, canvas, status }) {
     loadDocument,
     loadBundledBlock,
     loadActiveBlock,
+    async startGameplay() {
+      if (ironvaleGameplay) return ironvaleGameplay;
+      ironvaleGameplay = await createIronvaleStarterRuntime({ root, shell, engine, player, playerController, getImported: () => imported });
+      return ironvaleGameplay;
+    },
     get imported() { return imported; },
     destroy() {
       if (destroyed) return;
@@ -827,6 +837,8 @@ function createBlockImporterLab({ root, canvas, status }) {
       clearTimeout(viewportFinalTimer);
       clearViewportMetrics();
       document.body.classList.remove('world3d-game-mode');
+      ironvaleGameplay?.destroy?.();
+      ironvaleGameplay = null;
       creative?.destroy?.();
       playerController.destroy();
       player.destroy();

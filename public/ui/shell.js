@@ -84,26 +84,30 @@ export function renderCharacterHud(character = state.character) {
 }
 
 function applyBootstrap(result) {
-  state.authenticated = true; state.user = result.user; state.character = result.character; state.world = result.world;
+  state.authenticated = true; state.user = result.user; state.character = result.character; state.profile = result.profile || null;
+  state.needsCharacterCreation = !!result.needsCharacterCreation; state.creationOptions = result.creationOptions || null; state.world = result.world;
   state.journal = result.journal; state.inventory = result.inventory; state.equipment = result.equipment;
   renderDrawer(); renderCharacterHud(result.character);
 }
 function applySync(result) {
-  state.sync = result; if (result.character) state.character = result.character; if (result.journal) state.journal = result.journal; if (result.equipment) state.equipment = result.equipment;
+  state.sync = result; if (result.character) state.character = result.character; if ('profile' in result) state.profile = result.profile;
+  if ('needsCharacterCreation' in result) state.needsCharacterCreation = !!result.needsCharacterCreation;
+  if (result.journal) state.journal = result.journal; if (result.equipment) state.equipment = result.equipment;
   renderCharacterHud(state.character);
+  window.dispatchEvent(new CustomEvent('ironvale:state-sync'));
 }
 
 export async function refreshSession({ navigate = true } = {}) {
   setSessionStatus('Checking Ironvale session…');
   const result = await api('/api/ironvale/bootstrap', { riftCacheTtl: 1000 });
   if (!result.ok || !result.authenticated) {
-    clearState(); setDrawerOpen(false); retireLegacyHud(); $('#auth-grid')?.classList.remove('hidden'); $('#game-root')?.classList.add('hidden'); $('#mobile-nav')?.classList.add('hidden');
+    clearState(); document.body.classList.remove('ironvale-session-active'); setDrawerOpen(false); retireLegacyHud(); $('#auth-grid')?.classList.remove('hidden'); $('#game-root')?.classList.add('hidden'); $('#mobile-nav')?.classList.add('hidden');
     setSessionStatus('Not signed in.'); stopSync();
     if (navigate && location.hash && !['','#world'].includes(location.hash)) history.replaceState(null, '', '#world');
     return false;
   }
   applyBootstrap(result);
-  $('#auth-grid')?.classList.add('hidden'); $('#game-root')?.classList.remove('hidden'); retireLegacyHud(); $('#mobile-nav')?.classList.remove('hidden');
+  document.body.classList.add('ironvale-session-active'); $('#auth-grid')?.classList.add('hidden'); $('#game-root')?.classList.remove('hidden'); retireLegacyHud(); $('#mobile-nav')?.classList.add('hidden');
   setSessionStatus(`Connected as ${result.user.username}. Ironvale state synced.`); startSync(); return true;
 }
 
@@ -119,7 +123,7 @@ function scheduleMutationSync() { clearTimeout(syncAfterMutation); syncAfterMuta
 
 async function logout() {
   const result = await api('/api/auth/logout', { method: 'POST' });
-  if (result.ok) { clearState(); setDrawerOpen(false); retireLegacyHud(); stopSync(); showToast('Logged out.'); await refreshSession(); }
+  if (result.ok) { clearState(); document.body.classList.remove('ironvale-session-active'); setDrawerOpen(false); retireLegacyHud(); stopSync(); showToast('Logged out.'); await refreshSession(); }
 }
 export async function submitAuth(path, form) {
   const data = new FormData(form);
@@ -128,3 +132,4 @@ export async function submitAuth(path, form) {
   showToast(path.endsWith('register') ? 'Account created.' : 'Welcome back.');
   await refreshSession(); go('world');
 }
+window.addEventListener('ironvale:logout', () => logout());

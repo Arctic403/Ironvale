@@ -80,6 +80,18 @@ CREATE TABLE IF NOT EXISTS ironvale_characters (
 );
 CREATE INDEX IF NOT EXISTS idx_ironvale_character_zone ON ironvale_characters(zone_id);
 
+CREATE TABLE IF NOT EXISTS ironvale_character_profiles (
+  user_id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL,
+  class_id TEXT NOT NULL,
+  origin_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  chapter_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS ironvale_inventory (
   user_id TEXT NOT NULL,
   item_id TEXT NOT NULL,

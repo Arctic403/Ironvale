@@ -303,10 +303,14 @@ function mount(r) {
         <div class="rift-game-panel" data-rift-game-panel="menu">
           <div class="rift-game-menu-actions">
             <button class="primary" data-rift-resume type="button"><span>Resume</span><span>ESC</span></button>
+            <button data-ironvale-panel="character" type="button"><span>Character</span><span>C</span></button>
+            <button data-ironvale-panel="quests" type="button"><span>Quest Log</span><span>L</span></button>
+            <button data-ironvale-panel="bags" type="button"><span>Bags</span><span>B</span></button>
             <button data-rift-menu-world type="button"><span>World / Build Controls</span><span>›</span></button>
             <button data-rift-menu-settings type="button"><span>Graphics Settings</span><span>›</span></button>
             <button data-rift-menu-controls type="button"><span>Controls</span><span>›</span></button>
             <button data-rift-reset-graphics type="button"><span>Reset Graphics Defaults</span><span>↺</span></button>
+            <button data-ironvale-logout type="button"><span>Log Out</span><span>↪</span></button>
           </div>
         </div>
         <div class="rift-game-panel" data-rift-game-panel="world" hidden>
@@ -370,6 +374,8 @@ function mount(r) {
   r.querySelector('[data-rift-menu-settings]')?.addEventListener('click', () => panel('settings'));
   r.querySelector('[data-rift-menu-controls]')?.addEventListener('click', () => panel('controls'));
   r.querySelector('[data-rift-reset-graphics]')?.addEventListener('click', () => { resetRiftGraphics(); sync(); });
+  r.querySelectorAll('[data-ironvale-panel]').forEach(button => button.addEventListener('click', () => { window.IronvaleGameplay?.openPanel?.(button.dataset.ironvalePanel); overlay(false); }));
+  r.querySelector('[data-ironvale-logout]')?.addEventListener('click', () => { overlay(false); window.dispatchEvent(new CustomEvent('ironvale:logout')); });
   r.querySelectorAll('[data-rift-game-tab]').forEach(button => button.addEventListener('click', () => panel(button.dataset.riftGameTab)));
   r.querySelectorAll('[data-rift-world-target]').forEach(button => button.addEventListener('click', () => runWorldAction(button)));
   r.querySelector('[data-rift-dev-mode]')?.addEventListener('change', event => setDevMode(event.target.checked));
