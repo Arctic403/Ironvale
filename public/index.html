@@ -11,8 +11,8 @@
   <section id="auth-screen" class="screen">
     <div class="auth-card">
       <div class="brand">IRONVALE</div>
-      <h1>Rift Terrain Core</h1>
-      <p>Sign in to enter the new continuous terrain runtime.</p>
+      <h1>Rift Terrain</h1>
+      <p>Sign in to open the blank terrain workspace.</p>
       <div class="auth-tabs">
         <button type="button" data-auth-tab="login" class="active">Login</button>
         <button type="button" data-auth-tab="register">Register</button>
@@ -30,16 +30,29 @@
     <canvas id="rift-canvas"></canvas>
     <div class="topbar">
       <div><strong id="character-name">Ironvale</strong><span id="terrain-status">Loading terrain…</span></div>
-      <div class="top-actions"><button id="terrain-tools-button" type="button">Terrain</button><button id="logout-button" type="button">Logout</button></div>
+      <div class="top-actions"><button id="terrain-tools-button" type="button">Tools</button><button id="logout-button" type="button">Logout</button></div>
     </div>
+
     <div id="terrain-tools" class="terrain-tools" hidden>
-      <strong>Rift Terrain</strong><small>Brush applies at your character position.</small>
-      <label>Radius <input id="brush-radius" type="range" min="2" max="30" step="1" value="10"></label>
-      <label>Strength <input id="brush-strength" type="range" min="0.1" max="3" step="0.1" value="0.8"></label>
-      <div class="brush-grid"><button data-brush="raise">Raise</button><button data-brush="lower">Lower</button><button data-brush="smooth">Smooth</button><button data-brush="flatten">Flatten</button></div>
-      <button id="reset-terrain" class="wide">Reset generated terrain</button>
+      <div class="tool-heading"><div><strong>Terrain Tools</strong><small>Blank canvas. You build the map.</small></div><button id="edit-mode" type="button">Edit OFF</button></div>
+      <div class="brush-grid brush-modes">
+        <button data-brush="raise" class="active">Raise</button>
+        <button data-brush="lower">Lower</button>
+        <button data-brush="smooth">Smooth</button>
+        <button data-brush="flatten">Flatten</button>
+        <button data-brush="hole">Cut Hole</button>
+        <button data-brush="unhole">Fill Hole</button>
+      </div>
+      <label>Radius <span id="radius-value">10m</span><input id="brush-radius" type="range" min="2" max="40" step="1" value="10"></label>
+      <label>Strength <span id="strength-value">0.8</span><input id="brush-strength" type="range" min="0.1" max="3" step="0.1" value="0.8"></label>
+      <div class="history-grid"><button id="undo-terrain">Undo</button><button id="redo-terrain">Redo</button></div>
+      <div class="history-grid"><button id="save-terrain">Save Draft</button><button id="export-terrain">Export</button></div>
+      <button id="reset-terrain" class="wide danger">Reset to Blank</button>
+      <small id="editor-status" class="editor-status">Turn Edit ON, then tap or drag directly on the ground.</small>
     </div>
-    <div id="coords" class="coords">160, 10, 160</div>
+
+    <div id="brush-readout" class="brush-readout" hidden>Raise · 10m</div>
+    <div id="coords" class="coords">160, 0, 160</div>
     <div id="joystick" class="joystick" aria-label="Movement control"><div id="joystick-knob"></div></div>
     <div class="look-hint">Drag to look</div>
   </main>
