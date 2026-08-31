@@ -1,0 +1,71 @@
+name: Rift Terrain v1 Staging
+
+on:
+  push:
+    branches: [rift-terrain-v1-staging]
+    paths:
+      - 'public/rift-terrain.js'
+      - 'public/rift-world-blocks/ironvale-terrain-bootstrap.json'
+      - 'scripts/check-rift-terrain.js'
+      - 'scripts/apply-rift-terrain-v1.mjs'
+      - '.github/workflows/rift-terrain-v1-staging.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  terrain-v1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout terrain staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: rift-terrain-v1-staging
+          fetch-depth: 0
+
+      - name: Apply terrain integration
+        run: node scripts/apply-rift-terrain-v1.mjs
+
+      - name: Syntax check terrain integration
+        run: |
+          node --check public/rift-terrain.js
+          node --check public/rift-player.js
+          node --check public/downtown3d-foundation.js
+          node --check scripts/check-rift-terrain.js
+
+      - name: Verify terrain contract
+        run: npm run verify:terrain
+
+      - name: Full Ironvale build
+        run: npm run build
+
+      - name: Verify Worker bundle
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npx wrangler deploy --dry-run --outdir=/tmp/ironvale-terrain-worker
+
+      - name: Guard terrain authority
+        run: |
+          grep -q "createRiftTerrainFromDocument" public/downtown3d-foundation.js
+          grep -q "getTerrain: () => terrain" public/downtown3d-foundation.js
+          grep -q "terrain.supportCandidatesAt" public/rift-player.js
+          grep -q "rift-terrain-v1" public/rift-world-blocks/ironvale-terrain-bootstrap.json
+          test -s public/rift-terrain.js
+          test ! -e public/ironvale-smooth-terrain.js
+          test ! -e public/ironvale-environment.js
+
+      - name: Remove one-shot integration tooling
+        run: |
+          rm -f scripts/apply-rift-terrain-v1.mjs
+          rm -f .github/workflows/rift-terrain-v1-staging.yml
+
+      - name: Commit verified Rift Terrain v1
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'Implement Rift Terrain v1 smooth landscape and caves [skip ci]'
+          git push origin HEAD:rift-terrain-v1-staging
