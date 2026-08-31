@@ -9,6 +9,7 @@ const pkg = JSON.parse(read('package.json'));
 const index = read('public/index.html');
 const manifest = JSON.parse(read('public/manifest.webmanifest'));
 const app = read('public/app.js');
+const shell = read('public/ui/shell.js');
 const router = read('public/ui/router.js');
 const server = read('src/index.js');
 const schema = read('schema.sql');
@@ -28,6 +29,8 @@ expect(app.includes('createRouteMount') && app.includes("window.addEventListener
 expect(app.includes('request !== state.activeRequest') && app.includes('mount.isConnected'), 'stale async route renders must be prevented from replacing the active page');
 expect(router.includes("location.hash === nextHash") && router.includes("CustomEvent('ironvale:navigate'"), 'same-route navigation must be able to recover a pinned/restored Safari view');
 expect(worldShell.includes('const foundation = activeFoundation;') && worldShell.includes('activeFoundation = null;') && worldShell.includes("console.warn('Rift world foundation cleanup failed'"), 'world teardown must detach its global foundation before best-effort cleanup');
+expect(index.includes('id="hud-shell" class="hud-shell hidden"') && index.includes('<footer><button id="logout-btn"'), 'legacy stat strip must stay hidden and logout must live in the drawer');
+expect(shell.includes('function retireLegacyHud()') && !shell.includes("$('#hud-shell')?.classList.remove('hidden')"), 'session/bootstrap code must never revive the legacy global character HUD');
 for (const path of ['public/views/crimes.js','public/views/service.js','public/views/wiki.js','public/views/services','src/plugins','src/services']) expect(!exists(path), `${path} must be removed from active source`);
 for (const path of ['native/rift-core.cpp','public/rift-engine.js','public/rift-player.js','public/rift-wasm-core.js','public/rift-block-section.js','public/rift-building-pipeline.js']) expect(exists(path), `${path} Rift Engine foundation must remain`);
 expect(exists('public/rift-world-blocks') && exists('public/rift-buildings'), 'game asset namespaces must use Rift Engine names');
@@ -42,4 +45,4 @@ for (const token of ['IRONVALE_QUESTS','IRONVALE_NPCS','IRONVALE_FACTIONS','IRON
 expect(api.includes("/api/ironvale/bootstrap") && api.includes("/api/ironvale/sync") && api.includes("/api/ironvale/quests/accept"), 'Ironvale API foundation incomplete');
 expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v1"), '3D world shell must be Ironvale-branded');
 
-console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v3, authoring, Cloudflare and resilient SPA navigation foundations remain intact.');
+console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v3, authoring, Cloudflare, resilient SPA navigation and route-scoped character UI foundations remain intact.');
