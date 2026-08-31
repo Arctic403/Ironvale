@@ -1,0 +1,14 @@
+{
+  "name": "Ironvale Mobile Codespace",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "forwardPorts": [4173],
+  "portsAttributes": {
+    "4173": {
+      "label": "Mobile Codespace Bridge",
+      "onAutoForward": "silent",
+      "visibility": "public"
+    }
+  },
+  "postCreateCommand": "npm install --no-package-lock && npm install -g @openai/codex@latest --include=optional",
+  "postStartCommand": "nohup node .mobile-codespace/server.mjs > /tmp/mobile-codespace-bridge.log 2>&1 &"
+}
