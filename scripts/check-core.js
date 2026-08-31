@@ -40,8 +40,11 @@ if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
 if (!app.includes('function applyBrushAtReticle(')) failures.push('reticle sculpt action');
 if (!app.includes('function applyCameraLookDelta(') || !app.includes('function cameraForward(') || !app.includes('function cameraAnglesFromDirection(')) failures.push('shared camera math');
-if (!app.includes("import { loadRiggedCharacterAsset } from './rift-character.js'") || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(') || !app.includes('function updatePlayerCharacterAnimation(')) failures.push('animated textured humanoid controller hookup');
+if (!/import \{ loadRiggedCharacterAsset \} from '\.\/rift-character\.js\?v=/.test(app) || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(') || !app.includes('function updatePlayerCharacterAnimation(')) failures.push('animated textured humanoid controller hookup');
 if (!app.includes('createCapsuleGeometry()')) failures.push('character visual fallback');
+if (!app.includes('const CHARACTER_MODEL_URL = new URL(') || !app.includes('const CHARACTER_ANIMATION_URL = new URL(')) failures.push('versioned character asset URLs');
+if (!app.includes('if (next && preserveCamera && !freecamEnabled) updateOrbitCamera();') || !app.includes('// Make the mode switch atomic: camera, center ray and reticle all agree immediately.')) failures.push('freecam atomic camera refresh');
+if (!app.includes('character fallback: ${characterError}')) failures.push('visible character fallback diagnostics');
 if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person RPG focus');
 if (!app.includes('function currentViewRay(') || !app.includes('terrain.raycast(ray.origin, ray.direction, 1800, .5)')) failures.push('center-view interaction ray');
 if (app.includes('reticleScreen') || app.includes('moveReticleToClient(') || app.includes('raycastTerrainAtScreen(')) failures.push('movable pointer reticle returned');
@@ -52,6 +55,7 @@ if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier 
 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
 if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
+if (!characterRuntime.includes('DEFAULT_CHARACTER_MODEL_URL') || !characterRuntime.includes("cache: 'no-cache'")) failures.push('character cache-safe loading');
 const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');
 if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTexture') || !renderer.includes('createSkin(') || !renderer.includes('createTexture(')) failures.push('GPU character skinning/texturing');
 

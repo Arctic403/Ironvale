@@ -1,6 +1,9 @@
-import { RiftEngine } from './rift-engine.js';
-import { RiftTerrain } from './rift-terrain.js';
-import { loadRiggedCharacterAsset } from './rift-character.js';
+import { RiftEngine } from './rift-engine.js?v=20260831-character-freecam-r2';
+import { RiftTerrain } from './rift-terrain.js?v=20260831-character-freecam-r2';
+import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-freecam-r2';
+
+const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
+const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
 const $ = selector => document.querySelector(selector);
 const authScreen = $('#auth-screen');
@@ -423,8 +426,8 @@ async function installRiggedPlayerVisual() {
   let asset = null;
   try {
     asset = await loadRiggedCharacterAsset(
-      '/assets/characters/quaternius/universal-base-male.glb',
-      '/assets/characters/quaternius/universal-animation-library.glb'
+      CHARACTER_MODEL_URL,
+      CHARACTER_ANIMATION_URL
     );
     if (!engine || engine !== activeEngine || playerMesh !== fallbackMesh) {
       closeDecodedCharacterImages(asset);
@@ -477,6 +480,8 @@ async function installRiggedPlayerVisual() {
       for (const texture of textures.values()) activeEngine.destroyTexture(texture);
       if (skin) activeEngine.destroySkin(skin);
     }
+    const characterError = String(error?.message || error || 'unknown error').slice(0, 120);
+    if (terrainStatus) terrainStatus.textContent = `${terrainStatus.textContent} · character fallback: ${characterError}`;
     console.warn('Rigged humanoid failed to load; keeping capsule fallback.', error);
   }
 }
@@ -613,6 +618,8 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
   const next = Boolean(enabled) && Boolean(terrain) && Boolean(engine);
   if (next === freecamEnabled) return;
   cancelGesture();
+  // Capture the actual current orbit view, not a potentially stale previous-frame camera.
+  if (next && preserveCamera && !freecamEnabled) updateOrbitCamera();
   if (next && preserveCamera) {
     const direction = normalize3(
       lastCameraTarget[0] - lastCameraPosition[0],
@@ -642,6 +649,9 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
   editorStatus.textContent = freecamEnabled
     ? 'Swipe to look. Hold, then drag to sculpt continuously. Tap for one stamp.'
     : 'Turn Freecam ON to sculpt terrain.';
+  // Make the mode switch atomic: camera, center ray and reticle all agree immediately.
+  updateCamera();
+  updateReticleTarget();
 }
 
 function setupCanvasControls() {
@@ -718,7 +728,10 @@ function setupCanvasControls() {
     }
 
     if (gesture.mode === 'look') {
+      event.preventDefault();
       applyCameraLookDelta(freecam, dx, dy, FREECAM_MIN_PITCH, FREECAM_MAX_PITCH);
+      updateCamera();
+      updateReticleTarget();
       return;
     }
 
@@ -733,6 +746,7 @@ function setupCanvasControls() {
   const finish = event => {
     if (!freecamEnabled) {
       if (event.pointerId === orbitPointerId) orbitPointerId = null;
+      if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture?.(event.pointerId);
       return;
     }
     if (!gesture || event.pointerId !== gesture.pointerId) return;
@@ -748,6 +762,7 @@ function setupCanvasControls() {
     }
 
     const sculpted = endedGesture.mode === 'sculpt';
+    if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture?.(event.pointerId);
     endContinuousSculpt();
     gesture = null;
     clearTimeout(longPressTimer);

@@ -5,6 +5,8 @@ const TYPE_COMPONENTS = Object.freeze({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MA
 const COMPONENT_BYTES = Object.freeze({ 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 });
 const TARGET_HEIGHT = 1.82;
 const CHARACTER_STRIDE = 19;
+const DEFAULT_CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
+const DEFAULT_CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
 function parseGlb(buffer) {
   const view = new DataView(buffer);
@@ -274,7 +276,7 @@ async function loadTextureImage(parsed, modelUrl, textureIndex) {
   if (image.bufferView != null) {
     blob = new Blob([bufferViewBytes(parsed, image.bufferView)], { type: image.mimeType || 'application/octet-stream' });
   } else if (image.uri) {
-    const response = await fetch(new URL(image.uri, new URL(modelUrl, location.href)).href, { cache: 'force-cache' });
+    const response = await fetch(new URL(image.uri, new URL(modelUrl, location.href)).href, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`Character texture failed to load (${response.status}).`);
     blob = await response.blob();
   } else return null;
@@ -406,14 +408,14 @@ class RiftCharacterRuntime {
 }
 
 async function fetchGlb(url) {
-  const response = await fetch(url, { cache: 'force-cache' });
+  const response = await fetch(url, { cache: 'no-cache' });
   if (!response.ok) throw new Error(`Character asset failed to load (${response.status}).`);
   return parseGlb(await response.arrayBuffer());
 }
 
 export async function loadRiggedCharacterAsset(
-  modelUrl = '/assets/characters/quaternius/universal-base-male.glb',
-  animationUrl = '/assets/characters/quaternius/universal-animation-library.glb'
+  modelUrl = DEFAULT_CHARACTER_MODEL_URL,
+  animationUrl = DEFAULT_CHARACTER_ANIMATION_URL
 ) {
   const [modelParsed, animationParsed] = await Promise.all([fetchGlb(modelUrl), fetchGlb(animationUrl)]);
   const built = buildPrimitives(modelParsed);
@@ -446,7 +448,7 @@ export async function loadRiggedCharacterAsset(
 }
 
 // Backward-compatible diagnostic helper. Runtime gameplay should use loadRiggedCharacterAsset so textures and animation are preserved.
-export async function loadRiggedCharacterGeometry(url = '/assets/characters/quaternius/universal-base-male.glb') {
+export async function loadRiggedCharacterGeometry(url = DEFAULT_CHARACTER_MODEL_URL) {
   const asset = await loadRiggedCharacterAsset(url);
   return { geometry: asset.primitives[0]?.geometry, rig: asset.rig, materials: asset.materials };
 }
