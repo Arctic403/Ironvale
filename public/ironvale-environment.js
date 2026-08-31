@@ -10,11 +10,15 @@ export const IRONVALE_NATURE_ASSETS={
   pine:`${ROOT}Pine_1.gltf`
 };
 
+// The eastern formation deliberately uses oversized real meshes on top of the
+// smooth mountain. The landform supplies mass; these assets supply cliff faces,
+// silhouettes and the cave-mouth break-up without building a mountain from cubes.
 const rockPlacements=[
-  ['rock1',257,73,6.2,0.2],['rock2',267,77,5.4,1.6],['rock3',249,81,4.8,2.5],
-  ['rock2',276,88,6.8,0.8],['rock1',246,61,5.2,2.1],['rock3',266,57,4.7,1.1],
-  ['rock1',238,103,3.8,0.4],['rock2',229,118,4.1,2.8],['rock3',281,106,3.5,1.7],
-  ['rock2',254,69,3.3,0.0],['rock3',261,66,3.6,1.2],['rock1',270,67,3.0,2.2],
+  ['rock1',252,84,6.4,0.2],['rock2',244,84,5.7,1.6],['rock3',252,92,5.2,2.5],
+  ['rock2',244,92,6.9,0.8],['rock1',236,76,5.4,2.1],['rock3',244,68,4.8,1.1],
+  ['rock1',236,100,4.1,0.4],['rock2',228,108,4.3,2.8],['rock3',252,100,3.8,1.7],
+  ['rock2',252,88,3.7,0.0],['rock3',252,96,3.9,1.2],['rock1',244,88,3.5,2.2],
+  ['rock1',228,60,3.1,0.7],['rock2',220,84,3.0,2.3],['rock3',220,108,2.8,1.5],
   ['rock1',86,72,2.0,0.5],['rock2',70,92,2.3,2.0],['rock3',53,113,2.0,1.4],
   ['rock2',239,240,2.5,0.9],['rock1',267,224,2.8,2.4],['rock3',88,253,2.3,1.1]
 ];
@@ -34,11 +38,13 @@ async function instantiateShared(engine,key,placements){
   if(!relevant.length)return {drawables:[],bases:[]};
   const drawables=[],bases=[];
   for(const part of asset.parts){
+    // Upload each glTF primitive only once. All other instances share the same
+    // Rift Engine GPU geometry, which is critical for mobile memory use.
     const base=engine.addMesh(part.geometry,optionsFor(relevant[0]));
-    base.doubleSided=part.doubleSided||true;bases.push(base);drawables.push(base);
+    base.doubleSided=true;bases.push(base);drawables.push(base);
     for(let i=1;i<relevant.length;i++){
       const clone=engine.addDrawable(base.geometry,optionsFor(relevant[i]));
-      clone.doubleSided=part.doubleSided||true;drawables.push(clone);
+      clone.doubleSided=true;drawables.push(clone);
     }
   }
   return {drawables,bases};
@@ -64,8 +70,9 @@ export async function createIronvaleNatureEnvironment(engine){
 export function validateIronvaleNatureEnvironment(){
   const failures=[];
   if(Object.keys(IRONVALE_NATURE_ASSETS).length<5)failures.push('nature asset manifest');
-  if(rockPlacements.length<15)failures.push('rock formations');
+  if(rockPlacements.length<18)failures.push('rock formations');
   if(treePlacements.length<10)failures.push('tree dressing');
   if(!rockPlacements.some(p=>p[3]>=6))failures.push('large mountain rock scale');
+  if(rockPlacements.filter(p=>p[1]>220&&p[1]<260&&p[2]>65&&p[2]<110).length<10)failures.push('Blackstone mountain rock cluster');
   return {ok:failures.length===0,failures};
 }
