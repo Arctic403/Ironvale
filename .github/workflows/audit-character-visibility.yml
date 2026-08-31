@@ -1,0 +1,103 @@
+name: Audit Character Visibility
+
+on:
+  push:
+    branches: [character-visibility-audit]
+    paths:
+      - '.github/workflows/audit-character-visibility.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Quaternius GLB hierarchy
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json, math, struct
+          from pathlib import Path
+
+          path = Path('public/assets/characters/quaternius/universal-base-male.glb')
+          data = path.read_bytes()
+          if data[:4] != b'glTF':
+              raise SystemExit('bad GLB magic')
+          version, total = struct.unpack_from('<II', data, 4)
+          if version != 2 or total != len(data):
+              raise SystemExit('bad GLB header')
+          chunk_len, chunk_type = struct.unpack_from('<II', data, 12)
+          if chunk_type != 0x4E4F534A:
+              raise SystemExit('first chunk is not JSON')
+          doc = json.loads(data[20:20+chunk_len].decode('utf-8').rstrip('\x00 '))
+
+          nodes = doc.get('nodes', [])
+          parents = [-1] * len(nodes)
+          for p, node in enumerate(nodes):
+              for c in node.get('children', []):
+                  parents[c] = p
+
+          def mul(a,b):
+              out=[0.0]*16
+              for c in range(4):
+                  for r in range(4):
+                      out[c*4+r] = sum(a[k*4+r]*b[c*4+k] for k in range(4))
+              return out
+
+          def trs(node):
+              if 'matrix' in node:
+                  return [float(v) for v in node['matrix']]
+              t=node.get('translation',[0,0,0]); q=node.get('rotation',[0,0,0,1]); s=node.get('scale',[1,1,1])
+              x,y,z,w=[float(v) for v in q]
+              x2=x+x; y2=y+y; z2=z+z
+              xx=x*x2; xy=x*y2; xz=x*z2; yy=y*y2; yz=y*z2; zz=z*z2; wx=w*x2; wy=w*y2; wz=w*z2
+              sx,sy,sz=[float(v) for v in s]
+              return [
+                  (1-(yy+zz))*sx,(xy+wz)*sx,(xz-wy)*sx,0,
+                  (xy-wz)*sy,(1-(xx+zz))*sy,(yz+wx)*sy,0,
+                  (xz+wy)*sz,(yz-wx)*sz,(1-(xx+yy))*sz,0,
+                  float(t[0]),float(t[1]),float(t[2]),1
+              ]
+
+          local=[trs(n) for n in nodes]
+          world=[None]*len(nodes)
+          def resolve(i):
+              if world[i] is not None: return world[i]
+              p=parents[i]
+              world[i]=mul(resolve(p),local[i]) if p>=0 else local[i]
+              return world[i]
+          for i in range(len(nodes)): resolve(i)
+
+          def fmt(m):
+              return '['+', '.join(f'{v:.6g}' for v in m)+']'
+          def identity_error(m):
+              ident=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]
+              return max(abs(a-b) for a,b in zip(m,ident))
+
+          print('scenes=', doc.get('scenes'))
+          print('skins=', len(doc.get('skins',[])), 'meshes=', len(doc.get('meshes',[])), 'nodes=', len(nodes))
+          for i,n in enumerate(nodes):
+              if 'mesh' in n or 'skin' in n:
+                  print('\nMESH NODE', i, n.get('name'), 'mesh=',n.get('mesh'),'skin=',n.get('skin'),'parent=',parents[i])
+                  print(' local=',fmt(local[i]))
+                  print(' world=',fmt(world[i]))
+                  print(' worldIdentityError=',identity_error(world[i]))
+          for si,skin in enumerate(doc.get('skins',[])):
+              joints=skin.get('joints',[])
+              print('\nSKIN',si,skin.get('name'),'skeleton=',skin.get('skeleton'),'joints=',len(joints))
+              if skin.get('skeleton') is not None:
+                  s=skin['skeleton']; print(' skeleton node=',s,nodes[s].get('name'),'world=',fmt(world[s]))
+              roots=[j for j in joints if parents[j] not in joints]
+              print(' joint roots=',[(j,nodes[j].get('name'),parents[j],fmt(world[j])) for j in roots])
+
+          # Prove whether the runtime's omission of inverse(meshGlobal) is material for this asset.
+          affected=[]
+          for i,n in enumerate(nodes):
+              if 'mesh' in n and 'skin' in n and identity_error(world[i]) > 1e-6:
+                  affected.append(i)
+          print('\nNON_IDENTITY_SKINNED_MESH_NODES=', affected)
+          if affected:
+              print('RESULT: Rift current skin formula is missing inverse(meshGlobal) for this exact asset.')
+          else:
+              print('RESULT: mesh globals are identity; investigate another visibility cause.')
+          PY
