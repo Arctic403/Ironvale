@@ -1,0 +1,49 @@
+name: RiftLandscape v2 Integration
+
+on:
+  push:
+    branches: [rift-landscape-v2]
+    paths:
+      - '.rift-fixes/apply_landscape_v2.py'
+      - '.github/workflows/rift-landscape-v2.yml'
+      - 'public/rift-landscape.js'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: rift-landscape-v2
+          fetch-depth: 0
+
+      - name: Apply RiftLandscape integration
+        run: python3 .rift-fixes/apply_landscape_v2.py
+
+      - name: Verify landscape contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "class RiftLandscape extends RiftTerrain" public/rift-landscape.js
+          grep -F "recomposeEditLayers" public/rift-landscape.js
+          grep -F "paintMaterial" public/rift-landscape.js
+          grep -F "lodHysteresis" public/rift-landscape.js
+          grep -F "terrain-edit-layer" public/index.html
+          grep -F "rift-landscape-v2" public/world/ironvale-terrain.json
+          npm run build
+
+      - name: Commit verified terrain foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/rift-landscape-v2.yml .rift-fixes/apply_landscape_v2.py
+          rmdir .rift-fixes 2>/dev/null || true
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Build Unreal-inspired RiftLandscape terrain foundation'
+          git push origin HEAD:rift-landscape-v2
