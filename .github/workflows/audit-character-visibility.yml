@@ -1,4 +1,4 @@
-name: Audit Character Visibility
+name: Fix Character Visibility
 
 on:
   push:
@@ -7,96 +7,52 @@ on:
       - '.github/workflows/audit-character-visibility.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  audit:
+  fix:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Quaternius character and animation transforms
+        with:
+          ref: character-visibility-audit
+          fetch-depth: 0
+
+      - name: Apply character loader fix
+        run: python3 .rift-fixes/fix_character_sparse_accessors.py
+
+      - name: Verify exact animation library needs sparse/zero accessor support
         shell: bash
         run: |
           python3 <<'PY'
-          import json, math, struct
+          import json, struct
           from pathlib import Path
-
-          TYPE_COMPONENTS={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4,'MAT4':16}
-          COMPONENT_FMT={5120:'b',5121:'B',5122:'h',5123:'H',5125:'I',5126:'f'}
-          COMPONENT_SIZE={5120:1,5121:1,5122:2,5123:2,5125:4,5126:4}
-
-          def parse_glb(path):
-              data=Path(path).read_bytes()
-              assert data[:4]==b'glTF'
-              version,total=struct.unpack_from('<II',data,4)
-              assert version==2 and total==len(data)
-              off=12; doc=None; binary=None
-              while off+8<=len(data):
-                  ln,typ=struct.unpack_from('<II',data,off); off+=8
-                  chunk=data[off:off+ln]; off+=ln
-                  if typ==0x4E4F534A: doc=json.loads(chunk.decode('utf-8').rstrip('\x00 '))
-                  elif typ==0x004E4942: binary=chunk
-              return doc,binary
-
-          def accessor(doc,binary,index):
-              a=doc['accessors'][index]; bv=doc['bufferViews'][a['bufferView']]
-              comps=TYPE_COMPONENTS[a['type']]; ctype=a['componentType']; size=COMPONENT_SIZE[ctype]
-              stride=bv.get('byteStride',comps*size); start=bv.get('byteOffset',0)+a.get('byteOffset',0)
-              vals=[]
-              for i in range(a['count']):
-                  base=start+i*stride
-                  row=[]
-                  for c in range(comps):
-                      v=struct.unpack_from('<'+COMPONENT_FMT[ctype],binary,base+c*size)[0]
-                      if a.get('normalized'):
-                          if ctype==5120: v=max(v/127,-1)
-                          elif ctype==5121: v=v/255
-                          elif ctype==5122: v=max(v/32767,-1)
-                          elif ctype==5123: v=v/65535
-                      row.append(float(v))
-                  vals.append(row)
-              return vals
-
-          model,model_bin=parse_glb('public/assets/characters/quaternius/universal-base-male.glb')
-          anim,anim_bin=parse_glb('public/assets/characters/quaternius/universal-animation-library.glb')
-          model_names={n.get('name'):i for i,n in enumerate(model.get('nodes',[])) if n.get('name')}
-          anim_names={i:n.get('name') for i,n in enumerate(anim.get('nodes',[]))}
-
-          print('MODEL scene roots', model.get('scenes'))
-          print('MODEL root joint node 64=', model['nodes'][64])
-          print('MODEL scene parent node 68=', model['nodes'][68])
-          print('ANIMATION NAMES:', [a.get('name') for a in anim.get('animations',[])])
-
-          for wanted in ('Idle_Loop','Walk_Loop','Jog_Fwd_Loop'):
-              clip=next((a for a in anim.get('animations',[]) if a.get('name')==wanted),None)
-              if not clip:
-                  print('\nCLIP',wanted,'NOT FOUND'); continue
-              print('\nCLIP',wanted,'channels=',len(clip.get('channels',[])))
-              interesting=[]
-              for ch in clip.get('channels',[]):
-                  target=ch.get('target',{}); name=anim_names.get(target.get('node')); path=target.get('path')
-                  if name not in ('root','pelvis','Pelvis','hips','Hips','mixamorig:Hips'):
-                      continue
-                  sampler=clip['samplers'][ch['sampler']]
-                  times=accessor(anim,anim_bin,sampler['input'])
-                  values=accessor(anim,anim_bin,sampler['output'])
-                  first=values[1] if sampler.get('interpolation')=='CUBICSPLINE' and len(values)>1 else values[0]
-                  mins=[min(row[c] for row in values) for c in range(len(values[0]))]
-                  maxs=[max(row[c] for row in values) for c in range(len(values[0]))]
-                  interesting.append((name,path,first,mins,maxs,times[0][0],times[-1][0]))
-              for item in interesting: print(' ',item)
-
-          # Validate that the bind-pose skin matrices are approximately identity for vertices influenced by one joint.
-          skin=model['skins'][0]
-          ibm=accessor(model,model_bin,skin['inverseBindMatrices'])
-          print('\nIBM[0]=',ibm[0])
-          print('joint[0]=',skin['joints'][0],model['nodes'][skin['joints'][0]].get('name'))
-
-          # Material/texture facts that can cause whole-load failure before capsule removal.
-          print('\nMATERIALS')
-          for i,m in enumerate(model.get('materials',[])):
-              pbr=m.get('pbrMetallicRoughness',{})
-              print(i,m.get('name'),'baseColorFactor=',pbr.get('baseColorFactor'),'baseColorTexture=',pbr.get('baseColorTexture'))
-          print('IMAGES')
-          for i,img in enumerate(model.get('images',[])):
-              print(i,'mime=',img.get('mimeType'),'bufferView=',img.get('bufferView'),'uri=',img.get('uri'))
-          print('TEXTURES',model.get('textures'))
+          p=Path('public/assets/characters/quaternius/universal-animation-library.glb')
+          data=p.read_bytes(); assert data[:4]==b'glTF'
+          ln,typ=struct.unpack_from('<II',data,12); assert typ==0x4E4F534A
+          doc=json.loads(data[20:20+ln].decode('utf-8').rstrip('\x00 '))
+          missing=[i for i,a in enumerate(doc.get('accessors',[])) if 'bufferView' not in a]
+          sparse=[i for i,a in enumerate(doc.get('accessors',[])) if a.get('sparse')]
+          print('animation accessors without bufferView:',len(missing),missing[:20])
+          print('animation sparse accessors:',len(sparse),sparse[:20])
+          assert missing, 'Expected the imported animation library to exercise zero-base accessors'
           PY
+          grep -F "if (accessor.sparse)" public/rift-character.js
+          grep -F "accessor.bufferView != null" public/rift-character.js
+          grep -F "rift-character.js?v=20260831-character-sparse-r1" public/app.js
+          grep -F "/app.js?v=20260831-character-sparse-r1" public/index.html
+
+      - name: Build Ironvale
+        run: npm run build
+
+      - name: Commit verified character fix
+        shell: bash
+        run: |
+          rm -f .github/workflows/audit-character-visibility.yml .rift-fixes/fix_character_sparse_accessors.py
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Fix glTF animation accessors for player character"
+          git push origin HEAD:character-visibility-audit
