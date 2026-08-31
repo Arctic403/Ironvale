@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 const OUT='public/rift-world-blocks/brackenford-lowlands-001.json';
 const CONTENT='src/ironvale/content.js';
-const W=160,D=160;
+const W=320,D=320,SEA=2;
 const ops=[];
 const fill=(state,min,max,name)=>ops.push({op:'fill_box',state,min,max,...(name?{name}:{})});
 const set=(state,at,name)=>ops.push({op:'set',state,at,...(name?{name}:{})});
@@ -10,39 +10,74 @@ const cut=(min,max,name)=>ops.push({op:'cut_box',min,max,...(name?{name}:{})});
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const gauss=(x,z,cx,cz,sx,sz,a)=>a*Math.exp(-(((x-cx)/sx)**2+((z-cz)/sz)**2));
 const hash=(x,z)=>{const n=Math.sin(x*12.9898+z*78.233)*43758.5453;return n-Math.floor(n);};
-const riverX=z=>47+z*0.16+Math.sin(z/17)*8+Math.sin(z/41)*5;
-const riverW=z=>3.2+(Math.sin(z/23)+1)*0.9;
-const roadX=z=>91+Math.sin((z-20)/21)*10+Math.sin(z/9)*2.5;
-const basin=(x,z)=>clamp(1-(((x-82)/34)**2+((z-92)/30)**2),0,1);
+const coastNoise=(x,z)=>Math.sin(x/19)*5+Math.sin(z/23)*4+Math.sin((x+z)/31)*3+Math.cos((x-z)/27)*2;
+const islandField=(x,z)=>{
+  const dx=(x-160)/139,dz=(z-160)/132;
+  return 1-(dx*dx+dz*dz)+coastNoise(x,z)/95;
+};
+const riverX=z=>132+(z-52)*0.19+Math.sin(z/22)*12+Math.sin(z/47)*7;
+const riverW=z=>3.5+(Math.sin(z/29)+1)*1.2;
+const roadX=z=>188+Math.sin((z-55)/26)*15+Math.sin(z/12)*3.5;
+const basin=(x,z)=>clamp(1-(((x-178)/49)**2+((z-178)/42)**2),0,1);
 
 const height=Array.from({length:D},()=>new Int16Array(W));
+const land=Array.from({length:D},()=>new Uint8Array(W));
 for(let z=0;z<D;z++)for(let x=0;x<W;x++){
-  let h=2+gauss(x,z,137,27,25,22,18)+gauss(x,z,119,44,34,18,7)+gauss(x,z,24,43,24,25,5)+gauss(x,z,28,128,30,24,4)+gauss(x,z,118,131,34,28,4)+gauss(x,z,77,34,28,15,2.5);
-  h+=(Math.sin(x/13)+Math.cos(z/17)+Math.sin((x+z)/25))*0.42;
-  const b=basin(x,z); h=h*(1-b*0.72)+2.1*(b*0.72);
+  const coast=islandField(x,z);
+  if(coast<=0){height[z][x]=0;continue;}
+  land[z][x]=1;
+  let h=3;
+  h+=gauss(x,z,259,73,39,34,26);      // Blackstone mountain
+  h+=gauss(x,z,235,111,55,29,10);     // eastern shoulder
+  h+=gauss(x,z,67,91,44,50,8);        // western hills
+  h+=gauss(x,z,71,248,52,40,6);       // south-west hills
+  h+=gauss(x,z,246,250,54,45,7);      // south-east uplands
+  h+=gauss(x,z,158,59,46,24,4);       // northern ridge
+  h+=(Math.sin(x/18)+Math.cos(z/21)+Math.sin((x+z)/34))*0.7;
+  const b=basin(x,z);h=h*(1-b*0.68)+3.1*(b*0.68);
   const d=Math.abs(x-riverX(z)),rw=riverW(z);
-  if(d<=rw)h=1;else if(d<=rw+3)h=Math.min(h,2+Math.floor((d-rw)/1.5));
-  height[z][x]=clamp(Math.round(h),1,24);
+  if(z>42&&z<287&&d<=rw)h=1;else if(z>42&&z<287&&d<=rw+5)h=Math.min(h,2+Math.floor((d-rw)/1.7));
+  const shore=clamp(coast*12,0,1);
+  h=SEA+(h-SEA)*shore;
+  height[z][x]=clamp(Math.round(h),2,34);
 }
 
-// Compact natural terrain runs.
+// Ocean floor + continuous sea first; terrain overwrites water wherever island land exists.
+fill('sand',[0,0,0],[W-1,0,D-1],'Valeborn sea floor');
+fill('water',[0,1,0],[W-1,SEA,D-1],'Valeborn surrounding sea');
+
+// Compact island terrain runs. Similar-height contiguous cells share one authoring op.
 for(let z=0;z<D;z++){
   let x=0;
-  while(x<W){const h=height[z][x];let e=x;while(e+1<W&&height[z][e+1]===h)e++;fill('dirt',[x,0,z],[e,h-1,z],'Natural earth');fill('grass_block',[x,h,z],[e,h,z],'Natural turf');x=e+1;}
+  while(x<W){
+    if(!land[z][x]){x++;continue;}
+    const h=height[z][x];let e=x;
+    while(e+1<W&&land[z][e+1]&&height[z][e+1]===h)e++;
+    const shore=h<=3;
+    fill(shore?'sand':'dirt',[x,1,z],[e,h-1,z],shore?'Coastal sand mass':'Island earth');
+    fill(shore?'sand':'grass_block',[x,h,z],[e,h,z],shore?'Natural shoreline':'Island turf');
+    x=e+1;
+  }
 }
 
-// Curved river and banks: one compact span per row.
-for(let z=2;z<D-2;z++){
+// Main river cuts from the northern interior toward the southern coast.
+for(let z=44;z<286;z++){
   const cx=Math.round(riverX(z)),rw=Math.round(riverW(z));
-  fill('sand',[cx-rw,1,z],[cx+rw,1,z],'River bed');
-  fill('water',[cx-rw,2,z],[cx+rw,2,z],'Brackenford River');
-  set('gravel',[cx-rw-1,height[z][cx-rw-1],z],'River gravel bank');
-  set('gravel',[cx+rw+1,height[z][cx+rw+1],z],'River gravel bank');
+  if(!land[z]?.[cx])continue;
+  const l=clamp(cx-rw,1,W-2),r=clamp(cx+rw,1,W-2);
+  fill('sand',[l,1,z],[r,1,z],'Brackenford river bed');
+  fill('water',[l,2,z],[r,2,z],'Brackenford River');
+  if(land[z][l-1])set('gravel',[l-1,height[z][l-1],z],'River gravel bank');
+  if(land[z][r+1])set('gravel',[r+1,height[z][r+1],z],'River gravel bank');
 }
 
-// Curving old road through the valley.
-for(let z=6;z<154;z++){
-  const cx=Math.round(roadX(z)),y=Math.min(...[-2,-1,0,1,2].map(dx=>height[z][cx+dx]));
+// Main inland road; stops before the coasts so future ports/settlements remain design choices.
+for(let z=62;z<267;z++){
+  const cx=Math.round(roadX(z));
+  if(!land[z][cx])continue;
+  const sample=[-2,-1,0,1,2].filter(dx=>land[z][cx+dx]).map(dx=>height[z][cx+dx]);
+  if(!sample.length)continue;
+  const y=Math.min(...sample);
   fill('dirt_dry',[cx-2,y,z],[cx+2,y,z],'Old North Road verge');
   fill('gravel',[cx-1,y,z],[cx+1,y,z],'Old North Road');
 }
@@ -54,50 +89,74 @@ function stampTrail(points,name){
     for(let s=0;s<=steps;s++){
       const t=s/steps,cx=Math.round(x0+(x1-x0)*t),cz=Math.round(z0+(z1-z0)*t);
       for(let ox=-1;ox<=1;ox++)for(let oz=-1;oz<=1;oz++){
-        const x=cx+ox,z=cz+oz,k=x+'|'+z;if(x<1||z<1||x>=W-1||z>=D-1||seen.has(k))continue;seen.add(k);set('dirt_dry',[x,height[z][x],z],name);
+        const x=cx+ox,z=cz+oz,k=x+'|'+z;
+        if(x<1||z<1||x>=W-1||z>=D-1||!land[z][x]||seen.has(k))continue;
+        seen.add(k);set('dirt_dry',[x,height[z][x],z],name);
       }
     }
   }
 }
-stampTrail([[26,122],[34,112],[47,105],[61,98],[76,94],[90,91]],'Meadow footpath');
-stampTrail([[92,78],[104,68],[115,58],[124,49],[131,42],[136,37]],'Blackstone cave trail');
+stampTrail([[80,238],[102,224],[126,211],[151,197],[177,184],[198,171]],'Western meadow trail');
+stampTrail([[198,153],[216,136],[233,116],[247,96],[256,82],[263,72]],'Blackstone mountain trail');
+stampTrail([[173,186],[164,205],[153,225],[143,245],[134,264]],'South valley trail');
 
-// Cave cut directly into the mountain mass.
-cut([132,3,27],[145,11,33],'Blackstone cave entrance cut');
-cut([137,3,22],[148,10,32],'Blackstone cave tunnel');
-cut([143,3,15],[155,12,29],'Blackstone cave chamber');
-fill('stone_dark',[132,2,28],[150,2,32],'Blackstone cave floor');
-fill('mossy_stone',[131,3,27],[132,9,27],'Blackstone cave mouth west pier');
-fill('mossy_stone',[131,3,33],[132,9,33],'Blackstone cave mouth east pier');
-fill('stone_dark',[132,9,28],[136,11,32],'Blackstone cave brow');
+// Blackstone cave is carved into the east face of the mountain, not placed as a freestanding room.
+cut([257,4,66],[274,14,75],'Blackstone cave entrance cut');
+cut([265,4,58],[282,13,73],'Blackstone cave tunnel');
+cut([276,4,47],[296,16,70],'Blackstone cave chamber');
+fill('stone_dark',[257,3,68],[286,3,73],'Blackstone cave floor');
+fill('mossy_stone',[256,4,66],[257,11,66],'Blackstone cave mouth north pier');
+fill('mossy_stone',[256,4,75],[257,11,75],'Blackstone cave mouth south pier');
+fill('stone_dark',[257,11,67],[262,14,74],'Blackstone cave brow');
 
-// Rock outcrops.
-for(const [cx,cz,r] of [[147,39,4],[124,19,3],[117,52,3],[15,50,3],[35,30,2],[111,126,2]])for(let z=cz-r;z<=cz+r;z++)for(let x=cx-r;x<=cx+r;x++){
-  if(x<0||z<0||x>=W||z>=D||(x-cx)**2+(z-cz)**2>r*r)continue;
-  if(hash(x+7,z+13)>.46)set(hash(x,z)>.5?'stone':'mossy_stone',[x,height[z][x],z],'Natural rock outcrop');
+// Rock outcrops establish visual regions without placing buildings.
+for(const [cx,cz,r] of [[273,86,5],[247,55,4],[231,122,4],[46,108,4],[78,69,3],[231,242,3],[83,254,3]]){
+  for(let z=cz-r;z<=cz+r;z++)for(let x=cx-r;x<=cx+r;x++){
+    if(x<0||z<0||x>=W||z>=D||!land[z][x]||(x-cx)**2+(z-cz)**2>r*r)continue;
+    if(hash(x+7,z+13)>.5)set(hash(x,z)>.5?'stone':'mossy_stone',[x,height[z][x],z],'Natural rock outcrop');
+  }
 }
 
-// Woodland follows ridges/edges rather than filling the future settlement basin.
+// Woodlands follow ridges/coastal uplands and leave the central basin open for later settlement authoring.
 let trees=0;
-for(let z=6;z<D-6;z+=5)for(let x=6;x<W-6;x+=5){
-  const h=height[z][x],nearRiver=Math.abs(x-riverX(z))<9,nearRoad=Math.abs(x-roadX(z))<7;
-  const woodland=h>=6||(x<42&&z<85)||(z>132&&x>84);
-  if(!woodland||nearRiver||nearRoad||hash(x*3,z*5)<=.44)continue;
+for(let z=10;z<D-10;z+=6)for(let x=10;x<W-10;x+=6){
+  if(!land[z][x])continue;
+  const h=height[z][x],nearRiver=z>42&&z<287&&Math.abs(x-riverX(z))<11,nearRoad=z>62&&z<267&&Math.abs(x-roadX(z))<8;
+  const central=basin(x,z)>.28;
+  const woodland=h>=8||(x<105&&z<150)||(z>246&&x>195)||(x<105&&z>210);
+  if(!woodland||central||nearRiver||nearRoad||hash(x*3,z*5)<=.45)continue;
   fill('oak_wood',[x,h+1,z],[x,h+4,z],'Tree trunk');
   fill('grass_detail',[x-1,h+5,z-1],[x+1,h+6,z+1],'Tree crown detail');trees++;
 }
 
-// Sparse meadow detail.
-for(let z=10;z<150;z+=5)for(let x=10;x<150;x+=5){
-  if(Math.abs(x-riverX(z))<8||Math.abs(x-roadX(z))<6)continue;
-  const h=height[z][x];if(h<=4&&hash(x+31,z+17)>.3)set('grass_detail',[x,h+1,z],'Meadow grass');
+// Sparse natural ground detail.
+for(let z=14;z<D-14;z+=7)for(let x=14;x<W-14;x+=7){
+  if(!land[z][x])continue;
+  const h=height[z][x];
+  if(h>3&&h<=6&&Math.abs(x-riverX(z))>9&&hash(x+31,z+17)>.32)set('grass_detail',[x,h+1,z],'Lowland grass');
 }
 
-const world={format:'riftcity-city-block',version:2,id:'brackenford-lowlands-001',name:'Brackenford Lowlands · Natural Terrain Pass',units:'meters',grid:{cell_size:1,shape_increment:0.5},origin:[0,0,0],bounds:{min:[0,0,0],max:[159,31,159]},palette:{air:{material_id:0,shape:'air',color:[0,0,0]}},ops,prefabs:{},layout:[],anchors:{future_settlement_basin:{at:[82,3,92],facing:'north',tags:['future-town','meadow']},blackstone_cave:{at:[133,3,30],facing:'east',tags:['cave','mountain']},river_crossing:{at:[62,3,95],facing:'east',tags:['river','future-crossing']},north_road:{at:[90,3,78],facing:'north',tags:['road']}},validation:{overlap_policy:'allow'},metadata:{terrain_pass:'natural-v1',buildings:false,features:['mountain','cave','river','rolling-hills','valley','old-road','footpaths','woodland','future-settlement-basin']}};
+const world={
+  format:'riftcity-city-block',version:2,id:'brackenford-lowlands-001',name:'Valeborn Starter Island · Natural Terrain Pass',units:'meters',
+  grid:{cell_size:1,shape_increment:0.5},origin:[0,0,0],bounds:{min:[0,0,0],max:[319,47,319]},
+  palette:{air:{material_id:0,shape:'air',color:[0,0,0]}},ops,prefabs:{},layout:[],
+  anchors:{
+    future_settlement_basin:{at:[178,4,178],facing:'north',tags:['future-town','central-meadow']},
+    blackstone_cave:{at:[258,4,71],facing:'east',tags:['cave','mountain']},
+    river_crossing:{at:[155,3,181],facing:'east',tags:['river','future-crossing']},
+    old_north_road:{at:[194,4,154],facing:'north',tags:['road']},
+    western_questlands:{at:[84,6,207],facing:'east',tags:['future-quest-pocket','western-hills']},
+    southern_lowlands:{at:[157,4,257],facing:'north',tags:['future-quest-pocket','south-valley']},
+    north_coast:{at:[160,3,28],facing:'south',tags:['coast','future-quest-pocket']}
+  },
+  validation:{overlap_policy:'allow'},
+  metadata:{terrain_pass:'starter-island-v1',buildings:false,island:true,surrounded_by_water:true,features:['ocean','coastline','mountain','cave','river','rolling-hills','valleys','old-road','footpaths','woodland','central-settlement-basin','questland-reserves']}
+};
 fs.writeFileSync(OUT,JSON.stringify(world,null,2)+'\n');
 
 let content=fs.readFileSync(CONTENT,'utf8');
-content=content.replace(/description: 'Fields, training yards, workshops and old military roads surrounding the walled village of Brackenford\.'/,"description: 'A broad river valley of rolling meadow, wooded hills and the Blackstone mountain ridge. The settlement itself will be placed only after the natural terrain and travel routes are locked.'");
-content=content.replace(/spawn: \{ id: 'valeborn-training-yard', position: \[[^\]]+\], facing: 0 \}/,"spawn: { id: 'valeborn-training-yard', position: [82, 3, 92], facing: 0 }");
+content=content.replace(/description: 'A broad river valley of rolling meadow, wooded hills and the Blackstone mountain ridge\. The settlement itself will be placed only after the natural terrain and travel routes are locked\.'/,
+  "description: 'A large Valeborn island surrounded by open water, with long coasts, wooded uplands, river valleys, rolling questlands and the Blackstone mountain dominating the east. Brackenford will be placed later inside the central meadow basin.'");
+content=content.replace(/spawn: \{ id: 'valeborn-training-yard', position: \[[^\]]+\], facing: 0 \}/,"spawn: { id: 'valeborn-training-yard', position: [178, 4, 178], facing: 0 }");
 fs.writeFileSync(CONTENT,content);
-console.log(`[brackenford-natural] wrote ${ops.length} ops; trees=${trees}; buildings=0`);
+console.log(`[valeborn-island] ${W}x${D}; ops=${ops.length}; trees=${trees}; buildings=0`);
