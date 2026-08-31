@@ -28,7 +28,7 @@ window.addEventListener('focus', async ()=>{
     // before Safari/iOS delivered its change event, making Block 001 appear
     // permanently hardcoded. Session/HUD state can refresh without replacing
     // the current renderer/UI tree.
-    await refreshSession({navigate:false});
+    await refreshSession({navigate:false,maxAgeMs:120_000});
   } catch (error) {
     console.warn('RiftCity focus session refresh failed', error);
   } finally {

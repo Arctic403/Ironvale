@@ -94,6 +94,7 @@ export async function ensureGameplayTables(env) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_bank_ledger_user ON bank_ledger(user_id,created_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_investments_user ON player_investments(user_id,matures_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_auction_active ON auction_listings(status,created_at)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_education_active ON player_education(user_id,status,completes_at)').run();
   ensured = true;
 }
 

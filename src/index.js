@@ -12,12 +12,19 @@ import {
 } from './plugins/index.js';
 import { handleGameplayApi, ensureGameplayTables, incrementProgress, setProgressAtLeast, getGameplayModifiers } from './services/gameplay.js';
 import { getLawState, getLawChancePenalty, applyCrimeHeat, recordActivity } from './services/living-city.js';
+import { buildRiftSyncSnapshot, RIFT_SYNC_VERSION } from './services/sync.js';
 import { handleAiBuilderMcpRequest, AI_BUILDER_MCP_PATH, AI_BUILDER_MCP_VERSION, AI_BUILDER_REMOTE_TOOL_NAMES, executeRiftBridgeJob, RIFTBRIDGE_VERSION, RIFTBRIDGE_ENDPOINT, RIFTBRIDGE_JOB_FORMAT } from './ai-builder-mcp.js';
 
 const SESSION_COOKIE = 'riftcity_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 // Cloudflare Workers currently supports PBKDF2 iteration counts up to 100,000.
 const PASSWORD_ITERATIONS = 100_000;
+const SESSION_ACTIVITY_WRITE_INTERVAL_MS = 5 * 60_000;
+let playerStateSchemaEnsured = false;
+let playerLocationSchemaEnsured = false;
+let inventorySchemaEnsured = false;
+let crimeSchemaEnsured = false;
+let logSchemaEnsured = false;
 const LOG_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS system_logs (
     id TEXT PRIMARY KEY,
@@ -183,6 +190,7 @@ async function handleApi(request, env, url, requestId) {
   if (method === 'POST' && url.pathname === '/api/auth/logout') return logout(request, env, requestId);
   if (method === 'GET' && url.pathname === '/api/auth/me') return me(request, env);
   if (method === 'GET' && url.pathname === '/api/player/state') return getPlayerState(request, env);
+  if (method === 'GET' && url.pathname === '/api/sync') return getPlayerSync(request, env);
   if (method === 'GET' && url.pathname === '/api/items') return getItemCatalog(request, env);
   if (method === 'GET' && url.pathname.startsWith('/api/items/')) return getItem(request, env, url);
   if (method === 'GET' && url.pathname === '/api/inventory') return getInventory(request, env);
@@ -386,6 +394,21 @@ async function getPlayerState(request, env) {
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
   const playerState = await ensureActivePlayerState(env, auth.user.id);
   return json({ ok: true, player: toPublicPlayerState(playerState) });
+}
+
+async function getPlayerSync(request, env) {
+  const auth = await authenticate(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const snapshot = await buildRiftSyncSnapshot(auth.user.id, env, {
+    ensureActivePlayerState,
+    ensurePlayerLocation,
+    toPublicPlayerState,
+    toPublicPlayerLocation
+  });
+  return json(snapshot, 200, {
+    'Cache-Control': 'private, no-store',
+    'X-RiftCity-Sync-Version': RIFT_SYNC_VERSION
+  });
 }
 
 
@@ -823,10 +846,12 @@ function calculateResourceEffects(player, effects) {
 }
 
 async function ensureInventoryTable(env) {
+  if (inventorySchemaEnsured) return;
   try {
     await env.DB.prepare(PLAYER_INVENTORY_TABLE_SQL).run();
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_inventory_user ON player_inventory(user_id)').run();
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_inventory_equipped ON player_inventory(user_id, equipped_slot)').run();
+    inventorySchemaEnsured = true;
   } catch (error) {
     throw new Error(`Could not initialize player inventory: ${safeErrorMessage(error)}`);
   }
@@ -878,6 +903,7 @@ async function removeItemFromInventory(env, userId, itemId, quantity = 1) {
 }
 
 async function ensureCrimeTables(env) {
+  if (crimeSchemaEnsured) return;
   await ensureInventoryTable(env);
   await env.DB.prepare(PLAYER_CRIME_PROGRESS_TABLE_SQL).run();
   await env.DB.prepare(CRIME_HISTORY_TABLE_SQL).run();
@@ -885,6 +911,7 @@ async function ensureCrimeTables(env) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_crime_progress_mastery ON player_crime_progress(user_id, mastery)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_crime_history_user_created ON crime_history(user_id, created_at DESC)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_crime_history_crime ON crime_history(user_id, crime_id, created_at DESC)').run();
+  crimeSchemaEnsured = true;
 }
 
 function normalizeCrimeProgress(row, crimeId) {
@@ -2504,7 +2531,7 @@ async function authenticate(request, env) {
   const now = Date.now();
 
   const row = await env.DB.prepare(`
-    SELECT s.id AS session_id, s.expires_at, u.id, u.username, u.role, u.created_at,
+    SELECT s.id AS session_id, s.expires_at, s.last_seen_at, u.id, u.username, u.role, u.created_at,
       u.last_active_at, u.is_banned, u.ban_reason
     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?
   `).bind(tokenHash).first();
@@ -2515,10 +2542,16 @@ async function authenticate(request, env) {
     return null;
   }
 
-  await env.DB.batch([
-    env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').bind(now, row.session_id),
-    env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(now, row.id)
-  ]);
+  const lastActivityWrite = Math.max(Number(row.last_seen_at) || 0, Number(row.last_active_at) || 0);
+  if (now - lastActivityWrite >= SESSION_ACTIVITY_WRITE_INTERVAL_MS) {
+    await env.DB.batch([
+      env.DB.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').bind(now, row.session_id),
+      env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(now, row.id)
+    ]);
+  }
+  // The request is active now even when the persistence write is intentionally
+  // throttled. Keep response semantics current without spending two D1 writes
+  // on every API invocation.
   row.last_active_at = now;
   return { user: row, sessionId: row.session_id };
 }
@@ -2600,6 +2633,7 @@ async function writeAudit(env, actorUserId, action, targetUserId, details) {
 }
 
 async function ensurePlayerStateTable(env) {
+  if (playerStateSchemaEnsured) return;
   await env.DB.prepare(PLAYER_STATE_TABLE_SQL).run();
   const columns = await env.DB.prepare('PRAGMA table_info(player_state)').all();
   const names = new Set((columns.results || []).map(row => row.name));
@@ -2610,20 +2644,23 @@ async function ensurePlayerStateTable(env) {
   }
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_state_status ON player_state(status)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_state_level ON player_state(level)').run();
+  playerStateSchemaEnsured = true;
 }
 
 async function ensurePlayerState(env, userId) {
   await ensurePlayerStateTable(env);
+  const existing = await getPlayerStateRow(env, userId, false);
+  if (existing) return existing;
   const now = Date.now();
   await env.DB.prepare(`
-    INSERT OR IGNORE INTO player_state
+    INSERT INTO player_state
       (user_id, health_regen_at, energy_regen_at, nerve_regen_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?)
   `).bind(userId, now, now, now, now, now).run();
   return getPlayerStateRow(env, userId);
 }
 
-async function getPlayerStateRow(env, userId) {
+async function getPlayerStateRow(env, userId, required = true) {
   const row = await env.DB.prepare(`
     SELECT user_id, health, max_health, nerve, max_nerve, energy, max_energy, cash,
       level, xp, strength, defense, speed, dexterity, status, status_until, status_reason,
@@ -2631,8 +2668,8 @@ async function getPlayerStateRow(env, userId) {
     FROM player_state WHERE user_id = ?
   `).bind(userId).first();
 
-  if (!row) throw new Error('Could not create or load player state');
-  return row;
+  if (!row && required) throw new Error('Could not create or load player state');
+  return row || null;
 }
 
 function settleResourceValue(current, maximum, lastAt, config, timestamp) {
@@ -2725,24 +2762,27 @@ function xpNeededForLevel(level) {
 }
 
 async function ensurePlayerLocationTable(env) {
+  if (playerLocationSchemaEnsured) return;
   await env.DB.prepare(PLAYER_LOCATION_TABLE_SQL).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_location_district ON player_location(district_id)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_player_location_location ON player_location(location_id)').run();
+  playerLocationSchemaEnsured = true;
 }
 
 async function ensurePlayerLocation(env, userId) {
   await ensurePlayerLocationTable(env);
   const now = Date.now();
-  await env.DB.prepare(`
-    INSERT OR IGNORE INTO player_location (user_id, district_id, location_id, updated_at)
-    VALUES (?, 'services', 'rift-civic-hall', ?)
-  `).bind(userId, now).run();
-
   let row = await env.DB.prepare(`
     SELECT user_id, district_id, location_id, updated_at
     FROM player_location WHERE user_id = ?
   `).bind(userId).first();
-  if (!row) throw new Error('Could not create or load player location');
+  if (!row) {
+    await env.DB.prepare(`
+      INSERT INTO player_location (user_id, district_id, location_id, updated_at)
+      VALUES (?, 'services', 'rift-civic-hall', ?)
+    `).bind(userId, now).run();
+    row = { user_id: userId, district_id: 'services', location_id: 'rift-civic-hall', updated_at: now };
+  }
 
   // Phase 3.1 migration: old district-based locations are automatically moved
   // to City Hall, so existing players do not need a manual D1 migration.
@@ -2774,10 +2814,12 @@ function toPublicPlayerLocation(row) {
 }
 
 async function ensureLogTable(env) {
+  if (logSchemaEnsured) return;
   await env.DB.prepare(LOG_TABLE_SQL).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_system_logs_created ON system_logs(created_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_system_logs_severity ON system_logs(severity)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_system_logs_error_id ON system_logs(error_id)').run();
+  logSchemaEnsured = true;
 }
 
 async function safeWriteSystemLog(env, entry) {

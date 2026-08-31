@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS player_education (
   PRIMARY KEY(user_id,course_id),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_player_education_active ON player_education(user_id,status,completes_at);
 CREATE TABLE IF NOT EXISTS player_gym (
   user_id TEXT PRIMARY KEY,gym_exp INTEGER NOT NULL DEFAULT 0,streak INTEGER NOT NULL DEFAULT 0,
   sessions INTEGER NOT NULL DEFAULT 0,last_train_at INTEGER,updated_at INTEGER NOT NULL,
@@ -344,6 +345,7 @@ CREATE TABLE IF NOT EXISTS production_batches (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_production_user ON production_batches(user_id,completes_at);
+CREATE INDEX IF NOT EXISTS idx_production_unclaimed ON production_batches(user_id,claimed,completes_at);
 
 CREATE TABLE IF NOT EXISTS player_property_effects (
   user_id TEXT PRIMARY KEY,
@@ -478,6 +480,7 @@ CREATE TABLE IF NOT EXISTS activity_feed (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_feed_unread ON activity_feed(user_id,read,created_at DESC);
 
 CREATE TABLE IF NOT EXISTS city_activity_state (
   user_id TEXT NOT NULL,

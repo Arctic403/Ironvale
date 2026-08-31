@@ -74,6 +74,7 @@ export async function ensureLivingCityTables(env){
  if(ensured)return;
  for(const s of SQL.split(';').map(x=>x.trim()).filter(Boolean)) await env.DB.prepare(s).run();
  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id,created_at DESC)').run();
+ await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_activity_feed_unread ON activity_feed(user_id,read,created_at DESC)').run();
  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_law_history_user ON law_history(user_id,created_at DESC)').run();
  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_crime_operations_user ON crime_operations(user_id,status,completes_at)').run();
  ensured=true;

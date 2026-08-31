@@ -105,6 +105,7 @@ const CSS = `
 .rift-dev-tools-grid button.active{border-color:#69d69b;background:#174e38;color:#d9ffea}
 .rift-validator-row{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 12px}
 .rift-validator-row span{display:grid;gap:2px}.rift-validator-row small{color:#9eb0be;font-size:9px;font-weight:600}.rift-validator-row input{width:24px;height:24px;accent-color:#69d69b}
+.rift-network-readout{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:9px;border:1px solid #ffffff18;border-radius:12px;background:#09131b}.rift-network-readout div{min-width:0;padding:7px;border:1px solid #ffffff0d;background:#ffffff07}.rift-network-readout span{display:block;color:#8fa8ba;font:800 8px/1.2 system-ui;letter-spacing:.08em}.rift-network-readout b{display:block;margin-top:3px;color:#eaf8ff;font:900 12px/1 system-ui}.rift-network-readout small{grid-column:1/-1;color:#88a0b0;font:600 9px/1.35 system-ui}
 .rift-hide-fps #downtown3d-fps{display:none!important}
 @media(pointer:coarse),(max-width:700px){
   .rift-game-ui-active .world3d-top-left{top:58px!important}
@@ -176,6 +177,16 @@ function syncDevTools() {
   if (firstPerson) firstPerson.classList.toggle('active', !!firstPersonSource?.classList.contains('active'));
   const buildPanel = r.querySelector('[data-rift-tool-build-panel]');
   if (buildPanel) buildPanel.classList.toggle('active', !!r.querySelector('#rift-creative-panel')?.classList.contains('open'));
+  const networkOut = r.querySelector('[data-rift-network-readout]');
+  if (networkOut) {
+    const net = window.RiftCityNetwork?.status;
+    if (!net) networkOut.innerHTML='<small>Network telemetry becomes available after the RiftCity API bridge loads.</small>';
+    else {
+      const hit = Math.round((Number(net.cacheHitRate)||0)*100);
+      const daily = net.estimatedDailyRequests==null?'WARMING':Number(net.estimatedDailyRequests).toLocaleString();
+      networkOut.innerHTML=`<div><span>WORKER REQUESTS</span><b>${net.networkRequests}</b></div><div><span>AVOIDED</span><b>${net.avoidedWorkerRequests}</b></div><div><span>CACHE / DEDUPE</span><b>${hit}%</b></div><div><span>AVG LATENCY</span><b>${Math.round(net.avgLatencyMs||0)} ms</b></div><div><span>SYNC D1 ROWS</span><b>${net.syncBatchRowsRead}</b></div><div><span>EST. / DAY</span><b>${daily}</b></div><small>Sync batch queries: ${net.syncBatchQueries} · retries: ${net.retries} · blocked runaway GETs: ${net.blocked}. D1 row count is the aggregate-sync batch only, not every game query.</small>`;
+    }
+  }
 }
 
 function sync() {
@@ -319,6 +330,7 @@ function mount(r) {
             <button type="button" data-rift-tool-first-person>FIRST PERSON</button>
             <button type="button" data-rift-tool-build-panel>BUILD TOOLS</button>
             <label class="rift-validator-row"><span><b>VALIDATOR DEBUG</b><small>Show live validation pass popups after block/world edits.</small></span><input data-rift-validator-debug type="checkbox"></label>
+            <div class="rift-network-readout" data-rift-network-readout><small>Loading Cloudflare efficiency telemetry…</small></div>
           </div>
         </div>
         <div class="rift-game-panel" data-rift-game-panel="settings" hidden>
@@ -377,6 +389,7 @@ function mount(r) {
 
 window.addEventListener('riftgraphicschange', sync);
 window.addEventListener('riftgraphicsbuffer', sync);
+window.addEventListener('riftnetworkchange', syncDevTools);
 window.addEventListener('keydown', event => {
   if (typing()) return;
   const r = state.root || root();
@@ -407,7 +420,7 @@ hydrateDevState();
 new MutationObserver(mountAll).observe(document.documentElement, { childList: true, subtree: true });
 mountAll();
 window.RiftCityGameMenu = Object.freeze({
-  version: 'H1.86-dev-tools-validator-debug',
+  version: 'H1.87-cloudflare-efficiency',
   open() { mountAll(); if (state.root) overlay(true, 'menu'); },
   world() { mountAll(); if (state.root) overlay(true, 'world'); },
   settings() { mountAll(); if (state.root) overlay(true, 'settings'); },

@@ -128,6 +128,7 @@ export async function ensureAdvancedTables(env) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_combat_attacker ON combat_history(attacker_user_id,created_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_combat_defender ON combat_history(defender_user_id,created_at)').run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_production_user ON production_batches(user_id,completes_at)').run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_production_unclaimed ON production_batches(user_id,claimed,completes_at)').run();
   ensured = true;
 }
 

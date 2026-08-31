@@ -1,4 +1,4 @@
-import { api, getService } from './api.js';
+import { api } from './api.js';
 import { state, setPlayer, clearState } from './state.js';
 import { $, $$, escapeHtml, money, progress, duration, timeUntil } from './helpers.js';
 import { go } from './router.js';
@@ -24,7 +24,14 @@ const DRAWER_GROUPS = [
   ]]
 ];
 
+const EFFECT_SYNC_FALLBACK_MS=120_000;
+const EFFECT_SYNC_MIN_GAP_MS=5_000;
 let effectTimer=null;
+let effectRefreshTimer=null;
+let effectSyncPending=null;
+let lastEffectSyncAt=0;
+let mutationSyncTimer=null;
+let lastSessionRefreshAt=0;
 
 export function initShell() {
   $('#menu-button')?.addEventListener('click',()=>$('#game-drawer')?.classList.toggle('open'));
@@ -144,18 +151,23 @@ async function refreshResourceHudIfDue() {
   if (!due || refreshResourceHudIfDue.pending) return;
   refreshResourceHudIfDue.pending=true;
   try {
-    const result=await api('/api/player/state');
-    if (result.ok&&result.player) renderPlayerHud(result.player);
+    await refreshEffects({reason:'resource-regen',force:true});
   } finally {
     refreshResourceHudIfDue.pending=false;
   }
 }
 
-export async function refreshSession({navigate=true}={}) {
+export async function refreshSession({navigate=true,maxAgeMs=0}={}) {
+  if (state.authenticated && Number(maxAgeMs)>0 && Date.now()-lastSessionRefreshAt<Number(maxAgeMs)) {
+    renderPlayerHud(state.player);
+    startEffects();
+    return true;
+  }
   setSessionStatus('Checking RiftCity session…');
   const result=await api('/api/auth/me');
   if (!result.ok || !result.authenticated) {
     clearState();
+    lastSessionRefreshAt=0;
     $('#auth-grid')?.classList.remove('hidden');
     $('#game-root')?.classList.add('hidden');
     $('#hud-shell')?.classList.add('hidden');
@@ -166,6 +178,7 @@ export async function refreshSession({navigate=true}={}) {
     return false;
   }
   state.authenticated=true;
+  lastSessionRefreshAt=Date.now();
   state.user=result.user;
   state.player=result.player;
   state.location=result.location||state.location;
@@ -201,16 +214,25 @@ export async function submitAuth(path, form) {
   go('character');
 }
 
+function scheduleEffectRefresh(delay=EFFECT_SYNC_FALLBACK_MS) {
+  clearTimeout(effectRefreshTimer);
+  effectRefreshTimer=null;
+  if (!state.authenticated) return;
+  effectRefreshTimer=setTimeout(()=>refreshEffects({reason:'timer'}),Math.max(5_000,Number(delay)||EFFECT_SYNC_FALLBACK_MS));
+}
+
 export function startEffects() {
   if (effectTimer) return;
-  refreshEffects();
   effectTimer=setInterval(tickEffects,1000);
-  refreshEffects.timer=setInterval(refreshEffects,30000);
+  tickEffects();
+  refreshEffects({reason:'start',force:true});
 }
 
 export function stopEffects() {
   clearInterval(effectTimer); effectTimer=null;
-  clearInterval(refreshEffects.timer); refreshEffects.timer=null;
+  clearTimeout(effectRefreshTimer); effectRefreshTimer=null;
+  clearTimeout(mutationSyncTimer); mutationSyncTimer=null;
+  effectSyncPending=null;
 }
 
 let effects=[];
@@ -231,38 +253,70 @@ function renderEffect(effect) {
   </button>`;
 }
 
-export async function refreshEffects() {
-  if (!state.authenticated) return;
-  const [status,events,travel,education,production,bank,law,activity,merits]=await Promise.all([
-    getService('status'),getService('events'),getService('travel'),
-    getService('education'),getService('production'),getService('bank'),
-    getService('law'),getService('activity'),getService('merits')
-  ]);
-  if(law.ok) state.law=law.law; if(merits.ok) state.merits=merits.state;
-  const next=[];
-  if (status.ok && status.status?.type && status.status.type!=='active') {
-    next.push({label:String(status.status.type).toUpperCase(),until:status.status.until,route:'status',tone:'danger'});
+export async function refreshEffects({reason='manual',force=false}={}) {
+  if (!state.authenticated) return null;
+  if (!force && document.visibilityState==='hidden') {
+    scheduleEffectRefresh(EFFECT_SYNC_FALLBACK_MS);
+    return null;
   }
-  const event=events.event||events.activeEvent||events.current||events.events?.active;
-  if (events.ok && event) next.push({label:'CITY EVENT',value:event.name||event.title||'Active',route:'events',tone:'event'});
-  if (travel.ok && travel.state?.traveling_to) next.push({label:'TRAVEL',until:travel.state.arrives_at,route:'travel',tone:'info'});
-  if (education.ok) {
-    for (const row of education.enrollments||[]) {
-      if (row.status==='studying' && Number(row.completes_at)>Date.now()) {
-        const course=(education.courses||[]).find(c=>c.id===row.course_id);
-        next.push({label:'EDUCATION',value:course?.name||row.course_id,until:row.completes_at,route:'education'});
-      }
+  if (typeof navigator!=='undefined' && navigator.onLine===false) {
+    scheduleEffectRefresh(30_000);
+    return null;
+  }
+  const age=Date.now()-lastEffectSyncAt;
+  if (!force && age<EFFECT_SYNC_MIN_GAP_MS) {
+    scheduleEffectRefresh(Math.max(EFFECT_SYNC_MIN_GAP_MS-age,5_000));
+    return null;
+  }
+  if (effectSyncPending) return effectSyncPending;
+
+  effectSyncPending=(async()=>{
+    const result=await api('/api/sync',{riftBackground:true,riftCacheTtl:750});
+    if (!result.ok) {
+      scheduleEffectRefresh(result.offline?30_000:45_000);
+      return result;
     }
-  }
-  if (production.ok) {
-    const active=(production.batches||[]).filter(b=>!b.claimed);
-    if (active.length) next.push({label:'PRODUCTION',value:`${active.length} active`,route:'production'});
-  }
-  if (bank.ok && bank.security?.frozen) next.push({label:'BANK FROZEN',until:bank.security.frozenUntil||bank.security.frozen_until,route:'bank',tone:'danger'});
-  if(law.ok&&Number(law.law?.heat)>0) next.push({label:'HEAT',value:`${law.law.heat} · ${law.law.tier?.name||''}`,route:'law',tone:Number(law.law.heat)>=60?'danger':'event'});
-  if(activity.ok&&Number(activity.unread)>0) next.push({label:'ACTIVITY',value:`${activity.unread} unread`,route:'activity',tone:'info'});
-  effects=next;
-  const root=$('#effects-strip');
-  root?.classList.toggle('empty',!effects.length);
-  tickEffects();
+    lastEffectSyncAt=Date.now();
+    if (result.player) renderPlayerHud(result.player);
+    if (result.location) state.location=result.location;
+    const bundle=result.effects||{};
+    if (bundle.law) state.law=bundle.law;
+    if (bundle.merits) state.merits=bundle.merits;
+
+    const next=[];
+    const status=bundle.status||result.player?.status;
+    if (status?.type&&status.type!=='active') next.push({label:String(status.type).toUpperCase(),until:status.until,route:'status',tone:'danger'});
+    const event=bundle.event;
+    if (event) next.push({label:'CITY EVENT',value:event.name||event.title||'Active',route:'events',tone:'event'});
+    const travel=bundle.travel;
+    if (travel?.travelingTo&&Number(travel.arrivesAt)>Date.now()) next.push({label:'TRAVEL',until:travel.arrivesAt,route:'travel',tone:'info'});
+    for (const enrollment of bundle.education||[]) {
+      if (Number(enrollment.completesAt)>Date.now()) next.push({label:'EDUCATION',value:enrollment.name||enrollment.courseId,until:enrollment.completesAt,route:'education'});
+    }
+    if (Number(bundle.production?.activeCount)>0) next.push({label:'PRODUCTION',value:`${bundle.production.activeCount} active`,route:'production'});
+    if (bundle.bank?.frozen) next.push({label:'BANK FROZEN',until:bundle.bank.frozenUntil,route:'bank',tone:'danger'});
+    if (Number(bundle.law?.heat)>0) next.push({label:'HEAT',value:`${bundle.law.heat} · ${bundle.law.tier?.name||''}`,route:'law',tone:Number(bundle.law.heat)>=60?'danger':'event'});
+    if (Number(bundle.activity?.unread)>0) next.push({label:'ACTIVITY',value:`${bundle.activity.unread} unread`,route:'activity',tone:'info'});
+    effects=next;
+    const root=$('#effects-strip');
+    root?.classList.toggle('empty',!effects.length);
+    tickEffects();
+    scheduleEffectRefresh(Math.max(30_000,Number(result.pollAfterMs)||EFFECT_SYNC_FALLBACK_MS));
+    return result;
+  })();
+
+  try { return await effectSyncPending; }
+  finally { effectSyncPending=null; }
 }
+
+function scheduleMutationSync() {
+  if (!state.authenticated) return;
+  clearTimeout(mutationSyncTimer);
+  mutationSyncTimer=setTimeout(()=>refreshEffects({reason:'mutation',force:true}),350);
+}
+
+window.addEventListener('riftapi:mutation',scheduleMutationSync);
+window.addEventListener('online',()=>{ if(state.authenticated) refreshEffects({reason:'online',force:true}); });
+document.addEventListener('visibilitychange',()=>{
+  if (document.visibilityState==='visible'&&state.authenticated&&Date.now()-lastEffectSyncAt>30_000) refreshEffects({reason:'visible',force:true});
+});
