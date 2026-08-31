@@ -425,8 +425,8 @@ export async function loadRiggedCharacterAsset(
 
   const clips = buildAnimationClips(animationParsed, modelParsed.document);
   const clipNames = [...clips.keys()];
-  const idle = chooseClip(clipNames, [/^idle$/i, /idle/i, /stand/i], clipNames[0] || null);
-  const walk = chooseClip(clipNames, [/walk(?!.*back)/i, /walking/i, /run/i], idle);
+  const idle = chooseClip(clipNames, [/^idle_loop$/i, /^idle$/i, /^idle_/i, /stand/i], clipNames[0] || null);
+  const walk = chooseClip(clipNames, [/^walk_loop$/i, /^walk$/i, /^walk_/i, /walking/i, /run/i], idle);
   const runtime = new RiftCharacterRuntime(modelParsed.document, skins, clips);
   runtime.update(0, idle);
   const skin = modelParsed.document.skins?.[0];
