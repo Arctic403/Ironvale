@@ -2,6 +2,7 @@ import { RIFT_BLOCK_FACE_DEFS } from './rift-block-world.js';
 import { buildRiftPartialShapeGeometry, riftBlockStateHasPartialShape } from './rift-block-shapes.js';
 import {
   buildRiftNativeSectionFaceMasks,
+  buildRiftNativeSectionMesh,
   riftNativeSectionIndex,
   riftNativeWorldCellToSection
 } from './rift-wasm-core.js';
@@ -180,15 +181,32 @@ export class RiftBlockSection {
     return count;
   }
 
-  buildGeometry({ getOutsideBlock = null, getBlockColor = null, classifyBlockFace = null } = {}) {
+  buildGeometry({ getOutsideBlock = null, getBlockColor = null, classifyBlockFace = null, nativeNeighbors = null } = {}) {
     const origin = this.origin();
+
+    // Native Core v3 owns the full-block fast path end-to-end: persistent
+    // section residency, cross-section border culling, vertex/normal/material
+    // emission and index generation. Dynamic face classifiers and partial
+    // shapes deliberately fall through to the proven JavaScript pipeline.
+    if (typeof classifyBlockFace !== 'function') {
+      const nativeMesh = buildRiftNativeSectionMesh(this, {
+        neighbors: nativeNeighbors,
+        getOutsideBlock,
+        getBlockColor
+      });
+      if (nativeMesh) {
+        this.meshRevision = this.revision;
+        this.dirty = false;
+        return nativeMesh;
+      }
+    }
 
     // H1.56 shape-aware path. Legacy material-only states still use the proven
     // full-block fast path below, so the street renderer keeps its exact face
     // counts/performance until a section actually contains a slab or stair.
-    // Native Core v2 copies this section's compact 8 KiB state array once and
-    // returns both partial-shape detection and full-block visibility masks. This
-    // replaces up to 24,576 JS neighbor checks per dirty full-block section.
+    // If v3 intentionally declines the mesh (partial shape, dynamic face color,
+    // or unavailable WASM), its compact compatibility culler still preserves the
+    // previous fast full-block path before JavaScript emits any fallback faces.
     const nativeSectionAnalysis = buildRiftNativeSectionFaceMasks(this.states);
     const containsPartialShape = nativeSectionAnalysis.partial;
 
@@ -472,10 +490,19 @@ export class RiftSectionGrid {
 
   buildGeometryForSection(section, { getBlockColor = null, classifyBlockFace = null } = {}) {
     if (!(section instanceof RiftBlockSection)) throw new Error('Expected a RiftBlockSection.');
+    const nativeNeighbors = [
+      this.getSection(section.sx + 1, section.sy, section.sz),
+      this.getSection(section.sx - 1, section.sy, section.sz),
+      this.getSection(section.sx, section.sy + 1, section.sz),
+      this.getSection(section.sx, section.sy - 1, section.sz),
+      this.getSection(section.sx, section.sy, section.sz + 1),
+      this.getSection(section.sx, section.sy, section.sz - 1)
+    ];
     return section.buildGeometry({
       getOutsideBlock: (worldX, worldY, worldZ) => this.getBlockWorld(worldX, worldY, worldZ),
       getBlockColor,
-      classifyBlockFace
+      classifyBlockFace,
+      nativeNeighbors
     });
   }
 }

@@ -1,4 +1,5 @@
 import { ensureRiftSharedPalette } from './rift-material-library.js';
+import { createRiftNativeGridAccelerator } from './rift-wasm-core.js';
 const ROTATIONS=['north','east','south','west'];
 const clone=value=>JSON.parse(JSON.stringify(value));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -134,6 +135,9 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   function insideLocal(point){const b=draft?.bounds;return !!b&&point.every((v,i)=>v>=b.min[i]&&v<=b.max[i]);}
   function getGrid(){return getImported?.()?.grid||null;}
 
+  const nativeGrid=createRiftNativeGridAccelerator(()=>getGrid());
+  const FACE_NORMALS=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+
   function screenRay(clientX,clientY){
     const rect=canvas.getBoundingClientRect();
     const nx=((clientX-rect.left)/Math.max(1,rect.width))*2-1, ny=1-((clientY-rect.top)/Math.max(1,rect.height))*2;
@@ -152,8 +156,8 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
     return {origin:[...camera.position],direction:norm([forward[0]+right[0]*nx*t*aspect+up[0]*ny*t,forward[1]+right[1]*nx*t*aspect+up[1]*ny*t,forward[2]+right[2]*nx*t*aspect+up[2]*ny*t])};
   }
 
-  function raycast(clientX,clientY,maxDistance=120){
-    const grid=getGrid();if(!grid)return null;const ray=screenRay(clientX,clientY);let previous=null,lastKey='';
+  function raycastFallback(ray,maxDistance=120){
+    const grid=getGrid();if(!grid)return null;let previous=null,lastKey='';
     for(let d=.05;d<=maxDistance;d+=.06){
       const p=[ray.origin[0]+ray.direction[0]*d,ray.origin[1]+ray.direction[1]*d,ray.origin[2]+ray.direction[2]*d],cell=p.map(Math.floor),key=cell.join(',');
       if(key===lastKey)continue;lastKey=key;
@@ -163,6 +167,26 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
       previous=cell;
     }
     return null;
+  }
+
+  function raycast(clientX,clientY,maxDistance=120){
+    const grid=getGrid();if(!grid)return null;const ray=screenRay(clientX,clientY);
+    // Details/fluids live outside the solid RiftSection state array, so keep the
+    // exact legacy picker whenever special cells exist. Ordinary block editing
+    // uses the native voxel DDA and skips thousands of 0.06 m JS ray steps.
+    if((getImported?.()?.specialCells?.size||0)>0)return raycastFallback(ray,maxDistance);
+    const nativeHit=nativeGrid.raycast(ray.origin,ray.direction,maxDistance);
+    if(!nativeHit.native)return raycastFallback(ray,maxDistance);
+    if(!nativeHit.hit)return null;
+    const normal=FACE_NORMALS[nativeHit.face]||[0,0,0];
+    return {
+      hit:nativeHit.hit,
+      place:nativeHit.face<0?null:nativeHit.hit.map((value,index)=>value+normal[index]),
+      state:nativeHit.state,
+      distance:nativeHit.distance,
+      special:null,
+      native:true
+    };
   }
 
   function resolvePlaceState(){
@@ -237,6 +261,6 @@ export function createRiftCreativeMode({root,canvas,engine,camera,getImported,lo
   return {
     update(){updateTarget();},get active(){return active;},refreshAiDrafts,loadSelectedAiDraft,
     onDocumentLoaded(){if(active){draft=ensureRiftSharedPalette(clone(getImported().document));refreshPalette();refreshSelect();}},
-    destroy(){exit();toggle?.removeEventListener('click',toggleMode);window.removeEventListener('keydown',onKeyDown);canvas.removeEventListener('pointerdown',onCanvasPointerDown);canvas.removeEventListener('pointermove',onCanvasPointerMove);canvas.removeEventListener('pointerup',onCanvasPointerUp);engine.removeDrawables(markerEdges);}
+    destroy(){exit();toggle?.removeEventListener('click',toggleMode);window.removeEventListener('keydown',onKeyDown);canvas.removeEventListener('pointerdown',onCanvasPointerDown);canvas.removeEventListener('pointermove',onCanvasPointerMove);canvas.removeEventListener('pointerup',onCanvasPointerUp);nativeGrid.dispose();engine.removeDrawables(markerEdges);}
   };
 }

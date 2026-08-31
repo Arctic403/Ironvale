@@ -1,6 +1,9 @@
 import {
   buildRiftNativeSectionFaceMasks,
+  buildRiftNativeSectionMesh,
+  createRiftNativeGridAccelerator,
   getRiftNativeCoreStatus,
+  resetRiftNativeCoreMetrics,
   riftNativeStateShapeTop
 } from '../public/rift-wasm-core.js';
 import {
@@ -24,29 +27,51 @@ import {
   riftPlayerShapeTopAt,
   riftPlayerStairTop
 } from '../public/rift-player.js';
+import fs from 'node:fs';
 
 const failures = [];
 const ok = (value, message) => { if (!value) failures.push(message); };
 const near = (actual, expected, tolerance = 1e-5) => Math.abs(actual - expected) <= tolerance;
+resetRiftNativeCoreMetrics();
 
 const status = getRiftNativeCoreStatus();
-ok(status.wasm && status.version === 2, `Node engine bridge is not using native v2: ${JSON.stringify(status)}`);
+ok(status.wasm && status.version === 3, `Node engine bridge is not using native v3: ${JSON.stringify(status)}`);
+ok(status.residentSlotCapacity >= 64, `native resident slot capacity too small: ${status.residentSlotCapacity}`);
 
+// v2 compatibility mask API is still present for partial/dynamic fallbacks.
 const directStates = new Uint16Array(4096);
 directStates[(1 << 8) | (1 << 4) | 1] = 1;
 directStates[(1 << 8) | (1 << 4) | 2] = 1;
 const directMask = buildRiftNativeSectionFaceMasks(directStates);
 ok(directMask.native && !directMask.partial && directMask.blocks === 2 && directMask.candidateFaces === 10,
-  `native section face-mask bridge mismatch: ${JSON.stringify({ ...directMask, masks: undefined })}`);
+  `native section face-mask compatibility mismatch: ${JSON.stringify({ ...directMask, masks: undefined })}`);
 
+// v3 emits the entire full-block section geometry in C++.
 const section = new RiftBlockSection();
 section.setBlock(1, 1, 1, RIFT_SECTION_SOLID);
 section.setBlock(2, 1, 1, RIFT_SECTION_SOLID);
 const geometry = section.buildGeometry();
 ok(geometry.blocks === 2 && geometry.visibleFaces === 10 && geometry.culledFaces === 2,
-  `accelerated section geometry mismatch: ${JSON.stringify({ blocks: geometry.blocks, visibleFaces: geometry.visibleFaces, culledFaces: geometry.culledFaces })}`);
-ok(geometry.nativeFaceCulling === true, 'full-block section did not report native face culling');
+  `native mesh section geometry mismatch: ${JSON.stringify({ blocks: geometry.blocks, visibleFaces: geometry.visibleFaces, culledFaces: geometry.culledFaces })}`);
+ok(geometry.nativeFaceCulling === true && geometry.nativeMesh === true && geometry.nativeResident === true,
+  'full-block section did not report resident native mesh generation');
+ok(geometry.vertexStride === 9 && geometry.vertices.length === geometry.vertexCount * 9 && geometry.indices.length === geometry.triangles * 3,
+  'native mesh lost the Rift 9-float/index contract');
 
+// Material callbacks that are state-only can be collapsed to the native 256-entry palette.
+const colored = new RiftBlockSection();
+colored.setBlock(1, 1, 1, 5);
+const coloredMesh = buildRiftNativeSectionMesh(colored, { getBlockColor: ({ state }) => state === 5 ? [0.25, 0.5, 0.75] : [1,1,1] });
+ok(coloredMesh?.nativeMesh === true, 'state-only material resolver failed to use native mesh path');
+ok(near(coloredMesh?.vertices?.[6], 0.25) && near(coloredMesh?.vertices?.[7], 0.5) && near(coloredMesh?.vertices?.[8], 0.75),
+  'native material palette did not reach emitted vertices');
+
+// World/face-dependent colors intentionally reject v3 and preserve JavaScript geometry semantics.
+const dynamicColor = ({ worldX = 0 }) => worldX & 1 ? [1,0,0] : [0,1,0];
+ok(buildRiftNativeSectionMesh(colored, { getBlockColor: dynamicColor }) === null,
+  'dynamic material resolver should not be flattened into native state-only palette');
+
+// Cross-section border planes are copied from actual neighbor sections and culled natively.
 const grid = new RiftSectionGrid();
 const left = grid.addSection(new RiftBlockSection({ sx: 0, sy: 0, sz: 0 }));
 const right = grid.addSection(new RiftBlockSection({ sx: 1, sy: 0, sz: 0 }));
@@ -55,12 +80,27 @@ right.setBlock(0, 1, 1, RIFT_SECTION_SOLID);
 const leftGeometry = grid.buildGeometryForSection(left);
 const rightGeometry = grid.buildGeometryForSection(right);
 ok(leftGeometry.visibleFaces === 5 && rightGeometry.visibleFaces === 5,
-  `cross-section native boundary culling mismatch: ${leftGeometry.visibleFaces}/${rightGeometry.visibleFaces}`);
+  `native cross-section border culling mismatch: ${leftGeometry.visibleFaces}/${rightGeometry.visibleFaces}`);
+ok(leftGeometry.nativeMesh && rightGeometry.nativeMesh, 'cross-section mesh did not stay on native path');
 
+// Persistent section cache must observe revisions instead of freezing stale states.
+const accelerator = createRiftNativeGridAccelerator(() => grid);
+ok(accelerator.getBlockWorld(15,1,1) === 1 && accelerator.getBlockWorld(16,1,1) === 1,
+  'persistent native grid lookup failed across section boundary');
+left.setBlock(15,1,1,9);
+ok(accelerator.getBlockWorld(15,1,1) === 9, 'native resident section did not resync after JS revision change');
+const batch = accelerator.batchGetBlockWorld([[15,1,1],[16,1,1],[80,1,1]]);
+ok([...batch].join(',') === '9,1,0', `native batch world query mismatch: ${[...batch]}`);
+const ray = accelerator.raycast([14,1.5,1.5],[1,0,0],10);
+ok(ray.native && ray.hit?.join(',') === '15,1,1' && ray.face === 1 && ray.state === 9,
+  `native DDA raycast mismatch: ${JSON.stringify(ray)}`);
+accelerator.dispose();
+
+// Partial shape sections preserve the established shape-aware JavaScript geometry path.
 const slab = new RiftBlockSection();
 slab.setBlock(2, 2, 2, encodeRiftBlockState({ material: 1, shape: RIFT_BLOCK_SHAPES.bottomSlab }));
 const slabGeometry = slab.buildGeometry();
-ok(slabGeometry.shapeAware === true && slabGeometry.nativeFaceCulling !== true,
+ok(slabGeometry.shapeAware === true && slabGeometry.nativeMesh !== true,
   'partial-shape section failed to preserve shape-aware JS geometry path');
 
 const negative = riftWorldCellToSection(-17);
@@ -76,6 +116,13 @@ const eastStair = encodeRiftBlockState({ material: 1, shape: RIFT_BLOCK_SHAPES.s
 ok(near(riftPlayerShapeTopAt(eastStair, -0.25, 4.2), 0.75), 'player packed-state stair top mismatch');
 ok(near(riftNativeStateShapeTop(eastStair, -0.25, 4.2), 0.75), 'direct packed-state native stair top mismatch');
 
+const creativeSource = fs.readFileSync(new URL('../public/rift-creative-mode.js', import.meta.url), 'utf8');
+ok(creativeSource.includes('nativeGrid.raycast(') && creativeSource.includes('raycastFallback'),
+  'creative-mode picker is not wired to native DDA with a JS fallback');
+const playerSource = fs.readFileSync(new URL('../public/rift-player.js', import.meta.url), 'utf8');
+ok(playerSource.includes('createRiftNativeGridAccelerator') && playerSource.includes('nativeGrid.getBlockWorld'),
+  'player hot state probes are not routed through persistent native section residency');
+
 for (const [name, result] of [
   ['section storage', validateRiftBlockSectionStorage()],
   ['section grid', validateRiftSectionGrid()],
@@ -85,10 +132,20 @@ for (const [name, result] of [
   if (!result.ok) failures.push(`${name}: ${result.failures.join('; ')}`);
 }
 
+const finalStatus = getRiftNativeCoreStatus();
+ok(finalStatus.metrics.sectionSyncs >= 1 && finalStatus.metrics.sectionBytesCopied >= 8192,
+  `persistent-section metrics did not move: ${JSON.stringify(finalStatus.metrics)}`);
+ok(finalStatus.metrics.nativeMeshBuilds >= 1 && finalStatus.metrics.native.meshBuilds >= 1,
+  `native mesh metrics did not move: ${JSON.stringify(finalStatus.metrics)}`);
+ok(finalStatus.metrics.batchCalls >= 1 && finalStatus.metrics.native.batchCalls >= 1,
+  'native batch-query counters did not move');
+ok(finalStatus.metrics.raycasts >= 1 && finalStatus.metrics.native.raycasts >= 1,
+  'native raycast counters did not move');
+
 if (failures.length) {
   console.error('[rift-native-integration] FAIL');
   for (const failure of failures) console.error(` - ${failure}`);
   process.exit(1);
 }
 
-console.log('[rift-native-integration] PASS · C++ v2 drives full-block culling, section coordinates and player surface kernels while partial shapes retain the proven JS path.');
+console.log('[rift-native-integration] PASS · C++ v3 owns resident RiftSections, full-block mesh emission, cross-section borders, batched world queries and creative-mode DDA raycasts; partial/dynamic paths remain safe in JS.');

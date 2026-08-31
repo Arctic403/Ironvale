@@ -1,5 +1,6 @@
 import { decodeRiftBlockState, RIFT_BLOCK_SHAPES, RIFT_BLOCK_ROTATIONS } from './rift-block-shapes.js';
 import {
+  createRiftNativeGridAccelerator,
   riftNativeCrossedSupport,
   riftNativeGroundStepClassify,
   riftNativeStairTop,
@@ -228,7 +229,11 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
   let stepAssist = null;
   const touch = { x: 0, z: 0, run: false, jump: false, down: false };
 
-  const getState = (x, y, z) => getGrid?.()?.getBlockWorld(Math.floor(x), Math.floor(y), Math.floor(z)) || 0;
+  // Native Core v3 keeps hot RiftSections resident in WASM. Player collision
+  // still owns its mature JS state machine, but repeated block-state probes no
+  // longer have to decode section coordinates and typed arrays on every sample.
+  const nativeGrid = createRiftNativeGridAccelerator(() => getGrid?.());
+  const getState = (x, y, z) => nativeGrid.getBlockWorld(Math.floor(x), Math.floor(y), Math.floor(z)) || 0;
   const surfaces = createRiftPlayerSurfaceSampler({ getState, getWorldBounds });
 
   function constrainHorizontal(x, z) {
@@ -1188,6 +1193,7 @@ export function createRiftPlayerController({ canvas, camera, getGrid, getWorldBo
       pad?.removeEventListener('pointermove', onPadMove);
       pad?.removeEventListener('pointerup', onPadUp);
       pad?.removeEventListener('pointercancel', onPadUp);
+      nativeGrid.dispose();
     }
   };
 }
