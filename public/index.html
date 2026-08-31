@@ -28,13 +28,27 @@
 
   <main id="world-screen" class="screen" hidden>
     <canvas id="rift-canvas"></canvas>
+
     <div class="topbar">
-      <div><strong id="character-name">Ironvale</strong><span id="terrain-status">Loading terrain…</span></div>
-      <div class="top-actions"><button id="terrain-tools-button" type="button">Tools</button><button id="logout-button" type="button">Logout</button></div>
+      <div>
+        <strong id="character-name">Ironvale</strong>
+        <span id="terrain-status">Loading terrain…</span>
+      </div>
+      <div class="top-actions">
+        <button id="freecam-button" type="button">Freecam</button>
+        <button id="terrain-tools-button" type="button">Tools</button>
+        <button id="logout-button" type="button">Logout</button>
+      </div>
     </div>
 
     <div id="terrain-tools" class="terrain-tools" hidden>
-      <div class="tool-heading"><div><strong>Terrain Tools</strong><small>Blank canvas. You build the map.</small></div><button id="edit-mode" type="button">Edit OFF</button></div>
+      <div class="tool-heading">
+        <div>
+          <strong>Terrain Tools</strong>
+          <small>Freecam + reticle sculpting.</small>
+        </div>
+      </div>
+
       <div class="brush-grid brush-modes">
         <button data-brush="raise" class="active">Raise</button>
         <button data-brush="lower">Lower</button>
@@ -43,19 +57,36 @@
         <button data-brush="hole">Cut Hole</button>
         <button data-brush="unhole">Fill Hole</button>
       </div>
+
       <label>Radius <span id="radius-value">10m</span><input id="brush-radius" type="range" min="2" max="40" step="1" value="10"></label>
       <label>Strength <span id="strength-value">0.8</span><input id="brush-strength" type="range" min="0.1" max="3" step="0.1" value="0.8"></label>
+      <label>Fly Speed <span id="freecam-speed-value">14m/s</span><input id="freecam-speed" type="range" min="4" max="40" step="1" value="14"></label>
+
       <div class="history-grid"><button id="undo-terrain">Undo</button><button id="redo-terrain">Redo</button></div>
       <div class="history-grid"><button id="save-terrain">Save Draft</button><button id="export-terrain">Export</button></div>
       <button id="reset-terrain" class="wide danger">Reset to Blank</button>
-      <small id="editor-status" class="editor-status">Turn Edit ON, then tap or drag directly on the ground.</small>
+      <small id="editor-status" class="editor-status">Turn Freecam ON. Aim the reticle, then tap to sculpt.</small>
     </div>
 
+    <div id="terrain-reticle" class="terrain-reticle" hidden aria-hidden="true">
+      <span class="reticle-h"></span><span class="reticle-v"></span><span class="reticle-dot"></span>
+    </div>
     <div id="brush-readout" class="brush-readout" hidden>Raise · 10m</div>
+
     <div id="coords" class="coords">160, 0, 160</div>
-    <div id="joystick" class="joystick" aria-label="Movement control"><div id="joystick-knob"></div></div>
+
+    <div id="joystick" class="joystick" aria-label="Movement control">
+      <div id="joystick-knob"></div>
+    </div>
+
+    <div id="freecam-altitude" class="freecam-altitude" hidden>
+      <button type="button" data-freecam-vertical="1" aria-label="Freecam up">▲</button>
+      <button type="button" data-freecam-vertical="-1" aria-label="Freecam down">▼</button>
+    </div>
+
     <div class="look-hint">Drag to look</div>
   </main>
+
   <script type="module" src="/app.js"></script>
 </body>
 </html>
