@@ -1,0 +1,37 @@
+name: RPG Camera Audit Fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rpg-camera-audit-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-camera:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply centered-reticle RPG camera contract
+        run: python3 .rift-fixes/rpg_camera_fix.py
+
+      - name: Verify Ironvale
+        run: npm run build
+
+      - name: Commit verified camera contract
+        shell: bash
+        run: |
+          rm -f .rift-fixes/rpg_camera_fix.py
+          rmdir .rift-fixes 2>/dev/null || true
+          rm -f .github/workflows/rpg-camera-audit-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore centered-reticle RPG camera contract"
+          git push origin HEAD:main
