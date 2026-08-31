@@ -1,5 +1,10 @@
-// RiftCity Base Texture Atlas v1
+// RiftCity Base Texture Atlas v2
 // All tiles are generated procedurally at runtime. No third-party texture art is bundled.
+//
+// Safari/iOS compatibility: the atlas is built as a raw RGBA byte buffer instead
+// of a Canvas2D TexImageSource. WebKit can throw IndexSizeError while converting a
+// canvas source during texImage2D(); the narrow upload bridge below intercepts only
+// RiftCity's marked atlas source and uses the explicit raw RGBA overload instead.
 
 export const RIFT_TEXTURE_TILE_SIZE = 64;
 export const RIFT_TEXTURE_ATLAS_COLUMNS = 4;
@@ -16,201 +21,247 @@ export const RIFT_TEXTURE_INDEX = Object.freeze(Object.fromEntries(
   RIFT_TEXTURE_TILES.map((name, index) => [name, index])
 ));
 
+const ATLAS_SOURCE_MARKER = '__riftAtlasRawRgbaV2';
+const ATLAS_UPLOAD_PATCH = Symbol.for('riftcity.textureAtlas.rawRgbaUpload.v2');
+
+const BASES = Object.freeze([
+  [67, 112, 51],
+  [121, 84, 50],
+  [82, 59, 43],
+  [153, 112, 67],
+  [112, 116, 116],
+  [154, 157, 153],
+  [73, 78, 81],
+  [104, 106, 101],
+  [94, 103, 91],
+  [137, 91, 48],
+  [172, 132, 78],
+  [109, 104, 91],
+  [196, 174, 121],
+  [112, 108, 99],
+  [150, 91, 69],
+  [74, 58, 42]
+]);
+
 const clamp8 = value => Math.max(0, Math.min(255, Math.round(value)));
-const rgb = (r, g, b) => `rgb(${clamp8(r)},${clamp8(g)},${clamp8(b)})`;
 
 function hash2(x, y, seed = 0) {
-  let n = (Math.imul(x + 374761393, 668265263) ^ Math.imul(y + 1442695041, 2246822519) ^ Math.imul(seed + 1013904223, 3266489917)) >>> 0;
+  let n = (Math.imul((x | 0) + 374761393, 668265263) ^ Math.imul((y | 0) + 1442695041, 2246822519) ^ Math.imul((seed | 0) + 1013904223, 3266489917)) >>> 0;
   n ^= n >>> 13;
   n = Math.imul(n, 1274126177) >>> 0;
   n ^= n >>> 16;
   return n / 4294967295;
 }
 
-function paintNoise(ctx, x0, y0, size, base, spread, seed, grain = 1) {
-  const image = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const broad = (hash2(Math.floor(x / 5), Math.floor(y / 5), seed + 91) - 0.5) * spread * 0.65;
-      const fine = (hash2(x * grain, y * grain, seed) - 0.5) * spread;
-      const i = (y * size + x) * 4;
-      image.data[i] = clamp8(base[0] + broad + fine);
-      image.data[i + 1] = clamp8(base[1] + broad + fine);
-      image.data[i + 2] = clamp8(base[2] + broad + fine);
-      image.data[i + 3] = 255;
+function noise(x, y, seed, spread = 20) {
+  const broad = (hash2(Math.floor(x / 5), Math.floor(y / 5), seed + 91) - 0.5) * spread * 0.65;
+  const fine = (hash2(x, y, seed) - 0.5) * spread;
+  return broad + fine;
+}
+
+function tint(base, amount) {
+  return [clamp8(base[0] + amount), clamp8(base[1] + amount), clamp8(base[2] + amount)];
+}
+
+function mixColor(a, b, t) {
+  const u = Math.max(0, Math.min(1, t));
+  return [
+    clamp8(a[0] + (b[0] - a[0]) * u),
+    clamp8(a[1] + (b[1] - a[1]) * u),
+    clamp8(a[2] + (b[2] - a[2]) * u)
+  ];
+}
+
+function grassPixel(x, y) {
+  let color = tint(BASES[0], noise(x, y, 1001, 34));
+  const tuft = hash2(Math.floor(x / 2), Math.floor(y / 3), 1002);
+  if (tuft > 0.83) color = mixColor(color, [116, 151, 70], 0.46);
+  else if (tuft < 0.13) color = mixColor(color, [35, 76, 31], 0.42);
+  const blade = hash2(x, Math.floor(y / 4), 1003);
+  if (blade > 0.965) color = mixColor(color, [132, 164, 79], 0.38);
+  return color;
+}
+
+function dirtPixel(index, x, y) {
+  const spreads = [0, 30, 26, 32];
+  const seeds = [0, 2001, 2101, 2201];
+  let color = tint(BASES[index], noise(x, y, seeds[index], spreads[index]));
+  const speck = hash2(x * 3, y * 5, seeds[index] + 1);
+  if (speck > 0.94) color = mixColor(color, [178, 132, 82], 0.34);
+  else if (speck < 0.055) color = mixColor(color, [55, 40, 29], 0.36);
+  return color;
+}
+
+function stonePixel(index, x, y) {
+  const seed = 3001 + (index - 4) * 100;
+  let color = tint(BASES[index], noise(x, y, seed, 24));
+  const pore = hash2(x * 7, y * 11, seed + 1);
+  if (pore > 0.965) color = mixColor(color, [35, 38, 39], 0.24);
+  if (((x + Math.floor(hash2(Math.floor(y / 7), index, seed + 2) * 11)) % 29) === 0 && hash2(y, x, seed + 3) > 0.48) {
+    color = mixColor(color, [42, 45, 45], 0.24);
+  }
+  return color;
+}
+
+function cobblePixel(x, y) {
+  const cellW = 16;
+  const cellH = 12;
+  const row = Math.floor(y / cellH);
+  const shiftedX = x + ((row & 1) ? cellW * 0.5 : 0);
+  const localX = ((shiftedX % cellW) + cellW) % cellW;
+  const localY = y % cellH;
+  if (localX < 1.4 || localY < 1.4) return [54, 56, 53];
+  const col = Math.floor(shiftedX / cellW);
+  const variation = (hash2(col, row, 4001) - 0.5) * 30 + noise(x, y, 4002, 8);
+  return tint(BASES[7], variation);
+}
+
+function mossyStonePixel(x, y) {
+  let color = stonePixel(4, x, y);
+  color = mixColor(color, BASES[8], 0.34);
+  const patch = hash2(Math.floor(x / 7), Math.floor(y / 7), 3304);
+  if (patch > 0.64) color = mixColor(color, [57, 96, 43], Math.min(0.62, (patch - 0.64) * 1.6));
+  return color;
+}
+
+function woodPixel(index, x, y) {
+  const seed = 5001 + (index - 9) * 100;
+  const aged = index === 11;
+  const grain = Math.sin(x * 0.48 + Math.sin(y * 0.11 + seed) * 1.8) * (aged ? 8 : 11);
+  const broad = noise(Math.floor(x / 2), Math.floor(y / 4), seed, aged ? 13 : 10);
+  let color = tint(BASES[index], grain + broad);
+  const knot = hash2(Math.floor(x / 9), Math.floor(y / 11), seed + 7);
+  if (knot > 0.965) color = mixColor(color, aged ? [55, 53, 48] : [79, 48, 27], 0.42);
+  return color;
+}
+
+function sandPixel(x, y) {
+  let color = tint(BASES[12], noise(x, y, 6001, 20));
+  const grain = hash2(x * 5, y * 7, 6002);
+  if (grain > 0.91) color = mixColor(color, [234, 215, 160], 0.5);
+  else if (grain < 0.08) color = mixColor(color, [131, 115, 80], 0.28);
+  return color;
+}
+
+function gravelPixel(x, y) {
+  const gx = Math.floor(x / 4), gy = Math.floor(y / 4);
+  const rock = hash2(gx, gy, 7001);
+  const palette = rock > 0.75 ? [166, 160, 146] : rock < 0.25 ? [74, 72, 68] : BASES[13];
+  return tint(palette, noise(x, y, 7002, 16));
+}
+
+function clayPixel(x, y) {
+  let color = tint(BASES[14], noise(x, y, 8001, 18));
+  if (((x + Math.floor(hash2(y, 8, 8002) * 9)) % 37) === 0 && hash2(x, y, 8003) > 0.42) {
+    color = mixColor(color, [88, 52, 43], 0.30);
+  }
+  return color;
+}
+
+function mudPixel(x, y) {
+  let color = tint(BASES[15], noise(x, y, 9001, 18));
+  const puddle = hash2(Math.floor(x / 9), Math.floor(y / 6), 9002);
+  if (puddle > 0.72) color = mixColor(color, [103, 81, 57], 0.32);
+  else if (puddle < 0.16) color = mixColor(color, [41, 35, 29], 0.28);
+  return color;
+}
+
+function tilePixel(index, x, y) {
+  if (index === 0) return grassPixel(x, y);
+  if (index >= 1 && index <= 3) return dirtPixel(index, x, y);
+  if (index >= 4 && index <= 6) return stonePixel(index, x, y);
+  if (index === 7) return cobblePixel(x, y);
+  if (index === 8) return mossyStonePixel(x, y);
+  if (index >= 9 && index <= 11) return woodPixel(index, x, y);
+  if (index === 12) return sandPixel(x, y);
+  if (index === 13) return gravelPixel(x, y);
+  if (index === 14) return clayPixel(x, y);
+  return mudPixel(x, y);
+}
+
+function installRawAtlasUploadBridge() {
+  const proto = globalThis.WebGL2RenderingContext?.prototype;
+  if (!proto || proto[ATLAS_UPLOAD_PATCH]) return;
+  const nativeTexImage2D = proto.texImage2D;
+  if (typeof nativeTexImage2D !== 'function') return;
+
+  const patchedTexImage2D = function (...args) {
+    const source = args.length === 6 ? args[5] : null;
+    if (!source || source[ATLAS_SOURCE_MARKER] !== true) {
+      return nativeTexImage2D.apply(this, args);
     }
-  }
-  ctx.putImageData(image, x0, y0);
-}
 
-function flecks(ctx, x0, y0, size, colors, count, seed, maxRadius = 1.7) {
-  for (let i = 0; i < count; i += 1) {
-    const px = x0 + hash2(i, 7, seed) * size;
-    const py = y0 + hash2(i, 19, seed + 1) * size;
-    const radius = 0.35 + hash2(i, 29, seed + 2) * maxRadius;
-    ctx.fillStyle = colors[Math.floor(hash2(i, 43, seed + 3) * colors.length) % colors.length];
-    ctx.beginPath();
-    ctx.arc(px, py, radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-function cracks(ctx, x0, y0, size, seed, stroke = 'rgba(35,35,35,.25)', count = 5) {
-  ctx.strokeStyle = stroke;
-  ctx.lineWidth = 0.7;
-  for (let i = 0; i < count; i += 1) {
-    let x = x0 + hash2(i, 1, seed) * size;
-    let y = y0 + hash2(i, 2, seed) * size;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    const segments = 2 + Math.floor(hash2(i, 3, seed) * 4);
-    for (let s = 0; s < segments; s += 1) {
-      x += (hash2(i * 13 + s, 4, seed) - 0.5) * 10;
-      y += (hash2(i * 17 + s, 5, seed) - 0.5) * 10;
-      ctx.lineTo(x, y);
+    const previousFlip = this.getParameter(this.UNPACK_FLIP_Y_WEBGL);
+    const previousPremultiply = this.getParameter(this.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+    const previousAlignment = this.getParameter(this.UNPACK_ALIGNMENT);
+    try {
+      // Raw ArrayBufferView uploads avoid Safari/WebKit's Canvas TexImageSource
+      // conversion path. RGBA is also the most reliable upload format on Safari.
+      this.pixelStorei(this.UNPACK_FLIP_Y_WEBGL, false);
+      this.pixelStorei(this.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      this.pixelStorei(this.UNPACK_ALIGNMENT, 1);
+      return nativeTexImage2D.call(
+        this,
+        args[0],
+        args[1],
+        this.RGBA,
+        source.width,
+        source.height,
+        0,
+        this.RGBA,
+        this.UNSIGNED_BYTE,
+        source.data
+      );
+    } finally {
+      this.pixelStorei(this.UNPACK_FLIP_Y_WEBGL, previousFlip);
+      this.pixelStorei(this.UNPACK_PREMULTIPLY_ALPHA_WEBGL, previousPremultiply);
+      this.pixelStorei(this.UNPACK_ALIGNMENT, previousAlignment);
     }
-    ctx.stroke();
+  };
+
+  try {
+    Object.defineProperty(proto, 'texImage2D', {
+      value: patchedTexImage2D,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(proto, ATLAS_UPLOAD_PATCH, { value: true });
+  } catch (_) {
+    try {
+      proto.texImage2D = patchedTexImage2D;
+      proto[ATLAS_UPLOAD_PATCH] = true;
+    } catch (_) {}
   }
 }
 
-function grass(ctx, x, y, s) {
-  paintNoise(ctx, x, y, s, [67, 112, 51], 34, 1001);
-  flecks(ctx, x, y, s, ['rgba(39,76,31,.65)', 'rgba(113,145,65,.62)', 'rgba(74,94,41,.5)'], 180, 1002, 1.1);
-  ctx.lineWidth = 0.7;
-  for (let i = 0; i < 85; i += 1) {
-    const px = x + hash2(i, 1, 1003) * s;
-    const py = y + hash2(i, 2, 1003) * s;
-    const len = 1.5 + hash2(i, 3, 1003) * 4.5;
-    ctx.strokeStyle = hash2(i, 4, 1003) > 0.45 ? 'rgba(128,159,74,.55)' : 'rgba(31,74,35,.55)';
-    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + (hash2(i, 5, 1003) - .5) * 2, py - len); ctx.stroke();
-  }
-}
-
-function dirt(ctx, x, y, s, base, spread, seed) {
-  paintNoise(ctx, x, y, s, base, spread, seed);
-  flecks(ctx, x, y, s, ['rgba(74,50,31,.5)', 'rgba(166,120,75,.36)', 'rgba(42,31,23,.32)'], 120, seed + 1, 1.35);
-}
-
-function stone(ctx, x, y, s, base, seed, moss = false) {
-  paintNoise(ctx, x, y, s, base, 24, seed);
-  flecks(ctx, x, y, s, ['rgba(255,255,255,.10)', 'rgba(22,25,27,.12)', 'rgba(112,118,118,.16)'], 85, seed + 1, 1.15);
-  cracks(ctx, x, y, s, seed + 2, 'rgba(32,35,37,.24)', 5);
-  if (moss) {
-    for (let i = 0; i < 14; i += 1) {
-      const px = x + hash2(i, 11, seed + 3) * s;
-      const py = y + hash2(i, 12, seed + 3) * s;
-      const r = 2 + hash2(i, 13, seed + 3) * 6;
-      const grad = ctx.createRadialGradient(px, py, 0, px, py, r);
-      grad.addColorStop(0, 'rgba(62,102,44,.58)');
-      grad.addColorStop(1, 'rgba(62,102,44,0)');
-      ctx.fillStyle = grad; ctx.fillRect(px-r, py-r, r*2, r*2);
-    }
-  }
-}
-
-function cobblestone(ctx, x, y, s) {
-  paintNoise(ctx, x, y, s, [104, 106, 101], 18, 4001);
-  const cell = 16;
-  ctx.lineWidth = 2;
-  for (let row = -1; row < 5; row += 1) {
-    for (let col = -1; col < 5; col += 1) {
-      const off = (row & 1) ? cell * .5 : 0;
-      const px = x + col * cell + off + (hash2(col, row, 4002) - .5) * 3;
-      const py = y + row * cell + (hash2(row, col, 4003) - .5) * 3;
-      const w = 13 + hash2(col, row, 4004) * 5;
-      const h = 11 + hash2(col, row, 4005) * 5;
-      ctx.fillStyle = rgb(92 + hash2(col,row,4006)*34, 94 + hash2(col,row,4007)*31, 90 + hash2(col,row,4008)*29);
-      ctx.strokeStyle = 'rgba(48,50,48,.72)';
-      ctx.beginPath();
-      ctx.roundRect(px, py, w, h, 3);
-      ctx.fill(); ctx.stroke();
-    }
-  }
-  flecks(ctx, x, y, s, ['rgba(255,255,255,.09)', 'rgba(15,15,15,.10)'], 70, 4009, .8);
-}
-
-function wood(ctx, x, y, s, base, seed, aged = false) {
-  paintNoise(ctx, x, y, s, base, aged ? 18 : 15, seed);
-  for (let i = 0; i < 18; i += 1) {
-    const px = x + hash2(i, 1, seed + 1) * s;
-    const amp = 1 + hash2(i, 2, seed + 1) * 3;
-    ctx.strokeStyle = aged ? 'rgba(58,56,49,.34)' : 'rgba(88,53,28,.28)';
-    ctx.lineWidth = .7 + hash2(i, 3, seed + 1) * 1.2;
-    ctx.beginPath();
-    for (let yy = 0; yy <= s; yy += 4) {
-      const xx = px + Math.sin((yy + i * 7) * .12) * amp;
-      if (yy === 0) ctx.moveTo(xx, y + yy); else ctx.lineTo(xx, y + yy);
-    }
-    ctx.stroke();
-  }
-  for (let i = 0; i < 4; i += 1) {
-    const px = x + 8 + hash2(i, 4, seed + 2) * (s - 16);
-    const py = y + 8 + hash2(i, 5, seed + 2) * (s - 16);
-    ctx.strokeStyle = aged ? 'rgba(49,47,41,.5)' : 'rgba(79,45,24,.48)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath(); ctx.ellipse(px, py, 3.5 + hash2(i,6,seed)*3, 1.7 + hash2(i,7,seed)*2, 0, 0, Math.PI*2); ctx.stroke();
-  }
-}
-
-function sand(ctx, x, y, s) {
-  paintNoise(ctx, x, y, s, [196, 174, 121], 20, 6001);
-  flecks(ctx, x, y, s, ['rgba(236,218,163,.7)','rgba(133,115,78,.42)','rgba(82,76,64,.18)'], 260, 6002, .7);
-}
-
-function gravel(ctx, x, y, s) {
-  paintNoise(ctx, x, y, s, [112, 108, 99], 18, 7001);
-  flecks(ctx, x, y, s, ['rgba(154,150,139,.9)','rgba(72,70,67,.85)','rgba(123,111,93,.8)','rgba(184,177,160,.58)'], 190, 7002, 1.8);
-}
-
-function clay(ctx, x, y, s) {
-  paintNoise(ctx, x, y, s, [150, 91, 69], 18, 8001);
-  flecks(ctx, x, y, s, ['rgba(186,118,90,.30)','rgba(88,51,42,.22)'], 90, 8002, 1.0);
-  cracks(ctx, x, y, s, 8003, 'rgba(83,49,42,.18)', 3);
-}
-
-function mud(ctx, x, y, s) {
-  paintNoise(ctx, x, y, s, [74, 58, 42], 18, 9001);
-  for (let i = 0; i < 18; i += 1) {
-    const px = x + hash2(i, 1, 9002) * s;
-    const py = y + hash2(i, 2, 9002) * s;
-    const rx = 2 + hash2(i, 3, 9002) * 8;
-    const ry = 1 + hash2(i, 4, 9002) * 4;
-    ctx.fillStyle = hash2(i, 5, 9002) > .5 ? 'rgba(104,82,56,.32)' : 'rgba(42,36,29,.28)';
-    ctx.beginPath(); ctx.ellipse(px, py, rx, ry, hash2(i,6,9002)*Math.PI, 0, Math.PI*2); ctx.fill();
-  }
-}
+installRawAtlasUploadBridge();
 
 export function createRiftTextureAtlasCanvas() {
   const tile = RIFT_TEXTURE_TILE_SIZE;
-  const canvas = document.createElement('canvas');
-  canvas.width = tile * RIFT_TEXTURE_ATLAS_COLUMNS;
-  canvas.height = tile * RIFT_TEXTURE_ATLAS_ROWS;
-  const ctx = canvas.getContext('2d', { alpha: false });
-  if (!ctx) throw new Error('Rift texture atlas requires Canvas2D.');
-  ctx.imageSmoothingEnabled = false;
+  const width = tile * RIFT_TEXTURE_ATLAS_COLUMNS;
+  const height = tile * RIFT_TEXTURE_ATLAS_ROWS;
+  const data = new Uint8Array(width * height * 4);
 
-  const at = (index, draw) => {
-    const x = (index % RIFT_TEXTURE_ATLAS_COLUMNS) * tile;
-    const y = Math.floor(index / RIFT_TEXTURE_ATLAS_COLUMNS) * tile;
-    draw(ctx, x, y, tile);
+  for (let y = 0; y < height; y += 1) {
+    const tileY = Math.floor(y / tile);
+    const localY = y % tile;
+    for (let x = 0; x < width; x += 1) {
+      const tileX = Math.floor(x / tile);
+      const localX = x % tile;
+      const tileIndex = tileY * RIFT_TEXTURE_ATLAS_COLUMNS + tileX;
+      const color = tilePixel(tileIndex, localX, localY);
+      const offset = (y * width + x) * 4;
+      data[offset] = color[0];
+      data[offset + 1] = color[1];
+      data[offset + 2] = color[2];
+      data[offset + 3] = 255;
+    }
+  }
+
+  return {
+    width,
+    height,
+    data,
+    [ATLAS_SOURCE_MARKER]: true
   };
-
-  at(0, grass);
-  at(1, (c,x,y,s)=>dirt(c,x,y,s,[121,84,50],30,2001));
-  at(2, (c,x,y,s)=>dirt(c,x,y,s,[82,59,43],26,2101));
-  at(3, (c,x,y,s)=>dirt(c,x,y,s,[153,112,67],32,2201));
-  at(4, (c,x,y,s)=>stone(c,x,y,s,[112,116,116],3001));
-  at(5, (c,x,y,s)=>stone(c,x,y,s,[154,157,153],3101));
-  at(6, (c,x,y,s)=>stone(c,x,y,s,[73,78,81],3201));
-  at(7, cobblestone);
-  at(8, (c,x,y,s)=>stone(c,x,y,s,[94,103,91],3301,true));
-  at(9, (c,x,y,s)=>wood(c,x,y,s,[137,91,48],5001,false));
-  at(10, (c,x,y,s)=>wood(c,x,y,s,[172,132,78],5101,false));
-  at(11, (c,x,y,s)=>wood(c,x,y,s,[109,104,91],5201,true));
-  at(12, sand);
-  at(13, gravel);
-  at(14, clay);
-  at(15, mud);
-
-  return canvas;
 }
