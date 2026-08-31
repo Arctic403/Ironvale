@@ -11,6 +11,12 @@ const failures = forbidden.filter(path => fs.existsSync(path));
 const nativeRequired = ['native/include/rift/terrain.hpp','native/src/terrain.cpp','public/rift-core.js','public/rift-core.wasm.gz'];
 for (const path of nativeRequired) if (!fs.existsSync(path)) failures.push(`missing ${path}`);
 
+const characterRequired = ['public/rift-character.js','public/assets/characters/quaternius/universal-base-male.glb','public/assets/characters/quaternius/universal-animation-library.glb','public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.txt','public/assets/characters/quaternius/LICENSE-ANIMATIONS.txt'];
+for (const path of characterRequired) if (!fs.existsSync(path)) failures.push(`missing ${path}`);
+if (fs.existsSync('public/assets/characters/quaternius/universal-base-male.glb') && fs.statSync('public/assets/characters/quaternius/universal-base-male.glb').size !== 6465208) failures.push('rigged character asset size');
+if (fs.existsSync('public/assets/characters/quaternius/universal-animation-library.glb') && fs.statSync('public/assets/characters/quaternius/universal-animation-library.glb').size !== 2714756) failures.push('character animation asset size');
+if (fs.existsSync('public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.txt') && !fs.readFileSync('public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.txt','utf8').includes('CC0 1.0')) failures.push('character CC0 license');
+
 const world = JSON.parse(fs.readFileSync('public/world/ironvale-terrain.json', 'utf8'));
 if (world.format !== 'rift-world-v1') failures.push('world format');
 if (world.terrain?.format !== 'rift-terrain-v1') failures.push('terrain format');
@@ -34,6 +40,8 @@ if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
 if (!app.includes('function applyBrushAtReticle(')) failures.push('reticle sculpt action');
 if (!app.includes('function applyCameraLookDelta(') || !app.includes('function cameraForward(') || !app.includes('function cameraAnglesFromDirection(')) failures.push('shared camera math');
+if (!app.includes("import { loadRiggedCharacterGeometry } from './rift-character.js'") || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(')) failures.push('rigged humanoid controller hookup');
+if (!app.includes('createCapsuleGeometry()')) failures.push('character visual fallback');
 if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person RPG focus');
 if (!app.includes('function currentViewRay(') || !app.includes('terrain.raycast(ray.origin, ray.direction, 1800, .5)')) failures.push('center-view interaction ray');
 if (app.includes('reticleScreen') || app.includes('moveReticleToClient(') || app.includes('raycastTerrainAtScreen(')) failures.push('movable pointer reticle returned');

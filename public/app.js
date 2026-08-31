@@ -1,5 +1,6 @@
 import { RiftEngine } from './rift-engine.js';
 import { RiftTerrain } from './rift-terrain.js';
+import { loadRiggedCharacterGeometry } from './rift-character.js';
 
 const $ = selector => document.querySelector(selector);
 const authScreen = $('#auth-screen');
@@ -41,6 +42,7 @@ const CAMERA_MAX_EVENT_FRACTION = 0.22;
 const ORBIT_MIN_PITCH = -0.12;
 const ORBIT_MAX_PITCH = 1.05;
 const THIRD_PERSON_FOCUS_HEIGHT = 1.20;
+const PLAYER_COLLIDER_HALF_HEIGHT = .9;
 const FREECAM_MIN_PITCH = -1.45;
 const FREECAM_MAX_PITCH = 1.45;
 
@@ -52,6 +54,8 @@ let terrainMeshes = new Map();
 let terrainLodPlan = new Map();
 let lastTerrainLodRefresh = 0;
 let playerMesh = null;
+let playerVisualFeetAnchored = false;
+let playerRig = null;
 let brushMesh = null;
 let animationFrame = 0;
 let lastFrame = performance.now();
@@ -214,8 +218,11 @@ async function startWorld(url) {
   }
 
   rebuildTerrainMeshes();
+  playerVisualFeetAnchored = false;
+  playerRig = null;
   playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
+  void installRiggedPlayerVisual();
   updateOrbitCamera();
   reticle.hidden = false;
   updateReticleVisual();
@@ -238,6 +245,8 @@ function stopWorld() {
   terrainLodPlan = new Map();
   lastTerrainLodRefresh = 0;
   playerMesh = null;
+  playerVisualFeetAnchored = false;
+  playerRig = null;
   brushMesh = null;
   reticleHit = null;
   undoStack.length = 0;
@@ -367,7 +376,41 @@ function snapPlayerToSupport() {
     player.vy = 0;
     player.grounded = true;
   }
-  if (playerMesh) playerMesh.position = [player.x, player.y, player.z];
+  updatePlayerVisualTransform();
+}
+
+function updatePlayerVisualTransform() {
+  if (!playerMesh) return;
+  playerMesh.position[0] = player.x;
+  playerMesh.position[1] = playerVisualFeetAnchored ? player.y - PLAYER_COLLIDER_HALF_HEIGHT : player.y;
+  playerMesh.position[2] = player.z;
+  playerMesh.yaw = player.yaw;
+}
+
+async function installRiggedPlayerVisual() {
+  if (!engine || !playerMesh) return;
+  const activeEngine = engine;
+  const fallbackMesh = playerMesh;
+  try {
+    const asset = await loadRiggedCharacterGeometry('/assets/characters/quaternius/universal-base-male.glb');
+    if (!engine || engine !== activeEngine || playerMesh !== fallbackMesh) return;
+    const human = engine.addMesh(asset.geometry, {
+      position: [player.x, player.y - PLAYER_COLLIDER_HALF_HEIGHT, player.z],
+      yaw: player.yaw
+    });
+    human.rig = asset.rig;
+    human.characterAsset = 'quaternius-universal-base-male';
+    engine.removeMesh(fallbackMesh);
+    playerMesh = human;
+    playerVisualFeetAnchored = true;
+    playerRig = asset.rig;
+    updatePlayerVisualTransform();
+    const jointText = Number(asset.rig?.jointCount) || 0;
+    terrainStatus.textContent = `${terrainStatus.textContent} · humanoid ${jointText}-joint rig`;
+    console.info('Rift character visual loaded', asset.rig);
+  } catch (error) {
+    console.warn('Rigged humanoid failed to load; keeping capsule fallback.', error);
+  }
 }
 
 function frame(now) {
@@ -442,12 +485,7 @@ function updatePlayer(dt) {
     }
   }
 
-  if (playerMesh) {
-    playerMesh.position[0] = player.x;
-    playerMesh.position[1] = player.y;
-    playerMesh.position[2] = player.z;
-    playerMesh.yaw = player.yaw;
-  }
+  updatePlayerVisualTransform();
 }
 
 function updateFreecam(dt) {
