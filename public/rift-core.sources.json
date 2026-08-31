@@ -1,0 +1,14 @@
+{
+  "format": "rift-core-sources-v1",
+  "abi": 1,
+  "sources": [
+    {
+      "path": "native/include/rift/terrain.hpp",
+      "gitBlobSha": "d2e319a8e50bf2c33cab313ca0c259588f46ce3a"
+    },
+    {
+      "path": "native/src/terrain.cpp",
+      "gitBlobSha": "a488fe5fb15e88ad38c478bd08309787a4598619"
+    }
+  ]
+}
