@@ -71,6 +71,7 @@ export function resolveRiftThirdPersonCameraDistance({
   alpha,
   beta,
   desiredDistance,
+  cameraLift = 0,
   minDistance = RIFT_THIRD_PERSON_CAMERA_DEFAULTS.minDistance,
   collisionStep = RIFT_THIRD_PERSON_CAMERA_DEFAULTS.collisionStep,
   collisionSkin = RIFT_THIRD_PERSON_CAMERA_DEFAULTS.collisionSkin
@@ -87,7 +88,12 @@ export function resolveRiftThirdPersonCameraDistance({
     const x = target[0] + dx * t;
     const y = target[1] + dy * t;
     const z = target[2] + dz * t;
-    if (!occupiedAt(grid, x, y, z)) continue;
+    // Probe both the physical boom and the camera's lifted render path. The
+    // latter matters under ceilings: the old probe could pass safely below a
+    // roof, then framingLift moved the actual camera up inside that roof.
+    const blockedBoom = occupiedAt(grid, x, y, z);
+    const blockedCamera = occupiedAt(grid, x, y + (Number(cameraLift) || 0), z);
+    if (!blockedBoom && !blockedCamera) continue;
     safeDistance = Math.max(minDistance, length * Math.max(0, t - collisionSkin / length));
     break;
   }
@@ -167,6 +173,7 @@ export function createRiftThirdPersonCamera({
       alpha: boomAlpha,
       beta: boomBeta,
       desiredDistance: fixedDistance,
+      cameraLift: config.framingLift,
       minDistance: config.minDistance,
       collisionStep: config.collisionStep,
       collisionSkin: config.collisionSkin
@@ -360,6 +367,23 @@ export function validateRiftThirdPersonCamera() {
   if (Math.abs(clear - 8.5) > 1e-6) failures.push('clear third-person view changed camera distance');
   const blocked = resolveRiftThirdPersonCameraDistance({ grid:fakeGrid, target:[0,2,0], alpha:-Math.PI/2, beta:Math.PI/2, desiredDistance:8.5 });
   if (!(blocked < 8.5 && blocked >= RIFT_THIRD_PERSON_CAMERA_DEFAULTS.minDistance)) failures.push('camera collision did not retract before a blocking wall');
+
+  // A low roof can intersect only the lifted render camera while leaving the
+  // lower boom ray clear. Collision must still push the camera forward.
+  const roofGrid = {
+    getBlockWorld(x, y, z) {
+      return (x === 0 && y === 3 && z <= -3 && z >= -5) ? 1 : 0;
+    }
+  };
+  const roofBlocked = resolveRiftThirdPersonCameraDistance({
+    grid: roofGrid,
+    target: [0, 2, 0],
+    alpha: -Math.PI/2,
+    beta: Math.PI/2,
+    desiredDistance: 8.5,
+    cameraLift: RIFT_THIRD_PERSON_CAMERA_DEFAULTS.framingLift
+  });
+  if (!(roofBlocked < 8.5 && roofBlocked >= RIFT_THIRD_PERSON_CAMERA_DEFAULTS.minDistance)) failures.push('camera collision did not retract under a low roof');
 
   return { ok: failures.length === 0, failures };
 }
