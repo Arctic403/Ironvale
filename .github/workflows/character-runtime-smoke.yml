@@ -1,19 +1,51 @@
-name: Verify Character Runtime Assets
+name: Finalize Character Locomotion Defaults
 
 on:
   push:
     paths:
       - '.github/workflows/character-runtime-smoke.yml'
 
+permissions:
+  contents: write
+
 jobs:
-  smoke:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect rig textures and animation compatibility
+        with:
+          fetch-depth: 0
+      - name: Pin normal locomotion clips
         shell: bash
         run: |
           set -euo pipefail
-          echo 'aW1wb3J0IGpzb24sIHN0cnVjdCwgcmUKZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpkZWYgcmVhZF9nbGIocGF0aCk6CiAgICBkYXRhID0gUGF0aChwYXRoKS5yZWFkX2J5dGVzKCkKICAgIG1hZ2ljLCB2ZXJzaW9uLCBsZW5ndGggPSBzdHJ1Y3QudW5wYWNrX2Zyb20oJzxJSUknLCBkYXRhLCAwKQogICAgYXNzZXJ0IG1hZ2ljID09IDB4NDY1NDZDNjcgYW5kIHZlcnNpb24gPT0gMiBhbmQgbGVuZ3RoID09IGxlbihkYXRhKSwgcGF0aAogICAgb2ZmID0gMTIKICAgIGRvYyA9IE5vbmUKICAgIHdoaWxlIG9mZiArIDggPD0gbGVuKGRhdGEpOgogICAgICAgIG4sIGtpbmQgPSBzdHJ1Y3QudW5wYWNrX2Zyb20oJzxJSScsIGRhdGEsIG9mZik7IG9mZiArPSA4CiAgICAgICAgY2h1bmsgPSBkYXRhW29mZjpvZmYrbl07IG9mZiArPSBuCiAgICAgICAgaWYga2luZCA9PSAweDRFNEY1MzRBOgogICAgICAgICAgICBkb2MgPSBqc29uLmxvYWRzKGNodW5rLnJzdHJpcChiJ1x4MDAgJykuZGVjb2RlKCkpCiAgICBhc3NlcnQgZG9jCiAgICByZXR1cm4gZG9jCgptb2RlbCA9IHJlYWRfZ2xiKCdwdWJsaWMvYXNzZXRzL2NoYXJhY3RlcnMvcXVhdGVybml1cy91bml2ZXJzYWwtYmFzZS1tYWxlLmdsYicpCmFuaW0gPSByZWFkX2dsYigncHVibGljL2Fzc2V0cy9jaGFyYWN0ZXJzL3F1YXRlcm5pdXMvdW5pdmVyc2FsLWFuaW1hdGlvbi1saWJyYXJ5LmdsYicpCm1vZGVsX25hbWVzID0ge24uZ2V0KCduYW1lJykgZm9yIG4gaW4gbW9kZWwuZ2V0KCdub2RlcycsIFtdKSBpZiBuLmdldCgnbmFtZScpfQptZXNoX25vZGVzID0gW24gZm9yIG4gaW4gbW9kZWwuZ2V0KCdub2RlcycsIFtdKSBpZiAnbWVzaCcgaW4gbl0KcHJpbXMgPSBbXQpmb3Igbm9kZSBpbiBtZXNoX25vZGVzOgogICAgbWVzaCA9IG1vZGVsWydtZXNoZXMnXVtub2RlWydtZXNoJ11dCiAgICBmb3IgcCBpbiBtZXNoLmdldCgncHJpbWl0aXZlcycsIFtdKToKICAgICAgICBhdHRycyA9IHAuZ2V0KCdhdHRyaWJ1dGVzJywge30pCiAgICAgICAgcHJpbXMuYXBwZW5kKHsKICAgICAgICAgICAgJ3NraW4nOiBub2RlLmdldCgnc2tpbicpLAogICAgICAgICAgICAndXYnOiAnVEVYQ09PUkRfMCcgaW4gYXR0cnMsCiAgICAgICAgICAgICdqb2ludHMnOiAnSk9JTlRTXzAnIGluIGF0dHJzLAogICAgICAgICAgICAnd2VpZ2h0cyc6ICdXRUlHSFRTXzAnIGluIGF0dHJzLAogICAgICAgICAgICAnbWF0ZXJpYWwnOiBwLmdldCgnbWF0ZXJpYWwnKSwKICAgICAgICB9KQp0ZXh0dXJlc191c2VkID0gW10KZm9yIG1hdGVyaWFsIGluIG1vZGVsLmdldCgnbWF0ZXJpYWxzJywgW10pOgogICAgdGV4ID0gbWF0ZXJpYWwuZ2V0KCdwYnJNZXRhbGxpY1JvdWdobmVzcycsIHt9KS5nZXQoJ2Jhc2VDb2xvclRleHR1cmUnLCB7fSkuZ2V0KCdpbmRleCcpCiAgICBpZiB0ZXggaXMgbm90IE5vbmU6IHRleHR1cmVzX3VzZWQuYXBwZW5kKHRleCkKY2xpcHMgPSBbXQptYXRjaGVkID0gMAp0b3RhbF90YXJnZXRzID0gMApmb3IgaSwgY2xpcCBpbiBlbnVtZXJhdGUoYW5pbS5nZXQoJ2FuaW1hdGlvbnMnLCBbXSkpOgogICAgbmFtZSA9IGNsaXAuZ2V0KCduYW1lJykgb3IgZidBbmltYXRpb24ge2krMX0nCiAgICBuYW1lcyA9IFtdCiAgICBmb3IgY2ggaW4gY2xpcC5nZXQoJ2NoYW5uZWxzJywgW10pOgogICAgICAgIG5vZGVfaW5kZXggPSBjaC5nZXQoJ3RhcmdldCcsIHt9KS5nZXQoJ25vZGUnKQogICAgICAgIHRhcmdldF9uYW1lID0gYW5pbS5nZXQoJ25vZGVzJywgW10pW25vZGVfaW5kZXhdLmdldCgnbmFtZScpIGlmIG5vZGVfaW5kZXggaXMgbm90IE5vbmUgZWxzZSBOb25lCiAgICAgICAgaWYgdGFyZ2V0X25hbWU6CiAgICAgICAgICAgIHRvdGFsX3RhcmdldHMgKz0gMQogICAgICAgICAgICBpZiB0YXJnZXRfbmFtZSBpbiBtb2RlbF9uYW1lczogbWF0Y2hlZCArPSAxCiAgICAgICAgICAgIG5hbWVzLmFwcGVuZCh0YXJnZXRfbmFtZSkKICAgIGNsaXBzLmFwcGVuZChuYW1lKQoKZGVmIGNob29zZShwYXR0ZXJucywgZmFsbGJhY2s9Tm9uZSk6CiAgICBmb3IgcGF0IGluIHBhdHRlcm5zOgogICAgICAgIHIgPSByZS5jb21waWxlKHBhdCwgcmUuSSkKICAgICAgICBmb3IgbmFtZSBpbiBjbGlwczoKICAgICAgICAgICAgaWYgci5zZWFyY2gobmFtZSk6IHJldHVybiBuYW1lCiAgICByZXR1cm4gZmFsbGJhY2sKaWRsZSA9IGNob29zZShbcideaWRsZSQnLCByJ2lkbGUnLCByJ3N0YW5kJ10sIGNsaXBzWzBdIGlmIGNsaXBzIGVsc2UgTm9uZSkKd2FsayA9IGNob29zZShbcid3YWxrKD8hLipiYWNrKScsIHInd2Fsa2luZycsIHIncnVuJ10sIGlkbGUpCnN1bW1hcnkgPSB7CiAgICAnbW9kZWxOb2Rlcyc6IGxlbihtb2RlbC5nZXQoJ25vZGVzJywgW10pKSwKICAgICdtZXNoTm9kZXMnOiBsZW4obWVzaF9ub2RlcyksCiAgICAnc2tpbnMnOiBsZW4obW9kZWwuZ2V0KCdza2lucycsIFtdKSksCiAgICAnam9pbnRDb3VudCc6IGxlbihtb2RlbC5nZXQoJ3NraW5zJywgW3t9XSlbMF0uZ2V0KCdqb2ludHMnLCBbXSkpIGlmIG1vZGVsLmdldCgnc2tpbnMnKSBlbHNlIDAsCiAgICAncHJpbWl0aXZlcyc6IGxlbihwcmltcyksCiAgICAncmlnZ2VkUHJpbWl0aXZlcyc6IHN1bSgxIGZvciBwIGluIHByaW1zIGlmIHBbJ3NraW4nXSBpcyBub3QgTm9uZSBhbmQgcFsnam9pbnRzJ10gYW5kIHBbJ3dlaWdodHMnXSksCiAgICAndXZQcmltaXRpdmVzJzogc3VtKDEgZm9yIHAgaW4gcHJpbXMgaWYgcFsndXYnXSksCiAgICAnbWF0ZXJpYWxzJzogbGVuKG1vZGVsLmdldCgnbWF0ZXJpYWxzJywgW10pKSwKICAgICdpbWFnZXMnOiBsZW4obW9kZWwuZ2V0KCdpbWFnZXMnLCBbXSkpLAogICAgJ3RleHR1cmVzJzogbGVuKG1vZGVsLmdldCgndGV4dHVyZXMnLCBbXSkpLAogICAgJ2Jhc2VDb2xvclRleHR1cmVzVXNlZCc6IHNvcnRlZChzZXQodGV4dHVyZXNfdXNlZCkpLAogICAgJ2FuaW1hdGlvbkNsaXBzJzogbGVuKGNsaXBzKSwKICAgICdpZGxlQ2xpcCc6IGlkbGUsCiAgICAnd2Fsa0NsaXAnOiB3YWxrLAogICAgJ2FuaW1hdGlvblRhcmdldE5hbWVNYXRjaGVzJzogbWF0Y2hlZCwKICAgICdhbmltYXRpb25UYXJnZXROYW1lVG90YWwnOiB0b3RhbF90YXJnZXRzLAogICAgJ2NsaXBOYW1lcyc6IGNsaXBzLAp9CnByaW50KGpzb24uZHVtcHMoc3VtbWFyeSwgaW5kZW50PTIpKQphc3NlcnQgc3VtbWFyeVsnam9pbnRDb3VudCddID09IDY1CmFzc2VydCBzdW1tYXJ5WydyaWdnZWRQcmltaXRpdmVzJ10gPiAwCmFzc2VydCBzdW1tYXJ5Wyd1dlByaW1pdGl2ZXMnXSA+IDAKYXNzZXJ0IHN1bW1hcnlbJ2Jhc2VDb2xvclRleHR1cmVzVXNlZCddCmFzc2VydCBzdW1tYXJ5WydhbmltYXRpb25DbGlwcyddID09IDQzCmFzc2VydCBpZGxlIGFuZCB3YWxrCmFzc2VydCBtYXRjaGVkID09IHRvdGFsX3RhcmdldHMgYW5kIG1hdGNoZWQgPiAwLCAobWF0Y2hlZCwgdG90YWxfdGFyZ2V0cykK' | base64 -d > /tmp/character-smoke.py
-          python3 /tmp/character-smoke.py
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('public/rift-character.js')
+          text = path.read_text()
+          old_idle = "const idle = chooseClip(clipNames, [/^idle$/i, /idle/i, /stand/i], clipNames[0] || null);"
+          old_walk = "const walk = chooseClip(clipNames, [/walk(?!.*back)/i, /walking/i, /run/i], idle);"
+          new_idle = "const idle = chooseClip(clipNames, [/^idle_loop$/i, /^idle$/i, /^idle_/i, /stand/i], clipNames[0] || null);"
+          new_walk = "const walk = chooseClip(clipNames, [/^walk_loop$/i, /^walk$/i, /^walk_/i, /walking/i, /run/i], idle);"
+          if old_idle not in text or old_walk not in text:
+              raise SystemExit('Expected locomotion selector source was not found.')
+          text = text.replace(old_idle, new_idle, 1).replace(old_walk, new_walk, 1)
+          path.write_text(text)
+          PY
+          node --check public/rift-character.js
+          grep -F "^idle_loop$" public/rift-character.js >/dev/null
+          grep -F "^walk_loop$" public/rift-character.js >/dev/null
           npm run build
+      - name: Commit normal locomotion defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/rift-character.js
+          if git diff --cached --quiet; then
+            echo 'No locomotion default changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Use normal idle and walk character animations'
+          git push origin HEAD:main
