@@ -41,6 +41,14 @@ jobs:
             -Wl,--export=rift_aabb_intersects \
             -Wl,--export=rift_distance_sq3 \
             -Wl,--export=rift_hash3 \
+            -Wl,--export=rift_crossed_support \
+            -Wl,--export=rift_ground_step_classify \
+            -Wl,--export=rift_stair_top \
+            -Wl,--export=rift_shape_top \
+            -Wl,--export=rift_state_shape_top \
+            -Wl,--export=rift_section_states_ptr \
+            -Wl,--export=rift_section_face_masks_ptr \
+            -Wl,--export=rift_build_section_face_masks \
             native/rift-core.cpp \
             -o public/wasm/rift-core.wasm
           cp public/wasm/rift-core.wasm src/wasm/rift-core.wasm
