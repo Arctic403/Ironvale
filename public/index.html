@@ -22,7 +22,7 @@
       <span><strong>IRONVALE</strong><small>MEDIEVAL ONLINE RPG</small></span>
     </a>
     <div class="topbar-center"><span id="page-eyebrow">THE MARCHES</span><strong id="page-title-text">World</strong></div>
-    <button id="menu-button" class="menu-button" type="button" aria-label="Open navigation">☰</button>
+    <button id="menu-button" class="menu-button" type="button" aria-label="Open navigation" aria-controls="game-drawer" aria-expanded="false">☰</button>
   </header>
 
   <div id="status" class="status">Connecting to Ironvale…</div>
@@ -58,11 +58,13 @@
   <main id="game-root" class="game-root hidden"></main>
   <nav id="mobile-nav" class="mobile-nav hidden" aria-label="Primary navigation"></nav>
 
-  <div id="drawer-backdrop" class="drawer-backdrop"></div>
-  <aside id="game-drawer" class="game-drawer" aria-label="Ironvale navigation">
-    <header><div><span>IRONVALE</span><strong>The Marches</strong></div><button id="drawer-close" type="button">×</button></header>
-    <nav id="drawer-nav"></nav>
-  </aside>
+  <div id="game-drawer" class="game-drawer" aria-label="Ironvale navigation" aria-hidden="true">
+    <div id="drawer-backdrop" class="drawer-backdrop"></div>
+    <aside class="drawer-panel">
+      <header><div><span>IRONVALE</span><strong>The Marches</strong></div><button id="drawer-close" type="button" aria-label="Close navigation">×</button></header>
+      <nav id="drawer-nav"></nav>
+    </aside>
+  </div>
 
   <script type="module" src="/rift-wasm-core.js"></script>
   <script type="module" src="/rift-game-menu.js"></script>
