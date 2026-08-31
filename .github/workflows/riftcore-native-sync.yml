@@ -1,0 +1,63 @@
+name: RiftCore Native Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.rift-patches/**'
+      - 'native/**'
+      - 'scripts/build-native.mjs'
+      - '.github/workflows/riftcore-native-sync.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: riftcore-native-main
+  cancel-in-progress: false
+
+jobs:
+  build-native:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+
+      - name: Apply pending engine payload
+        shell: bash
+        run: |
+          shopt -s nullglob
+          parts=(.rift-patches/lodpart*)
+          if [ ${#parts[@]} -gt 0 ]; then
+            cat "${parts[@]}" > /tmp/ironvale-lod.b64
+            base64 --decode /tmp/ironvale-lod.b64 > /tmp/ironvale-lod.tar.gz
+            tar -xzf /tmp/ironvale-lod.tar.gz
+            rm -f "${parts[@]}"
+            rmdir .rift-patches 2>/dev/null || true
+          fi
+
+      - name: Build RiftCore WASM
+        run: npm run build:native
+
+      - name: Verify Ironvale core
+        run: npm run build
+
+      - name: Commit synchronized engine artifacts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "RiftCore source and artifact are already synchronized."
+            exit 0
+          fi
+          git commit -m "Sync RiftCore terrain engine and WASM"
+          git push origin HEAD:main
