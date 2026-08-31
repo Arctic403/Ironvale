@@ -40,7 +40,7 @@ expect(nativeCore.includes('int rift_core_version() { return 4; }') && nativeCor
 expect(nativeBridge.includes("version: 'native-core-browser-v4'") && nativeBridge.includes('riftNativeSpatialQuery') && nativeBridge.includes('riftNativeSimulateAgents') && nativeBridge.includes('riftNativeResolveCombat'), 'browser bridge must expose the Native Core v4 gameplay kernels');
 expect(exists('public/rift-world-blocks') && exists('public/rift-buildings'), 'game asset namespaces must use Rift Engine names');
 expect(!exists('public/riftcity-blocks') && !exists('public/riftcity-buildings'), 'RiftCity-named asset directories must be gone');
-expect(exists('public/rift-world-blocks/ironvale-foundation-001.json'), 'Ironvale foundation world must be the default block');
+expect(exists('public/rift-world-blocks/ironvale-terrain-bootstrap.json'), 'Ironvale terrain bootstrap must be the default world while Rift Terrain is rebuilt');
 expect(server.includes("handleIronvaleApi") && server.includes("ironvale_session"), 'Worker must use Ironvale API and session namespace');
 expect(!server.includes("url.pathname === '/api/crimes'") && !server.includes("url.pathname.startsWith('/api/services')") && !server.includes("url.pathname === '/api/world/travel'"), 'modern RiftCity gameplay routes must be removed');
 expect(server.includes("url.pathname.startsWith('/api/world/blocks/')"), 'Rift authoring block endpoint must remain');
@@ -48,6 +48,6 @@ for (const table of ['ironvale_characters','ironvale_inventory','ironvale_equipm
 for (const legacy of ['player_crime_progress','crime_history','player_casino','player_law','player_bank_accounts']) expect(!schema.includes(legacy), `fresh schema still contains ${legacy}`);
 for (const token of ['IRONVALE_QUESTS','IRONVALE_NPCS','IRONVALE_FACTIONS','IRONVALE_CREATURES','IRONVALE_DUNGEONS','blackstone-barrow','brackenford']) expect(content.includes(token), `content foundation missing ${token}`);
 expect(api.includes("/api/ironvale/bootstrap") && api.includes("/api/ironvale/sync") && api.includes("/api/ironvale/quests/accept"), 'Ironvale API foundation incomplete');
-expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v2"), '3D world shell must be Ironvale-branded');
+expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v3") && worldShell.includes('ironvale-terrain-bootstrap.json'), '3D world shell must be Ironvale-branded and terrain-reset aware');
 
 console.log('[ironvale-foundation] PASS · Ironvale owns a game-first 3D MMO surface while Rift Engine, Native Core v4, authoring and Cloudflare foundations remain intact.');

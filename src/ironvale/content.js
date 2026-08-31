@@ -50,9 +50,9 @@ export const IRONVALE_CAMPAIGNS = Object.freeze([
 export const IRONVALE_ZONES = Object.freeze([
   {
     id: 'brackenford-lowlands', name: 'Brackenford Lowlands', levelMin: 1, levelMax: 10, kind: 'starter-zone',
-    worldId: 'brackenford-lowlands-001', worldUrl: '/rift-world-blocks/brackenford-lowlands-001.json',
-    description: 'A broad working lowland of crooked medieval lanes, irregular timber-and-stone buildings, farms, wooded hills, an abandoned watch and the Blackstone cave ridge around Brackenford.',
-    spawn: { id: 'valeborn-training-yard', position: [178, 4, 178], facing: 0 },
+    worldId: 'ironvale-terrain-bootstrap', worldUrl: '/rift-world-blocks/ironvale-terrain-bootstrap.json',
+    description: 'A broad Valeborn starter region whose authored landscape is being rebuilt on Rift Terrain. Story, quest and world-object definitions remain independent from the terrain implementation.',
+    spawn: { id: 'valeborn-training-yard', position: [160, 2, 160], facing: 0 },
     campaignId: 'the-broken-oath', chapterId: 'ash-on-the-road'
   }
 ]);

@@ -8,13 +8,11 @@ import { createRiftPlayer, createRiftPlayerController } from './rift-player.js';
 import { createRiftCreativeMode } from './rift-creative-mode.js';
 import { createRiftThirdPersonCamera, createRiftFirstPersonCamera } from './rift-third-person-camera.js';
 import { createIronvaleStarterRuntime } from './ironvale-gameplay.js';
-import { createValebornSmoothTerrain } from './ironvale-smooth-terrain.js';
-import { createIronvaleNatureEnvironment } from './ironvale-environment.js';
 
 let activeFoundation = null;
-const DEFAULT_BLOCK_URL = new URL('./rift-world-blocks/brackenford-lowlands-001.json', import.meta.url);
-const ACTIVE_BLOCK_STORAGE_KEY = 'ironvale:world:active-block:v2';
-const ACTIVE_BLOCK_STORAGE_VERSION = 2;
+const DEFAULT_BLOCK_URL = new URL('./rift-world-blocks/ironvale-terrain-bootstrap.json', import.meta.url);
+const ACTIVE_BLOCK_STORAGE_KEY = 'ironvale:world:active-block:v3';
+const ACTIVE_BLOCK_STORAGE_VERSION = 3;
 const ACTIVE_BLOCK_MAX_BYTES = 2 * 1024 * 1024;
 
 export function destroyDowntown3D() {
@@ -189,7 +187,7 @@ function createBlockImporterLab({ root, canvas, status }) {
   const meshOptions = {
     color: '#ffffff',
     noise: 0,
-    blockGrid: 0.16,
+    blockGrid: 0,
     blockFaceShade: 1,
     blockElevationCue: 0.01,
     blockElevationBase: 0,
@@ -203,12 +201,9 @@ function createBlockImporterLab({ root, canvas, status }) {
   let topView = false;
   let gameMode = false;
   let destroyed = false;
-  let sourceLabel = 'BRACKENFORD LOWLANDS';
+  let sourceLabel = 'IRONVALE TERRAIN BOOTSTRAP';
   let persistenceLabel = 'BUNDLED';
   let ironvaleGameplay = null;
-  let smoothTerrain = null;
-  let natureEnvironment = null;
-  let visualRevision = 0;
 
   const nameLabel = root.querySelector('#rift-import-name');
   const descriptionLabel = root.querySelector('#rift-import-description');
@@ -232,7 +227,7 @@ function createBlockImporterLab({ root, canvas, status }) {
   const fullscreenButton = root.querySelector('#world3d-fullscreen-button');
   const fileInput = root.querySelector('#rift-import-file');
 
-  const player = createRiftPlayer(engine, { position: [32, 2, 32] });
+  const player = createRiftPlayer(engine, { position: [160, 2, 160] });
   let requestedPlayerVisible = true;
   player.setVisible(true);
   const playerController = createRiftPlayerController({
@@ -426,20 +421,6 @@ function createBlockImporterLab({ root, canvas, status }) {
     window.setTimeout(() => status.classList.add('settled'), 2400);
   };
 
-  const syncVisualEnvironment = async document => {
-    const revision = ++visualRevision;
-    natureEnvironment?.destroy?.(); natureEnvironment = null;
-    smoothTerrain?.destroy?.(); smoothTerrain = null;
-    if (document?.metadata?.visual_surface !== 'smooth-terrain-v1') return;
-    smoothTerrain = createValebornSmoothTerrain(engine, { chunkSize: 32, step: 2 });
-    try {
-      const environment = await createIronvaleNatureEnvironment(engine);
-      if (destroyed || revision !== visualRevision) { environment?.destroy?.(); return; }
-      natureEnvironment = environment;
-    } catch (error) {
-      console.warn('Ironvale nature environment could not finish loading', error);
-    }
-  };
 
   const loadDocument = (document, label = 'LOCAL JSON', options = {}) => {
     const compiled = compileRiftCityBlock(document);
@@ -447,7 +428,7 @@ function createBlockImporterLab({ root, canvas, status }) {
 
     const nextDrawables = [];
     try {
-      if (document?.metadata?.visual_surface !== 'smooth-terrain-v1') for (const mesh of compiled.meshes) {
+      for (const mesh of compiled.meshes) {
         // H1.74: third-person camera collision owns visibility. Render each compiled
         // RiftSection as one complete mesh; camera position must never hide authored
         // roof, wall, floor, slab or stair geometry.
@@ -464,7 +445,6 @@ function createBlockImporterLab({ root, canvas, status }) {
     engine.removeDrawables(blockDrawables);
     blockDrawables = nextDrawables;
     imported = compiled;
-    void syncVisualEnvironment(compiled.document);
     ironvaleGameplay?.onWorldChanged?.(compiled.document);
     sourceLabel = label;
     persistenceLabel = options.persistenceLabel || 'PREVIEW ONLY';
@@ -505,17 +485,17 @@ function createBlockImporterLab({ root, canvas, status }) {
   const loadBundledBlock = async ({ reason = '' } = {}) => {
     if (status && validatorDebugEnabled()) {
       status.classList.remove('ready', 'error', 'settled');
-      status.innerHTML = '<strong>IMPORTING COMMERCE BLOCK 01…</strong><span>Fetching the bundled JSON, validating its contract, expanding compact operations and compiling cross-section block meshes.</span>';
+      status.innerHTML = '<strong>LOADING TERRAIN BOOTSTRAP…</strong><span>Fetching the bundled JSON, validating its contract, expanding compact operations and compiling cross-section block meshes.</span>';
     }
     const response = await fetch(DEFAULT_BLOCK_URL, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`Bundled Block 001 request failed with HTTP ${response.status}.`);
+    if (!response.ok) throw new Error(`Bundled terrain bootstrap request failed with HTTP ${response.status}.`);
     const document = await response.json();
     if (destroyed) return null;
-    const compiled = loadDocument(document, 'DEFAULT BLOCK 001', { persistenceLabel: 'BUNDLED' });
+    const compiled = loadDocument(document, 'TERRAIN BOOTSTRAP', { persistenceLabel: 'BUNDLED' });
     if (reason && status && validatorDebugEnabled()) {
       status.classList.add('ready');
       status.classList.remove('error', 'settled');
-      status.innerHTML = `<strong>DEFAULT BLOCK RESTORED</strong><span>${escapeText(reason)}</span>`;
+      status.innerHTML = `<strong>TERRAIN BOOTSTRAP RESTORED</strong><span>${escapeText(reason)}</span>`;
     }
     return compiled;
   };
@@ -534,7 +514,7 @@ function createBlockImporterLab({ root, canvas, status }) {
         persistenceLabel: saved.mode === 'SESSION' ? 'SESSION SAVED' : 'PERSISTED'
       });
     } catch (error) {
-      console.warn('Saved Rift world block could not be restored; falling back to bundled Block 001.', error);
+      console.warn('Saved Rift world block could not be restored; falling back to the bundled terrain bootstrap.', error);
       clearPersistedBlock();
       return loadBundledBlock({
         reason: `The saved import could not be restored (${error?.message || 'invalid saved JSON'}), so Ironvale cleared it and loaded the bundled default.`
@@ -593,7 +573,7 @@ function createBlockImporterLab({ root, canvas, status }) {
       if (status) {
         status.classList.add('error');
         status.classList.remove('ready', 'settled');
-        status.innerHTML = `<strong>BLOCK 001 RELOAD FAILED</strong><span>${escapeText(error?.message || 'Could not reload bundled block.')}</span>`;
+        status.innerHTML = `<strong>TERRAIN BOOTSTRAP RELOAD FAILED</strong><span>${escapeText(error?.message || 'Could not reload bundled block.')}</span>`;
       }
     }
   };
@@ -860,9 +840,6 @@ function createBlockImporterLab({ root, canvas, status }) {
       document.body.classList.remove('world3d-game-mode');
       ironvaleGameplay?.destroy?.();
       ironvaleGameplay = null;
-      visualRevision += 1;
-      natureEnvironment?.destroy?.(); natureEnvironment = null;
-      smoothTerrain?.destroy?.(); smoothTerrain = null;
       creative?.destroy?.();
       playerController.destroy();
       player.destroy();

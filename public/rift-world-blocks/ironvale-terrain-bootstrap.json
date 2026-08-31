@@ -1,0 +1,95 @@
+{
+  "format": "riftcity-city-block",
+  "version": 2,
+  "id": "ironvale-terrain-bootstrap",
+  "name": "Ironvale Terrain Bootstrap",
+  "units": "meters",
+  "grid": {
+    "cell_size": 1,
+    "shape_increment": 0.5
+  },
+  "origin": [
+    0,
+    0,
+    0
+  ],
+  "bounds": {
+    "min": [
+      0,
+      0,
+      0
+    ],
+    "max": [
+      319,
+      8,
+      319
+    ]
+  },
+  "palette": {
+    "air": {
+      "material_id": 0,
+      "shape": "air",
+      "color": [
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "ops": [
+    {
+      "op": "fill_box",
+      "state": "grass_block",
+      "min": [
+        0,
+        0,
+        0
+      ],
+      "max": [
+        319,
+        0,
+        319
+      ],
+      "name": "Temporary flat compatibility floor"
+    }
+  ],
+  "prefabs": {},
+  "layout": [],
+  "anchors": {
+    "terrain_origin": {
+      "at": [
+        160,
+        1,
+        160
+      ],
+      "facing": "north",
+      "tags": [
+        "terrain-origin",
+        "bootstrap"
+      ]
+    },
+    "starter_spawn": {
+      "at": [
+        160,
+        1,
+        160
+      ],
+      "facing": "north",
+      "tags": [
+        "spawn",
+        "bootstrap"
+      ]
+    }
+  },
+  "validation": {
+    "overlap_policy": "allow"
+  },
+  "metadata": {
+    "terrain_reset": true,
+    "terrain_authority": "rift-terrain-native-pending",
+    "compatibility_floor": true,
+    "legacy_island": false,
+    "buildings": false,
+    "purpose": "Temporary flat collision/bootstrap surface while native editable Rift Terrain replaces the retired procedural/block terrain prototypes."
+  }
+}
