@@ -45,7 +45,7 @@
       <div class="tool-heading">
         <div>
           <strong>Terrain Tools</strong>
-          <small>Freecam + reticle sculpting.</small>
+          <small>Freecam + movable reticle sculpting.</small>
         </div>
       </div>
 
@@ -65,7 +65,7 @@
       <div class="history-grid"><button id="undo-terrain">Undo</button><button id="redo-terrain">Redo</button></div>
       <div class="history-grid"><button id="save-terrain">Save Draft</button><button id="export-terrain">Export</button></div>
       <button id="reset-terrain" class="wide danger">Reset to Blank</button>
-      <small id="editor-status" class="editor-status">Turn Freecam ON. Aim the reticle, then tap to sculpt.</small>
+      <small id="editor-status" class="editor-status">Turn Freecam ON. 1 finger aims, tap sculpts, 2 fingers look.</small>
     </div>
 
     <div id="terrain-reticle" class="terrain-reticle" hidden aria-hidden="true">
@@ -73,7 +73,7 @@
     </div>
     <div id="brush-readout" class="brush-readout" hidden>Raise · 10m</div>
 
-    <div id="coords" class="coords">160, 0, 160</div>
+    <div id="coords" class="coords">320, 0, 320</div>
 
     <div id="joystick" class="joystick" aria-label="Movement control">
       <div id="joystick-knob"></div>
@@ -84,7 +84,7 @@
       <button type="button" data-freecam-vertical="-1" aria-label="Freecam down">▼</button>
     </div>
 
-    <div class="look-hint">Drag to look</div>
+    <div class="look-hint">1 finger aim · 2 fingers look</div>
   </main>
 
   <script type="module" src="/app.js"></script>
