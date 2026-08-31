@@ -22,6 +22,9 @@ jobs:
       - name: Strip legacy terrain
         run: node scripts/terrain-reset-cleanup.mjs
 
+      - name: Align terrain-reset verifiers
+        run: node scripts/terrain-reset-fix-verifiers.mjs
+
       - name: Verify starter contract
         run: node scripts/check-ironvale-starter-game.js
 
@@ -53,6 +56,7 @@ jobs:
       - name: Remove one-shot reset tooling
         run: |
           rm -f scripts/terrain-reset-cleanup.mjs
+          rm -f scripts/terrain-reset-fix-verifiers.mjs
           rm -f .github/workflows/ironvale-terrain-reset.yml
 
       - name: Commit verified terrain reset
