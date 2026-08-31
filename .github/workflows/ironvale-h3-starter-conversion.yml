@@ -1,0 +1,74 @@
+name: Ironvale H3 Starter Conversion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-ironvale-h3-starter.mjs'
+      - '.github/workflows/ironvale-h3-starter-conversion.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout Ironvale
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Guard source head
+        run: |
+          test -f scripts/apply-ironvale-h3-starter.mjs
+          test -f native/rift-core.cpp
+          grep -q "Rift Native Core v4" native/rift-core.cpp
+
+      - name: Apply H3 starter game conversion
+        run: node scripts/apply-ironvale-h3-starter.mjs
+
+      - name: Verify JavaScript syntax and full Ironvale regression suite
+        run: npm run build
+
+      - name: Install Worker dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify Cloudflare Worker and WASM bundle
+        run: npx wrangler deploy --dry-run --outdir=/tmp/ironvale-h3-worker
+
+      - name: Verify production diff
+        run: |
+          git diff --check
+          test -s public/rift-world-blocks/brackenford-lowlands-001.json
+          test -s public/ironvale-gameplay.js
+          node scripts/check-ironvale-starter-game.js
+          git status --short
+
+      - name: Commit verified H3 starter game
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            src/ironvale/content.js \
+            src/ironvale/api.js \
+            schema.sql \
+            public/app.js \
+            public/ui/state.js \
+            public/ui/shell.js \
+            public/ironvale-gameplay.js \
+            public/ironvale.css \
+            public/downtown3d-foundation.js \
+            public/rift-game-menu.js \
+            public/rift-world-blocks/brackenford-lowlands-001.json \
+            scripts/check-ironvale-starter-game.js \
+            scripts/check-ironvale-foundation.js \
+            package.json
+          if git diff --cached --quiet; then
+            echo 'H3.0 starter game already applied.'
+            exit 0
+          fi
+          git commit -m 'Build Valeborn Knight 3D starter experience'
+          git push origin HEAD:main
