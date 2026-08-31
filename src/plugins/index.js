@@ -1,5 +1,8 @@
 // Central plugin registry surface for RiftCity.
 // Core engines import from this file; gameplay definitions stay in isolated modules.
+// Loading the shared native core here guarantees Wrangler bundles the same C++ WASM
+// module used by the browser without forcing the giant Worker entry file to own it.
+import '../rift-wasm-core.js';
 
 export {
   CRIME_REGISTRY,
