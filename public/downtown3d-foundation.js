@@ -655,10 +655,44 @@ function createBlockImporterLab({ root, canvas, status }) {
   window.addEventListener('riftdevmodechange', onDevModeChange);
   window.addEventListener('riftvalidatordebugchange', onValidatorDebugChange);
 
-  const resize = () => {
+  let viewportSettleTimer = 0;
+  let viewportFinalTimer = 0;
+
+  const syncViewport = () => {
+    if (destroyed) return;
+    const viewport = window.visualViewport;
+    const width = Math.max(1, Math.round(Number(viewport?.width) || window.innerWidth || shell?.clientWidth || canvas.clientWidth || 1));
+    const height = Math.max(1, Math.round(Number(viewport?.height) || window.innerHeight || shell?.clientHeight || canvas.clientHeight || 1));
+    const style = document.documentElement.style;
+    style.setProperty('--rift-viewport-width', `${width}px`);
+    style.setProperty('--rift-viewport-height', `${height}px`);
+    style.setProperty('--rift-viewport-left', `${Math.max(0, Number(viewport?.offsetLeft) || 0)}px`);
+    style.setProperty('--rift-viewport-top', `${Math.max(0, Number(viewport?.offsetTop) || 0)}px`);
+
     const target = coarsePointer ? 1.35 : 1.75;
     const deviceRatio = Math.max(1, window.devicePixelRatio || 1);
     engine.resize(Math.min(deviceRatio, target));
+  };
+
+  const settleViewport = () => {
+    if (destroyed) return;
+    syncViewport();
+    requestAnimationFrame(syncViewport);
+    clearTimeout(viewportSettleTimer);
+    clearTimeout(viewportFinalTimer);
+    // Mobile Safari/PWA viewport dimensions can settle after fullscreen chrome
+    // and orientation APIs finish. Re-measure twice so portrait fullscreen never
+    // keeps the pre-fullscreen canvas/HUD geometry.
+    viewportSettleTimer = window.setTimeout(syncViewport, 80);
+    viewportFinalTimer = window.setTimeout(syncViewport, 220);
+  };
+
+  const clearViewportMetrics = () => {
+    const style = document.documentElement.style;
+    style.removeProperty('--rift-viewport-width');
+    style.removeProperty('--rift-viewport-height');
+    style.removeProperty('--rift-viewport-left');
+    style.removeProperty('--rift-viewport-top');
   };
 
   const setGameMode = async enabled => {
@@ -667,6 +701,7 @@ function createBlockImporterLab({ root, canvas, status }) {
     fullscreenButton?.classList.toggle('active', enabled);
     if (fullscreenButton) fullscreenButton.textContent = enabled ? 'WINDOW' : 'FULLSCREEN';
     if (enabled) {
+      settleViewport();
       try {
         const request = shell?.requestFullscreen || shell?.webkitRequestFullscreen;
         if (request && !document.fullscreenElement && !document.webkitFullscreenElement) await request.call(shell);
@@ -679,7 +714,7 @@ function createBlockImporterLab({ root, canvas, status }) {
       } catch (_) {}
       try { screen.orientation?.unlock?.(); } catch (_) {}
     }
-    requestAnimationFrame(resize);
+    settleViewport();
   };
   const onFullscreenButton = () => setGameMode(!gameMode);
   fullscreenButton?.addEventListener('click', onFullscreenButton);
@@ -692,15 +727,16 @@ function createBlockImporterLab({ root, canvas, status }) {
       fullscreenButton?.classList.remove('active');
       if (fullscreenButton) fullscreenButton.textContent = 'FULLSCREEN';
     }
-    requestAnimationFrame(resize);
+    settleViewport();
   };
 
   document.addEventListener('fullscreenchange', onFullscreenChange);
   document.addEventListener('webkitfullscreenchange', onFullscreenChange);
-  window.addEventListener('resize', resize);
-  window.addEventListener('orientationchange', resize);
-  window.visualViewport?.addEventListener('resize', resize);
-  resize();
+  window.addEventListener('resize', settleViewport);
+  window.addEventListener('orientationchange', settleViewport);
+  window.visualViewport?.addEventListener('resize', settleViewport);
+  window.visualViewport?.addEventListener('scroll', settleViewport);
+  settleViewport();
 
   let raf = 0;
   let fpsTimer = performance.now();
@@ -770,9 +806,13 @@ function createBlockImporterLab({ root, canvas, status }) {
       fullscreenButton?.removeEventListener('click', onFullscreenButton);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
-      window.removeEventListener('resize', resize);
-      window.removeEventListener('orientationchange', resize);
-      window.visualViewport?.removeEventListener('resize', resize);
+      window.removeEventListener('resize', settleViewport);
+      window.removeEventListener('orientationchange', settleViewport);
+      window.visualViewport?.removeEventListener('resize', settleViewport);
+      window.visualViewport?.removeEventListener('scroll', settleViewport);
+      clearTimeout(viewportSettleTimer);
+      clearTimeout(viewportFinalTimer);
+      clearViewportMetrics();
       document.body.classList.remove('world3d-game-mode');
       creative?.destroy?.();
       playerController.destroy();

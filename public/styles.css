@@ -68,8 +68,9 @@
 .world3d-rotate.visible{display:flex}.world3d-phone-icon{font-size:2.8rem;line-height:1;transform:rotate(90deg);color:var(--accent)}.world3d-rotate strong{font-size:1rem;text-transform:uppercase}.world3d-rotate span{font-size:.7rem;color:var(--muted)}
 body.world3d-game-mode{overflow:hidden;overscroll-behavior:none;background:#080a0c}
 body.world3d-game-mode .topbar,body.world3d-game-mode #status,body.world3d-game-mode #hud-shell,body.world3d-game-mode #mobile-nav{display:none!important}
-body.world3d-game-mode .game-root:has(.world3d-shell){position:fixed;inset:0;z-index:200;width:100%;height:100dvh;padding:0;margin:0;overflow:hidden}
-body.world3d-game-mode .world3d-shell{width:100%;height:100%;min-height:0}
+body.world3d-game-mode .game-root:has(.world3d-shell){position:fixed;left:0;top:0;right:auto;bottom:auto;z-index:200;width:var(--rift-viewport-width,100vw);height:var(--rift-viewport-height,100dvh);max-width:none;max-height:none;padding:0;margin:0;overflow:hidden}
+body.world3d-game-mode .world3d-shell{width:var(--rift-viewport-width,100%);height:var(--rift-viewport-height,100%);max-width:none;max-height:none;min-height:0}
+body.world3d-game-mode #riftcity-3d-canvas{width:100%!important;height:100%!important}
 
 @media(max-width:900px),(pointer:coarse){.game-root:has(.world3d-shell){height:calc(100dvh - 128px)}.world3d-touch{display:flex}.world3d-current{display:none}.world3d-prompt{bottom:108px}.world3d-top-left{top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));padding:8px 10px}.world3d-top-left small{display:none}.world3d-top-right{top:max(10px,env(safe-area-inset-top));right:max(10px,env(safe-area-inset-right))}.world3d-directory{bottom:64px}.world3d-shell{min-height:420px}}
 @media(max-width:560px){.world3d-top-left{max-width:calc(100vw - 205px)}.world3d-top-left strong{font-size:.68rem}.world3d-hud-button{font-size:.47rem;padding:7px}.world3d-prompt{min-width:210px}.world3d-joystick{width:118px;height:118px}.world3d-joystick-ring{width:100px;height:100px}.world3d-action-pad{grid-template-columns:62px 62px;gap:9px}.world3d-action{width:62px;height:62px}.world3d-directory-group button{grid-template-columns:42px 1fr}.world3d-directory-group button small{display:none}}
@@ -3453,6 +3454,22 @@ body.dev-block-editor-page{
 .rift-first-person-reticle:before{left:10px;top:2px;width:2px;height:18px}.rift-first-person-reticle:after{left:2px;top:10px;width:18px;height:2px}
 .rift-creative-active .rift-first-person-reticle:before,.rift-creative-active .rift-first-person-reticle:after{background:#8ef0b4}
 .rift-block-import-lab.rift-reticle-active #riftcity-3d-canvas{cursor:none}
+
+/* H1.86 — visualViewport-authoritative iPhone fullscreen sizing.
+   Safari/PWA chrome and failed orientation locks can leave 100dvh one layout
+   cycle behind the actually visible portrait viewport. JS publishes the live
+   visualViewport dimensions above; every gameplay overlay inherits this shell. */
+body.world3d-game-mode .rift-first-person-reticle{
+  left:calc(var(--rift-viewport-width,100vw) * .5);
+  top:calc(var(--rift-viewport-height,100dvh) * .5);
+}
+@media (orientation:portrait) and (pointer:coarse){
+  body.world3d-game-mode .game-root:has(.world3d-shell),
+  body.world3d-game-mode .world3d-shell{
+    width:var(--rift-viewport-width,100vw)!important;
+    height:var(--rift-viewport-height,100dvh)!important;
+  }
+}
 
 /* H1.85 — portrait fullscreen gameplay HUD cleanup
    iOS may keep the device in portrait even when the world asks for landscape.
