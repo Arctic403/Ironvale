@@ -16,9 +16,12 @@ const schema = read('schema.sql');
 const content = read('src/ironvale/content.js');
 const api = read('src/ironvale/api.js');
 const worldShell = read('public/downtown3d-foundation.js');
+const nativeCore = read('native/rift-core.cpp');
+const nativeBridge = read('public/rift-wasm-core.js');
 
 expect(pkg.name === 'ironvale-medieval-mmo', 'package must identify Ironvale');
 expect(pkg.scripts?.build?.includes('verify:ironvale'), 'build must run Ironvale verifier');
+expect(pkg.scripts?.build?.includes('verify:native-v4'), 'build must run Native Core v4 verifier');
 expect(index.includes('IRONVALE') && !index.includes('RiftCity'), 'active HTML must be Ironvale branded');
 expect(manifest.name === 'Ironvale' && manifest.start_url === '/#world' && manifest.orientation === 'any', 'PWA must launch Ironvale world in any orientation');
 expect(manifest.icons?.[0]?.src === '/ironvale-icon.svg' && exists('public/ironvale-icon.svg'), 'Ironvale icon must be installed');
@@ -33,6 +36,8 @@ expect(index.includes('id="hud-shell" class="hud-shell hidden"') && index.includ
 expect(shell.includes('function retireLegacyHud()') && !shell.includes("$('#hud-shell')?.classList.remove('hidden')"), 'session/bootstrap code must never revive the legacy global character HUD');
 for (const path of ['public/views/crimes.js','public/views/service.js','public/views/wiki.js','public/views/services','src/plugins','src/services']) expect(!exists(path), `${path} must be removed from active source`);
 for (const path of ['native/rift-core.cpp','public/rift-engine.js','public/rift-player.js','public/rift-wasm-core.js','public/rift-block-section.js','public/rift-building-pipeline.js']) expect(exists(path), `${path} Rift Engine foundation must remain`);
+expect(nativeCore.includes('int rift_core_version() { return 4; }') && nativeCore.includes('rift_player_step_world') && nativeCore.includes('rift_pathfind_world') && nativeCore.includes('rift_combat_resolve'), 'Native Core v4 gameplay kernel must remain compiled into the engine');
+expect(nativeBridge.includes("version: 'native-core-browser-v4'") && nativeBridge.includes('riftNativeSpatialQuery') && nativeBridge.includes('riftNativeSimulateAgents') && nativeBridge.includes('riftNativeResolveCombat'), 'browser bridge must expose the Native Core v4 gameplay kernels');
 expect(exists('public/rift-world-blocks') && exists('public/rift-buildings'), 'game asset namespaces must use Rift Engine names');
 expect(!exists('public/riftcity-blocks') && !exists('public/riftcity-buildings'), 'RiftCity-named asset directories must be gone');
 expect(exists('public/rift-world-blocks/ironvale-foundation-001.json'), 'Ironvale foundation world must be the default block');
@@ -45,4 +50,4 @@ for (const token of ['IRONVALE_QUESTS','IRONVALE_NPCS','IRONVALE_FACTIONS','IRON
 expect(api.includes("/api/ironvale/bootstrap") && api.includes("/api/ironvale/sync") && api.includes("/api/ironvale/quests/accept"), 'Ironvale API foundation incomplete');
 expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v1"), '3D world shell must be Ironvale-branded');
 
-console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v3, authoring, Cloudflare, resilient SPA navigation and route-scoped character UI foundations remain intact.');
+console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v4, authoring, Cloudflare, resilient SPA navigation and route-scoped character UI foundations remain intact.');
