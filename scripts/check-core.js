@@ -40,7 +40,7 @@ if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
 if (!app.includes('function applyBrushAtReticle(')) failures.push('reticle sculpt action');
 if (!app.includes('function applyCameraLookDelta(') || !app.includes('function cameraForward(') || !app.includes('function cameraAnglesFromDirection(')) failures.push('shared camera math');
-if (!app.includes("import { loadRiggedCharacterGeometry } from './rift-character.js'") || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(')) failures.push('rigged humanoid controller hookup');
+if (!app.includes("import { loadRiggedCharacterAsset } from './rift-character.js'") || !app.includes('function installRiggedPlayerVisual(') || !app.includes('function updatePlayerVisualTransform(') || !app.includes('function updatePlayerCharacterAnimation(')) failures.push('animated textured humanoid controller hookup');
 if (!app.includes('createCapsuleGeometry()')) failures.push('character visual fallback');
 if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person RPG focus');
 if (!app.includes('function currentViewRay(') || !app.includes('terrain.raycast(ray.origin, ray.direction, 1800, .5)')) failures.push('center-view interaction ray');
@@ -49,6 +49,11 @@ if (!app.includes('reticle.hidden = false;')) failures.push('world reticle is no
 if (/orbitCamera\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app) || /freecam\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app)) failures.push('fixed-pixel camera yaw math returned');
 if (/orbitCamera\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app) || /freecam\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app)) failures.push('fixed-pixel camera pitch math returned');
 if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier still present');
+
+const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
+if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
+const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');
+if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTexture') || !renderer.includes('createSkin(') || !renderer.includes('createTexture(')) failures.push('GPU character skinning/texturing');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 if (!terrain.includes("import { RiftCore } from './rift-core.js'")) failures.push('terrain is not backed by RiftCore WASM');
@@ -71,4 +76,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: centered-reticle RPG camera + stable viewport camera math + adaptive stitched terrain LOD + C++/WASM terrain core.');
+console.log('Ironvale core verified: textured animated humanoid + centered-reticle RPG camera + adaptive stitched terrain LOD + C++/WASM terrain core.');

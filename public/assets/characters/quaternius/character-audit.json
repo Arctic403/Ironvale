@@ -21,6 +21,15 @@
     "bytes": 2714756,
     "clips": 43,
     "sharedJointCount": 65,
-    "status": "imported for locomotion integration"
+    "status": "integrated into locomotion runtime"
+  },
+  "runtime": {
+    "skinning": "WebGL2 GPU joint-matrix texture",
+    "materials": "embedded glTF base-color textures + baseColorFactor",
+    "locomotion": [
+      "idle",
+      "walk"
+    ],
+    "fallback": "capsule remains active if character loading fails"
   }
 }

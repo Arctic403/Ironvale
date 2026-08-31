@@ -1,6 +1,6 @@
 import { RiftEngine } from './rift-engine.js';
 import { RiftTerrain } from './rift-terrain.js';
-import { loadRiggedCharacterGeometry } from './rift-character.js';
+import { loadRiggedCharacterAsset } from './rift-character.js';
 
 const $ = selector => document.querySelector(selector);
 const authScreen = $('#auth-screen');
@@ -54,8 +54,11 @@ let terrainMeshes = new Map();
 let terrainLodPlan = new Map();
 let lastTerrainLodRefresh = 0;
 let playerMesh = null;
+let playerCharacter = null;
 let playerVisualFeetAnchored = false;
+let playerVisualFeetOffset = 0;
 let playerRig = null;
+let playerMoving = false;
 let brushMesh = null;
 let animationFrame = 0;
 let lastFrame = performance.now();
@@ -218,8 +221,11 @@ async function startWorld(url) {
   }
 
   rebuildTerrainMeshes();
+  playerCharacter = null;
   playerVisualFeetAnchored = false;
+  playerVisualFeetOffset = 0;
   playerRig = null;
+  playerMoving = false;
   playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
   void installRiggedPlayerVisual();
@@ -245,8 +251,11 @@ function stopWorld() {
   terrainLodPlan = new Map();
   lastTerrainLodRefresh = 0;
   playerMesh = null;
+  playerCharacter = null;
   playerVisualFeetAnchored = false;
+  playerVisualFeetOffset = 0;
   playerRig = null;
+  playerMoving = false;
   brushMesh = null;
   reticleHit = null;
   undoStack.length = 0;
@@ -381,36 +390,104 @@ function snapPlayerToSupport() {
 
 function updatePlayerVisualTransform() {
   if (!playerMesh) return;
+  const feetY = playerVisualFeetAnchored
+    ? player.y - PLAYER_COLLIDER_HALF_HEIGHT + playerVisualFeetOffset
+    : player.y;
+  if (playerCharacter?.meshes?.length) {
+    for (const mesh of playerCharacter.meshes) {
+      mesh.position[0] = player.x;
+      mesh.position[1] = feetY;
+      mesh.position[2] = player.z;
+      mesh.yaw = player.yaw;
+    }
+    return;
+  }
   playerMesh.position[0] = player.x;
-  playerMesh.position[1] = playerVisualFeetAnchored ? player.y - PLAYER_COLLIDER_HALF_HEIGHT : player.y;
+  playerMesh.position[1] = feetY;
   playerMesh.position[2] = player.z;
   playerMesh.yaw = player.yaw;
+}
+
+function closeDecodedCharacterImages(asset) {
+  const images = new Set((asset?.primitives || []).map(entry => entry?.material?.baseColorImage).filter(Boolean));
+  for (const image of images) image.close?.();
 }
 
 async function installRiggedPlayerVisual() {
   if (!engine || !playerMesh) return;
   const activeEngine = engine;
   const fallbackMesh = playerMesh;
+  let skin = null;
+  const meshes = [];
+  const textures = new Map();
+  let asset = null;
   try {
-    const asset = await loadRiggedCharacterGeometry('/assets/characters/quaternius/universal-base-male.glb');
-    if (!engine || engine !== activeEngine || playerMesh !== fallbackMesh) return;
-    const human = engine.addMesh(asset.geometry, {
-      position: [player.x, player.y - PLAYER_COLLIDER_HALF_HEIGHT, player.z],
-      yaw: player.yaw
-    });
-    human.rig = asset.rig;
-    human.characterAsset = 'quaternius-universal-base-male';
-    engine.removeMesh(fallbackMesh);
-    playerMesh = human;
+    asset = await loadRiggedCharacterAsset(
+      '/assets/characters/quaternius/universal-base-male.glb',
+      '/assets/characters/quaternius/universal-animation-library.glb'
+    );
+    if (!engine || engine !== activeEngine || playerMesh !== fallbackMesh) {
+      closeDecodedCharacterImages(asset);
+      return;
+    }
+
+    skin = activeEngine.createSkin(asset.rig.jointCount);
+    const initialMatrices = asset.runtime.getSkinMatrices(0);
+    if (!initialMatrices) throw new Error('Character runtime did not produce skin matrices.');
+    activeEngine.updateSkin(skin, initialMatrices);
+
+    const renderScale = Number(asset.rig.renderScale) || 1;
+    for (const primitive of asset.primitives) {
+      const textureIndex = primitive.material?.baseColorTextureIndex;
+      let texture = null;
+      if (Number.isInteger(textureIndex) && primitive.material?.baseColorImage) {
+        if (!textures.has(textureIndex)) textures.set(textureIndex, activeEngine.createTexture(primitive.material.baseColorImage));
+        texture = textures.get(textureIndex);
+      }
+      const human = activeEngine.addMesh(primitive.geometry, {
+        position: [player.x, player.y - PLAYER_COLLIDER_HALF_HEIGHT, player.z],
+        yaw: player.yaw,
+        scale: [renderScale, renderScale, renderScale],
+        baseColorFactor: primitive.material?.baseColorFactor || [1, 1, 1, 1],
+        texture,
+        skin: primitive.skinIndex == null ? null : skin
+      });
+      human.rig = asset.rig;
+      human.characterAsset = 'quaternius-universal-base-male';
+      meshes.push(human);
+    }
+    if (!meshes.length) throw new Error('Character runtime produced no renderable primitives.');
+
+    closeDecodedCharacterImages(asset);
+    activeEngine.removeMesh(fallbackMesh);
+    playerCharacter = { asset, meshes, skin, textures: [...textures.values()] };
+    playerMesh = meshes[0];
     playerVisualFeetAnchored = true;
+    playerVisualFeetOffset = -(Number(asset.rig.feetAtY) || 0);
     playerRig = asset.rig;
     updatePlayerVisualTransform();
     const jointText = Number(asset.rig?.jointCount) || 0;
-    terrainStatus.textContent = `${terrainStatus.textContent} · humanoid ${jointText}-joint rig`;
-    console.info('Rift character visual loaded', asset.rig);
+    const clipText = Number(asset.rig?.animationClipCount) || asset.clips?.length || 0;
+    terrainStatus.textContent = `${terrainStatus.textContent} · textured animated humanoid · ${jointText} joints · ${clipText} clips`;
+    console.info('Rift character visual loaded', { rig: asset.rig, clips: asset.clips, defaults: asset.defaultClips });
   } catch (error) {
+    closeDecodedCharacterImages(asset);
+    if (engine === activeEngine) {
+      for (const mesh of meshes) activeEngine.removeMesh(mesh);
+      for (const texture of textures.values()) activeEngine.destroyTexture(texture);
+      if (skin) activeEngine.destroySkin(skin);
+    }
     console.warn('Rigged humanoid failed to load; keeping capsule fallback.', error);
   }
+}
+
+function updatePlayerCharacterAnimation(dt) {
+  if (!playerCharacter?.asset || !playerCharacter.skin || !engine) return;
+  const { asset, skin } = playerCharacter;
+  const clip = (!freecamEnabled && playerMoving) ? asset.defaultClips.walk : asset.defaultClips.idle;
+  asset.runtime.update(dt, clip);
+  const matrices = asset.runtime.getSkinMatrices(0);
+  if (matrices) engine.updateSkin(skin, matrices);
 }
 
 function frame(now) {
@@ -420,6 +497,7 @@ function frame(now) {
   updateKeyboardInput();
   if (freecamEnabled) updateFreecam(dt);
   else updatePlayer(dt);
+  updatePlayerCharacterAnimation(dt);
   updateCamera();
   updateTerrainLod(now);
   updateReticleTarget();
@@ -454,6 +532,7 @@ function updateKeyboardInput() {
 
 function updatePlayer(dt) {
   const moving = Math.abs(input.forward) + Math.abs(input.strafe) > .001;
+  playerMoving = moving;
   if (moving) {
     const basis = cameraGroundBasis(orbitCamera.yaw);
     let dx = basis.forwardX * input.forward + basis.rightX * input.strafe;

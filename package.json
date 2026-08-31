@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node --check src/index.js && node --check public/app.js && node --check public/rift-engine.js && node --check public/rift-core.js && node --check public/rift-terrain.js && node scripts/check-native.mjs && node scripts/check-core.js",
+    "build": "node --check src/index.js && node --check public/app.js && node --check public/rift-character.js && node --check public/rift-engine.js && node --check public/rift-core.js && node --check public/rift-terrain.js && node scripts/check-native.mjs && node scripts/check-core.js",
     "build:native": "node scripts/build-native.mjs",
     "check:native": "node scripts/check-native.mjs",
     "dev": "wrangler dev",
