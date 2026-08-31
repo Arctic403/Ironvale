@@ -17,19 +17,17 @@ expect(IRONVALE_RACES.length === 1 && IRONVALE_RACES[0].id === 'valeborn', 'H3.0
 expect(IRONVALE_CLASSES.length === 1 && IRONVALE_CLASSES[0].id === 'knight', 'H3.0 must expose exactly one playable class: Knight');
 expect(IRONVALE_ZONES.length === 1 && IRONVALE_ZONES[0].id === 'brackenford-lowlands', 'H3.0 must expose exactly one starter zone');
 expect(IRONVALE_QUESTS.length >= 5 && IRONVALE_CAMPAIGNS.some(c => c.id === 'the-broken-oath'), 'starter main-story chapter is missing');
-expect(world.id === 'brackenford-lowlands-001' && world.ops.length >= 45, 'starter world is not materially authored');
-expect(compiled.stats.cells > 18000 && compiled.stats.operations >= 45, 'starter world did not compile into a real Rift world');
-if (world.version >= 2) {
-  expect(world.bounds?.max?.[0] >= 159 && world.bounds?.max?.[2] >= 159, 'rebuilt starter region must span multiple Rift sections');
-  expect((world.layout || []).length >= 30 && Object.keys(world.prefabs || {}).length >= 8, 'starter region prefab composition is missing');
-  expect(compiled.stats.sections >= 100 && compiled.stats.operations >= 900 && compiled.stats.detailCells >= 1000, 'Brackenford region scale/detail regressed');
-  expect(worldText.includes('Warden hall') && worldText.includes('Reeve great hall') && worldText.includes('North Watch'), 'rebuilt core-town landmarks are missing');
-  expect(worldText.includes('Farmhouse') && worldText.includes('Barn') && worldText.includes('West barley'), 'working farmstead is missing');
-  expect(worldText.includes('Blackstone cave tunnel') && worldText.includes('Blackstone cave chamber'), 'Blackstone cave terrain is missing');
-  expect(worldText.includes('clear interior') && worldText.includes('tall interior'), 'starter buildings lost full-height interiors');
-} else {
-  expect(worldText.includes('Training hall') && worldText.includes('North Watch') && worldText.includes('Old North Road'), 'starter area landmarks are missing');
-}
+expect(world.id === 'brackenford-lowlands-001' && world.ops.length >= 100, 'starter world is not materially authored');
+expect(compiled.stats.cells > 18000 && compiled.stats.operations >= 100, 'starter world did not compile into a real Rift world');
+expect(world.version === 2, 'starter terrain must remain on the v2 Rift world format');
+expect(world.bounds?.max?.[0] >= 159 && world.bounds?.max?.[2] >= 159 && world.bounds?.max?.[1] >= 24, 'natural starter region lost horizontal or vertical scale');
+expect(Object.keys(world.prefabs || {}).length === 0 && (world.layout || []).length === 0, 'terrain-first pass must not generate town buildings');
+expect(world.metadata?.terrain_pass === 'natural-v1' && world.metadata?.buildings === false, 'natural terrain-pass metadata is missing');
+expect(worldText.includes('Blackstone cave entrance cut') && worldText.includes('Blackstone cave tunnel') && worldText.includes('Blackstone cave chamber'), 'mountain cave is missing');
+expect(worldText.includes('Brackenford River') && worldText.includes('River gravel bank'), 'river and natural banks are missing');
+expect(worldText.includes('Old North Road') && worldText.includes('Meadow footpath') && worldText.includes('Blackstone cave trail'), 'natural travel paths are missing');
+expect(worldText.includes('Natural rock outcrop') && worldText.includes('Tree trunk') && worldText.includes('Meadow grass'), 'terrain dressing is missing');
+expect(compiled.stats.sections >= 80 && compiled.stats.detailCells >= 200, 'natural region scale/detail regressed');
 expect(app.includes("renderCity") && !app.includes('renderCharacter') && !app.includes('renderJournal') && !app.includes('renderCodex'), 'active app must mount the 3D game instead of routed document pages');
 expect(gameplay.includes('createIronvaleStarterRuntime') && gameplay.includes('riftNativeResolveCombat') && gameplay.includes("Digit1") && gameplay.includes("KeyE"), 'in-world creation/interaction/Knight runtime is incomplete');
 expect(gameplay.includes("data-iv-panel=\"character\"") && gameplay.includes("data-iv-panel=\"quests\"") && gameplay.includes("data-iv-panel=\"bags\""), 'character, quests and bags must remain in-game overlays');
@@ -38,4 +36,4 @@ expect(foundation.includes("ironvale:world:active-block:v2") && !foundation.incl
 expect(api.includes("/api/ironvale/character/create") && api.includes("/api/ironvale/quests/progress"), 'starter persistence endpoints are missing');
 expect(schema.includes('ironvale_character_profiles'), 'character identity table is missing');
 expect(css.includes('body.ironvale-session-active>.topbar') && css.includes('.iv-actionbar') && css.includes('.iv-character-create'), 'game-first fullscreen HUD styling is missing');
-console.log('[ironvale-starter-game] PASS · Valeborn Knight character creation → 3D Brackenford starter region → in-world questing/training → The Broken Oath chapter-one hook.');
+console.log('[ironvale-starter-game] PASS · Valeborn Knight foundation + terrain-first 3D Brackenford region with mountain, cave, river, hills and travel routes.');
