@@ -47,7 +47,16 @@ jobs:
           node --check scripts/apply-ironvale-h3-starter.mjs
 
       - name: Apply H3 starter game conversion
-        run: node scripts/apply-ironvale-h3-starter.mjs
+        run: |
+          node scripts/apply-ironvale-h3-starter.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/ironvale/content.js')
+          text = path.read_text()
+          text = text.replace("Knight's first combat action", "Knight\\'s first combat action")
+          text = text.replace("Knight's basic Strike", "Knight\\'s basic Strike")
+          path.write_text(text)
+          PY
 
       - name: Verify JavaScript syntax and full Ironvale regression suite
         run: npm run build
