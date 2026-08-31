@@ -24,6 +24,10 @@ expect(manifest.icons?.[0]?.src === '/ironvale-icon.svg' && exists('public/ironv
 expect(!exists('public/riftcity-icon.svg'), 'old RiftCity icon must be removed');
 expect(router.includes("'world'") && !router.includes("casino:'casino'") && !router.includes("police:'law'"), 'router must expose the new RPG surface');
 expect(app.includes('renderJournal') && app.includes('renderCodex') && !app.includes('renderCrimes') && !app.includes('renderService'), 'active app must route to Ironvale views only');
+expect(app.includes('createRouteMount') && app.includes("window.addEventListener('popstate'") && app.includes("window.addEventListener('ironvale:navigate'"), 'Ironvale SPA navigation must keep isolated route mounts and history recovery listeners');
+expect(app.includes('request !== state.activeRequest') && app.includes('mount.isConnected'), 'stale async route renders must be prevented from replacing the active page');
+expect(router.includes("location.hash === nextHash") && router.includes("CustomEvent('ironvale:navigate'"), 'same-route navigation must be able to recover a pinned/restored Safari view');
+expect(worldShell.includes('const foundation = activeFoundation;') && worldShell.includes('activeFoundation = null;') && worldShell.includes("console.warn('Rift world foundation cleanup failed'"), 'world teardown must detach its global foundation before best-effort cleanup');
 for (const path of ['public/views/crimes.js','public/views/service.js','public/views/wiki.js','public/views/services','src/plugins','src/services']) expect(!exists(path), `${path} must be removed from active source`);
 for (const path of ['native/rift-core.cpp','public/rift-engine.js','public/rift-player.js','public/rift-wasm-core.js','public/rift-block-section.js','public/rift-building-pipeline.js']) expect(exists(path), `${path} Rift Engine foundation must remain`);
 expect(exists('public/rift-world-blocks') && exists('public/rift-buildings'), 'game asset namespaces must use Rift Engine names');
@@ -38,4 +42,4 @@ for (const token of ['IRONVALE_QUESTS','IRONVALE_NPCS','IRONVALE_FACTIONS','IRON
 expect(api.includes("/api/ironvale/bootstrap") && api.includes("/api/ironvale/sync") && api.includes("/api/ironvale/quests/accept"), 'Ironvale API foundation incomplete');
 expect(worldShell.includes('IRONVALE · RIFT ENGINE WORLD FOUNDATION') && worldShell.includes("ironvale:world:active-block:v1"), '3D world shell must be Ironvale-branded');
 
-console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v3, authoring and Cloudflare foundations remain intact.');
+console.log('[ironvale-foundation] PASS · Ironvale owns the active MMO/RPG surface while Rift Engine, Native Core v3, authoring, Cloudflare and resilient SPA navigation foundations remain intact.');
