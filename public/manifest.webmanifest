@@ -1,27 +1,17 @@
 {
   "id": "/",
-  "name": "RiftCity",
-  "short_name": "RiftCity",
-  "description": "RiftCity browser MMO",
-  "start_url": "/#city",
+  "name": "Ironvale",
+  "short_name": "Ironvale",
+  "description": "A grounded medieval online RPG built on the Rift Engine.",
+  "start_url": "/#world",
   "scope": "/",
   "display": "standalone",
-  "display_override": [
-    "standalone",
-    "browser"
-  ],
-  "orientation": "landscape",
-  "background_color": "#10100e",
-  "theme_color": "#11110f",
-  "categories": [
-    "games"
-  ],
+  "display_override": ["standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#14120d",
+  "theme_color": "#17140e",
+  "categories": ["games"],
   "icons": [
-    {
-      "src": "/riftcity-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "/ironvale-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

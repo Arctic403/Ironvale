@@ -1,13 +1,13 @@
 {
   "format": "riftcity-world-index",
   "version": 1,
-  "activeBlockId": "riftcity-base-world-001",
+  "activeBlockId": "ironvale-foundation-world-001",
   "blocks": [
     {
-      "id": "riftcity-base-world-001",
-      "name": "RiftCity Base World",
+      "id": "ironvale-foundation-world-001",
+      "name": "Ironvale Foundation World",
       "district": "base-world",
-      "path": "./downtown-block-001.json",
+      "path": "./ironvale-foundation-001.json",
       "runtime_overlays": [],
       "tags": ["active", "base-world", "texture-atlas-v1", "ai-authorable", "single-player"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
@@ -25,16 +25,16 @@
       "name": "AI Building Pipeline Smoke · Generated",
       "district": "pipeline-test",
       "source_type": "building-program",
-      "path": "../riftcity-buildings/building-program-smoke-001.json",
+      "path": "../rift-buildings/building-program-smoke-001.json",
       "tags": ["engine-test", "ai-building-program", "semantic", "world-coordinates", "diagnostic"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     },
     {
-      "id": "riftcity-bank-001-generated",
-      "name": "RiftCity Bank · H2.01 Research Branch",
+      "id": "legacy-building-fixture-001-generated",
+      "name": "Legacy Building Fixture · Regression Archive",
       "district": "diagnostic-archive",
       "source_type": "building-program",
-      "path": "../riftcity-buildings/riftcity-bank-001.json",
+      "path": "../rift-buildings/legacy-building-fixture-001.json",
       "tags": ["diagnostic", "archived-city-program", "ai-building-program", "semantic", "world-coordinates"],
       "inspection": { "views": ["top", "birdseye", "north", "east", "south", "west"] }
     }

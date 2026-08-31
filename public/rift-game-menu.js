@@ -1,8 +1,8 @@
 import { getRiftGraphics, setRiftGraphics, resetRiftGraphics, getRiftRenderBuffer } from './rift-render-quality.js';
 
 const state = { root: null, open: false };
-const DEV_MODE_KEY = 'riftcity:dev-mode:v1';
-const VALIDATOR_DEBUG_KEY = 'riftcity:validator-debug:v1';
+const DEV_MODE_KEY = 'ironvale:dev-mode:v1';
+const VALIDATOR_DEBUG_KEY = 'ironvale:validator-debug:v1';
 
 function readStoredFlag(key) {
   try { return localStorage.getItem(key) === '1'; } catch (_) { return false; }
@@ -179,8 +179,8 @@ function syncDevTools() {
   if (buildPanel) buildPanel.classList.toggle('active', !!r.querySelector('#rift-creative-panel')?.classList.contains('open'));
   const networkOut = r.querySelector('[data-rift-network-readout]');
   if (networkOut) {
-    const net = window.RiftCityNetwork?.status;
-    if (!net) networkOut.innerHTML='<small>Network telemetry becomes available after the RiftCity API bridge loads.</small>';
+    const net = window.IronvaleNetwork?.status;
+    if (!net) networkOut.innerHTML='<small>Network telemetry becomes available after the Ironvale API bridge loads.</small>';
     else {
       const hit = Math.round((Number(net.cacheHitRate)||0)*100);
       const daily = net.estimatedDailyRequests==null?'WARMING':Number(net.estimatedDailyRequests).toLocaleString();
@@ -287,9 +287,9 @@ function mount(r) {
   item.className = 'rift-game-overlay';
   item.setAttribute('aria-hidden', 'true');
   item.innerHTML = `
-    <section class="rift-game-card" role="dialog" aria-modal="true" aria-label="RiftCity game menu">
+    <section class="rift-game-card" role="dialog" aria-modal="true" aria-label="Ironvale game menu">
       <header>
-        <div><span>RIFTCITY</span><strong>Game Menu</strong></div>
+        <div><span>IRONVALE</span><strong>Game Menu</strong></div>
         <button class="rift-game-close" data-rift-close-menu type="button" aria-label="Close menu">×</button>
       </header>
       <div class="rift-game-body">
@@ -316,7 +316,7 @@ function mount(r) {
             <button type="button" data-rift-world-target="#rift-import-json">IMPORT JSON</button>
             <button type="button" data-rift-world-target="#rift-import-reset">RESET DEFAULT</button>
             <button type="button" data-rift-world-target="#rift-import-cull">CULL ON</button>
-            <button type="button" data-rift-world-target="#rift-import-top">CITY OVERVIEW</button>
+            <button type="button" data-rift-world-target="#rift-import-top">WORLD OVERVIEW</button>
             <button type="button" data-rift-world-target="#rift-import-view">RESET VIEW</button>
             <button type="button" data-rift-world-target="#world3d-fullscreen-button">FULLSCREEN</button>
           </div>
@@ -419,8 +419,8 @@ function mountAll() {
 hydrateDevState();
 new MutationObserver(mountAll).observe(document.documentElement, { childList: true, subtree: true });
 mountAll();
-window.RiftCityGameMenu = Object.freeze({
-  version: 'H1.87-cloudflare-efficiency',
+window.IronvaleGameMenu = Object.freeze({
+  version: 'ironvale-foundation-v1',
   open() { mountAll(); if (state.root) overlay(true, 'menu'); },
   world() { mountAll(); if (state.root) overlay(true, 'world'); },
   settings() { mountAll(); if (state.root) overlay(true, 'settings'); },

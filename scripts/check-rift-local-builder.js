@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { compileRiftBuildingProgram } from '../public/rift-building-program.js';
 import { runLocalBuildJob, sha256Json, RIFT_LOCAL_BUILD_JOB_FORMAT, RIFT_LOCAL_BUILD_VERSION } from '../public/builder/local-build-core.js';
 
-const bank = JSON.parse(await fs.readFile(new URL('../public/riftcity-buildings/riftcity-bank-001.json', import.meta.url), 'utf8'));
+const bank = JSON.parse(await fs.readFile(new URL('../public/rift-buildings/legacy-building-fixture-001.json', import.meta.url), 'utf8'));
 const job = {
   format: RIFT_LOCAL_BUILD_JOB_FORMAT,
   version: 1,
   job_id: 'parity-bank-h2.10',
-  target: { path: 'public/riftcity-buildings/riftcity-bank-001.json', branch: 'ai-static-world-builder' },
+  target: { path: 'public/rift-buildings/legacy-building-fixture-001.json', branch: 'ai-static-world-builder' },
   candidate: { program: bank },
   changed_paths: []
 };

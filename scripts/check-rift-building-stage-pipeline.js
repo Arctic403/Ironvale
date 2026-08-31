@@ -33,7 +33,7 @@ try {
   assert(RIFT_BUILDING_PIPELINE_VERSION === 2, 'Building pipeline version must be H2/v2.');
   assert(RIFT_INTERIOR_ARCHITECTURE_VERSION === 2, 'Interior architecture must route through staged v2.');
 
-  const bank = readJson('public/riftcity-buildings/riftcity-bank-001.json');
+  const bank = readJson('public/rift-buildings/legacy-building-fixture-001.json');
   const bankResult = compileRiftBuildingProgram(bank, { strict: true });
   assert(JSON.stringify(stageIds(bankResult.pipeline)) === JSON.stringify(expectedStages), 'Bank pipeline stage order is not authoritative H2 order.');
   assert(bankResult.pipeline.version === 2, 'Bank compile did not record pipeline v2.');

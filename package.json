@@ -1,10 +1,10 @@
 {
-  "name": "riftcity-v2-phase8-2-living-city",
-  "version": "0.8.2",
+  "name": "ironvale-medieval-mmo",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:cloudflare-efficiency && npm run verify:wasm && npm run verify:native-integration && npm run verify:blueprints && npm run verify:building-pipeline && npm run verify:building-programs && npm run verify:interiors && npm run verify:inspection && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
+    "build": "npm run verify:js-only && node scripts/check-js.js && npm run verify:ironvale && npm run verify:wasm && npm run verify:native-integration && npm run verify:blueprints && npm run verify:building-pipeline && npm run verify:building-programs && npm run verify:interiors && npm run verify:inspection && npm run verify:world-composition && npm run verify:player-physics && npm run verify:building-visibility && npm run verify:smart-camera && npm run verify:third-person-camera && npm run verify:ai-builder",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:create": "wrangler d1 create riftcity-v2",
@@ -24,7 +24,7 @@
     "verify:third-person-camera": "node scripts/check-rift-third-person-camera.js",
     "verify:ai-builder": "node scripts/check-rift-ai-builder.js",
     "verify:native-integration": "node scripts/check-rift-native-integration.js",
-    "verify:cloudflare-efficiency": "node scripts/check-rift-cloudflare-efficiency.js"
+    "verify:ironvale": "node scripts/check-ironvale-foundation.js"
   },
   "devDependencies": {
     "wrangler": "^4.30.0"

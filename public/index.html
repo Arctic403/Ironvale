@@ -2,73 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#11110f" />
-  <meta name="application-name" content="RiftCity" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no" />
+  <meta name="theme-color" content="#17140e" />
+  <meta name="application-name" content="Ironvale" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="RiftCity" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>RiftCity</title>
+  <meta name="apple-mobile-web-app-title" content="Ironvale" />
+  <title>Ironvale — Medieval Online RPG</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" type="image/svg+xml" href="/riftcity-icon.svg" />
-  <link rel="apple-touch-icon" href="/riftcity-icon.svg" />
+  <link rel="icon" href="/ironvale-icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/ironvale-icon.svg" />
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/ironvale.css" />
 </head>
 <body>
-  <div id="app-shell">
-    <header class="topbar">
-      <button id="menu-button" class="icon-button" aria-label="Open menu">☰</button>
-      <a class="brand" href="#city" data-route="city"><span class="brand-mark">R</span><strong>RiftCity</strong></a>
-      <div class="page-title"><span id="page-eyebrow" class="eyebrow">RIFTCITY</span><h1 id="page-title-text">Character</h1></div>
-      <div class="top-actions">
-        <span id="hud-status" class="hud-status status-active">OFFLINE</span>
-        <button id="logout-btn" class="ghost-button">Logout</button>
-      </div>
-    </header>
+  <header class="topbar">
+    <a href="#world" class="brand" data-route="world" aria-label="Ironvale world">
+      <span class="brand-mark">IV</span>
+      <span><strong>IRONVALE</strong><small>MEDIEVAL ONLINE RPG</small></span>
+    </a>
+    <div class="topbar-center"><span id="page-eyebrow">THE MARCHES</span><strong id="page-title-text">World</strong></div>
+    <button id="menu-button" class="menu-button" type="button" aria-label="Open navigation">☰</button>
+  </header>
 
-    <section id="status" class="session-status">Checking session…</section>
+  <div id="status" class="status">Connecting to Ironvale…</div>
+  <div id="message" class="message hidden"></div>
 
-    <section id="hud-shell" class="hud-shell hidden">
-      <div id="hud-primary" class="hud-scroll"></div>
-      <div id="effects-strip" class="effects-strip empty"></div>
-    </section>
+  <section id="auth-grid" class="auth-grid">
+    <article class="auth-story">
+      <span class="eyebrow">IRONVALE · FOUNDATION AGE</span>
+      <h1>Enter the Marches.</h1>
+      <p>Travel old roads, earn your place among rival factions, uncover forgotten ruins, and shape a persistent character in a grounded medieval world.</p>
+      <div class="ironvale-auth-notes"><span>Persistent character</span><span>Quest chains</span><span>Open-world zones</span><span>Dungeon foundation</span></div>
+    </article>
+    <form id="login-form" class="auth-panel">
+      <span class="eyebrow">RETURNING TRAVELER</span><h2>Sign in</h2>
+      <label>Username<input name="username" required minlength="3" maxlength="20" autocomplete="username" /></label>
+      <label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password" /></label>
+      <button class="rc-button primary" type="submit">Enter Ironvale</button>
+    </form>
+    <form id="register-form" class="auth-panel">
+      <span class="eyebrow">NEW TRAVELER</span><h2>Create account</h2>
+      <label>Username<input name="username" required minlength="3" maxlength="20" autocomplete="username" /></label>
+      <label>Password<input name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+      <button class="rc-button" type="submit">Begin the journey</button>
+    </form>
+  </section>
 
-    <section id="auth-grid" class="auth-layout">
-      <div class="auth-copy">
-        <span class="eyebrow">RIFTCITY V2</span>
-        <h2>Enter the city.</h2>
-        <p>Server-authoritative crime, economy, progression, combat and world systems. Sign in to continue your player.</p>
-      </div>
-      <div class="auth-forms">
-        <form id="login-form" class="rc-panel auth-panel">
-          <span class="eyebrow">RETURNING PLAYER</span><h2>Login</h2>
-          <label>Username<input name="username" autocomplete="username" required /></label>
-          <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
-          <button class="rc-button primary">Enter RiftCity</button>
-        </form>
-        <form id="register-form" class="rc-panel auth-panel">
-          <span class="eyebrow">NEW PLAYER</span><h2>Create account</h2>
-          <label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" required /></label>
-          <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
-          <button class="rc-button">Create player</button>
-        </form>
-      </div>
-    </section>
+  <section id="hud-shell" class="hud-shell hidden">
+    <div id="hud-primary" class="hud-primary"></div>
+    <div id="effects-strip" class="effects-strip empty"></div>
+    <div class="hud-meta"><span id="hud-status" class="hud-status status-active">ACTIVE</span><button id="logout-btn" class="hud-logout" type="button">LOG OUT</button></div>
+  </section>
 
-    <main id="game-root" class="game-root hidden" aria-live="polite"></main>
+  <main id="game-root" class="game-root hidden"></main>
+  <nav id="mobile-nav" class="mobile-nav hidden" aria-label="Primary navigation"></nav>
 
-    <aside id="game-drawer" class="game-drawer">
-      <button id="drawer-backdrop" class="drawer-backdrop" aria-label="Close menu"></button>
-      <div class="drawer-panel">
-        <header><div class="brand"><span class="brand-mark">R</span><strong>RiftCity</strong></div><button id="drawer-close" class="icon-button">×</button></header>
-        <nav id="drawer-nav"></nav>
-        <footer><a href="/admin/logs">Developer logs</a></footer>
-      </div>
-    </aside>
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <aside id="game-drawer" class="game-drawer" aria-label="Ironvale navigation">
+    <header><div><span>IRONVALE</span><strong>The Marches</strong></div><button id="drawer-close" type="button">×</button></header>
+    <nav id="drawer-nav"></nav>
+  </aside>
 
-    <div id="message" class="message hidden" role="status"></div>
-    <nav id="mobile-nav" class="mobile-nav hidden" aria-label="Primary navigation"></nav>
-  </div>
   <script type="module" src="/rift-wasm-core.js"></script>
   <script type="module" src="/rift-game-menu.js"></script>
   <script type="module" src="/rift-ai-world-tools.js"></script>

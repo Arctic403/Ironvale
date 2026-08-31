@@ -12,7 +12,7 @@ let engine=null,camera=null,compiled=null,authoring=null,report=null;
 function setStatus(v){if(status)status.textContent=String(v||'')}
 function queryParam(name){return params.has(name)?params.get(name):undefined}
 function safeProgramUrl(raw){
-  raw=String(raw||'./riftcity-buildings/riftcity-bank-001.json').trim();
+  raw=String(raw||'./rift-buildings/legacy-building-fixture-001.json').trim();
   if(/^(?:[a-z]+:)?\/\//i.test(raw))throw new Error('3D Building Inspector only loads local source-controlled JSON.');
   const url=new URL(raw,import.meta.url);if(url.origin!==location.origin)throw new Error('Inspection program must stay on current origin.');return url;
 }

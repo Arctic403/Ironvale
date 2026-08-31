@@ -67,12 +67,12 @@ function verifyStructureMetadata(compiled, label) {
 }
 
 try {
-  const activeDocument = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/downtown-block-001.json', import.meta.url), 'utf8'));
+  const activeDocument = JSON.parse(fs.readFileSync(new URL('../public/rift-world-blocks/ironvale-foundation-001.json', import.meta.url), 'utf8'));
   const active = compileRiftCityBlock(activeDocument);
   verifyNoCameraCutaway(active, 'active base world');
 
   const activeStructures = active.visibility?.structures || [];
-  if (activeDocument.id === 'riftcity-base-world-001') {
+  if (activeDocument.id === 'ironvale-foundation-world-001') {
     if (activeStructures.length) failures.push(`base-world reset unexpectedly produced ${activeStructures.length} building visibility structure(s)`);
   } else {
     verifyStructureMetadata(active, 'active world');
@@ -80,7 +80,7 @@ try {
 
   // The reset world intentionally has no buildings, so keep a source-controlled
   // building fixture as the integration test for containment/blocker metadata.
-  const fixtureDocument = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/blueprint-example-downtown-cross.json', import.meta.url), 'utf8'));
+  const fixtureDocument = JSON.parse(fs.readFileSync(new URL('../public/rift-world-blocks/blueprint-example-downtown-cross.json', import.meta.url), 'utf8'));
   const fixture = compileRiftCityBlock(fixtureDocument);
   verifyNoCameraCutaway(fixture, 'building fixture');
   verifyStructureMetadata(fixture, 'building fixture');

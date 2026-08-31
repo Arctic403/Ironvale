@@ -2,7 +2,7 @@
   "format": "riftcity-building-report",
   "version": 1,
   "sourceProgramId": "building-program-smoke-001",
-  "sourceFingerprint": "fnv1a-3e0cb302",
+  "sourceFingerprint": "fnv1a-af3d2d31",
   "ok": true,
   "stats": {
     "conceptualCells": 6144,

@@ -22,7 +22,7 @@ let xray = false;
 let view = null;
 
 function safeUrl(value) {
-  const raw = String(value || './riftcity-buildings/building-program-smoke-001.json').trim();
+  const raw = String(value || './rift-buildings/building-program-smoke-001.json').trim();
   if (/^(?:[a-z]+:)?\/\//i.test(raw)) throw new Error('Building inspector only loads local source-controlled JSON.');
   const url = new URL(raw, import.meta.url);
   if (url.origin !== location.origin) throw new Error('Building inspector program must stay on the current origin.');

@@ -55,7 +55,7 @@ Closing or suspending Safari pauses polling. The phone is the compute worker, no
   "version": 1,
   "job_id": "bank-candidate-001",
   "target": {
-    "path": "public/riftcity-buildings/riftcity-bank-001.json",
+    "path": "public/rift-buildings/legacy-building-fixture-001.json",
     "branch": "ai-static-world-builder"
   },
   "candidate": {

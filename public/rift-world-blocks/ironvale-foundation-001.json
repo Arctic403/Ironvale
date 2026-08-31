@@ -1,8 +1,8 @@
 {
   "format": "riftcity-city-block",
   "version": 1,
-  "id": "riftcity-base-world-001",
-  "name": "RiftCity Base World",
+  "id": "ironvale-foundation-world-001",
+  "name": "Ironvale Foundation World",
   "units": "meters",
   "grid": {
     "cell_size": 1,

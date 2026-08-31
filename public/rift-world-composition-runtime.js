@@ -1,4 +1,4 @@
-// RiftCity Base World reset.
+// Ironvale Foundation World reset.
 //
 // H2.01 previously intercepted the bundled Downtown JSON request and composed
 // the Bank BuildingProgram into it at runtime. The active city is intentionally

@@ -1,7 +1,7 @@
 {
   "format":"riftcity-building-program",
   "version":1,
-  "id":"riftcity-bank-001",
+  "id":"legacy-building-fixture-001",
   "name":"RiftCity Bank",
   "units":"meters",
   "world_origin":[181,0,21],

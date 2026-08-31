@@ -2,7 +2,7 @@ import { RiftCamera, RiftEngine } from './rift-engine.js';
 import { compileRiftCityBlock } from './rift-city-block-importer.js';
 import { compileRiftBuildingProgram } from './rift-building-program.js';
 
-const INDEX_URL = new URL('./riftcity-blocks/world-index.json', import.meta.url);
+const INDEX_URL = new URL('./rift-world-blocks/world-index.json', import.meta.url);
 const canvas = document.querySelector('#inspection-canvas');
 const status = document.querySelector('#inspection-status');
 const params = new URLSearchParams(location.search);

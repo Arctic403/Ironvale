@@ -6,8 +6,8 @@ import { compileRiftCityBlock } from '../public/rift-city-block-importer.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const publicRoot = join(root, 'public');
-const blockRoot = join(publicRoot, 'riftcity-blocks');
-const buildingRoot = join(publicRoot, 'riftcity-buildings');
+const blockRoot = join(publicRoot, 'rift-world-blocks');
+const buildingRoot = join(publicRoot, 'rift-buildings');
 const indexPath = join(blockRoot, 'world-index.json');
 const index = JSON.parse(await readFile(indexPath, 'utf8'));
 

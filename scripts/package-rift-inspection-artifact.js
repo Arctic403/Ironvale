@@ -84,7 +84,7 @@ const manifest={
   format:'riftcity-building-inspection-manifest',
   version:1,
   generatedAt:new Date().toISOString(),
-  building:{id:report?.buildingId||'riftcity-bank-001',name:report?.name||'RiftCity Bank'},
+  building:{id:report?.buildingId||'legacy-building-fixture-001',name:report?.name||'RiftCity Bank'},
   review:{
     contactSheet:'contact-sheet.webp',
     report:'bank-inspection-report.json',

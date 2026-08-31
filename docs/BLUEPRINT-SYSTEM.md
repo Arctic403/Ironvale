@@ -49,4 +49,4 @@ Validation expands Blueprint-generated operations and evaluates the actual affec
 
 After expansion, Blueprint ops still pass through `compileRiftCityBlock()`, `RiftSectionGrid`, encoded RiftBlock states and the existing full/slab/stair mesh builder. Blueprint is an authoring/compiler layer, not a second renderer.
 
-See `public/riftcity-blocks/blueprint-example-downtown-cross.json` for a working nested-prefab, road, curb, group and anchor-connection example.
+See `public/rift-world-blocks/blueprint-example-downtown-cross.json` for a working nested-prefab, road, curb, group and anchor-connection example.

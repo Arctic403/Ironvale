@@ -1,33 +1,28 @@
 export const state = {
-  authenticated:false,
-  user:null,
-  player:null,
-  location:null,
-  world:null,
-  inventory:null,
-  crimes:null,
-  route:null,
-  selectedLocation:null,
-  activeRequest:0,
-  serviceCache:new Map(),
-  inlineMessage:null,
-  law:null,
-  merits:null
+  authenticated: false,
+  user: null,
+  character: null,
+  world: null,
+  journal: null,
+  inventory: null,
+  equipment: null,
+  sync: null,
+  route: null,
+  activeRequest: 0,
+  inlineMessage: null
 };
 
-export function setPlayer(player) {
-  if (player) state.player = player;
+export function setCharacter(character) {
+  if (character) state.character = character;
 }
 
 export function clearState() {
-  state.authenticated=false;
-  state.user=null;
-  state.player=null;
-  state.location=null;
-  state.world=null;
-  state.inventory=null;
-  state.crimes=null;
-  state.selectedLocation=null;
-  state.law=null; state.merits=null;
-  state.serviceCache.clear();
+  state.authenticated = false;
+  state.user = null;
+  state.character = null;
+  state.world = null;
+  state.journal = null;
+  state.inventory = null;
+  state.equipment = null;
+  state.sync = null;
 }

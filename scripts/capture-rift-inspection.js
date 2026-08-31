@@ -7,8 +7,8 @@ const args = Object.fromEntries(process.argv.slice(2).map(item => {
 }));
 const port = Number(args.port || args['debug-port'] || 9222);
 const outputDir = path.resolve(args.output || 'rift-building-previews/full-resolution');
-const base3d = args.base3d || 'http://127.0.0.1:4173/building-3d-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json';
-const basePlan = args.plan || 'http://127.0.0.1:4173/building-inspection.html?program=./riftcity-buildings/riftcity-bank-001.json';
+const base3d = args.base3d || 'http://127.0.0.1:4173/building-3d-inspection.html?program=./rift-buildings/legacy-building-fixture-001.json';
+const basePlan = args.plan || 'http://127.0.0.1:4173/building-inspection.html?program=./rift-buildings/legacy-building-fixture-001.json';
 
 const shots = [
   ['bank-exterior-iso-nw', `${base3d}&mode=full&view=iso-nw`, '3d'],

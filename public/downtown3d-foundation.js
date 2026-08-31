@@ -9,8 +9,8 @@ import { createRiftCreativeMode } from './rift-creative-mode.js';
 import { createRiftThirdPersonCamera, createRiftFirstPersonCamera } from './rift-third-person-camera.js';
 
 let activeFoundation = null;
-const DEFAULT_BLOCK_URL = new URL('./riftcity-blocks/downtown-block-001.json', import.meta.url);
-const ACTIVE_BLOCK_STORAGE_KEY = 'riftcity:h1.57:active-city-block:v1';
+const DEFAULT_BLOCK_URL = new URL('./rift-world-blocks/ironvale-foundation-001.json', import.meta.url);
+const ACTIVE_BLOCK_STORAGE_KEY = 'ironvale:world:active-block:v1';
 const ACTIVE_BLOCK_STORAGE_VERSION = 1;
 const ACTIVE_BLOCK_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -24,15 +24,15 @@ export async function renderDowntown3D(root) {
   destroyDowntown3D();
 
   root.innerHTML = `
-    <section class="world3d-shell downtown3d-foundation rift-block-import-lab" aria-label="RiftCity JSON city block importer">
-      <canvas id="riftcity-3d-canvas" aria-label="Imported RiftCity block preview"></canvas>
+    <section class="world3d-shell downtown3d-foundation rift-block-import-lab" aria-label="Ironvale Rift Engine world">
+      <canvas id="riftcity-3d-canvas" aria-label="Ironvale world preview"></canvas>
       <div class="world3d-vignette" aria-hidden="true"></div>
       <div id="rift-first-person-reticle" class="rift-first-person-reticle" aria-hidden="true"><span></span></div>
 
       <div class="world3d-top-left downtown3d-title rift-import-title">
-        <span class="eyebrow">RIFT BLOCK ENGINE · H1.75 THIRD-PERSON · STAIR ALIGNMENT</span>
-        <strong id="rift-import-name">LOADING COMMERCE BLOCK 01…</strong>
-        <small id="rift-import-description">Third-person camera collision keeps the view inside playable space; roofs, walls and upper floors always render normally with no camera-driven cutaway behavior.</small>
+        <span class="eyebrow">IRONVALE · RIFT ENGINE WORLD FOUNDATION</span>
+        <strong id="rift-import-name">LOADING IRONVALE FOUNDATION…</strong>
+        <small id="rift-import-description">The Ironvale world foundation is live on Rift Engine: native sections, third-person movement, build tools and streaming-ready terrain.</small>
       </div>
 
       <div class="world3d-top-right downtown3d-actions rift-import-actions">
@@ -41,11 +41,11 @@ export async function renderDowntown3D(root) {
         <button id="rift-import-json" class="world3d-hud-button" type="button">IMPORT JSON</button>
         <button id="rift-import-reset" class="world3d-hud-button" type="button">RESET DEFAULT</button>
         <button id="rift-import-cull" class="world3d-hud-button active" type="button">CULL ON</button>
-        <button id="rift-import-top" class="world3d-hud-button" type="button">CITY OVERVIEW</button>
+        <button id="rift-import-top" class="world3d-hud-button" type="button">WORLD OVERVIEW</button>
         <button id="rift-import-view" class="world3d-hud-button" type="button">RESET VIEW</button>
         <button id="rift-first-person-toggle" class="world3d-hud-button" type="button">FIRST PERSON</button>
         <button id="world3d-fullscreen-button" class="world3d-hud-button" type="button">FULLSCREEN</button>
-        <input id="rift-import-file" class="rift-import-file" type="file" accept=".json,application/json" aria-label="Choose a RiftCity city block JSON file">
+        <input id="rift-import-file" class="rift-import-file" type="file" accept=".json,application/json" aria-label="Choose a Rift Engine world block JSON file">
       </div>
 
       <div id="downtown3d-status" class="downtown3d-status settled" role="status">
@@ -63,8 +63,8 @@ export async function renderDowntown3D(root) {
         </div>
       </div>
 
-      <aside id="rift-creative-panel" class="rift-creative-panel" aria-label="RiftCity reticle build tools">
-        <header><div><span>RIFTCITY BUILD MODE</span><strong>OVERHEAD CITY BUILDER</strong></div><button id="rift-creative-close" type="button">HIDE</button></header>
+      <aside id="rift-creative-panel" class="rift-creative-panel" aria-label="Ironvale reticle build tools">
+        <header><div><span>IRONVALE BUILD MODE</span><strong>RIFT WORLD BUILDER</strong></div><button id="rift-creative-close" type="button">HIDE</button></header>
         <div class="rift-creative-block-actions"><button data-rift-block-action="break" class="active">BREAK CELL</button><button data-rift-block-action="place">PLACE CELL</button></div>
         <label>BLOCK<select id="rift-creative-block-state"></select></label>
         <button id="rift-creative-stair-rotate" type="button">ROTATE STAIR ↷</button>
@@ -114,7 +114,7 @@ export async function renderDowntown3D(root) {
     await foundation.loadActiveBlock();
     return foundation;
   } catch (error) {
-    console.error('RiftCity H1.75 third-person block world failed to start', error);
+    console.error('Ironvale Rift Engine world failed to start', error);
     if (status) {
       status.classList.add('error');
       status.classList.remove('settled');
@@ -186,7 +186,7 @@ function createBlockImporterLab({ root, canvas, status }) {
   let topView = false;
   let gameMode = false;
   let destroyed = false;
-  let sourceLabel = 'DEFAULT BLOCK 001';
+  let sourceLabel = 'IRONVALE FOUNDATION';
   let persistenceLabel = 'BUNDLED';
 
   const nameLabel = root.querySelector('#rift-import-name');

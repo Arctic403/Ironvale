@@ -5,7 +5,7 @@ import {compileRiftBuildingProgram} from '../public/rift-building-program.js';
 import {createRiftInspectionReport} from '../public/rift-building-inspection-core.js';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
-const input=process.argv[2]||'public/riftcity-buildings/riftcity-bank-001.json';
+const input=process.argv[2]||'public/rift-buildings/legacy-building-fixture-001.json';
 const resolved=path.resolve(here,'..',input);
 const source=JSON.parse(fs.readFileSync(resolved,'utf8'));
 const compiled=compileRiftBuildingProgram(source,{strict:true});

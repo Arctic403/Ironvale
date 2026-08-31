@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import { compileRiftCityBlock } from '../public/rift-city-block-importer.js';
 import { RIFT_SHARED_PALETTE } from '../public/rift-material-library.js';
 
-const base = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/downtown-block-001.json', import.meta.url), 'utf8'));
-const worldIndex = JSON.parse(fs.readFileSync(new URL('../public/riftcity-blocks/world-index.json', import.meta.url), 'utf8'));
+const base = JSON.parse(fs.readFileSync(new URL('../public/rift-world-blocks/ironvale-foundation-001.json', import.meta.url), 'utf8'));
+const worldIndex = JSON.parse(fs.readFileSync(new URL('../public/rift-world-blocks/world-index.json', import.meta.url), 'utf8'));
 const runtimeSource = fs.readFileSync(new URL('../public/rift-world-composition-runtime.js', import.meta.url), 'utf8');
 const atlasSource = fs.readFileSync(new URL('../public/rift-texture-atlas.js', import.meta.url), 'utf8');
 const engineSource = fs.readFileSync(new URL('../public/rift-engine.js', import.meta.url), 'utf8');
@@ -13,8 +13,8 @@ const failures = [];
 const ok = (value, message) => { if (!value) failures.push(message); };
 
 try {
-  ok(base.id === 'riftcity-base-world-001', `Active block id ${base.id} is not the base-world reset.`);
-  ok(base.name === 'RiftCity Base World', 'Base world name drifted.');
+  ok(base.id === 'ironvale-foundation-world-001', `Active block id ${base.id} is not the base-world reset.`);
+  ok(base.name === 'Ironvale Foundation World', 'Base world name drifted.');
   ok(Array.isArray(base.ops) && base.ops.length === 2, `Base world should contain exactly two terrain ops, found ${base.ops?.length}.`);
   ok(base.ops.every(op => op.op === 'fill_box'), 'Base world contains authored non-terrain operations.');
   ok(base.ops.some(op => op.state === 'dirt'), 'Base world dirt foundation is missing.');
@@ -50,8 +50,8 @@ try {
   ok(!materialSource.includes("localStorage.removeItem('riftcity:h1.57:active-city-block:v1')"), 'Material initialization can still blindly erase the active-world save.');
 
   const activeEntry = worldIndex.blocks.find(entry => entry.id === worldIndex.activeBlockId);
-  ok(worldIndex.activeBlockId === 'riftcity-base-world-001', `World index activeBlockId ${worldIndex.activeBlockId} != riftcity-base-world-001.`);
-  ok(activeEntry?.path === './downtown-block-001.json', 'Base world index path drifted.');
+  ok(worldIndex.activeBlockId === 'ironvale-foundation-world-001', `World index activeBlockId ${worldIndex.activeBlockId} != ironvale-foundation-world-001.`);
+  ok(activeEntry?.path === './ironvale-foundation-001.json', 'Base world index path drifted.');
   ok(!activeEntry?.runtime_overlays?.length, 'Base world must not advertise runtime building overlays.');
 
   const compiled = compileRiftCityBlock(base);

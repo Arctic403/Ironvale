@@ -9,7 +9,7 @@ const fail = message => {
 const importer = validateRiftCityBlockImporter();
 if (!importer.ok) fail(`importer self-test failed: ${importer.failures.join('; ')}`);
 
-const examplePath = new URL('../public/riftcity-blocks/blueprint-example-downtown-cross.json', import.meta.url);
+const examplePath = new URL('../public/rift-world-blocks/blueprint-example-downtown-cross.json', import.meta.url);
 const example = JSON.parse(fs.readFileSync(examplePath, 'utf8'));
 
 try {

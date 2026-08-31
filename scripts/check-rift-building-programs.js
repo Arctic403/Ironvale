@@ -6,7 +6,7 @@ import { compileRiftCityBlock } from '../public/rift-city-block-importer.js';
 import { decodeRiftBlockState, RIFT_BLOCK_SHAPES } from '../public/rift-block-shapes.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const sourceDir = path.join(root, 'public', 'riftcity-buildings');
+const sourceDir = path.join(root, 'public', 'rift-buildings');
 const failures = [];
 const summaries = [];
 
@@ -14,7 +14,7 @@ function stable(value) { return JSON.stringify(value); }
 function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
 
 if (!fs.existsSync(sourceDir)) {
-  console.error('Missing public/riftcity-buildings directory.');
+  console.error('Missing public/rift-buildings directory.');
   process.exit(1);
 }
 

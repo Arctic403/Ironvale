@@ -3,7 +3,7 @@ import {compileRiftBuildingProgram} from '../public/rift-building-program.js';
 import {compileRiftCityBlock} from '../public/rift-city-block-importer.js';
 import {buildRiftInspectionDocument,createRiftInspectionReport,inspectionFocus} from '../public/rift-building-inspection-core.js';
 
-const source=JSON.parse(fs.readFileSync(new URL('../public/riftcity-buildings/riftcity-bank-001.json',import.meta.url),'utf8'));
+const source=JSON.parse(fs.readFileSync(new URL('../public/rift-buildings/legacy-building-fixture-001.json',import.meta.url),'utf8'));
 const authoring=compileRiftBuildingProgram(source,{strict:true});
 const report=createRiftInspectionReport(authoring);
 const fail=[];const ok=(v,m)=>{if(!v)fail.push(m)};
