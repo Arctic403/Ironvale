@@ -47,7 +47,7 @@ const foundation = fs.readFileSync('public/downtown3d-foundation.js', 'utf8');
 const player = fs.readFileSync('public/rift-player.js', 'utf8');
 expect(foundation.includes("createRiftTerrainFromDocument") && foundation.includes('buildSurfaceGeometries'), 'world foundation is not rendering Rift Terrain');
 expect(foundation.includes('getTerrain: () => terrain'), 'player controller is not connected to Rift Terrain');
-expect(player.includes('getTerrain') && player.includes('terrain.supportCandidatesAt'), 'player surface solver is not terrain-aware');
+expect(player.includes('getTerrain') && player.includes('getTerrain?.()?.supportCandidatesAt?.('), 'player surface solver is not terrain-aware');
 expect(player.includes("!getTerrain?.()"), 'native block-only player step must be bypassed while smooth terrain owns collision');
 
 console.log(`[rift-terrain] PASS · ${stats.surfaceChunks} surface chunks · ${stats.samples} height samples · ${surfaceTriangles} surface triangles · ${caveMeshes[0].triangles} cave triangles · sculpt + holes + terrain collision live.`);
