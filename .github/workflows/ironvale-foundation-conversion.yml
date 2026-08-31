@@ -7,7 +7,7 @@ on:
       - '.github/workflows/ironvale-foundation-conversion.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   convert:
@@ -72,14 +72,22 @@ jobs:
       - name: Verify Cloudflare Worker and WASM bundle
         run: npx wrangler deploy --dry-run
 
-      - name: Commit verified Ironvale foundation to main
+      - name: Build verified Git bundle
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --cached --quiet; then
-            echo "No Ironvale conversion changes to commit."
-            exit 0
-          fi
           git commit -m "Establish Ironvale medieval MMO foundation"
-          git push origin HEAD:main
+          git bundle create ironvale-foundation.bundle HEAD
+          git rev-parse HEAD > ironvale-foundation-commit.txt
+          git rev-parse HEAD^{tree} > ironvale-foundation-tree.txt
+
+      - name: Upload verified Ironvale bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironvale-foundation-verified-bundle
+          path: |
+            ironvale-foundation.bundle
+            ironvale-foundation-commit.txt
+            ironvale-foundation-tree.txt
+          retention-days: 1
