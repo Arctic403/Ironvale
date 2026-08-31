@@ -30,6 +30,7 @@ jobs:
             --target=wasm32 \
             -O3 \
             -nostdlib \
+            -fno-builtin \
             -fno-exceptions \
             -fno-rtti \
             -Wl,--no-entry \
