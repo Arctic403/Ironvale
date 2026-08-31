@@ -5,10 +5,9 @@
   "portsAttributes": {
     "4173": {
       "label": "Mobile Codespace Bridge",
-      "onAutoForward": "silent",
-      "visibility": "public"
+      "onAutoForward": "silent"
     }
   },
   "postCreateCommand": "npm install --no-package-lock && npm install -g @openai/codex@latest --include=optional",
-  "postStartCommand": "nohup node .mobile-codespace/server.mjs > /tmp/mobile-codespace-bridge.log 2>&1 &"
+  "postStartCommand": "bash .mobile-codespace/start.sh"
 }
