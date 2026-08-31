@@ -11,9 +11,12 @@ const world = JSON.parse(fs.readFileSync('public/world/ironvale-terrain.json', '
 if (world.format !== 'rift-world-v1') failures.push('world format');
 if (world.terrain?.format !== 'rift-terrain-v1') failures.push('terrain format');
 if (world.metadata?.legacyBlocks !== false || world.metadata?.voxelGrid !== false) failures.push('terrain metadata');
-if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length < 1) failures.push('cave geometry');
+if (world.metadata?.blankCanvas !== true) failures.push('terrain must boot as blank canvas');
+if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
+if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
+if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
 const worker = fs.readFileSync('src/index.js', 'utf8').toLowerCase();
 const forbiddenPatterns = [[/\bcombat\b/,'combat'],[/\binventory\b/,'inventory'],[/\bquest(s|_progress)?\b/,'quest'],[/ai-builder/,'ai-builder'],[/block_layout/,'block_layout'],[/riftblock/,'riftblock']];
 for (const [pattern,label] of forbiddenPatterns) if (pattern.test(worker)) failures.push(`worker contains ${label}`);
-if (failures.length) { console.error('Ironvale core hard-cut verification failed:', failures.join(', ')); process.exit(1); }
-console.log('Ironvale core verified: engine + terrain + auth/session/character only.');
+if (failures.length) { console.error('Ironvale core verification failed:', failures.join(', ')); process.exit(1); }
+console.log('Ironvale core verified: blank terrain editor + auth/session/character only.');
