@@ -21,7 +21,9 @@ expect(compiled.stats.cells > 18000 && compiled.stats.operations >= 45, 'starter
 expect(JSON.stringify(world).includes('Training hall') && JSON.stringify(world).includes('North Watch') && JSON.stringify(world).includes('Old North Road'), 'starter area landmarks are missing');
 expect(app.includes("renderCity") && !app.includes('renderCharacter') && !app.includes('renderJournal') && !app.includes('renderCodex'), 'active app must mount the 3D game instead of routed document pages');
 expect(gameplay.includes('createIronvaleStarterRuntime') && gameplay.includes('riftNativeResolveCombat') && gameplay.includes("Digit1") && gameplay.includes("KeyE"), 'in-world creation/interaction/Knight runtime is incomplete');
+expect(gameplay.includes("data-iv-panel=\"character\"") && gameplay.includes("data-iv-panel=\"quests\"") && gameplay.includes("data-iv-panel=\"bags\""), 'character, quests and bags must remain in-game overlays');
 expect(foundation.includes("brackenford-lowlands-001.json") && foundation.includes('createIronvaleStarterRuntime') && foundation.includes('startGameplay'), 'Rift world boot is not wired to H3.0 starter gameplay');
+expect(foundation.includes("ironvale:world:active-block:v2") && !foundation.includes("ironvale:world:active-block:v1"), 'starter game must invalidate the old flat saved-world slot');
 expect(api.includes("/api/ironvale/character/create") && api.includes("/api/ironvale/quests/progress"), 'starter persistence endpoints are missing');
 expect(schema.includes('ironvale_character_profiles'), 'character identity table is missing');
 expect(css.includes('body.ironvale-session-active>.topbar') && css.includes('.iv-actionbar') && css.includes('.iv-character-create'), 'game-first fullscreen HUD styling is missing');
