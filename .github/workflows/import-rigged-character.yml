@@ -1,0 +1,179 @@
+name: Import CC0 Rigged Character
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/import-rigged-character.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import-character:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download audited Quaternius CC0 assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/assets/characters/quaternius
+          curl --fail --location --retry 4 --retry-delay 2 \
+            https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/night-striker.glb \
+            -o public/assets/characters/quaternius/universal-base-male.glb
+          curl --fail --location --retry 4 --retry-delay 2 \
+            https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/universal-animation-library.glb \
+            -o public/assets/characters/quaternius/universal-animation-library.glb
+          curl --fail --location --retry 4 --retry-delay 2 \
+            https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-BASE-CHARACTERS.txt \
+            -o public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.txt
+          curl --fail --location --retry 4 --retry-delay 2 \
+            https://raw.githubusercontent.com/Seyamalam/blood-league-kickoff/main/public/assets/vendor/quaternius/LICENSE-ANIMATIONS.txt \
+            -o public/assets/characters/quaternius/LICENSE-ANIMATIONS.txt
+
+          echo 'a466828c67a4acc9b2413212ce6d9cde235e3aed9b675680c14fd9673858f118  public/assets/characters/quaternius/universal-base-male.glb' | sha256sum --check --strict
+          echo '4c748767741a3e495d89667b9a218b690ba9810b9517a12e960780e3ca72c4e9  public/assets/characters/quaternius/universal-animation-library.glb' | sha256sum --check --strict
+
+      - name: Inspect the actual GLB contracts
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+
+          function inspectGlb(file) {
+            const bytes = fs.readFileSync(file);
+            if (bytes.readUInt32LE(0) !== 0x46546c67) throw new Error(`${file}: not GLB`);
+            if (bytes.readUInt32LE(4) !== 2) throw new Error(`${file}: not glTF 2.0`);
+            let offset = 12;
+            let json = null;
+            while (offset + 8 <= bytes.length) {
+              const length = bytes.readUInt32LE(offset);
+              const type = bytes.readUInt32LE(offset + 4);
+              offset += 8;
+              const chunk = bytes.subarray(offset, offset + length);
+              offset += length;
+              if (type === 0x4e4f534a) json = JSON.parse(chunk.toString('utf8').replace(/\u0000+$/g, '').trim());
+            }
+            if (!json) throw new Error(`${file}: JSON chunk missing`);
+            const nodes = json.nodes || [];
+            return {
+              path: file,
+              bytes: bytes.length,
+              sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+              generator: json.asset?.generator || null,
+              extensionsUsed: json.extensionsUsed || [],
+              extensionsRequired: json.extensionsRequired || [],
+              sceneCount: (json.scenes || []).length,
+              rootScenes: (json.scenes || []).map((scene, i) => ({ index: i, name: scene.name || null, nodes: scene.nodes || [] })),
+              meshes: (json.meshes || []).map((mesh, i) => ({
+                index: i,
+                name: mesh.name || null,
+                primitives: (mesh.primitives || []).map((primitive, p) => ({
+                  index: p,
+                  mode: primitive.mode ?? 4,
+                  material: primitive.material ?? null,
+                  attributes: Object.keys(primitive.attributes || {}),
+                  targets: (primitive.targets || []).length
+                }))
+              })),
+              materials: (json.materials || []).map((material, i) => ({
+                index: i,
+                name: material.name || null,
+                baseColorFactor: material.pbrMetallicRoughness?.baseColorFactor || null,
+                baseColorTexture: material.pbrMetallicRoughness?.baseColorTexture?.index ?? null,
+                metallicFactor: material.pbrMetallicRoughness?.metallicFactor ?? null,
+                roughnessFactor: material.pbrMetallicRoughness?.roughnessFactor ?? null
+              })),
+              textureCount: (json.textures || []).length,
+              imageCount: (json.images || []).length,
+              skins: (json.skins || []).map((skin, i) => ({
+                index: i,
+                name: skin.name || null,
+                skeleton: skin.skeleton ?? null,
+                inverseBindMatrices: skin.inverseBindMatrices ?? null,
+                jointCount: (skin.joints || []).length,
+                joints: (skin.joints || []).map(index => ({ index, name: nodes[index]?.name || null }))
+              })),
+              meshNodes: nodes.map((node, index) => node.mesh == null ? null : ({
+                index,
+                name: node.name || null,
+                mesh: node.mesh,
+                skin: node.skin ?? null,
+                matrix: node.matrix || null,
+                translation: node.translation || null,
+                rotation: node.rotation || null,
+                scale: node.scale || null
+              })).filter(Boolean),
+              animations: (json.animations || []).map((animation, i) => ({
+                index: i,
+                name: animation.name || null,
+                channels: (animation.channels || []).length,
+                samplers: (animation.samplers || []).length,
+                targets: [...new Set((animation.channels || []).map(channel => channel.target?.node).filter(Number.isInteger).map(index => nodes[index]?.name || `node-${index}`))]
+              })),
+              accessors: (json.accessors || []).map((accessor, i) => ({
+                index: i,
+                type: accessor.type,
+                componentType: accessor.componentType,
+                count: accessor.count,
+                normalized: Boolean(accessor.normalized),
+                sparse: accessor.sparse ? { count: accessor.sparse.count } : null
+              }))
+            };
+          }
+
+          const report = {
+            format: 'ironvale-character-audit-v1',
+            source: {
+              author: 'Quaternius',
+              characterPack: 'Universal Base Characters (Standard)',
+              animationPack: 'Universal Animation Library (Standard)',
+              license: 'CC0-1.0',
+              characterPage: 'https://quaternius.com/packs/universalbasecharacters.html',
+              animationPage: 'https://quaternius.com/packs/universalanimationlibrary.html'
+            },
+            character: inspectGlb('public/assets/characters/quaternius/universal-base-male.glb'),
+            animations: inspectGlb('public/assets/characters/quaternius/universal-animation-library.glb')
+          };
+          fs.writeFileSync('public/assets/characters/quaternius/character-audit.json', JSON.stringify(report, null, 2) + '\n');
+          NODE
+
+      - name: Record third-party asset provenance
+        shell: bash
+        run: |
+          cat > THIRD_PARTY_ASSETS.md <<'EOF'
+          # Third-Party Assets
+
+          ## Quaternius — Universal Base Characters / Universal Animation Library
+
+          - Runtime files: `public/assets/characters/quaternius/universal-base-male.glb` and `universal-animation-library.glb`
+          - Author: Quaternius
+          - Character source: https://quaternius.com/packs/universalbasecharacters.html
+          - Animation source: https://quaternius.com/packs/universalanimationlibrary.html
+          - License: CC0 1.0 Universal / Public Domain Dedication
+          - Character SHA-256: `a466828c67a4acc9b2413212ce6d9cde235e3aed9b675680c14fd9673858f118`
+          - Animation SHA-256: `4c748767741a3e495d89667b9a218b690ba9810b9517a12e960780e3ca72c4e9`
+          - Imported from the audited browser-ready copies preserved in `Seyamalam/blood-league-kickoff`; the original Quaternius license texts are bundled beside the assets.
+
+          Collision and authoritative movement remain Rift/Ironvale-owned. The imported humanoid is a visual rig and does not become the gameplay collider.
+          EOF
+
+      - name: Verify current Ironvale before landing assets
+        run: npm run build
+
+      - name: Commit imported assets and audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/import-rigged-character.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Import CC0 rigged humanoid character assets"
+          git push origin HEAD:main
