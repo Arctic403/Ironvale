@@ -1,6 +1,6 @@
 import { RiftEngine } from './rift-engine.js?v=20260831-character-freecam-r2';
 import { RiftTerrain } from './rift-terrain.js?v=20260831-character-freecam-r2';
-import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-freecam-r2';
+import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';
 
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;

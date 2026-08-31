@@ -56,6 +56,7 @@ if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
 if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
 if (!characterRuntime.includes('DEFAULT_CHARACTER_MODEL_URL') || !characterRuntime.includes("cache: 'no-cache'")) failures.push('character cache-safe loading');
+if (!characterRuntime.includes('accessor.bufferView != null') || !characterRuntime.includes('if (accessor.sparse)') || !characterRuntime.includes('sparse.indices') || !characterRuntime.includes('sparse.values')) failures.push('glTF zero-base/sparse accessor support');
 const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');
 if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTexture') || !renderer.includes('createSkin(') || !renderer.includes('createTexture(')) failures.push('GPU character skinning/texturing');
 
