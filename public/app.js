@@ -174,6 +174,7 @@ window.IronvaleDiagnostics = Object.freeze({
   setAuto: enabled => { const value = diagnostics.setAutoEnabled(enabled); refreshDiagnosticButtons(); return value; },
   record: (category, message, data, severity) => diagnostics.record(category, message, data, severity),
   network: () => diagnostics.getNetworkTelemetry(),
+  console: () => diagnostics.getConsoleTelemetry(true),
   registerProvider: (name, provider) => diagnostics.registerProvider(name, provider),
   unregisterProvider: name => diagnostics.unregisterProvider(name)
 });
@@ -392,6 +393,33 @@ function resourceTimingDiagnostics() {
   return entries.slice(-180).map(entry => ({ name: entry.name, initiatorType: entry.initiatorType, duration: entry.duration, startTime: entry.startTime, transferSize: entry.transferSize, encodedBodySize: entry.encodedBodySize, decodedBodySize: entry.decodedBodySize, nextHopProtocol: entry.nextHopProtocol || null }));
 }
 
+async function sha256Hex(buffer) {
+  if (!crypto?.subtle) return null;
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
+}
+
+async function wasmArtifactDiagnostics() {
+  try {
+    const response = await fetch('/rift-core.wasm.gz', { cache: 'no-store' });
+    if (!response.ok) return { error: 'HTTP ' + response.status };
+    const bytes = await response.arrayBuffer();
+    return { url: response.url, compressedBytes: bytes.byteLength, sha256: await sha256Hex(bytes), fingerprintKind: 'sha256-compressed-artifact' };
+  } catch (error) { return { error: String(error?.message || error) }; }
+}
+
+function deviceCapabilityDiagnostics() {
+  return {
+    userAgent: navigator.userAgent, platform: navigator.platform || null, language: navigator.language, languages: navigator.languages || [],
+    hardwareConcurrency: navigator.hardwareConcurrency || null, deviceMemory: navigator.deviceMemory || null, maxTouchPoints: navigator.maxTouchPoints || 0, online: navigator.onLine,
+    pixelRatio: devicePixelRatio || 1, screen: { width: screen?.width || null, height: screen?.height || null, colorDepth: screen?.colorDepth || null, pixelDepth: screen?.pixelDepth || null },
+    secureContext: globalThis.isSecureContext, crossOriginIsolated: globalThis.crossOriginIsolated, webAssembly: typeof WebAssembly !== 'undefined',
+    sharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined', offscreenCanvas: typeof OffscreenCanvas !== 'undefined', decompressionStream: typeof DecompressionStream !== 'undefined', compressionStream: typeof CompressionStream !== 'undefined',
+    webGPU: Boolean(navigator.gpu), opfs: Boolean(navigator.storage?.getDirectory), cacheStorage: 'caches' in window, serviceWorker: 'serviceWorker' in navigator,
+    pointerCoarse: matchMedia?.('(pointer: coarse)')?.matches || false, hoverCapable: matchMedia?.('(hover: hover)')?.matches || false, reducedMotion: matchMedia?.('(prefers-reduced-motion: reduce)')?.matches || false
+  };
+}
+
 function webGlDiagnosticInfo(gl, deep = false) {
   if (!gl) return null;
   const read = parameter => { try { return gl.getParameter(parameter); } catch (_) { return null; } };
@@ -507,7 +535,7 @@ async function buildDiagnosticSnapshot(level = 1) {
     const response = await fetch('/rift-core.sources.json', { cache: 'no-store' });
     coreSourceManifest = response.ok ? await response.json() : { error: 'HTTP ' + response.status };
   } catch (error) { coreSourceManifest = { error: String(error?.message || error) }; }
-  const [storage, cacheState, serviceWorker] = await Promise.all([storageDiagnostics(), cacheDiagnostics(), serviceWorkerDiagnostics()]);
+  const [storage, cacheState, serviceWorker, wasmArtifact] = await Promise.all([storageDiagnostics(), cacheDiagnostics(), serviceWorkerDiagnostics(), wasmArtifactDiagnostics()]);
   const resources = resourceTimingDiagnostics();
   const draftText = localStorage.getItem(LOCAL_DRAFT_KEY);
   const deep = {
@@ -517,7 +545,9 @@ async function buildDiagnosticSnapshot(level = 1) {
     remoteLibraryPointer,
     renderer: { webgl: webGlDiagnosticInfo(gl, true), engine: engine?.getDiagnostics?.(true) || { ready: false, boot: getRiftEngineBootTelemetry() } },
     native: terrain?.getNativeDiagnostics?.(true) || null,
-    riftCore: { sourceManifest: coreSourceManifest, wasmResource: resources.find(entry => entry.name.includes('rift-core.wasm')) || null },
+    riftCore: { sourceManifest: coreSourceManifest, wasmResource: resources.find(entry => entry.name.includes('rift-core.wasm')) || null, artifact: wasmArtifact },
+    deviceCapabilities: deviceCapabilityDiagnostics(),
+    consoleTelemetry: diagnostics.getConsoleTelemetry(true),
     storage,
     cacheState,
     serviceWorker,

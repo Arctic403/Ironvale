@@ -123,6 +123,10 @@ if (!terrainMaterials.includes('class RiftTerrainMaterialRuntime') || !terrainMa
 
 const diagnosticsRuntime = fs.readFileSync('public/rift-diagnostics.js', 'utf8');
 if (!diagnosticsRuntime.includes('class RiftDiagnostics') || !diagnosticsRuntime.includes('automatic-crash') || !diagnosticsRuntime.includes('l1Quick') || !diagnosticsRuntime.includes('l2Runtime') || !diagnosticsRuntime.includes('l3Deep') || !diagnosticsRuntime.includes('credentialsIncluded: false')) failures.push('three-layer sanitized diagnostics runtime');
+if (!diagnosticsRuntime.includes('getConsoleTelemetry(') || !diagnosticsRuntime.includes('_installConsoleTelemetry(')) failures.push('console warning/error telemetry');
+if (!renderer.includes('vertexBufferVertices') || !renderer.includes("format:srgb?'SRGB8_ALPHA8':'RGBA8'")) failures.push('renderer vertex/texture-format telemetry');
+if (!app.includes('wasmArtifactDiagnostics()') || !app.includes('deviceCapabilityDiagnostics()') || !app.includes('consoleTelemetry: diagnostics.getConsoleTelemetry(true)')) failures.push('deep artifact/device/console telemetry');
+if (world.diagnostics?.blackBoxCompleteness !== 'max-v1' || !world.diagnostics?.deepTelemetry?.includes('native-failure-history')) failures.push('max black-box diagnostics world contract');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 const landscape = fs.readFileSync('public/rift-landscape.js', 'utf8');
@@ -144,6 +148,7 @@ if (!terrain.includes('planSectionLods(')) failures.push('terrain LOD planner mi
 if (!terrain.includes('markDirtyRegion(')) failures.push('terrain dirty region tracking missing');
 if (!terrain.includes('NATIVE.rift_terrain_sample_height')) failures.push('terrain sampling not native');
 if (!terrain.includes('NATIVE.rift_terrain_raycast')) failures.push('native terrain raycast missing');
+if (!terrain.includes('NATIVE_FAILURES') || !terrain.includes('failureCount: NATIVE_FAILURES.length')) failures.push('native failure history diagnostics');
 
 const rendererRuntimeBlackBox = fs.readFileSync('public/rift-engine.js', 'utf8');
 if (!diagnosticsRuntime.includes("ironvale-diagnostics-v2") || !diagnosticsRuntime.includes('_installFetchTelemetry') || !diagnosticsRuntime.includes('registerProvider(') || !diagnosticsRuntime.includes('subsystemProviders')) failures.push('diagnostic network/provider runtime');
@@ -162,4 +167,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: RiftLandscape + meter scale contract + silent automated validator + three-layer diagnostic dumps + C++/WASM terrain + RPG runtime.');
+console.log('Ironvale core verified: RiftLandscape + C++/WASM terrain + RPG runtime + max three-layer engine black-box diagnostics.');

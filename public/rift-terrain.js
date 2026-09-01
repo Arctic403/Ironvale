@@ -10,6 +10,7 @@ const DEFAULT_LOD_DISTANCES = Object.freeze([96, 192, 320, 480]);
 const DEFAULT_COLLISION_LOD_STEPS = Object.freeze([1, 2, 4]);
 const NATIVE = RiftCore.exports;
 const MEMORY = RiftCore.memory;
+const NATIVE_FAILURES = [];
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 function lerp(a, b, t) { return a + (b - a) * t; }
@@ -40,7 +41,11 @@ function distanceToSegment3(px, py, pz, a, b) {
 }
 
 function assertNative(ok, message) {
-  if (!ok) throw new Error(message);
+  if (ok) return;
+  const error = new Error(message);
+  NATIVE_FAILURES.push({ at: new Date().toISOString(), message: String(message || 'Native call failed'), stack: String(error.stack || '').slice(0, 8000) });
+  if (NATIVE_FAILURES.length > 64) NATIVE_FAILURES.splice(0, NATIVE_FAILURES.length - 64);
+  throw error;
 }
 
 export function validateRiftTerrainConfig(config) {
@@ -123,7 +128,9 @@ export class RiftTerrain {
       terrain: { columns: this.columns, rows: this.rows, sampleSpacing: this.sampleSpacing, samples: this.heights?.length || this.columns * this.rows, cells: this.manualHoles?.length || (this.columns - 1) * (this.rows - 1), revision: this.revision },
       exportCount: exportNames.length,
       functionCount: nativeFunctions.length,
-      ...(deep ? { exports: exportNames, nativeFunctions } : {})
+      failureCount: NATIVE_FAILURES.length,
+      lastFailure: NATIVE_FAILURES.at(-1) || null,
+      ...(deep ? { exports: exportNames, nativeFunctions, failures: [...NATIVE_FAILURES] } : {})
     };
   }
 

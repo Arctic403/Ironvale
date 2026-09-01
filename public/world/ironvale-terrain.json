@@ -274,6 +274,24 @@
       "includeCredentials": false,
       "includeCookies": false,
       "redactSecretKeys": true
-    }
+    },
+    "blackBoxCompleteness": "max-v1",
+    "deepTelemetry": [
+      "mesh-resource-material-inventory",
+      "gpu-memory-estimates",
+      "draw-triangle-index-vertex-stats",
+      "shader-compile-link-logs",
+      "webgl-error-history",
+      "context-loss-history",
+      "wasm-abi-memory-exports-source-manifest-artifact-sha256",
+      "native-failure-history",
+      "frame-subsystem-timings",
+      "network-failures-timings",
+      "console-warning-error-history",
+      "storage-quota-cache-service-worker",
+      "module-cache-versions",
+      "device-capabilities",
+      "asset-scene-provider-hooks"
+    ]
   }
 }

@@ -6,6 +6,7 @@ const LAST_CRASH_KEY = 'ironvale:diagnostics:last-crash:v1';
 const SETTINGS_KEY = 'ironvale:diagnostics:settings:v1';
 const MAX_EVENTS = 160;
 const MAX_NETWORK_EVENTS = 120;
+const MAX_CONSOLE_EVENTS = 120;
 const MAX_STRING = 120000;
 const REDACTED_KEY = /(pass(word)?|token|secret|cookie|authorization|session|credential|api[-_]?key)/i;
 
@@ -25,6 +26,8 @@ function safeError(error) {
 function sanitizeString(value) {
   let text = String(value);
   if (text.length > MAX_STRING) text = text.slice(0, MAX_STRING) + '…[truncated]';
+  text = text.replace(/((?:password|token|secret|authorization|api[-_]?key)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]');
+  text = text.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, 'Bearer [REDACTED]');
   if (/^https?:\/\//i.test(text)) {
     try {
       const url = new URL(text);
@@ -90,6 +93,7 @@ export class RiftDiagnostics {
     this.intervalMs = Math.max(2000, Math.trunc(Number(options.intervalMs) || 5000));
     this.events = [];
     this.networkEvents = [];
+    this.consoleEvents = [];
     this.providers = new Map();
     this.lastValidation = null;
     this.timer = 0;
@@ -105,6 +109,7 @@ export class RiftDiagnostics {
     };
     this._nativeFetch = null;
     this._fetchWrapper = null;
+    this._consoleOriginals = null;
   }
 
   _installFetchTelemetry() {
@@ -145,6 +150,34 @@ export class RiftDiagnostics {
 
   getNetworkTelemetry() { return sanitize(this.networkEvents); }
 
+  _recordConsole(level, args) {
+    const values = Array.from(args || []).slice(0, 8).map(value => value instanceof Error ? safeError(value) : sanitize(value));
+    this.consoleEvents.push({ at: isoNow(), level, values });
+    if (this.consoleEvents.length > MAX_CONSOLE_EVENTS) this.consoleEvents.splice(0, this.consoleEvents.length - MAX_CONSOLE_EVENTS);
+  }
+
+  _installConsoleTelemetry() {
+    if (this._consoleOriginals || !globalThis.console) return;
+    this._consoleOriginals = {};
+    for (const level of ['warn', 'error']) {
+      if (typeof console[level] !== 'function') continue;
+      const original = console[level];
+      this._consoleOriginals[level] = original;
+      console[level] = (...args) => { this._recordConsole(level, args); return original.apply(console, args); };
+    }
+  }
+
+  _restoreConsoleTelemetry() {
+    if (!this._consoleOriginals) return;
+    for (const [level, original] of Object.entries(this._consoleOriginals)) console[level] = original;
+    this._consoleOriginals = null;
+  }
+
+  getConsoleTelemetry(deep = true) {
+    const events = deep ? this.consoleEvents : this.consoleEvents.slice(-30);
+    return { total: this.consoleEvents.length, warnings: this.consoleEvents.filter(item => item.level === 'warn').length, errors: this.consoleEvents.filter(item => item.level === 'error').length, events: sanitize(events) };
+  }
+
   registerProvider(name, provider) {
     const key = String(name || '').trim().slice(0, 80);
     if (!key || typeof provider !== 'function') throw new Error('Diagnostic provider requires a name and function.');
@@ -181,6 +214,7 @@ export class RiftDiagnostics {
     window.addEventListener('error', this._errorHandler);
     window.addEventListener('unhandledrejection', this._rejectionHandler);
     this._installFetchTelemetry();
+    this._installConsoleTelemetry();
     this._restartTimer();
     queueMicrotask(() => { void this.runValidation('startup'); });
     return this;
@@ -194,6 +228,7 @@ export class RiftDiagnostics {
     window.removeEventListener('error', this._errorHandler);
     window.removeEventListener('unhandledrejection', this._rejectionHandler);
     this._restoreFetchTelemetry();
+    this._restoreConsoleTelemetry();
   }
 
   _restartTimer() {
@@ -269,6 +304,7 @@ export class RiftDiagnostics {
       dump.layers.l2Runtime = {
         ...(snapshot?.runtime || {}),
         network: sanitize(this.networkEvents.slice(-24)),
+        console: this.getConsoleTelemetry(false),
         subsystemProviders: await this._collectProviders(2),
         recentEvents: sanitize(this.events.slice(-50))
       };
@@ -277,6 +313,7 @@ export class RiftDiagnostics {
       dump.layers.l3Deep = {
         ...(snapshot?.deep || {}),
         network: sanitize(this.networkEvents),
+        console: this.getConsoleTelemetry(true),
         subsystemProviders: await this._collectProviders(3),
         recentEvents: sanitize(this.events.slice(-MAX_EVENTS))
       };

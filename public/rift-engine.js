@@ -265,7 +265,7 @@ export class RiftEngine {
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
     gl.texImage2D(gl.TEXTURE_2D,0,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,image);
-    gl.generateMipmap(gl.TEXTURE_2D);gl.bindTexture(gl.TEXTURE_2D,null);this.textures.add(texture);const width=Math.max(1,Number(image.width||image.videoWidth)||1),height=Math.max(1,Number(image.height||image.videoHeight)||1);this.textureInfo.set(texture,{id:'tex-'+this._resourceSequence++,width,height,srgb:Boolean(srgb),mipmapped:true,estimatedBytes:mipEstimateBytes(width,height)});return texture;
+    gl.generateMipmap(gl.TEXTURE_2D);gl.bindTexture(gl.TEXTURE_2D,null);this.textures.add(texture);const width=Math.max(1,Number(image.width||image.videoWidth)||1),height=Math.max(1,Number(image.height||image.videoHeight)||1);this.textureInfo.set(texture,{id:'tex-'+this._resourceSequence++,width,height,srgb:Boolean(srgb),format:srgb?'SRGB8_ALPHA8':'RGBA8',mipmapped:true,estimatedBytes:mipEstimateBytes(width,height)});return texture;
   }
 
   createTextureArray(width,height,layers,{srgb=false}={}){
@@ -275,7 +275,7 @@ export class RiftEngine {
     gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
     gl.texStorage3D(gl.TEXTURE_2D_ARRAY,levels,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,w,h,depth);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
-    const resource={texture,width:w,height:h,layers:depth,levels,srgb:Boolean(srgb),diagnosticId:'tex-array-'+this._resourceSequence++,estimatedBytes:mipEstimateBytes(w,h,depth)};this.textureArrays.add(resource);return resource;
+    const resource={texture,width:w,height:h,layers:depth,levels,srgb:Boolean(srgb),format:srgb?'SRGB8_ALPHA8':'RGBA8',mipmapped:levels>1,diagnosticId:'tex-array-'+this._resourceSequence++,estimatedBytes:mipEstimateBytes(w,h,depth)};this.textureArrays.add(resource);return resource;
   }
   fillTextureArrayLayer(resource,layer,rgba){
     if(!resource||!this.textureArrays.has(resource))return;
@@ -349,7 +349,7 @@ export class RiftEngine {
   }
   getViewport(){return this.viewport}
   render(){
-    const renderStarted=performance.now();let drawCalls=0,triangles=0,indices=0,visibleMeshes=0;
+    const renderStarted=performance.now();let drawCalls=0,triangles=0,indices=0,vertexBufferVertices=0,visibleMeshes=0;
     const gl=this.gl;const viewport=this.resize();const aspect=viewport.aspect;perspective(this.projection,this.camera.fov,aspect,this.camera.near,this.camera.far);lookAt(this.view,this.camera.position,this.camera.target);const clear=this.environment.clear;
     gl.clearColor(clear[0],clear[1],clear[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.locations.projection,false,this.projection);gl.uniformMatrix4fv(this.locations.view,false,this.view);gl.uniform3fv(this.locations.light,this.environment.light);gl.uniform3fv(this.locations.fogColor,this.environment.fog);gl.uniform1f(this.locations.fogNear,this.environment.fogNear);gl.uniform1f(this.locations.fogFar,this.environment.fogFar);gl.uniform3fv(this.locations.camera,this.camera.position);gl.uniform1i(this.locations.baseColorTexture,0);gl.uniform1i(this.locations.jointMatrices,1);gl.uniform1i(this.locations.terrainAlbedoArray,2);gl.uniform1i(this.locations.terrainNormalArray,3);gl.uniform1i(this.locations.terrainRoughnessArray,4);
     gl.vertexAttrib2f(3,0,0);gl.vertexAttrib4f(4,0,0,0,0);gl.vertexAttrib4f(5,1,0,0,0);gl.vertexAttrib4f(6,1,0,0,0);gl.vertexAttrib2f(7,0,0);
@@ -364,19 +364,19 @@ export class RiftEngine {
         gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.normalArray.texture);
         gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.roughnessArray.texture);
       }
-      gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0);drawCalls+=1;visibleMeshes+=1;indices+=mesh.count;triangles+=Math.floor(mesh.count/3)
+      gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0);drawCalls+=1;visibleMeshes+=1;indices+=mesh.count;vertexBufferVertices+=mesh.vertexCount||0;triangles+=Math.floor(mesh.count/3)
     }
     gl.bindVertexArray(null);for(const unit of [4,3,2]){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D_ARRAY,null)}gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
-    this._telemetry.frameNumber+=1;this._telemetry.lastFrame={at:new Date().toISOString(),renderMs:performance.now()-renderStarted,drawCalls,visibleMeshes,triangles,indices};if(this._telemetry.frameNumber%60===0)this._captureGlErrors('render');
+    this._telemetry.frameNumber+=1;this._telemetry.lastFrame={at:new Date().toISOString(),renderMs:performance.now()-renderStarted,drawCalls,visibleMeshes,triangles,indices,vertexBufferVertices,vertexMetricNote:'Unique vertex records in buffers submitted by visible indexed meshes; exact post-transform GPU invocations are not exposed by WebGL.'};if(this._telemetry.frameNumber%60===0)this._captureGlErrors('render');
   }
   _captureGlErrors(source='runtime'){
     const gl=this.gl;if(!gl||gl.isContextLost?.())return;for(let index=0;index<8;index+=1){const code=gl.getError();if(code===gl.NO_ERROR)break;this._telemetry.glErrors.push({at:new Date().toISOString(),source,code,name:glErrorName(gl,code)});}if(this._telemetry.glErrors.length>80)this._telemetry.glErrors.splice(0,this._telemetry.glErrors.length-80);
   }
   getDiagnostics(deep=false){
     const textureLookup=this.textureInfo;
-    const meshes=[...this.meshes].map(mesh=>({id:mesh.diagnosticId,kind:mesh.kind,label:mesh.label,visible:Boolean(mesh.visible),position:[...mesh.position],yaw:mesh.yaw,scale:[...mesh.scale],bounds:mesh.bounds,vertexCount:mesh.vertexCount,indexCount:mesh.count,triangles:Math.floor(mesh.count/3),vertexBytes:mesh.vertexBytes,indexBytes:mesh.indexBytes,stride:mesh.stride,attributes:Object.keys(mesh.attributes||{}),textureId:textureLookup.get(mesh.texture)?.id||null,skinId:mesh.skin?.diagnosticId||null,terrainMaterial:Boolean(mesh.terrainMaterial)}));
+    const meshes=[...this.meshes].map(mesh=>({id:mesh.diagnosticId,kind:mesh.kind,label:mesh.label,visible:Boolean(mesh.visible),position:[...mesh.position],yaw:mesh.yaw,scale:[...mesh.scale],bounds:mesh.bounds,vertexCount:mesh.vertexCount,indexCount:mesh.count,triangles:Math.floor(mesh.count/3),vertexBytes:mesh.vertexBytes,indexBytes:mesh.indexBytes,stride:mesh.stride,attributes:Object.keys(mesh.attributes||{}),textureId:textureLookup.get(mesh.texture)?.id||null,skinId:mesh.skin?.diagnosticId||null,terrainMaterial:Boolean(mesh.terrainMaterial),material:{baseColorFactor:[...mesh.baseColorFactor],tint:[...mesh.tint],textureId:textureLookup.get(mesh.texture)?.id||null,terrain:Boolean(mesh.terrainMaterial)}}));
     const textures=[...textureLookup.values()].map(info=>({...info}));
-    const textureArrays=[...this.textureArrays].map(resource=>({id:resource.diagnosticId,width:resource.width,height:resource.height,layers:resource.layers,levels:resource.levels,srgb:resource.srgb,estimatedBytes:resource.estimatedBytes}));
+    const textureArrays=[...this.textureArrays].map(resource=>({id:resource.diagnosticId,width:resource.width,height:resource.height,layers:resource.layers,levels:resource.levels,srgb:resource.srgb,format:resource.format|| (resource.srgb?'SRGB8_ALPHA8':'RGBA8'),mipmapped:resource.mipmapped!==false,estimatedBytes:resource.estimatedBytes}));
     const skins=[...this.skins].map(skin=>({id:skin.diagnosticId,jointCount:skin.jointCount,estimatedBytes:skin.estimatedBytes}));
     const meshBytes=meshes.reduce((sum,item)=>sum+(item.vertexBytes||0)+(item.indexBytes||0),0),textureBytes=textures.reduce((sum,item)=>sum+(item.estimatedBytes||0),0),arrayBytes=textureArrays.reduce((sum,item)=>sum+(item.estimatedBytes||0),0),skinBytes=skins.reduce((sum,item)=>sum+(item.estimatedBytes||0),0);
     const program={linked:Boolean(this.gl.getProgramParameter(this.program,this.gl.LINK_STATUS)),activeAttributes:this.gl.getProgramParameter(this.program,this.gl.ACTIVE_ATTRIBUTES),activeUniforms:this.gl.getProgramParameter(this.program,this.gl.ACTIVE_UNIFORMS)};
