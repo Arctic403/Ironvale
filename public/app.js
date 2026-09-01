@@ -2,10 +2,10 @@ import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260
 import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
-import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-engine-blackbox-r1';
+import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r2';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-scale-contract-r1';
 
-const APP_DIAGNOSTIC_BUILD = '20260901-engine-blackbox-r1';
+const APP_DIAGNOSTIC_BUILD = '20260901-diagnostic-gzip-r2';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -168,6 +168,8 @@ diagnostics.registerProvider('native', level => terrain?.getNativeDiagnostics?.(
 window.IronvaleDiagnostics = Object.freeze({
   validate: () => diagnostics.runValidation('api'),
   dump: level => diagnostics.exportDump(level || 2, 'api'),
+  dumpCompressed: level => diagnostics.exportCompressedDump(level || 2, 'api-compressed'),
+  compressedExportSupported: () => typeof CompressionStream === 'function',
   lastCrash: () => diagnostics.getLastCrash(),
   exportLastCrash: () => diagnostics.exportLastCrash(),
   clearLastCrash: () => { diagnostics.clearLastCrash(); refreshDiagnosticButtons(); },
@@ -269,6 +271,21 @@ diagnosticAutoButton?.addEventListener('click', () => { diagnostics.setAutoEnabl
 document.querySelectorAll('[data-diagnostic-dump]').forEach(button => button.addEventListener('click', () => {
   const level = Number(button.dataset.diagnosticDump) || 1;
   void diagnostics.exportDump(level, 'manual-tools');
+}));
+document.querySelectorAll('[data-diagnostic-compressed]').forEach(button => button.addEventListener('click', async () => {
+  const level = Number(button.dataset.diagnosticCompressed) || 1;
+  try {
+    button.disabled = true;
+    await diagnostics.exportCompressedDump(level, 'manual-tools-compressed');
+  } catch (error) {
+    diagnostics.record('dump', 'Lossless compressed export failed', { level, error }, 'error');
+    if (diagnosticStatus) {
+      diagnosticStatus.dataset.status = 'fail';
+      diagnosticStatus.textContent = String(error?.message || error || 'Compressed export failed');
+    }
+  } finally {
+    button.disabled = typeof CompressionStream !== 'function';
+  }
 }));
 diagnosticLastCrashButton?.addEventListener('click', () => diagnostics.exportLastCrash());
 authDumpButton?.addEventListener('click', () => diagnostics.exportLastCrash());
@@ -573,6 +590,11 @@ function refreshDiagnosticButtons() {
     diagnosticAutoButton.textContent = 'Auto Validator: ' + (diagnostics.autoEnabled ? 'On' : 'Off');
     diagnosticAutoButton.classList.toggle('active', diagnostics.autoEnabled);
   }
+  document.querySelectorAll('[data-diagnostic-compressed]').forEach(button => {
+    const supported = typeof CompressionStream === 'function';
+    button.disabled = !supported;
+    button.title = supported ? 'Lossless GZIP export' : 'This browser does not support CompressionStream GZIP export';
+  });
   const hasCrash = diagnostics.hasLastCrash();
   if (diagnosticLastCrashButton) diagnosticLastCrashButton.hidden = !hasCrash;
   if (authDumpButton) authDumpButton.hidden = !hasCrash;
