@@ -1,4 +1,6 @@
-export const IRONVALE_HISTORY_BRIDGE_FORMAT = 'ironvale-history-bridge-v1';
+export const IRONVALE_HISTORY_BRIDGE_FORMAT = 'ironvale-history-bridge-v2';
+
+const TERRAIN_HISTORY_FORMAT = 'rift-landscape-state-v1';
 
 const state = {
   format: IRONVALE_HISTORY_BRIDGE_FORMAT,
@@ -12,7 +14,9 @@ const state = {
   baselineRedoDepth: null,
   restored: false,
   restoreAt: null,
-  restoreError: null
+  restoreError: null,
+  filteredNonHistoryPushes: 0,
+  filteredNonHistoryPops: 0
 };
 
 let undoRef = null;
@@ -32,6 +36,11 @@ function record(message, data = null, severity = 'info') {
   try { window.IronvaleDiagnostics?.record?.('history-bridge', message, data, severity); } catch (_) {}
 }
 function cloneStack(stack) { return Array.isArray(stack) ? stack.slice() : []; }
+function isTerrainHistoryState(value) { return Boolean(value && typeof value === 'object' && value.format === TERRAIN_HISTORY_FORMAT); }
+function stackLooksLikeTerrainHistory(stack) {
+  if (!Array.isArray(stack) || stack.length === 0) return false;
+  return isTerrainHistoryState(stack[stack.length - 1]);
+}
 function currentAutoStatus() {
   try { return window.IronvaleAutoValidation?.status?.() || null; } catch (_) { return null; }
 }
@@ -46,6 +55,8 @@ function beginRun(runId) {
   state.restored = false;
   state.restoreAt = null;
   state.restoreError = null;
+  state.filteredNonHistoryPushes = 0;
+  state.filteredNonHistoryPops = 0;
   undoRef = null;
   redoRef = null;
   baselineUndo = [];
@@ -62,23 +73,35 @@ function installArrayHooks() {
   arrayHooksInstalled = true;
   nativePush = Array.prototype.push;
   nativePop = Array.prototype.pop;
+
   Array.prototype.push = function ironvaleHistoryPush(...items) {
-    if (state.active && operationPhase === 'undo') {
-      redoRef = this;
-      state.redoCaptured = true;
-    } else if (state.active && operationPhase === 'redo') {
-      undoRef = this;
-      state.undoCaptured = true;
+    const terrainHistoryPush = items.some(isTerrainHistoryState);
+    if (state.active && operationPhase && terrainHistoryPush) {
+      if (operationPhase === 'undo') {
+        redoRef = this;
+        state.redoCaptured = true;
+      } else if (operationPhase === 'redo') {
+        undoRef = this;
+        state.undoCaptured = true;
+      }
+    } else if (state.active && operationPhase && !terrainHistoryPush) {
+      state.filteredNonHistoryPushes += 1;
     }
     return nativePush.apply(this, items);
   };
+
   Array.prototype.pop = function ironvaleHistoryPop() {
-    if (state.active && operationPhase === 'undo') {
-      undoRef = this;
-      state.undoCaptured = true;
-    } else if (state.active && operationPhase === 'redo') {
-      redoRef = this;
-      state.redoCaptured = true;
+    const terrainHistoryPop = stackLooksLikeTerrainHistory(this);
+    if (state.active && operationPhase && terrainHistoryPop) {
+      if (operationPhase === 'undo') {
+        undoRef = this;
+        state.undoCaptured = true;
+      } else if (operationPhase === 'redo') {
+        redoRef = this;
+        state.redoCaptured = true;
+      }
+    } else if (state.active && operationPhase && !terrainHistoryPop) {
+      state.filteredNonHistoryPops += 1;
     }
     return nativePop.call(this);
   };
@@ -140,12 +163,13 @@ function captureBaselineFromIntegrity(integrity) {
   if (redoDepth === 0) baselineRedo = [];
 
   const depthMatches = (!undoRef || undoRef.length === undoDepth) && (!redoRef || redoRef.length === redoDepth);
-  record('Captured auto-test history baseline', {
+  record('Captured auto-test terrain history baseline', {
     runId: state.runId,
     undoDepth,
     redoDepth,
     undoRef: Boolean(undoRef),
     redoRef: Boolean(redoRef),
+    terrainHistoryFormat: TERRAIN_HISTORY_FORMAT,
     depthMatches
   }, depthMatches ? 'info' : 'warn');
 }
@@ -155,26 +179,28 @@ function restoreHistory() {
       undoRef.length = 0;
       if (baselineUndo.length) nativePush.apply(undoRef, baselineUndo);
     } else if ((state.baselineUndoDepth || 0) !== 0) {
-      throw new Error('Undo stack reference was not captured');
+      throw new Error('Undo terrain-history stack reference was not captured');
     }
     if (redoRef) {
       redoRef.length = 0;
       if (baselineRedo.length) nativePush.apply(redoRef, baselineRedo);
     } else if ((state.baselineRedoDepth || 0) !== 0) {
-      throw new Error('Redo stack reference was not captured');
+      throw new Error('Redo terrain-history stack reference was not captured');
     }
     state.restored = true;
     state.restoreAt = isoNow();
     state.restoreError = null;
-    record('Restored exact pre-test undo/redo history', {
+    record('Restored exact pre-test terrain undo/redo history before integrity snapshot', {
       runId: state.runId,
       undoDepth: undoRef?.length ?? state.baselineUndoDepth,
-      redoDepth: redoRef?.length ?? state.baselineRedoDepth
+      redoDepth: redoRef?.length ?? state.baselineRedoDepth,
+      filteredNonHistoryPushes: state.filteredNonHistoryPushes,
+      filteredNonHistoryPops: state.filteredNonHistoryPops
     });
   } catch (error) {
     state.restored = false;
     state.restoreError = short(error);
-    record('Failed to restore exact pre-test history', { runId: state.runId, error: state.restoreError }, 'error');
+    record('Failed to restore exact pre-test terrain history', { runId: state.runId, error: state.restoreError }, 'error');
   }
 }
 function wrapValidatorGuard() {
@@ -195,11 +221,13 @@ function wrapValidatorGuard() {
         try { captureBaselineFromIntegrity(integrity); }
         catch (error) {
           state.restoreError = `baseline capture: ${short(error)}`;
-          record('History baseline probe failed', { runId: state.runId, error: state.restoreError }, 'warn');
+          record('Terrain history baseline probe failed', { runId: state.runId, error: state.restoreError }, 'warn');
         }
         return integrity;
       }
 
+      // Critical ordering: exact history is restored BEFORE the auto validator reads
+      // undoDepth/redoDepth for its post-test integrity comparison.
       restoreHistory();
       const integrity = await nativeCaptureIntegrity(...args);
       if (state.captureCount >= 2) finishRun();
@@ -217,7 +245,14 @@ function registerProvider() {
     ...state,
     currentUndoDepth: undoRef?.length ?? null,
     currentRedoDepth: redoRef?.length ?? null,
-    policy: { exactBaselineRestore: true, terrainStateUntouchedByBridge: true, arrayHooksOnlyDuringAutoRun: true }
+    policy: {
+      exactBaselineRestore: true,
+      restoreBeforeIntegritySnapshot: true,
+      terrainStateUntouchedByBridge: true,
+      terrainHistoryFormat: TERRAIN_HISTORY_FORMAT,
+      ignoresDiagnosticJournalArrays: true,
+      arrayHooksOnlyDuringAutoRun: true
+    }
   }));
   providerRegistered = true;
 }
