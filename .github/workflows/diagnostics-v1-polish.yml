@@ -1,0 +1,48 @@
+name: Diagnostics V1 Polish
+
+on:
+  push:
+    branches: [diagnostics-v1]
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: diagnostics-v1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Polish runtime diagnostics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('public/rift-diagnostics.js')
+          s = p.read_text()
+          old = "const reduced = structuredClone ? structuredClone(dump) : JSON.parse(json);"
+          new = "const reduced = typeof structuredClone === 'function' ? structuredClone(dump) : JSON.parse(json);"
+          if old not in s: raise SystemExit('missing structuredClone anchor')
+          p.write_text(s.replace(old,new,1))
+
+          p = Path('public/app.js')
+          s = p.read_text()
+          old = "diagnosticCheck('character.visual', Boolean(playerCharacter?.meshes?.length), playerCharacter?.meshes?.length ? 'Rigged visual active' : 'Capsule fallback active', 'warn')"
+          new = "diagnosticCheck('character.visual', Boolean(playerMesh), playerCharacter?.meshes?.length ? 'Rigged visual active' : playerMesh ? 'Fallback/player visual active' : 'No player visual')"
+          if old not in s: raise SystemExit('missing character validation anchor')
+          p.write_text(s.replace(old,new,1))
+          PY
+      - name: Verify full Ironvale build
+        run: npm run build
+      - name: Commit diagnostics polish
+        run: |
+          rm -f .github/workflows/diagnostics-v1-polish.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Polish diagnostic validator runtime behavior'
+          git push origin HEAD:diagnostics-v1
