@@ -3,6 +3,7 @@ import fs from 'node:fs';
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const index = read('public/index.html');
 const app = read('public/app.js');
+const autoValidation = read('public/rift-auto-validation.js');
 const geometryGuard = read('public/rift-geometry-guard.js');
 const glTripwire = read('public/rift-gl-tripwire.js');
 const historyBridge = read('public/rift-history-bridge.js');
@@ -33,12 +34,28 @@ assert(app.includes('const d = (ring + 1) * radial + next;'), 'fallback capsule 
 assert(app.includes("IRONVALE_EDITOR_HISTORY_FORMAT = 'ironvale-editor-history-runtime-v1'"), 'explicit editor history runtime format missing');
 assert(app.includes('window.IronvaleEditorHistory = Object.freeze'), 'explicit editor history runtime API missing');
 assert(app.includes('captureEditorHistory') && app.includes('restoreEditorHistory'), 'editor history capture/restore API incomplete');
+assert(app.includes("IRONVALE_PLAYER_STATE_FORMAT = 'ironvale-player-state-runtime-v1'"), 'explicit player-state runtime format missing');
+assert(app.includes('window.IronvalePlayerState = Object.freeze'), 'explicit player-state runtime API missing');
+assert(app.includes('restorePlayerState') && app.includes('playerStateSnapshot'), 'player-state capture/restore API incomplete');
 
+assert(geometryGuard.includes("IRONVALE_GEOMETRY_GUARD_FORMAT = 'ironvale-geometry-guard-v2'"), 'geometry guard v2 missing');
 assert(geometryGuard.includes("CAPSULE_LABEL = 'player-capsule'"), 'fallback capsule safety-net target missing');
 assert(geometryGuard.includes('const d = (ring + 1) * CAPSULE_RADIAL + next'), 'capsule safety-net seam repair missing');
 assert(geometryGuard.includes('index >= vertexCount'), 'generic out-of-bounds index rejection missing');
 assert(geometryGuard.includes('IRONVALE_GEOMETRY_INDEX_OOB'), 'descriptive geometry bounds error missing');
+assert(geometryGuard.includes('validateOrRepair'), 'geometry guard must validate before deciding to repair');
+assert(geometryGuard.includes("error?.code !== 'IRONVALE_GEOMETRY_INDEX_OOB'"), 'legacy capsule repair must require a real bounds failure');
+assert(geometryGuard.includes('validateBeforeRepair: true'), 'geometry guard validate-first policy missing');
+assert(geometryGuard.includes('repairsKnownLegacyFallbackCapsuleOnlyWhenInvalid: true'), 'geometry safety repair must stay invalid-only');
+assert(geometryGuard.includes('healthyGeometryRepairCountMustStayZero: true'), 'healthy geometry zero-repair policy missing');
 assert(geometryGuard.includes('rejectsOutOfBoundsIndicesBeforeWebGL: true'), 'geometry guard policy assertion missing');
+
+assert(autoValidation.includes('restorePlayerBaseline'), 'auto validator exact player restoration helper missing');
+assert(autoValidation.includes("window.IronvalePlayerState?.capture?.('auto-validation')"), 'auto validator must capture the pre-test player transform');
+assert(autoValidation.includes('state.playerRestoration = await restorePlayerBaseline(playerBaseline)'), 'auto validator must restore player before integrity comparison');
+assert(autoValidation.includes('Number(r.playerDistance) <= 0.001'), 'post-test integrity must require effectively zero player drift');
+assert(autoValidation.includes('restoresPlayerTransformExactly: true'), 'auto validator exact-player policy missing');
+assert(autoValidation.includes('restoresRealtimeAuthorityBeforeCheckpoint: true'), 'auto validator must restore realtime authority before the checkpoint');
 
 assert(glTripwire.includes("dormantUntilPeriodicError: true"), 'tripwire must remain dormant until a periodic GL error');
 assert(glTripwire.includes("tripwire:render") === false, 'tripwire telemetry source must identify exact operations, not a generic render source');
