@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { validateWorldScaleContract, resolveAssetScale, RIFT_REFERENCE_CHARACTER_HEIGHT_METERS } from '../public/rift-scale.js';
 
 const forbidden = [
   'public/wasm','src/wasm','public/builder','public/editor','public/rift-world-blocks',
@@ -19,6 +20,17 @@ if (fs.existsSync('public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.t
 
 const world = JSON.parse(fs.readFileSync('public/world/ironvale-terrain.json', 'utf8'));
 if (world.format !== 'rift-world-v1') failures.push('world format');
+const worldScaleValidation = validateWorldScaleContract(world);
+if (!worldScaleValidation.ok) failures.push(`world scale contract: ${worldScaleValidation.errors.join('; ')}`);
+if (world.metadata?.assetScaleContract !== true || world.metadata?.assetScaleSchemaVersion !== 1) failures.push('asset scale metadata');
+if (RIFT_REFERENCE_CHARACTER_HEIGHT_METERS !== 1.82) failures.push('reference character scale');
+const meterAssetScale = resolveAssetScale({ units: 'meters' });
+if (meterAssetScale.authoredToWorldScale !== 1 || JSON.stringify(meterAssetScale.finalScale) !== JSON.stringify([1,1,1])) failures.push('meter-authored asset scale preservation');
+const centimeterAssetScale = resolveAssetScale({ units: 'centimeters' });
+if (Math.abs(centimeterAssetScale.authoredToWorldScale - 0.01) > 1e-9) failures.push('explicit centimeter asset conversion');
+let rejectedUnknownAssetUnits = false;
+try { resolveAssetScale({ units: 'mystery-units' }); } catch { rejectedUnknownAssetUnits = true; }
+if (!rejectedUnknownAssetUnits) failures.push('unknown asset units must not be guessed');
 if (world.terrain?.format !== 'rift-terrain-v1') failures.push('terrain format');
 if (world.metadata?.legacyBlocks !== false || world.metadata?.voxelGrid !== false) failures.push('terrain metadata');
 if (world.metadata?.blankCanvas !== true) failures.push('terrain must boot as blank canvas');
@@ -43,6 +55,7 @@ if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('
 const app = fs.readFileSync('public/app.js', 'utf8');
 if (!app.includes('function updateTerrainLod(') || !app.includes('terrain.planSectionLods(')) failures.push('adaptive terrain LOD controller');
 if (!app.includes("import { RiftLandscape } from './rift-landscape.js?v=") || !app.includes('new RiftLandscape(worldDocument.terrain)')) failures.push('RiftLandscape runtime integration');
+if (!app.includes("import { validateWorldScaleContract } from './rift-scale.js?v=") || !app.includes('validateWorldScaleContract(worldDocument)')) failures.push('world scale runtime validation');
 if (!app.includes("ironvale:terrain:draft:v4") || !app.includes('serializeLandscapeEdits') || !app.includes('captureEditState')) failures.push('layer-aware terrain persistence/undo');
 if (!app.includes('refreshTerrainLayerControls') || !app.includes("$('#terrain-edit-layer')")) failures.push('terrain edit layer controls');
 if (!app.includes('function rebuildDirtyTerrainSections(')) failures.push('dirty terrain section rebuilds');
@@ -87,6 +100,9 @@ if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !s
 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
 if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
+if (!characterRuntime.includes('RIFT_REFERENCE_CHARACTER_HEIGHT_METERS') || characterRuntime.includes('const TARGET_HEIGHT = 1.82;')) failures.push('character/world scale source of truth');
+const scaleRuntime = fs.readFileSync('public/rift-scale.js', 'utf8');
+if (!scaleRuntime.includes("RIFT_ASSET_SCALE_FORMAT = 'rift-asset-scale-v1'") || !scaleRuntime.includes('resolveAssetScale(') || !scaleRuntime.includes('auto-guessing')) failures.push('asset scale normalization runtime');
 if (!characterRuntime.includes('DEFAULT_CHARACTER_MODEL_URL') || !characterRuntime.includes("cache: 'no-cache'")) failures.push('character cache-safe loading');
 if (!characterRuntime.includes('accessor.bufferView != null') || !characterRuntime.includes('if (accessor.sparse)') || !characterRuntime.includes('sparse.indices') || !characterRuntime.includes('sparse.values')) failures.push('glTF zero-base/sparse accessor support');
 const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');

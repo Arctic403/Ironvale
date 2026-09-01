@@ -1,7 +1,8 @@
 import { RiftEngine } from './rift-engine.js?v=20260901-terrain-lock-r3';
 import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
-import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';
+import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
+import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-scale-contract-r1';
 
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
@@ -315,6 +316,8 @@ async function startWorld(url) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Terrain failed to load (${response.status})`);
   worldDocument = await response.json();
+  const worldScaleValidation = validateWorldScaleContract(worldDocument);
+  if (!worldScaleValidation.ok) throw new Error(`World scale validation failed: ${worldScaleValidation.errors.join('; ')}`);
   terrain = new RiftLandscape(worldDocument.terrain);
   const terrainValidation = terrain.validateLandscape?.();
   if (terrainValidation && !terrainValidation.ok) throw new Error(`Terrain validation failed: ${terrainValidation.errors.join('; ')}`);

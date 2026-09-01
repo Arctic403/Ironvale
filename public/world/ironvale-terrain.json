@@ -211,6 +211,31 @@
     "terrainLayerManagement": true,
     "terrainDebugOverlay": true,
     "terrainFoundationLocked": true,
-    "terrainSchemaVersion": 3
+    "terrainSchemaVersion": 3,
+    "assetScaleContract": true,
+    "assetScaleSchemaVersion": 1
+  },
+  "scale": {
+    "format": "rift-scale-v1",
+    "worldUnits": "meters",
+    "metersPerWorldUnit": 1,
+    "referenceCharacterHeightMeters": 1.82,
+    "referenceColliderHeightMeters": 1.8,
+    "assetPolicy": {
+      "format": "rift-asset-scale-v1",
+      "gltfDefaultUnits": "meters",
+      "preserveAuthoredScale": true,
+      "autoGuessScale": false,
+      "allowMetadataUnitConversion": true,
+      "allowMetadataCorrectionScale": true,
+      "defaultCorrectionScale": 1,
+      "placementScaleDefault": [
+        1,
+        1,
+        1
+      ],
+      "allowNonUniformPlacementScale": true,
+      "characterPolicy": "normalize-to-reference-height"
+    }
   }
 }

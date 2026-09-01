@@ -1,9 +1,11 @@
+import { RIFT_REFERENCE_CHARACTER_HEIGHT_METERS } from './rift-scale.js?v=20260901-scale-contract-r1';
+
 const GLB_MAGIC = 0x46546c67;
 const GLB_JSON = 0x4e4f534a;
 const GLB_BIN = 0x004e4942;
 const TYPE_COMPONENTS = Object.freeze({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 });
 const COMPONENT_BYTES = Object.freeze({ 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 });
-const TARGET_HEIGHT = 1.82;
+const TARGET_HEIGHT = RIFT_REFERENCE_CHARACTER_HEIGHT_METERS;
 const CHARACTER_STRIDE = 19;
 const DEFAULT_CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const DEFAULT_CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
