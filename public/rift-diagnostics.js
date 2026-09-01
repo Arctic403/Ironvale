@@ -17,26 +17,28 @@ function clampLevel(value) { return Math.max(1, Math.min(3, Math.trunc(Number(va
 function safeError(error) {
   if (!error) return null;
   return {
-    name: String(error.name || 'Error').slice(0, 120),
-    message: String(error.message || error || 'unknown error').slice(0, 4000),
-    stack: String(error.stack || '').slice(0, 12000)
+    name: sanitizeString(error.name || 'Error').slice(0, 120),
+    message: sanitizeString(error.message || error || 'unknown error').slice(0, 4000),
+    stack: sanitizeString(error.stack || '').slice(0, 12000)
   };
+}
+
+function sanitizeUrl(raw) {
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    for (const key of [...url.searchParams.keys()]) if (REDACTED_KEY.test(key)) url.searchParams.set(key, '[REDACTED]');
+    return url.href;
+  } catch (_) { return raw; }
 }
 
 function sanitizeString(value) {
   let text = String(value);
   if (text.length > MAX_STRING) text = text.slice(0, MAX_STRING) + '…[truncated]';
-  text = text.replace(/((?:password|token|secret|authorization|api[-_]?key)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]');
+  text = text.replace(/((?:pass(?:word)?|token|secret|cookie|authorization|session|credential|api[-_]?key)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1[REDACTED]');
   text = text.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, 'Bearer [REDACTED]');
-  if (/^https?:\/\//i.test(text)) {
-    try {
-      const url = new URL(text);
-      url.username = '';
-      url.password = '';
-      for (const key of [...url.searchParams.keys()]) if (REDACTED_KEY.test(key)) url.searchParams.set(key, '[REDACTED]');
-      text = url.href;
-    } catch (_) {}
-  }
+  text = text.replace(/https?:\/\/[^\s"'<>]+/gi, match => sanitizeUrl(match));
   return text;
 }
 
@@ -279,7 +281,14 @@ export class RiftDiagnostics {
 
   async createDump(level = 1, reason = 'manual', incident = null) {
     const resolvedLevel = clampLevel(level);
-    const snapshot = sanitize(await this.snapshotProvider(resolvedLevel));
+    let snapshot = {};
+    let snapshotError = null;
+    try {
+      snapshot = sanitize(await this.snapshotProvider(resolvedLevel)) || {};
+    } catch (error) {
+      snapshotError = safeError(error);
+      this.record('diagnostics', 'Snapshot provider failed', snapshotError, 'error');
+    }
     const dump = {
       format: DIAGNOSTIC_DUMP_FORMAT,
       schemaVersion: 1,
@@ -296,6 +305,7 @@ export class RiftDiagnostics {
         note: 'Known secret-bearing keys are redacted. Authentication form values and cookies are never collected.'
       },
       validation: sanitize(this.lastValidation),
+      captureErrors: snapshotError ? [{ source: 'snapshotProvider', error: snapshotError }] : [],
       layers: {
         l1Quick: snapshot?.quick || {}
       }
@@ -323,17 +333,42 @@ export class RiftDiagnostics {
   }
 
   _storeCrash(dump) {
-    try {
-      let json = JSON.stringify(dump);
-      if (json.length > 900000) {
-        const reduced = typeof structuredClone === 'function' ? structuredClone(dump) : JSON.parse(json);
-        if (reduced.layers?.l2Runtime?.recentEvents) reduced.layers.l2Runtime.recentEvents = reduced.layers.l2Runtime.recentEvents.slice(-15);
-        reduced.storageNote = 'Automatic crash dump reduced to fit browser storage.';
-        json = JSON.stringify(reduced);
-      }
-      localStorage.setItem(LAST_CRASH_KEY, json);
-      return true;
-    } catch (_) { return false; }
+    const clone = value => typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+    const reduced = clone(dump);
+    const candidates = [dump];
+
+    if (reduced.layers?.l2Runtime?.recentEvents) reduced.layers.l2Runtime.recentEvents = reduced.layers.l2Runtime.recentEvents.slice(-15);
+    if (reduced.layers?.l2Runtime?.network) reduced.layers.l2Runtime.network = reduced.layers.l2Runtime.network.slice(-8);
+    if (reduced.layers?.l2Runtime?.console?.events) reduced.layers.l2Runtime.console.events = reduced.layers.l2Runtime.console.events.slice(-8);
+    reduced.storageNote = 'Automatic crash dump reduced for durable browser storage.';
+    candidates.push(reduced);
+
+    const minimal = {
+      format: dump?.format || DIAGNOSTIC_DUMP_FORMAT,
+      schemaVersion: dump?.schemaVersion || 1,
+      runtimeFormat: dump?.runtimeFormat || DIAGNOSTIC_RUNTIME_FORMAT,
+      level: 2,
+      levelName: 'runtime',
+      createdAt: dump?.createdAt || isoNow(),
+      reason: dump?.reason || 'automatic-crash',
+      privacy: dump?.privacy || { sanitized: true, credentialsIncluded: false },
+      validation: dump?.validation || null,
+      incident: dump?.incident || null,
+      captureErrors: dump?.captureErrors || [],
+      layers: { l1Quick: dump?.layers?.l1Quick || {} },
+      storageNote: 'Minimal automatic crash dump stored after the full runtime dump exceeded browser storage.'
+    };
+    candidates.push(minimal);
+
+    for (const candidate of candidates) {
+      try {
+        const json = JSON.stringify(candidate);
+        if (json.length > 900000 && candidate !== minimal) continue;
+        localStorage.setItem(LAST_CRASH_KEY, json);
+        return true;
+      } catch (_) {}
+    }
+    return false;
   }
 
   getLastCrash() {
