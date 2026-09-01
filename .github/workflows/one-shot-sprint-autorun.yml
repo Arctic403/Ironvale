@@ -1,0 +1,43 @@
+name: Ironvale One-shot Sprint Auto Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-shot-sprint-autorun.yml'
+      - 'scripts/apply-sprint-autorun.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply sprint and Auto Run upgrade
+        run: node scripts/apply-sprint-autorun.mjs
+      - name: Verify syntax
+        run: |
+          node --check public/app.js
+          node --check public/rift-auto-validation.js
+          node --check src/realtime-entry.js
+          node --check scripts/check-realtime-state.mjs
+      - name: Verify movement contract
+        run: node scripts/check-realtime-state.mjs
+      - name: Commit source upgrade
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/app.js public/index.html public/styles.css public/rift-auto-validation.js src/realtime-entry.js scripts/check-realtime-state.mjs
+          if git diff --cached --quiet; then
+            echo "No source upgrade required."
+            exit 0
+          fi
+          git commit -m "Add mobile sprint and Auto Run movement"
+          git push origin HEAD:main
