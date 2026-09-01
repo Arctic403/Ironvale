@@ -13,7 +13,7 @@ const HORIZONTAL_LAG_ALLOWANCE_METERS = 3.5;
 const MAX_VERTICAL_SPEED_MPS = 60;
 const VERTICAL_LAG_ALLOWANCE_METERS = 20;
 const MAX_Y_ABS = 10000;
-const REALTIME_FORMAT = 'ironvale-realtime-authority-v1';
+const REALTIME_FORMAT = 'ironvale-realtime-authority-v2';
 
 function getCookie(request, name) {
   const header = request.headers.get('cookie') || '';
@@ -149,9 +149,11 @@ async function checkpointBeforeLogout(request, env) {
   const auth = await loadSessionState(request, env);
   if (!auth) return;
   const stub = playerStateStub(env, auth.userId);
+  const headers = internalStateHeaders(auth, request);
+  headers.set('x-ironvale-checkpoint-reason', 'logout');
   await stub.fetch(new Request('https://player-state/checkpoint', {
     method: 'POST',
-    headers: internalStateHeaders(auth, request)
+    headers
   })).catch(() => null);
 }
 
@@ -278,7 +280,7 @@ export class PlayerState extends DurableObject {
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server, ['player']);
     server.serializeAttachment(initial);
-    await this.ensureCheckpointAlarm();
+    if (initial.dirty) await this.ensureCheckpointAlarm();
     server.send(JSON.stringify({
       type: 'hello',
       format: REALTIME_FORMAT,
@@ -408,6 +410,7 @@ export class PlayerState extends DurableObject {
     }
 
     this.applyAccepted(state, validation);
+    if (state.dirty) await this.ensureCheckpointAlarm();
     let checkpointed = false;
     if (state.dirty && validation.now - state.lastCheckpointAt >= CHECKPOINT_INTERVAL_MS) {
       checkpointed = await this.checkpointState(state, 'periodic-safety');
@@ -451,17 +454,15 @@ export class PlayerState extends DurableObject {
   }
 
   async checkpointRequest(request) {
-    let best = this.httpState;
-    for (const ws of this.ctx.getWebSockets()) {
-      try {
-        const candidate = ws.deserializeAttachment();
-        if (!candidate || candidate.superseded) continue;
-        if (!best || Number(candidate.lastAcceptedAt) > Number(best.lastAcceptedAt)) best = candidate;
-      } catch (_) {}
-    }
-    if (!best) best = this.stateFromHeaders(request);
+    const selected = this.latestAuthorityState();
+    const best = selected?.state || this.stateFromHeaders(request);
     const checkpointReason = String(request.headers.get('x-ironvale-checkpoint-reason') || 'explicit-http').slice(0, 32);
     const saved = await this.checkpointState(best, checkpointReason);
+    if (selected?.socket) {
+      try { selected.socket.serializeAttachment(best); } catch (_) {}
+    } else {
+      this.httpState = best;
+    }
     return json({ ok: true, saved, checkpointCount: best.checkpointCount || 0 });
   }
 
@@ -475,16 +476,18 @@ export class PlayerState extends DurableObject {
         this.httpState = best.state;
       }
     }
-    const hasLiveSocket = this.ctx.getWebSockets().some(ws => {
-      try { return !(ws.deserializeAttachment()?.superseded); } catch { return false; }
-    });
-    if (hasLiveSocket || this.httpState?.dirty) await this.ctx.storage.setAlarm(Date.now() + CHECKPOINT_INTERVAL_MS);
+    const remaining = this.latestAuthorityState();
+    if (remaining?.state?.dirty) await this.ctx.storage.setAlarm(Date.now() + CHECKPOINT_INTERVAL_MS);
   }
 
   async webSocketClose(ws, code, reason) {
     try {
-      const state = ws.deserializeAttachment();
-      if (state && !state.superseded) await this.checkpointState(state, 'disconnect');
+      const closing = ws.deserializeAttachment();
+      if (closing && !closing.superseded) {
+        const fallback = this.httpState && Number(this.httpState.lastAcceptedAt || 0) > Number(closing.lastAcceptedAt || 0) ? this.httpState : closing;
+        await this.checkpointState(fallback, 'disconnect');
+        if (fallback === this.httpState) this.httpState = fallback;
+      }
     } catch (error) {
       console.error('Ironvale realtime disconnect checkpoint failed', error);
     }
@@ -493,8 +496,12 @@ export class PlayerState extends DurableObject {
 
   async webSocketError(ws, error) {
     try {
-      const state = ws.deserializeAttachment();
-      if (state && !state.superseded) await this.checkpointState(state, 'socket-error');
+      const socketState = ws.deserializeAttachment();
+      if (socketState && !socketState.superseded) {
+        const fallback = this.httpState && Number(this.httpState.lastAcceptedAt || 0) > Number(socketState.lastAcceptedAt || 0) ? this.httpState : socketState;
+        await this.checkpointState(fallback, 'socket-error');
+        if (fallback === this.httpState) this.httpState = fallback;
+      }
     } catch (checkpointError) {
       console.error('Ironvale realtime socket checkpoint failed', checkpointError);
     }
