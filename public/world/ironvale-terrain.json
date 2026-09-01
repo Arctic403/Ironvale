@@ -169,7 +169,7 @@
       "activeMaterialLayer": "dirt",
       "activeSpline": null,
       "mobilePerformance": {
-        "pixelRatioMin": 1.0,
+        "pixelRatioMin": 1,
         "pixelRatioMax": 1.5,
         "adaptiveFrames": 90,
         "materialTextureSize": 512
@@ -213,7 +213,11 @@
     "terrainFoundationLocked": true,
     "terrainSchemaVersion": 3,
     "assetScaleContract": true,
-    "assetScaleSchemaVersion": 1
+    "assetScaleSchemaVersion": 1,
+    "automatedValidator": true,
+    "diagnosticDumpSystem": true,
+    "diagnosticDumpLayers": 3,
+    "diagnosticSchemaVersion": 1
   },
   "scale": {
     "format": "rift-scale-v1",
@@ -236,6 +240,35 @@
       ],
       "allowNonUniformPlacementScale": true,
       "characterPolicy": "normalize-to-reference-height"
+    }
+  },
+  "diagnostics": {
+    "format": "ironvale-diagnostics-v1",
+    "autoValidator": true,
+    "validatorIntervalMs": 5000,
+    "dumpFormat": "ironvale-diagnostic-dump-v1",
+    "layers": [
+      {
+        "level": 1,
+        "id": "quick",
+        "purpose": "compact failure summary and core state"
+      },
+      {
+        "level": 2,
+        "id": "runtime",
+        "purpose": "subsystem state, renderer, terrain, camera, player and recent events"
+      },
+      {
+        "level": 3,
+        "id": "deep",
+        "purpose": "sanitized forensic world/edit/runtime snapshot"
+      }
+    ],
+    "automaticCrashDumpLevel": 2,
+    "privacy": {
+      "includeCredentials": false,
+      "includeCookies": false,
+      "redactSecretKeys": true
     }
   }
 }

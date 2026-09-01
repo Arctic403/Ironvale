@@ -2,6 +2,7 @@ import { RiftEngine } from './rift-engine.js?v=20260901-terrain-lock-r3';
 import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
+import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostics-r1';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-scale-contract-r1';
 
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
@@ -58,6 +59,11 @@ const basicAttackButton = $('#basic-attack-button');
 const lookHint = $('.look-hint');
 const terrainDebugToggle = $('#terrain-debug-toggle');
 const terrainDebugReadout = $('#terrain-debug-readout');
+const diagnosticStatus = $('#diagnostic-status');
+const diagnosticRunButton = $('#diagnostic-run');
+const diagnosticAutoButton = $('#diagnostic-auto');
+const diagnosticLastCrashButton = $('#diagnostic-last-crash');
+const authDumpButton = $('#auth-dump-button');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
@@ -145,6 +151,23 @@ let longPressTimer = 0;
 let continuousBrushTimer = 0;
 let sculptFlattenY = null;
 
+const diagnostics = new RiftDiagnostics({
+  snapshotProvider: buildDiagnosticSnapshot,
+  validator: buildDiagnosticChecks,
+  intervalMs: 5000,
+  onValidation: refreshDiagnosticUi,
+  onCrash: () => refreshDiagnosticButtons()
+}).start();
+
+window.IronvaleDiagnostics = Object.freeze({
+  validate: () => diagnostics.runValidation('api'),
+  dump: level => diagnostics.exportDump(level || 2, 'api'),
+  lastCrash: () => diagnostics.getLastCrash(),
+  exportLastCrash: () => diagnostics.exportLastCrash(),
+  clearLastCrash: () => { diagnostics.clearLastCrash(); refreshDiagnosticButtons(); },
+  setAuto: enabled => { const value = diagnostics.setAutoEnabled(enabled); refreshDiagnosticButtons(); return value; }
+});
+
 document.querySelectorAll('[data-auth-tab]').forEach(button => button.addEventListener('click', () => {
   authMode = button.dataset.authTab;
   document.querySelectorAll('[data-auth-tab]').forEach(tab => tab.classList.toggle('active', tab === button));
@@ -230,6 +253,14 @@ moveSplinePointButton?.addEventListener('click', moveLastSplinePointToReticle);
 removeSplinePointButton?.addEventListener('click', removeLastSplinePoint);
 clearSplineButton?.addEventListener('click', clearActiveTerrainSpline);
 terrainDebugToggle?.addEventListener('click', () => setTerrainDebug(!terrainDebugEnabled));
+diagnosticRunButton?.addEventListener('click', () => { void diagnostics.runValidation('manual'); });
+diagnosticAutoButton?.addEventListener('click', () => { diagnostics.setAutoEnabled(!diagnostics.autoEnabled); refreshDiagnosticButtons(); });
+document.querySelectorAll('[data-diagnostic-dump]').forEach(button => button.addEventListener('click', () => {
+  const level = Number(button.dataset.diagnosticDump) || 1;
+  void diagnostics.exportDump(level, 'manual-tools');
+}));
+diagnosticLastCrashButton?.addEventListener('click', () => diagnostics.exportLastCrash());
+authDumpButton?.addEventListener('click', () => diagnostics.exportLastCrash());
 splineWidthInput?.addEventListener('change', updateActiveSplineSettings);
 splineFalloffInput?.addEventListener('change', updateActiveSplineSettings);
 $('#undo-terrain').addEventListener('click', undoTerrain);
@@ -287,7 +318,166 @@ setupCanvasControls();
 setupJoystick();
 refreshEditorLabels();
 updateReticleVisual();
+refreshDiagnosticUi();
+refreshDiagnosticButtons();
 bootSession();
+
+
+function diagnosticCheck(id, passed, detail = '', severity = 'error') {
+  return { id, status: passed ? 'pass' : severity === 'warn' ? 'warn' : 'fail', detail };
+}
+
+function finiteVector(values) {
+  return Array.isArray(values) && values.length >= 3 && values.slice(0, 3).every(Number.isFinite);
+}
+
+function summarizeStreamPlan(plan) {
+  if (!plan) return null;
+  return {
+    render: [...(plan.render || [])],
+    preload: [...(plan.preload || [])],
+    unloaded: [...(plan.unloaded || [])]
+  };
+}
+
+function webGlDiagnosticInfo(gl, deep = false) {
+  if (!gl) return null;
+  const read = parameter => { try { return gl.getParameter(parameter); } catch (_) { return null; } };
+  const info = {
+    contextLost: Boolean(gl.isContextLost?.()),
+    maxTextureSize: read(gl.MAX_TEXTURE_SIZE),
+    maxArrayTextureLayers: read(gl.MAX_ARRAY_TEXTURE_LAYERS),
+    maxTextureImageUnits: read(gl.MAX_TEXTURE_IMAGE_UNITS),
+    maxVertexTextureImageUnits: read(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS),
+    maxRenderbufferSize: read(gl.MAX_RENDERBUFFER_SIZE)
+  };
+  try {
+    const extension = gl.getExtension('WEBGL_debug_renderer_info');
+    if (extension) {
+      info.vendor = read(extension.UNMASKED_VENDOR_WEBGL);
+      info.renderer = read(extension.UNMASKED_RENDERER_WEBGL);
+    }
+  } catch (_) {}
+  if (deep) {
+    try { info.extensions = gl.getSupportedExtensions?.() || []; } catch (_) { info.extensions = []; }
+  }
+  return info;
+}
+
+function buildDiagnosticChecks() {
+  const checks = [
+    diagnosticCheck('browser.webgl2-api', typeof WebGL2RenderingContext !== 'undefined', 'WebGL2 API available'),
+    diagnosticCheck('runtime.scale-module', typeof validateWorldScaleContract === 'function', 'World scale validator loaded')
+  ];
+  if (!worldDocument) return checks;
+
+  const scaleValidation = validateWorldScaleContract(worldDocument);
+  const terrainValidation = terrain?.validateLandscape?.();
+  checks.push(
+    diagnosticCheck('world.scale-contract', scaleValidation.ok, scaleValidation.errors?.join('; ') || '1 unit = 1 meter'),
+    diagnosticCheck('world.terrain-runtime', Boolean(terrain), terrain ? 'RiftLandscape loaded' : 'Terrain runtime missing'),
+    diagnosticCheck('renderer.engine', Boolean(engine?.gl), engine?.gl ? 'WebGL2 engine ready' : 'Renderer missing'),
+    diagnosticCheck('renderer.context', Boolean(engine?.gl) && !engine.gl.isContextLost?.(), engine?.gl?.isContextLost?.() ? 'WebGL context lost' : 'Context active'),
+    diagnosticCheck('player.position', [player.x, player.y, player.z, player.yaw].every(Number.isFinite), 'Player transform finite'),
+    diagnosticCheck('camera.position', finiteVector(lastCameraPosition) && finiteVector(lastCameraTarget), 'Camera transform finite'),
+    diagnosticCheck('terrain.validation', terrainValidation?.ok !== false, terrainValidation?.errors?.join('; ') || 'Landscape valid'),
+    diagnosticCheck('terrain.meshes', terrainMeshes.size > 0, terrainMeshes.size + ' terrain meshes'),
+    diagnosticCheck('terrain.lod-plan', terrainLodPlan.size > 0, terrainLodPlan.size + ' planned sections'),
+    diagnosticCheck('terrain.streaming', Boolean(terrainStreamPlan?.render?.size), (terrainStreamPlan?.render?.size || 0) + ' render components'),
+    diagnosticCheck('character.visual', Boolean(playerCharacter?.meshes?.length), playerCharacter?.meshes?.length ? 'Rigged visual active' : 'Capsule fallback active', 'warn')
+  );
+  return checks;
+}
+
+async function buildDiagnosticSnapshot(level = 1) {
+  const resolvedLevel = Math.max(1, Math.min(3, Math.trunc(Number(level) || 1)));
+  const scaleValidation = worldDocument ? validateWorldScaleContract(worldDocument) : null;
+  const terrainValidation = terrain?.validateLandscape?.() || null;
+  const terrainStats = terrain?.getStats?.() || null;
+  const viewport = engine?.getViewport?.() || null;
+  const gl = engine?.gl || null;
+  const quick = {
+    app: 'Ironvale',
+    diagnostics: 'ironvale-diagnostics-v1',
+    phase: worldDocument ? 'world' : 'auth',
+    worldId: worldDocument?.id || null,
+    worldUnits: worldDocument?.units || null,
+    player: [player.x, player.y, player.z, player.yaw],
+    cameraMode: freecamEnabled ? 'freecam' : 'third-person',
+    terrainReady: Boolean(terrain),
+    rendererReady: Boolean(engine),
+    characterVisual: playerCharacter?.meshes?.length ? 'rigged' : playerMesh ? 'fallback' : 'none',
+    status: terrainStatus?.textContent || authStatus?.textContent || '',
+    userAgent: navigator.userAgent,
+    viewportCss: viewport ? [viewport.cssWidth, viewport.cssHeight] : [innerWidth, innerHeight]
+  };
+  if (resolvedLevel === 1) return { quick };
+
+  const runtime = {
+    world: worldDocument ? {
+      format: worldDocument.format, version: worldDocument.version, id: worldDocument.id, units: worldDocument.units,
+      scale: worldDocument.scale, metadata: worldDocument.metadata, terrainSize: worldDocument.terrain?.size,
+      scaleValidation
+    } : null,
+    terrain: {
+      stats: terrainStats, validation: terrainValidation, meshCount: terrainMeshes.size, lodPlanSize: terrainLodPlan.size,
+      lodSummary: terrainLodPlan.size ? lodSummary() : '', streamPlan: summarizeStreamPlan(terrainStreamPlan),
+      activeEditLayer: terrain?.activeEditLayer?.id || null, activeMaterialLayer: terrain?.activeMaterialLayer?.id || null, activeSpline: terrain?.activeSpline?.id || null
+    },
+    renderer: {
+      ready: Boolean(engine), viewport, pixelRatioCap: engine?.pixelRatioCap ?? null, meshCount: engine?.meshes?.size ?? 0,
+      textureCount: engine?.textures?.size ?? 0, textureArrayCount: engine?.textureArrays?.size ?? 0, skinCount: engine?.skins?.size ?? 0,
+      camera: engine?.camera || null, environment: engine?.environment || null, webgl: webGlDiagnosticInfo(gl, false)
+    },
+    player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw, vy: player.vy, grounded: player.grounded, moving: playerMoving },
+    character: {
+      rigged: Boolean(playerCharacter?.meshes?.length), meshCount: playerCharacter?.meshes?.length || (playerMesh ? 1 : 0),
+      rig: playerRig ? { renderHeight: playerRig.renderHeight, renderScale: playerRig.renderScale, feetAtY: playerRig.feetAtY, jointCount: playerRig.jointCount, animationClipCount: playerRig.animationClipCount, authoredForward: playerRig.authoredForward } : null
+    },
+    camera: { orbit: { ...orbitCamera }, freecam: { ...freecam }, lastPosition: [...lastCameraPosition], lastTarget: [...lastCameraTarget], profile: viewportCameraProfile },
+    performance: { averageFrameMs: terrainPerfAverageMs, approximateFps: terrainPerfAverageMs > 0 ? 1000 / terrainPerfAverageMs : null, mobileLandscape: isMobileLandscapeGameplay() },
+    editor: { freecamEnabled, brushMode, undoDepth: undoStack.length, redoDepth: redoStack.length, reticleHit, terrainDebugEnabled },
+    browser: { language: navigator.language, hardwareConcurrency: navigator.hardwareConcurrency || null, deviceMemory: navigator.deviceMemory || null, online: navigator.onLine }
+  };
+  if (resolvedLevel === 2) return { quick, runtime };
+
+  let remoteLibraryPointer = null;
+  try {
+    const response = await fetch('/assets/remote-library.json', { cache: 'no-store' });
+    remoteLibraryPointer = response.ok ? await response.json() : { error: 'HTTP ' + response.status };
+  } catch (error) {
+    remoteLibraryPointer = { error: String(error?.message || error) };
+  }
+  const draftText = localStorage.getItem(LOCAL_DRAFT_KEY);
+  const deep = {
+    worldDocument,
+    landscapeEdits: terrain?.serializeLandscapeEdits?.() || null,
+    localDraft: { key: LOCAL_DRAFT_KEY, bytes: draftText ? new TextEncoder().encode(draftText).byteLength : 0 },
+    remoteLibraryPointer,
+    renderer: { webgl: webGlDiagnosticInfo(gl, true) },
+    targeting: { registeredTargets: combatTargets.size, selectedTargetId, hardLockEnabled },
+    moduleContracts: { terrainDraft: 'v4', landscape: worldDocument?.terrain?.landscape?.format || null, scale: worldDocument?.scale?.format || null }
+  };
+  return { quick, runtime, deep };
+}
+
+function refreshDiagnosticUi(validation = diagnostics.lastValidation) {
+  if (!diagnosticStatus) return;
+  if (!validation) { diagnosticStatus.textContent = 'Validator starting…'; diagnosticStatus.dataset.status = 'idle'; return; }
+  const counts = validation.counts || { pass: 0, warn: 0, fail: 0 };
+  diagnosticStatus.dataset.status = validation.status;
+  diagnosticStatus.textContent = validation.status.toUpperCase() + ' · ' + counts.pass + ' pass · ' + counts.warn + ' warn · ' + counts.fail + ' fail';
+}
+
+function refreshDiagnosticButtons() {
+  if (diagnosticAutoButton) {
+    diagnosticAutoButton.textContent = 'Auto Validator: ' + (diagnostics.autoEnabled ? 'On' : 'Off');
+    diagnosticAutoButton.classList.toggle('active', diagnostics.autoEnabled);
+  }
+  const hasCrash = diagnostics.hasLastCrash();
+  if (diagnosticLastCrashButton) diagnosticLastCrashButton.hidden = !hasCrash;
+  if (authDumpButton) authDumpButton.hidden = !hasCrash;
+}
 
 async function bootSession() {
   try {
@@ -303,8 +493,10 @@ async function bootSession() {
     await startWorld(data.world?.url || '/world/ironvale-terrain.json');
   } catch (error) {
     console.error('Ironvale world boot failed.', error);
+    const crashDump = await diagnostics.captureCrash(error, 'world-boot').catch(() => null);
     showAuth();
-    setAuthStatus(`World boot failed: ${String(error?.message || error || 'unknown error').slice(0, 180)}`, true);
+    refreshDiagnosticButtons();
+    setAuthStatus(`World boot failed: ${String(error?.message || error || 'unknown error').slice(0, 180)}${crashDump ? ' · L2 diagnostic dump saved' : ''}`, true);
   }
 }
 
@@ -356,6 +548,9 @@ async function startWorld(url) {
   updateReticleTarget();
   const stats = terrain.getStats?.() || {};
   terrainStatus.textContent = `RiftLandscape · 640×640 · ${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · ${stats.editLayers ?? 1} edit layer${(stats.editLayers ?? 1) === 1 ? '' : 's'} · adaptive LOD`;
+  diagnostics.record('world', 'World boot completed', { worldId: worldDocument?.id, terrainMeshes: terrainMeshes.size });
+  void diagnostics.runValidation('world-boot');
+  refreshDiagnosticButtons();
   lastFrame = performance.now();
   animationFrame = requestAnimationFrame(frame);
 }
@@ -681,6 +876,7 @@ async function installRiggedPlayerVisual() {
     }
     const characterError = String(error?.message || error || 'unknown error').slice(0, 120);
     if (terrainStatus) terrainStatus.textContent = `${terrainStatus.textContent} · character fallback: ${characterError}`;
+    diagnostics.record('character', 'Rigged humanoid failed; capsule fallback active', { error }, 'warn');
     console.warn('Rigged humanoid failed to load; keeping capsule fallback.', error);
   }
 }

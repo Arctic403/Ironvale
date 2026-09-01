@@ -141,3 +141,16 @@ button{touch-action:manipulation}
   .look-hint{right:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px));transform:translateX(50%);font-size:10px}
   #world-screen.freecam .look-hint{bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px))}
 }
+
+
+/* Silent automated validator + three-layer dump controls. */
+.auth-dump-button{width:100%;min-height:40px;margin-top:8px;border:1px solid #d89c5970;border-radius:10px;background:#2b2115;color:#ffe0b3;font-weight:800}
+.diagnostic-tools{margin-top:12px;padding-top:10px;border-top:1px solid #ffffff14}
+.diagnostic-tools>strong{display:block;margin-bottom:6px;font-size:11px;color:#b8c9bc}
+.diagnostic-tools>small{display:block;margin-top:7px;color:#9fb0a3;font:700 10px/1.35 monospace;white-space:normal}
+#diagnostic-status[data-status=pass]{color:#8ed59c}
+#diagnostic-status[data-status=warn]{color:#f0c46c}
+#diagnostic-status[data-status=fail]{color:#ff9f98}
+.diagnostic-dump-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:8px}
+.diagnostic-dump-grid button{min-width:0;padding:0 5px;font-size:10px}
+#diagnostic-auto.active{border-color:#7bc58c;background:#2c5a3a}

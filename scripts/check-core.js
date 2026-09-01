@@ -48,6 +48,8 @@ if (!(Number(world.terrain?.landscape?.lodHysteresis) > 0)) failures.push('lands
 if (!world.terrain.landscape.materialLayers.every(layer => typeof layer.texture === 'string' && typeof layer.normal === 'string' && typeof layer.roughness === 'string')) failures.push('terrain PBR texture sets');
 if (world.metadata?.terrainFoundationLocked !== true || world.metadata?.terrainSchemaVersion !== 3) failures.push('terrain foundation lock metadata');
 if (world.metadata?.frustumCulling !== true || world.metadata?.componentStreamingRuntime !== true || world.metadata?.collisionLodRuntime !== true) failures.push('terrain runtime optimization metadata');
+if (world.metadata?.automatedValidator !== true || world.metadata?.diagnosticDumpSystem !== true || world.metadata?.diagnosticDumpLayers !== 3) failures.push('automated diagnostics metadata');
+if (world.diagnostics?.format !== 'ironvale-diagnostics-v1' || world.diagnostics?.dumpFormat !== 'ironvale-diagnostic-dump-v1' || world.diagnostics?.automaticCrashDumpLevel !== 2 || world.diagnostics?.layers?.length !== 3) failures.push('three-layer diagnostic dump contract');
 if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
 if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
 if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
@@ -65,6 +67,8 @@ if (!app.includes('function refreshTerrainStreamPlan(') || !app.includes('planCo
 if (!app.includes('function setTerrainDebug(') || !app.includes('createTerrainDebugOverlayGeometry')) failures.push('terrain debug overlay');
 if (!app.includes('function updateTerrainPerformance(') || !app.includes('MOBILE_TERRAIN_PIXEL_RATIO_MAX')) failures.push('mobile terrain performance controller');
 if (!app.includes('function updateActiveEditLayerName(') || !app.includes('function deleteActiveEditLayer(')) failures.push('terrain edit layer management');
+if (!app.includes("import { RiftDiagnostics } from './rift-diagnostics.js?v=") || !app.includes('buildDiagnosticSnapshot') || !app.includes('buildDiagnosticChecks') || !app.includes('window.IronvaleDiagnostics')) failures.push('automated runtime validator integration');
+if (!app.includes("diagnostics.captureCrash(error, 'world-boot')") || !app.includes('L2 diagnostic dump saved')) failures.push('automatic boot crash dump');
 if (!app.includes('function moveLastSplinePointToReticle(') || !app.includes('function removeLastSplinePoint(')) failures.push('spline point editing tools');
 if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
@@ -95,6 +99,8 @@ if (!indexHtml.includes('id="terrain-spline"') || !indexHtml.includes('id="add-s
 if (!indexHtml.includes('id="terrain-layer-name"') || !indexHtml.includes('id="terrain-layer-opacity"') || !indexHtml.includes('id="delete-terrain-edit-layer"')) failures.push('landscape layer management tools');
 if (!indexHtml.includes('id="move-spline-point"') || !indexHtml.includes('id="remove-spline-point"')) failures.push('landscape spline point tools');
 if (!indexHtml.includes('id="terrain-debug-toggle"') || !indexHtml.includes('id="terrain-debug-readout"')) failures.push('terrain debug tools');
+if (!indexHtml.includes('id="diagnostic-run"') || !indexHtml.includes('id="diagnostic-auto"') || !indexHtml.includes('data-diagnostic-dump="1"') || !indexHtml.includes('data-diagnostic-dump="2"') || !indexHtml.includes('data-diagnostic-dump="3"')) failures.push('three-layer diagnostic tools UI');
+if (!indexHtml.includes('id="auth-dump-button"')) failures.push('auth crash dump export');
 if (!styles.includes('overflow-y:auto') || !styles.includes('scrollbar-gutter:stable') || !styles.includes('.terrain-tools::-webkit-scrollbar')) failures.push('scrollable terrain tools panel');
 if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
 
@@ -111,6 +117,9 @@ if (!renderer.includes('sampler2DArray uTerrainAlbedoArray') || !renderer.includ
 if (!renderer.includes('isSphereVisible(') || !renderer.includes('setPixelRatioCap(')) failures.push('renderer culling/performance controls');
 const terrainMaterials = fs.readFileSync('public/rift-terrain-materials.js', 'utf8');
 if (!terrainMaterials.includes('class RiftTerrainMaterialRuntime') || !terrainMaterials.includes('updateTextureArrayLayer') || !terrainMaterials.includes('resizeWidth')) failures.push('terrain material streaming runtime');
+
+const diagnosticsRuntime = fs.readFileSync('public/rift-diagnostics.js', 'utf8');
+if (!diagnosticsRuntime.includes('class RiftDiagnostics') || !diagnosticsRuntime.includes('automatic-crash') || !diagnosticsRuntime.includes('l1Quick') || !diagnosticsRuntime.includes('l2Runtime') || !diagnosticsRuntime.includes('l3Deep') || !diagnosticsRuntime.includes('credentialsIncluded: false')) failures.push('three-layer sanitized diagnostics runtime');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 const landscape = fs.readFileSync('public/rift-landscape.js', 'utf8');
@@ -145,4 +154,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: RiftLandscape v2 edit layers + visible material painting + spline terrain deformation + scrollable mobile tools + component LOD hysteresis + C++/WASM terrain + RPG runtime.');
+console.log('Ironvale core verified: RiftLandscape + meter scale contract + silent automated validator + three-layer diagnostic dumps + C++/WASM terrain + RPG runtime.');

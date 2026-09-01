@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101a16">
   <title>Ironvale</title>
-  <link rel="stylesheet" href="/styles.css?v=20260901-terrain-lock-r1">
+  <link rel="stylesheet" href="/styles.css?v=20260901-diagnostics-r1">
 </head>
 <body>
   <section id="auth-screen" class="screen">
@@ -23,6 +23,7 @@
         <button id="auth-submit" type="submit">Enter Ironvale</button>
       </form>
       <div id="auth-status" role="status"></div>
+      <button id="auth-dump-button" class="auth-dump-button" type="button" hidden>Export Last Diagnostic Dump</button>
     </div>
   </section>
 
@@ -100,6 +101,19 @@
         <small id="terrain-debug-readout">Debug overlay off.</small>
       </div>
 
+      <div class="diagnostic-tools">
+        <strong>Diagnostics</strong>
+        <small id="diagnostic-status" data-status="idle">Validator starting…</small>
+        <div class="history-grid"><button id="diagnostic-run" type="button">Validate Now</button><button id="diagnostic-auto" type="button">Auto Validator: On</button></div>
+        <div class="diagnostic-dump-grid" aria-label="Diagnostic dump layers">
+          <button data-diagnostic-dump="1" type="button">L1 Quick</button>
+          <button data-diagnostic-dump="2" type="button">L2 Runtime</button>
+          <button data-diagnostic-dump="3" type="button">L3 Deep</button>
+        </div>
+        <button id="diagnostic-last-crash" class="wide" type="button" hidden>Export Last Crash</button>
+        <small>Automatic checks stay silent. Crashes save an L2 dump; L3 is the full sanitized forensic snapshot.</small>
+      </div>
+
       <label>Radius <span id="radius-value">10m</span><input id="brush-radius" type="range" min="2" max="40" step="1" value="10"></label>
       <label>Strength <span id="strength-value">0.8</span><input id="brush-strength" type="range" min="0.1" max="3" step="0.1" value="0.8"></label>
       <label>Fly Speed <span id="freecam-speed-value">14m/s</span><input id="freecam-speed" type="range" min="4" max="40" step="1" value="14"></label>
@@ -145,6 +159,6 @@
     <div class="look-hint">Swipe: look · tap enemy: target</div>
   </main>
 
-  <script type="module" src="/app.js?v=20260901-scale-contract-r1"></script>
+  <script type="module" src="/app.js?v=20260901-diagnostics-r1"></script>
 </body>
 </html>
