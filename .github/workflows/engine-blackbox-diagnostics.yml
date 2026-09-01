@@ -17,12 +17,24 @@ jobs:
           node-version: 22
       - name: Apply engine black-box patch
         run: node scripts/apply-engine-blackbox.mjs
+      - name: Fix verifier variable collision
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          let check = fs.readFileSync('scripts/check-core.js', 'utf8');
+          const duplicate = "const diagnosticsRuntime = fs.readFileSync('public/rift-diagnostics.js', 'utf8');\nconst rendererRuntime = fs.readFileSync('public/rift-engine.js', 'utf8');";
+          if (!check.includes(duplicate)) throw new Error('Expected generated verifier block not found.');
+          check = check.replace(duplicate, "const rendererRuntimeBlackBox = fs.readFileSync('public/rift-engine.js', 'utf8');");
+          check = check.replace("if (!rendererRuntime.includes('rift-engine-telemetry-v1') || !rendererRuntime.includes('getRiftEngineBootTelemetry') || !rendererRuntime.includes('getDiagnostics(deep=false)') || !rendererRuntime.includes('gpuMemoryEstimate') || !rendererRuntime.includes('_captureGlErrors')) failures.push('renderer black-box telemetry runtime');", "if (!rendererRuntimeBlackBox.includes('rift-engine-telemetry-v1') || !rendererRuntimeBlackBox.includes('getRiftEngineBootTelemetry') || !rendererRuntimeBlackBox.includes('getDiagnostics(deep=false)') || !rendererRuntimeBlackBox.includes('gpuMemoryEstimate') || !rendererRuntimeBlackBox.includes('_captureGlErrors')) failures.push('renderer black-box telemetry runtime');");
+          fs.writeFileSync('scripts/check-core.js', check);
+          NODE
       - name: Verify telemetry source contracts
         run: |
           node --check public/rift-diagnostics.js
           node --check public/rift-engine.js
           node --check public/rift-terrain.js
           node --check public/app.js
+          node --check scripts/check-core.js
           grep -q "ironvale-diagnostics-v2" public/rift-diagnostics.js
           grep -q "rift-engine-telemetry-v1" public/rift-engine.js
           grep -q "getNativeDiagnostics" public/rift-terrain.js
