@@ -127,6 +127,7 @@ if (!diagnosticsRuntime.includes('class RiftDiagnostics') || !diagnosticsRuntime
 if (!diagnosticsRuntime.includes('getConsoleTelemetry(') || !diagnosticsRuntime.includes('_installConsoleTelemetry(')) failures.push('console warning/error telemetry');
 if (!diagnosticsRuntime.includes("captureErrors: snapshotError ?") || !diagnosticsRuntime.includes("'Snapshot provider failed'")) failures.push('diagnostic snapshot failure isolation');
 if (!diagnosticsRuntime.includes('sanitizeString(error.message') || !diagnosticsRuntime.includes("match => sanitizeUrl(match)")) failures.push('diagnostic error/url secret redaction');
+if (diagnosticsRuntime.includes('pass(?:word)?') || !diagnosticsRuntime.includes('password|passphrase')) failures.push('diagnostic validator pass-count preservation');
 if (!diagnosticsRuntime.includes("Minimal automatic crash dump stored") || !diagnosticsRuntime.includes("candidates.push(minimal)")) failures.push('progressive automatic crash dump storage fallback');
 if (!diagnosticsRuntime.includes('exportCompressedDump(') || !diagnosticsRuntime.includes("new CompressionStream('gzip')") || !diagnosticsRuntime.includes("'.json.gz'")) failures.push('lossless GZIP diagnostic export runtime');
 if (!app.includes('dumpCompressed: level =>') || !app.includes("'[data-diagnostic-compressed]'")) failures.push('lossless diagnostic export app integration');
