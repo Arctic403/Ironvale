@@ -1,0 +1,41 @@
+name: Engine Black Box Diagnostics
+on:
+  push:
+    branches: [engine-blackbox-diagnostics]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: engine-blackbox-diagnostics
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply engine black-box patch
+        run: node scripts/apply-engine-blackbox.mjs
+      - name: Verify telemetry source contracts
+        run: |
+          node --check public/rift-diagnostics.js
+          node --check public/rift-engine.js
+          node --check public/rift-terrain.js
+          node --check public/app.js
+          grep -q "ironvale-diagnostics-v2" public/rift-diagnostics.js
+          grep -q "rift-engine-telemetry-v1" public/rift-engine.js
+          grep -q "getNativeDiagnostics" public/rift-terrain.js
+          grep -q "gpuMemoryEstimate" public/rift-engine.js
+          grep -q "resourceTimingDiagnostics" public/app.js
+          grep -q "engineBlackBoxDiagnostics" public/world/ironvale-terrain.json
+      - name: Verify full Ironvale build
+        run: npm run build
+      - name: Commit verified black-box diagnostics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f scripts/apply-engine-blackbox.mjs .github/workflows/engine-blackbox-diagnostics.yml
+          git add -A
+          git commit -m "Max out three-layer engine diagnostic dumps"
+          git push origin HEAD:engine-blackbox-diagnostics
