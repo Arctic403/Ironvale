@@ -22,6 +22,7 @@ const state = {
   baselineIntegrity: null,
   finalIntegrity: null,
   restoration: null,
+  playerRestoration: null,
   postValidation: null,
   evidence: { captures: 0, failed: 0, totalBytes: 0, files: [] }
 };
@@ -64,6 +65,7 @@ function resetRunState() {
   state.baselineIntegrity = null;
   state.finalIntegrity = null;
   state.restoration = null;
+  state.playerRestoration = null;
   state.postValidation = null;
   state.evidence = { captures: 0, failed: 0, totalBytes: 0, files: [] };
   evidenceFiles = new Map();
@@ -372,6 +374,40 @@ async function restoreUiBaseline(baseline) {
   await sleep(80);
 }
 
+async function restorePlayerBaseline(baseline) {
+  const api = window.IronvalePlayerState;
+  if (!baseline || !api?.restore) throw new Error('Player restoration API unavailable');
+  const restored = api.restore(baseline);
+  if (!restored?.ok) throw new Error(restored?.error || 'Player transform restore failed');
+  await nextFrame();
+  await nextFrame();
+
+  const response = await fetch('/api/character/position', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ x: baseline.x, y: baseline.y, z: baseline.z, yaw: baseline.yaw })
+  });
+  if (!response.ok) throw new Error(`Authoritative player restore HTTP ${response.status}`);
+
+  // WebSocket message ordering guarantees the exact movement packet precedes
+  // this checkpoint when realtime is connected. The normal HTTP fallback still
+  // remains RAM-authoritative and never writes ordinary movement directly to D1.
+  await sleep(80);
+  window.dispatchEvent(new Event('pagehide'));
+  await sleep(220);
+
+  const current = api.status?.();
+  const distance = current ? Math.hypot(
+    Number(current.x) - Number(baseline.x),
+    Number(current.y) - Number(baseline.y),
+    Number(current.z) - Number(baseline.z)
+  ) : Number.POSITIVE_INFINITY;
+  const yawDelta = current ? Math.abs(Number(current.yaw) - Number(baseline.yaw)) : Number.POSITIVE_INFINITY;
+  const exact = Number.isFinite(distance) && distance <= 0.001 && Number.isFinite(yawDelta) && yawDelta <= 0.001;
+  if (!exact) throw new Error(`Player baseline restore drifted by ${distance.toFixed(4)}m / yaw ${yawDelta.toFixed(4)}`);
+  return { ok: true, distance, yawDelta, baseline: { x: baseline.x, y: baseline.y, z: baseline.z, yaw: baseline.yaw } };
+}
+
 async function runFullAutoValidation() {
   if (state.running) return;
   const world = required('#world-screen', 'World screen');
@@ -383,6 +419,7 @@ async function runFullAutoValidation() {
   if (bundleButton) bundleButton.disabled = true;
   button.textContent = 'Running Full Auto Test…';
   const uiBaseline = captureUiBaseline();
+  const playerBaseline = window.IronvalePlayerState?.capture?.('auto-validation') || null;
   diagnosticsRecord('Full auto validation started', { runId: state.runId, format: AUTO_VALIDATION_FORMAT });
 
   try {
@@ -531,15 +568,17 @@ async function runFullAutoValidation() {
     });
 
     await restoreUiBaseline(uiBaseline);
+    state.playerRestoration = await restorePlayerBaseline(playerBaseline);
     await runStep('post-test restoration integrity', async () => {
       if (!state.baselineIntegrity || !window.IronvaleValidatorGuard?.captureIntegrity) throw new Error('Baseline integrity snapshot unavailable');
       state.finalIntegrity = await window.IronvaleValidatorGuard.captureIntegrity();
       state.restoration = window.IronvaleValidatorGuard.compareIntegrity(state.baselineIntegrity, state.finalIntegrity);
       const r = state.restoration;
-      const status = r.terrainMatched === false || r.draftMatched === false || r.terrainSelectionMatched === false ? 'fail' : r.historyMatched === false ? 'warn' : 'pass';
+      const playerExact = Number.isFinite(Number(r.playerDistance)) && Number(r.playerDistance) <= 0.001;
+      const status = r.terrainMatched === false || r.draftMatched === false || r.terrainSelectionMatched === false || !playerExact ? 'fail' : r.historyMatched === false ? 'warn' : 'pass';
       return {
         status,
-        detail: `terrain=${r.terrainMatched} draft=${r.draftMatched} selection=${r.terrainSelectionMatched} history=${r.historyMatched} undoΔ=${r.undoDelta} redoΔ=${r.redoDelta} playerΔ=${r.playerDistance ?? 'n/a'}m`
+        detail: `terrain=${r.terrainMatched} draft=${r.draftMatched} selection=${r.terrainSelectionMatched} history=${r.historyMatched} undoΔ=${r.undoDelta} redoΔ=${r.redoDelta} playerΔ=${r.playerDistance ?? 'n/a'}m exact=${playerExact}`
       };
     });
 
@@ -732,6 +771,7 @@ function registerProvider() {
     lastError: state.lastError,
     skipped: state.skipped,
     restoration: state.restoration,
+    playerRestoration: state.playerRestoration,
     postValidation: state.postValidation,
     evidence: {
       captures: state.evidence.captures,
@@ -746,6 +786,8 @@ function registerProvider() {
       validationBundleManual: true,
       restoresTemporaryTerrainEdits: true,
       verifiesRestorationIntegrity: true,
+      restoresPlayerTransformExactly: true,
+      restoresRealtimeAuthorityBeforeCheckpoint: true,
       exercisesRealtimeCheckpoint: true,
       destructiveReset: false,
       logout: false

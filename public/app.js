@@ -209,6 +209,47 @@ window.IronvaleEditorHistory = Object.freeze({
   status: editorHistoryStatus
 });
 
+const IRONVALE_PLAYER_STATE_FORMAT = 'ironvale-player-state-runtime-v1';
+
+function playerStateSnapshot(label = 'external') {
+  return {
+    format: IRONVALE_PLAYER_STATE_FORMAT,
+    label: String(label || 'external').slice(0, 80),
+    x: player.x,
+    y: player.y,
+    z: player.z,
+    yaw: player.yaw,
+    vy: player.vy,
+    grounded: Boolean(player.grounded)
+  };
+}
+
+function restorePlayerState(snapshot) {
+  const values = [snapshot?.x, snapshot?.y, snapshot?.z, snapshot?.yaw].map(Number);
+  if (values.some(value => !Number.isFinite(value))) {
+    return { ok: false, error: 'invalid-player-transform', ...playerStateSnapshot('restore-failed') };
+  }
+  input.forward = 0;
+  input.strafe = 0;
+  input.keys.clear();
+  joystickActive = false;
+  playerMoving = false;
+  player.x = values[0];
+  player.y = values[1];
+  player.z = values[2];
+  player.yaw = values[3];
+  player.vy = Number.isFinite(Number(snapshot?.vy)) ? Number(snapshot.vy) : 0;
+  player.grounded = snapshot?.grounded !== false;
+  return { ok: true, ...playerStateSnapshot('restored') };
+}
+
+window.IronvalePlayerState = Object.freeze({
+  format: IRONVALE_PLAYER_STATE_FORMAT,
+  capture: playerStateSnapshot,
+  restore: restorePlayerState,
+  status: () => playerStateSnapshot('status')
+});
+
 let gesture = null;
 let longPressTimer = 0;
 let continuousBrushTimer = 0;
