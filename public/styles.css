@@ -76,6 +76,10 @@ button{touch-action:manipulation}
 .coords{position:absolute;z-index:8;left:50%;bottom:max(16px,env(safe-area-inset-bottom));transform:translateX(-50%);padding:7px 10px;border-radius:9px;background:#07100bbc;color:#dce9df;font:700 10px/1 monospace;pointer-events:none}
 .joystick{position:absolute;z-index:22;left:max(22px,env(safe-area-inset-left));bottom:max(28px,calc(env(safe-area-inset-bottom) + 20px));width:112px;height:112px;border:1px solid #ffffff20;border-radius:50%;background:#07100b70;touch-action:none}
 .joystick>div{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px;border:1px solid #ffffff28;border-radius:50%;background:#d9eee030;transform:translate(0,0)}
+.sprint-button{position:absolute;z-index:23;left:max(142px,calc(env(safe-area-inset-left) + 132px));bottom:max(34px,calc(env(safe-area-inset-bottom) + 26px));width:72px;height:72px;border:1px solid #ffffff2b;border-radius:50%;background:#132219d9;color:#f1f7f2;font-size:11px;font-weight:900;letter-spacing:.01em;box-shadow:0 6px 20px #0005;backdrop-filter:blur(8px);touch-action:none}
+.sprint-button.active{background:#2d5a39;border-color:#8bd39a}
+.sprint-button.auto-run{background:#72511e;border-color:#f0c46c;color:#fff0bd}
+#world-screen.freecam .sprint-button{display:none!important}
 .freecam-altitude{position:absolute;z-index:22;right:max(22px,env(safe-area-inset-right));bottom:max(28px,calc(env(safe-area-inset-bottom) + 20px));display:grid;gap:8px}
 .freecam-altitude[hidden]{display:none!important}
 .freecam-altitude button{width:54px;height:54px;border-radius:50%;font-size:18px;background:#07100bc9;backdrop-filter:blur(8px)}
@@ -85,6 +89,7 @@ button{touch-action:manipulation}
 
 @media(pointer:fine){
   .joystick{opacity:.42}
+  .sprint-button{opacity:.62}
 }
 @media(max-width:600px){
   .auth-card{padding:22px}
@@ -95,6 +100,7 @@ button{touch-action:manipulation}
   .terrain-tools button{min-height:38px;font-size:11px}
   .terrain-tools label{grid-template-columns:58px 46px 1fr}
   .joystick{width:104px;height:104px;left:max(16px,env(safe-area-inset-left));bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
+  .sprint-button{left:max(126px,calc(env(safe-area-inset-left) + 116px));bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px));width:66px;height:66px;font-size:10px}
   .freecam-altitude{right:max(16px,env(safe-area-inset-right));bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
   .freecam-altitude button{width:50px;height:50px}
 }
@@ -133,6 +139,7 @@ button{touch-action:manipulation}
   .topbar span{font-size:9px}
   .top-actions button{height:36px;padding:0 10px;font-size:10px}
   .joystick{width:100px;height:100px;left:max(16px,env(safe-area-inset-left));bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
+  .sprint-button{left:max(124px,calc(env(safe-area-inset-left) + 114px));bottom:max(24px,calc(env(safe-area-inset-bottom) + 18px));width:64px;height:64px}
   .joystick>div{width:44px;height:44px;margin:-22px}
   .combat-hud{right:max(16px,env(safe-area-inset-right));bottom:max(68px,calc(env(safe-area-inset-bottom) + 58px));gap:6px}
   .ability-buttons button{width:42px;height:42px}

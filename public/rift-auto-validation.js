@@ -544,6 +544,42 @@ async function runFullAutoValidation() {
       return 'attack + ability 1/2/3 handlers exercised';
     }, { optional: true });
 
+    await runStep('sprint + auto run controls', async () => {
+      const movement = window.IronvaleMovementMode;
+      const button = required('#sprint-button', 'Sprint button');
+      if (!movement?.status || !movement?.cancel) throw new Error('Movement mode runtime unavailable');
+      if ($('#freecam-button')?.classList.contains('active')) $('#freecam-button').click();
+      movement.cancel('validator-start');
+
+      const dispatch = (type, pointerId) => button.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId, pointerType: 'touch', button: 0, buttons: type === 'pointerdown' ? 1 : 0 }));
+      dispatch('pointerdown', 9321);
+      await sleep(90);
+      dispatch('pointerup', 9321);
+      await sleep(60);
+      if (!movement.status().sprintEnabled || movement.status().autoRun) throw new Error('Tap did not arm sprint');
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }));
+      await sleep(180);
+      if (!movement.status().sprinting) throw new Error('Sprint did not activate while moving');
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true }));
+      await sleep(90);
+      if (movement.status().sprintEnabled) throw new Error('Sprint did not cancel when movement stopped');
+
+      dispatch('pointerdown', 9322);
+      await sleep(520);
+      if (!movement.status().autoRun || !movement.status().sprinting) throw new Error('Long hold did not activate Auto Run');
+      dispatch('pointerup', 9322);
+      await sleep(90);
+      if (!movement.status().autoRun) throw new Error('Auto Run did not stay latched after long hold release');
+
+      dispatch('pointerdown', 9323);
+      await sleep(70);
+      dispatch('pointerup', 9323);
+      await sleep(80);
+      if (movement.status().autoRun || movement.status().sprintEnabled) throw new Error('Tap did not cancel Auto Run');
+      return 'tap sprint + stop-to-cancel + ' + movement.status().autoRunHoldMs + 'ms hold Auto Run path exercised';
+    });
+
     await runStep('realtime movement + checkpoint path', async () => {
       const freecamButton = required('#freecam-button');
       if (freecamButton.classList.contains('active')) freecamButton.click();
@@ -792,6 +828,7 @@ function registerProvider() {
       verifiesRestorationIntegrity: true,
       restoresPlayerTransformExactly: true,
       restoresRealtimeAuthorityBeforeCheckpoint: true,
+      exercisesSprintAndAutoRun: true,
       exercisesDirectRealtimePublisher: true,
       exercisesRealtimeCheckpoint: true,
       destructiveReset: false,

@@ -5,7 +5,7 @@ import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-con
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-scale-contract-r1';
 
-const APP_DIAGNOSTIC_BUILD = '20260901-diagnostic-gzip-r3';
+const APP_DIAGNOSTIC_BUILD = '20260901-sprint-autorun-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -65,6 +65,7 @@ const diagnosticRunButton = $('#diagnostic-run');
 const diagnosticAutoButton = $('#diagnostic-auto');
 const diagnosticLastCrashButton = $('#diagnostic-last-crash');
 const authDumpButton = $('#auth-dump-button');
+const sprintButton = $('#sprint-button');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
@@ -102,6 +103,9 @@ const MOBILE_TERRAIN_PIXEL_RATIO_MAX = 1.5;
 const MOBILE_TERRAIN_PIXEL_RATIO_MIN = 1.0;
 const TERRAIN_PERF_SAMPLE_FRAMES = 90;
 const TERRAIN_DEBUG_UPDATE_MS = 250;
+const WALK_SPEED_MPS = 7.2;
+const SPRINT_SPEED_MPS = 10.8;
+const AUTO_RUN_HOLD_MS = 450;
 
 let authMode = 'login';
 let engine = null;
@@ -124,6 +128,10 @@ let playerVisualFeetAnchored = false;
 let playerVisualFeetOffset = 0;
 let playerRig = null;
 let playerMoving = false;
+let playerSprinting = false;
+let sprintEnabled = false;
+let sprintSawMovement = false;
+let autoRunEnabled = false;
 let brushMesh = null;
 let animationFrame = 0;
 let lastFrame = performance.now();
@@ -232,6 +240,7 @@ function restorePlayerState(snapshot) {
   input.strafe = 0;
   input.keys.clear();
   joystickActive = false;
+  cancelMovementAssist('player-restore');
   playerMoving = false;
   player.x = values[0];
   player.y = values[1];
@@ -249,6 +258,81 @@ window.IronvalePlayerState = Object.freeze({
   status: () => playerStateSnapshot('status')
 });
 
+const IRONVALE_MOVEMENT_MODE_FORMAT = 'ironvale-movement-mode-v1';
+
+function movementModeStatus() {
+  return {
+    format: IRONVALE_MOVEMENT_MODE_FORMAT,
+    walkSpeedMps: WALK_SPEED_MPS,
+    sprintSpeedMps: SPRINT_SPEED_MPS,
+    sprintEnabled,
+    sprinting: playerSprinting,
+    autoRun: autoRunEnabled,
+    sprintSawMovement,
+    moving: playerMoving,
+    effectiveSpeedMps: playerSprinting ? SPRINT_SPEED_MPS : playerMoving ? WALK_SPEED_MPS : 0,
+    mobileControl: Boolean(sprintButton),
+    autoRunHoldMs: AUTO_RUN_HOLD_MS
+  };
+}
+
+function refreshSprintButton() {
+  if (!sprintButton) return;
+  sprintButton.classList.toggle('active', sprintEnabled);
+  sprintButton.classList.toggle('auto-run', autoRunEnabled);
+  sprintButton.setAttribute('aria-pressed', sprintEnabled ? 'true' : 'false');
+  sprintButton.textContent = autoRunEnabled ? 'Auto Run' : sprintEnabled ? 'Sprint ON' : 'Sprint';
+}
+
+function cancelMovementAssist(reason = 'cancel') {
+  const changed = sprintEnabled || autoRunEnabled || playerSprinting;
+  sprintEnabled = false;
+  autoRunEnabled = false;
+  sprintSawMovement = false;
+  playerSprinting = false;
+  refreshSprintButton();
+  if (changed) {
+    try { diagnostics.record('movement', 'Sprint/auto-run cancelled', { reason }, 'info'); } catch (_) {}
+  }
+  return movementModeStatus();
+}
+
+function setSprintMode(enabled, source = 'api') {
+  if (!enabled) return cancelMovementAssist(source);
+  if (freecamEnabled || !terrain || !engine) return movementModeStatus();
+  sprintEnabled = true;
+  autoRunEnabled = false;
+  sprintSawMovement = Math.abs(input.forward) + Math.abs(input.strafe) > .001;
+  refreshSprintButton();
+  try { diagnostics.record('movement', 'Sprint armed', { source }, 'info'); } catch (_) {}
+  return movementModeStatus();
+}
+
+function setAutoRunMode(enabled, source = 'api') {
+  if (!enabled) return cancelMovementAssist(source);
+  if (freecamEnabled || !terrain || !engine) return movementModeStatus();
+  sprintEnabled = true;
+  autoRunEnabled = true;
+  sprintSawMovement = true;
+  refreshSprintButton();
+  try { diagnostics.record('movement', 'Auto Run enabled', { source }, 'info'); } catch (_) {}
+  return movementModeStatus();
+}
+
+function toggleSprintMode(source = 'tap') {
+  if (sprintEnabled || autoRunEnabled) return cancelMovementAssist(source);
+  return setSprintMode(true, source);
+}
+
+window.IronvaleMovementMode = Object.freeze({
+  format: IRONVALE_MOVEMENT_MODE_FORMAT,
+  status: movementModeStatus,
+  setSprint: (enabled, source = 'api') => setSprintMode(Boolean(enabled), source),
+  toggleSprint: (source = 'api') => toggleSprintMode(source),
+  setAutoRun: (enabled, source = 'api') => setAutoRunMode(Boolean(enabled), source),
+  cancel: (reason = 'api') => cancelMovementAssist(reason)
+});
+
 let gesture = null;
 let longPressTimer = 0;
 let continuousBrushTimer = 0;
@@ -264,6 +348,7 @@ const diagnostics = new RiftDiagnostics({
 
 diagnostics.registerProvider('engine', level => engine?.getDiagnostics?.(level >= 3) || { ready: false, boot: getRiftEngineBootTelemetry() });
 diagnostics.registerProvider('native', level => terrain?.getNativeDiagnostics?.(level >= 3) || null);
+diagnostics.registerProvider('movement-mode', () => movementModeStatus());
 
 window.IronvaleDiagnostics = Object.freeze({
   validate: () => diagnostics.runValidation('api'),
@@ -322,6 +407,7 @@ window.addEventListener('ironvale:movement-correction', event => {
   input.strafe = 0;
   input.keys.clear();
   joystickActive = false;
+  cancelMovementAssist('authoritative-correction');
   playerMoving = false;
   player.x = values[0];
   player.y = values[1];
@@ -453,13 +539,16 @@ window.addEventListener('keyup', event => input.keys.delete(event.key.toLowerCas
 window.addEventListener('blur', () => {
   input.keys.clear();
   freecamVertical = 0;
+  cancelMovementAssist('window-blur');
   cancelGesture();
 });
+document.addEventListener('visibilitychange', () => { if (document.hidden) cancelMovementAssist('document-hidden'); });
 window.addEventListener('resize', () => applyViewportCameraProfile());
 window.visualViewport?.addEventListener('resize', () => applyViewportCameraProfile());
 
 setupCanvasControls();
 setupJoystick();
+setupSprintControl();
 refreshEditorLabels();
 updateReticleVisual();
 refreshDiagnosticUi();
@@ -600,7 +689,8 @@ function buildDiagnosticChecks() {
     diagnosticCheck('terrain.meshes', terrainMeshes.size > 0, terrainMeshes.size + ' terrain meshes'),
     diagnosticCheck('terrain.lod-plan', terrainLodPlan.size > 0, terrainLodPlan.size + ' planned sections'),
     diagnosticCheck('terrain.streaming', Boolean(terrainStreamPlan?.render?.size), (terrainStreamPlan?.render?.size || 0) + ' render components'),
-    diagnosticCheck('character.visual', Boolean(playerMesh), playerCharacter?.meshes?.length ? 'Rigged visual active' : playerMesh ? 'Fallback/player visual active' : 'No player visual')
+    diagnosticCheck('character.visual', Boolean(playerMesh), playerCharacter?.meshes?.length ? 'Rigged visual active' : playerMesh ? 'Fallback/player visual active' : 'No player visual'),
+    diagnosticCheck('player.movement-mode', Boolean(sprintButton) && typeof window.IronvaleMovementMode?.status === 'function', `walk ${WALK_SPEED_MPS}m/s · sprint ${SPRINT_SPEED_MPS}m/s · auto-run hold ${AUTO_RUN_HOLD_MS}ms`)
   );
   return checks;
 }
@@ -646,7 +736,7 @@ async function buildDiagnosticSnapshot(level = 1) {
       textureCount: engine?.textures?.size ?? 0, textureArrayCount: engine?.textureArrays?.size ?? 0, skinCount: engine?.skins?.size ?? 0,
       camera: engine?.camera || null, environment: engine?.environment || null, webgl: webGlDiagnosticInfo(gl, false), telemetry: engine?.getDiagnostics?.(false) || { boot: getRiftEngineBootTelemetry() }
     },
-    player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw, vy: player.vy, grounded: player.grounded, moving: playerMoving },
+    player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw, vy: player.vy, grounded: player.grounded, moving: playerMoving, sprinting: playerSprinting, sprintEnabled, autoRun: autoRunEnabled, movementSpeedMps: playerSprinting ? SPRINT_SPEED_MPS : playerMoving ? WALK_SPEED_MPS : 0 },
     character: {
       rigged: Boolean(playerCharacter?.meshes?.length), meshCount: playerCharacter?.meshes?.length || (playerMesh ? 1 : 0),
       rig: playerRig ? { renderHeight: playerRig.renderHeight, renderScale: playerRig.renderScale, feetAtY: playerRig.feetAtY, jointCount: playerRig.jointCount, animationClipCount: playerRig.animationClipCount, authoredForward: playerRig.authoredForward } : null
@@ -772,6 +862,7 @@ async function startWorld(url) {
   playerVisualFeetAnchored = false;
   playerVisualFeetOffset = 0;
   playerRig = null;
+  cancelMovementAssist('world-start');
   playerMoving = false;
   playerMesh = engine.addMesh(createCapsuleGeometry(), { kind: 'character-fallback', label: 'player-capsule', position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
@@ -819,6 +910,7 @@ function stopWorld() {
   playerVisualFeetAnchored = false;
   playerVisualFeetOffset = 0;
   playerRig = null;
+  cancelMovementAssist('world-stop');
   playerMoving = false;
   brushMesh = null;
   reticleHit = null;
@@ -1124,7 +1216,9 @@ async function installRiggedPlayerVisual() {
 function updatePlayerCharacterAnimation(dt) {
   if (!playerCharacter?.asset || !playerCharacter.skin || !engine) return;
   const { asset, skin } = playerCharacter;
-  const clip = (!freecamEnabled && playerMoving) ? asset.defaultClips.walk : asset.defaultClips.idle;
+  const clip = (!freecamEnabled && playerMoving)
+    ? (playerSprinting ? (asset.defaultClips.run || asset.defaultClips.walk) : asset.defaultClips.walk)
+    : asset.defaultClips.idle;
   asset.runtime.update(dt, clip);
   const matrices = asset.runtime.getSkinMatrices(0);
   if (matrices) engine.updateSkin(skin, matrices);
@@ -1200,15 +1294,23 @@ function updateKeyboardInput() {
 }
 
 function updatePlayer(dt) {
-  const moving = Math.abs(input.forward) + Math.abs(input.strafe) > .001;
+  const manualMoving = Math.abs(input.forward) + Math.abs(input.strafe) > .001;
+  if (sprintEnabled && !autoRunEnabled) {
+    if (manualMoving) sprintSawMovement = true;
+    else if (sprintSawMovement) cancelMovementAssist('movement-stopped');
+  }
+  const effectiveForward = autoRunEnabled ? 1 : input.forward;
+  const effectiveStrafe = input.strafe;
+  const moving = Math.abs(effectiveForward) + Math.abs(effectiveStrafe) > .001;
   playerMoving = moving;
+  playerSprinting = moving && sprintEnabled;
   if (moving) {
     const basis = cameraGroundBasis(orbitCamera.yaw);
-    let dx = basis.forwardX * input.forward + basis.rightX * input.strafe;
-    let dz = basis.forwardZ * input.forward + basis.rightZ * input.strafe;
+    let dx = basis.forwardX * effectiveForward + basis.rightX * effectiveStrafe;
+    let dz = basis.forwardZ * effectiveForward + basis.rightZ * effectiveStrafe;
     const length = Math.hypot(dx, dz) || 1;
     dx /= length; dz /= length;
-    const speed = 7.2;
+    const speed = playerSprinting ? SPRINT_SPEED_MPS : WALK_SPEED_MPS;
     const nextX = clamp(player.x + dx * speed * dt, terrain.origin[0] + .5, terrain.origin[0] + terrain.width - .5);
     const nextZ = clamp(player.z + dz * speed * dt, terrain.origin[2] + .5, terrain.origin[2] + terrain.depth - .5);
     const support = collisionSupportHeight(nextX, nextZ, player.y - .9, { maxRise: .9, maxDrop: 3.2 });
@@ -1319,6 +1421,7 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
     freecam.yaw = angles.yaw;
     freecam.pitch = clamp(angles.pitch, FREECAM_MIN_PITCH, FREECAM_MAX_PITCH);
   }
+  if (next) cancelMovementAssist('freecam');
   freecamEnabled = next;
   freecamVertical = 0;
   input.forward = 0;
@@ -2404,6 +2507,41 @@ function setupJoystick() {
   };
   stick.addEventListener('pointerup', end);
   stick.addEventListener('pointercancel', end);
+}
+
+function setupSprintControl() {
+  if (!sprintButton) return;
+  let pointerId = null;
+  let holdTimer = 0;
+  let longHoldActivated = false;
+
+  const clearHold = () => { clearTimeout(holdTimer); holdTimer = 0; };
+  sprintButton.addEventListener('pointerdown', event => {
+    if (freecamEnabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    pointerId = event.pointerId;
+    longHoldActivated = false;
+    try { sprintButton.setPointerCapture?.(pointerId); } catch (_) {}
+    clearHold();
+    holdTimer = setTimeout(() => {
+      if (pointerId !== event.pointerId) return;
+      longHoldActivated = true;
+      setAutoRunMode(true, 'sprint-long-hold');
+    }, AUTO_RUN_HOLD_MS);
+  });
+
+  const finish = (event, cancelled = false) => {
+    if (event.pointerId !== pointerId) return;
+    clearHold();
+    try { if (sprintButton.hasPointerCapture?.(event.pointerId)) sprintButton.releasePointerCapture?.(event.pointerId); } catch (_) {}
+    pointerId = null;
+    if (!cancelled && !longHoldActivated) toggleSprintMode('sprint-tap');
+    longHoldActivated = false;
+  };
+  sprintButton.addEventListener('pointerup', event => finish(event, false));
+  sprintButton.addEventListener('pointercancel', event => finish(event, true));
+  refreshSprintButton();
 }
 
 function moveAngleToward(current, target, maxDelta) {

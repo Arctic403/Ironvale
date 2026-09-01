@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101a16">
   <title>Ironvale</title>
-  <link rel="stylesheet" href="/styles.css?v=20260901-diagnostics-r1">
+  <link rel="stylesheet" href="/styles.css?v=20260901-sprint-autorun-r1">
 </head>
 <body>
   <section id="auth-screen" class="screen">
@@ -141,6 +141,7 @@
     <div id="joystick" class="joystick" aria-label="Movement control">
       <div id="joystick-knob"></div>
     </div>
+    <button id="sprint-button" class="sprint-button" type="button" aria-label="Sprint. Hold for Auto Run." aria-pressed="false">Sprint</button>
 
     <div id="freecam-altitude" class="freecam-altitude" hidden>
       <button type="button" data-freecam-vertical="1" aria-label="Freecam up">▲</button>
@@ -167,14 +168,14 @@
   </main>
 
   <script type="module" src="/rift-geometry-guard.js?v=20260901-capsule-index-r2"></script>
-  <script type="module" src="/app.js?v=20260901-realtime-10hz-r1"></script>
+  <script type="module" src="/app.js?v=20260901-sprint-autorun-r1"></script>
   <script type="module" src="/rift-gl-tripwire.js?v=20260901-render-forensics-r1"></script>
   <script type="module" src="/rift-realtime.js?v=20260901-realtime-10hz-r1"></script>
   <script type="module" src="/rift-diagnostic-hooks.js?v=20260901-blackbox-hooks-r1"></script>
   <script type="module" src="/rift-architecture-guard.js?v=20260901-root-cleanup-r1"></script>
   <script type="module" src="/rift-validator-guard.js?v=20260901-validator-evidence-r1"></script>
   <script type="module" src="/rift-history-bridge.js?v=20260901-history-runtime-r1"></script>
-  <script type="module" src="/rift-auto-validation.js?v=20260901-realtime-10hz-r1"></script>
+  <script type="module" src="/rift-auto-validation.js?v=20260901-sprint-autorun-r1"></script>
   <script type="module" src="/rift-auto-validation-ui-hotfix.js?v=20260901-auto-tools-close-r1"></script>
 </body>
 </html>
