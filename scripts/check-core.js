@@ -102,7 +102,8 @@ if (!indexHtml.includes('id="terrain-spline"') || !indexHtml.includes('id="add-s
 if (!indexHtml.includes('id="terrain-layer-name"') || !indexHtml.includes('id="terrain-layer-opacity"') || !indexHtml.includes('id="delete-terrain-edit-layer"')) failures.push('landscape layer management tools');
 if (!indexHtml.includes('id="move-spline-point"') || !indexHtml.includes('id="remove-spline-point"')) failures.push('landscape spline point tools');
 if (!indexHtml.includes('id="terrain-debug-toggle"') || !indexHtml.includes('id="terrain-debug-readout"')) failures.push('terrain debug tools');
-if (!indexHtml.includes('id="diagnostic-run"') || !indexHtml.includes('id="diagnostic-auto"') || !indexHtml.includes('data-diagnostic-dump="1"') || !indexHtml.includes('data-diagnostic-dump="2"') || !indexHtml.includes('data-diagnostic-dump="3"')) failures.push('three-layer diagnostic tools UI');
+if (!indexHtml.includes('id="diagnostic-run"') || !indexHtml.includes('id="diagnostic-auto"') || !indexHtml.includes('data-diagnostic-dump="1"') || !indexHtml.includes('data-diagnostic-dump="2"') || !indexHtml.includes('data-diagnostic-dump="3"')) failures.push('three-layer raw diagnostic tools UI');
+if (!indexHtml.includes('data-diagnostic-compressed="1"') || !indexHtml.includes('data-diagnostic-compressed="2"') || !indexHtml.includes('data-diagnostic-compressed="3"')) failures.push('three-layer lossless GZIP diagnostic tools UI');
 if (!indexHtml.includes('id="auth-dump-button"')) failures.push('auth crash dump export');
 if (!styles.includes('overflow-y:auto') || !styles.includes('scrollbar-gutter:stable') || !styles.includes('.terrain-tools::-webkit-scrollbar')) failures.push('scrollable terrain tools panel');
 if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
@@ -127,6 +128,8 @@ if (!diagnosticsRuntime.includes('getConsoleTelemetry(') || !diagnosticsRuntime.
 if (!diagnosticsRuntime.includes("captureErrors: snapshotError ?") || !diagnosticsRuntime.includes("'Snapshot provider failed'")) failures.push('diagnostic snapshot failure isolation');
 if (!diagnosticsRuntime.includes('sanitizeString(error.message') || !diagnosticsRuntime.includes("match => sanitizeUrl(match)")) failures.push('diagnostic error/url secret redaction');
 if (!diagnosticsRuntime.includes("Minimal automatic crash dump stored") || !diagnosticsRuntime.includes("candidates.push(minimal)")) failures.push('progressive automatic crash dump storage fallback');
+if (!diagnosticsRuntime.includes('exportCompressedDump(') || !diagnosticsRuntime.includes("new CompressionStream('gzip')") || !diagnosticsRuntime.includes("'.json.gz'")) failures.push('lossless GZIP diagnostic export runtime');
+if (!app.includes('dumpCompressed: level =>') || !app.includes("'[data-diagnostic-compressed]'")) failures.push('lossless diagnostic export app integration');
 if (!renderer.includes('vertexBufferVertices') || !renderer.includes("format:srgb?'SRGB8_ALPHA8':'RGBA8'")) failures.push('renderer vertex/texture-format telemetry');
 if (!app.includes('wasmArtifactDiagnostics()') || !app.includes('deviceCapabilityDiagnostics()') || !app.includes('consoleTelemetry: diagnostics.getConsoleTelemetry(true)')) failures.push('deep artifact/device/console telemetry');
 if (world.diagnostics?.blackBoxCompleteness !== 'max-v1' || !world.diagnostics?.deepTelemetry?.includes('native-failure-history')) failures.push('max black-box diagnostics world contract');
