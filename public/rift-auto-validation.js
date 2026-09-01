@@ -376,25 +376,20 @@ async function restoreUiBaseline(baseline) {
 
 async function restorePlayerBaseline(baseline) {
   const api = window.IronvalePlayerState;
+  const realtime = window.IronvaleRealtimeMovement;
   if (!baseline || !api?.restore) throw new Error('Player restoration API unavailable');
+  if (!realtime?.publish || !realtime?.checkpoint) throw new Error('Direct realtime publisher unavailable');
   const restored = api.restore(baseline);
   if (!restored?.ok) throw new Error(restored?.error || 'Player transform restore failed');
   await nextFrame();
   await nextFrame();
 
-  const response = await fetch('/api/character/position', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ x: baseline.x, y: baseline.y, z: baseline.z, yaw: baseline.yaw })
-  });
-  if (!response.ok) throw new Error(`Authoritative player restore HTTP ${response.status}`);
-
-  // WebSocket message ordering guarantees the exact movement packet precedes
-  // this checkpoint when realtime is connected. The normal HTTP fallback still
-  // remains RAM-authoritative and never writes ordinary movement directly to D1.
-  await sleep(80);
-  window.dispatchEvent(new Event('pagehide'));
-  await sleep(220);
+  const published = realtime.publish({ x: baseline.x, y: baseline.y, z: baseline.z, yaw: baseline.yaw }, { force: true, source: 'validator-restore' });
+  if (published?.ok === false) throw new Error(published?.reason || 'Authoritative player restore publish failed');
+  await sleep(140);
+  const checkpoint = await realtime.checkpoint('validator-restore');
+  if (checkpoint?.ok === false) throw new Error(checkpoint?.error || 'Authoritative player restore checkpoint failed');
+  await sleep(180);
 
   const current = api.status?.();
   const distance = current ? Math.hypot(
@@ -405,7 +400,7 @@ async function restorePlayerBaseline(baseline) {
   const yawDelta = current ? Math.abs(Number(current.yaw) - Number(baseline.yaw)) : Number.POSITIVE_INFINITY;
   const exact = Number.isFinite(distance) && distance <= 0.001 && Number.isFinite(yawDelta) && yawDelta <= 0.001;
   if (!exact) throw new Error(`Player baseline restore drifted by ${distance.toFixed(4)}m / yaw ${yawDelta.toFixed(4)}`);
-  return { ok: true, distance, yawDelta, baseline: { x: baseline.x, y: baseline.y, z: baseline.z, yaw: baseline.yaw } };
+  return { ok: true, distance, yawDelta, transport: published?.transport || null, checkpointTransport: checkpoint?.transport || null, baseline: { x: baseline.x, y: baseline.y, z: baseline.z, yaw: baseline.yaw } };
 }
 
 async function runFullAutoValidation() {
@@ -552,11 +547,20 @@ async function runFullAutoValidation() {
     await runStep('realtime movement + checkpoint path', async () => {
       const freecamButton = required('#freecam-button');
       if (freecamButton.classList.contains('active')) freecamButton.click();
+      const realtime = window.IronvaleRealtimeMovement;
+      if (!realtime?.status || !realtime?.checkpoint) throw new Error('Direct realtime publisher unavailable');
+      const before = realtime.status();
       await holdKey('w', 300);
       await holdKey('s', 300);
-      window.dispatchEvent(new Event('pagehide'));
-      await sleep(350);
-      return 'forward/back movement interception + pagehide checkpoint requested';
+      await sleep(180);
+      const afterMovement = realtime.status();
+      const directDelta = Number(afterMovement?.directPublished || 0) - Number(before?.directPublished || 0);
+      if (directDelta < 2) throw new Error(`Direct 10Hz publisher only emitted ${directDelta} packet(s)`);
+      const checkpoint = await realtime.checkpoint('auto-validation');
+      if (checkpoint?.ok === false) throw new Error('Realtime checkpoint request failed');
+      await sleep(220);
+      const after = realtime.status();
+      return `direct packets=${directDelta} · total sent=${after.sent || 0} · accepted=${after.accepted || 0} · RTT=${after.lastRttMs ?? 'n/a'}ms · checkpoint=${checkpoint?.transport || 'unknown'}`;
     });
 
     await runStep('backend health + network telemetry', async () => {
@@ -788,6 +792,7 @@ function registerProvider() {
       verifiesRestorationIntegrity: true,
       restoresPlayerTransformExactly: true,
       restoresRealtimeAuthorityBeforeCheckpoint: true,
+      exercisesDirectRealtimePublisher: true,
       exercisesRealtimeCheckpoint: true,
       destructiveReset: false,
       logout: false

@@ -36,17 +36,20 @@ async function movementD1Check(instance) {
   const policyDeclared = realtime?.authority === 'server-durable-object' &&
     realtime?.d1Policy === 'load-checkpoint-only' &&
     realtime?.checkpointPolicy?.ordinaryMovementWritesToD1 === false;
+  const publisherDeclared = realtime?.publisherMode === 'direct-meaningful-10hz' &&
+    Number(realtime?.publishPolicy?.maxHz) === 10 &&
+    realtime?.publishPolicy?.appLegacyHeartbeatRemoved === true;
   const socketPackets = Number(realtime?.sent) || 0;
 
   let status = 'pass';
   if (d1Calls > 0 || d1Writes > 0 || d1Failures > 0) status = 'fail';
-  else if (!policyDeclared) status = 'fail';
+  else if (!policyDeclared || !publisherDeclared) status = 'fail';
   else if (!realtime) status = 'warn';
 
   const check = statusCheck(
     'architecture.movement-zero-d1',
     status,
-    `${movement.length} backend movement request(s) · ${d1Calls} D1 call(s) · ${d1Writes} D1 write(s) · ${socketPackets} realtime packet(s) · policy=${policyDeclared ? 'RAM-authoritative' : 'invalid'}`
+    `${movement.length} backend movement request(s) · ${d1Calls} D1 call(s) · ${d1Writes} D1 write(s) · ${socketPackets} realtime packet(s) · publisher=${publisherDeclared ? 'direct-10Hz' : 'invalid'} · policy=${policyDeclared ? 'RAM-authoritative' : 'invalid'}`
   );
   state.lastCheck = {
     at: new Date().toISOString(),
@@ -56,6 +59,9 @@ async function movementD1Check(instance) {
     d1Writes,
     d1Failures,
     socketPackets,
+    directPublished: Number(realtime?.directPublished) || 0,
+    legacyIntercepts: Number(realtime?.legacyIntercepts) || 0,
+    publisherDeclared,
     policyDeclared
   };
   return check;

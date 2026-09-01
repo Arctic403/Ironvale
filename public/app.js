@@ -127,7 +127,6 @@ let playerMoving = false;
 let brushMesh = null;
 let animationFrame = 0;
 let lastFrame = performance.now();
-let lastPositionSave = 0;
 let freecamEnabled = false;
 let brushMode = 'raise';
 let reticleHit = null;
@@ -315,6 +314,24 @@ $('#logout-button').addEventListener('click', async () => {
   showAuth();
 });
 
+window.addEventListener('ironvale:movement-correction', event => {
+  const position = event?.detail?.position;
+  const values = [position?.x, position?.y, position?.z, position?.yaw].map(Number);
+  if (values.some(value => !Number.isFinite(value))) return;
+  input.forward = 0;
+  input.strafe = 0;
+  input.keys.clear();
+  joystickActive = false;
+  playerMoving = false;
+  player.x = values[0];
+  player.y = values[1];
+  player.z = values[2];
+  player.yaw = values[3];
+  player.vy = 0;
+  player.grounded = true;
+  try { diagnostics.record('realtime', 'Applied authoritative movement correction', { reason: event?.detail?.reason || null, seq: event?.detail?.seq ?? null, position: { x: player.x, y: player.y, z: player.z, yaw: player.yaw } }, 'warn'); } catch (_) {}
+});
+
 $('#terrain-tools-button').addEventListener('click', () => { tools.hidden = !tools.hidden; });
 freecamButton.addEventListener('click', () => setFreecam(!freecamEnabled));
 lockTargetButton.addEventListener('click', () => setHardLock(!hardLockEnabled));
@@ -438,8 +455,6 @@ window.addEventListener('blur', () => {
   freecamVertical = 0;
   cancelGesture();
 });
-window.addEventListener('pagehide', () => savePosition(true));
-window.addEventListener('beforeunload', () => savePosition(true));
 window.addEventListener('resize', () => applyViewportCameraProfile());
 window.visualViewport?.addEventListener('resize', () => applyViewportCameraProfile());
 
@@ -1145,9 +1160,8 @@ function frame(now) {
     ? `CAM ${freecam.x.toFixed(1)}, ${freecam.y.toFixed(1)}, ${freecam.z.toFixed(1)}`
     : `${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`;
 
-  if (!freecamEnabled && now - lastPositionSave > 5000) {
-    lastPositionSave = now;
-    savePosition();
+  if (!freecamEnabled) {
+    window.IronvaleRealtimeMovement?.publish?.({ x: player.x, y: player.y, z: player.z, yaw: player.yaw });
   }
   animationFrame = requestAnimationFrame(frame);
 }
@@ -2337,18 +2351,6 @@ function updateBrushMarkerPosition() {
   if (!brushMesh) return;
   brushMesh.visible = freecamEnabled && Boolean(reticleHit);
   if (reticleHit) brushMesh.position = [reticleHit.x, reticleHit.y + .035, reticleHit.z];
-}
-
-async function savePosition(useKeepalive = false) {
-  if (!engine || freecamEnabled) return;
-  try {
-    await fetch('/api/character/position', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ x: player.x, y: player.y, z: player.z, yaw: player.yaw }),
-      keepalive: useKeepalive
-    });
-  } catch {}
 }
 
 async function api(path, options = {}) {

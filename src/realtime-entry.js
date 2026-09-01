@@ -134,6 +134,17 @@ async function routePositionFallback(request, env) {
   return stub.fetch(internal);
 }
 
+async function routeRealtimeCheckpoint(request, env) {
+  const auth = await loadSessionState(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const body = await readJson(request);
+  const reason = String(body?.reason || 'explicit-http').slice(0, 32);
+  const stub = playerStateStub(env, auth.userId);
+  const headers = internalStateHeaders(auth, request);
+  headers.set('x-ironvale-checkpoint-reason', reason);
+  return stub.fetch(new Request('https://player-state/checkpoint', { method: 'POST', headers }));
+}
+
 async function checkpointBeforeLogout(request, env) {
   const auth = await loadSessionState(request, env);
   if (!auth) return;
@@ -151,6 +162,10 @@ export default {
 
     if (url.pathname === '/api/realtime/movement') {
       return routeRealtimeSocket(request, env);
+    }
+
+    if (method === 'POST' && url.pathname === '/api/realtime/checkpoint') {
+      return routeRealtimeCheckpoint(request, env);
     }
 
     // Compatibility bridge: the legacy 5-second position heartbeat is intercepted
@@ -203,6 +218,25 @@ export class PlayerState extends DurableObject {
     };
   }
 
+  async ensureCheckpointAlarm() {
+    const current = await this.ctx.storage.getAlarm();
+    if (current == null) await this.ctx.storage.setAlarm(Date.now() + CHECKPOINT_INTERVAL_MS);
+  }
+
+  latestAuthorityState() {
+    let best = this.httpState && !this.httpState.superseded ? { state: this.httpState, socket: null } : null;
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        const candidate = ws.deserializeAttachment();
+        if (!candidate || candidate.superseded) continue;
+        if (!best || Number(candidate.lastAcceptedAt || candidate.sourceUpdatedAt || 0) > Number(best.state.lastAcceptedAt || best.state.sourceUpdatedAt || 0)) {
+          best = { state: candidate, socket: ws };
+        }
+      } catch (_) {}
+    }
+    return best;
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === '/connect') return this.connect(request);
@@ -213,11 +247,23 @@ export class PlayerState extends DurableObject {
 
   async connect(request) {
     if (request.headers.get('Upgrade') !== 'websocket') return json({ ok: false, error: 'WebSocket upgrade required' }, 426);
-    const initial = this.stateFromHeaders(request);
+    let initial = this.stateFromHeaders(request);
     if (!initial.userId || initial.sessionExpiresAt <= Date.now()) return json({ ok: false, error: 'Session expired' }, 401);
 
-    // A player has one live authority stream. Mark older sockets as superseded so
-    // their close event cannot overwrite a newer state checkpoint.
+    // Carry the freshest RAM authority into the replacement socket before older
+    // sockets are superseded. This prevents a reconnect from reverting to the
+    // last D1 checkpoint after an HTTP-fallback movement window.
+    const carried = this.latestAuthorityState();
+    if (carried?.state?.userId === initial.userId) {
+      initial = {
+        ...carried.state,
+        username: initial.username,
+        sessionExpiresAt: initial.sessionExpiresAt,
+        superseded: false,
+        connectedAt: Date.now()
+      };
+    }
+
     for (const existing of this.ctx.getWebSockets()) {
       try {
         const previous = existing.deserializeAttachment() || {};
@@ -226,11 +272,13 @@ export class PlayerState extends DurableObject {
         existing.close(4001, 'superseded');
       } catch (_) {}
     }
+    this.httpState = null;
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     this.ctx.acceptWebSocket(server, ['player']);
     server.serializeAttachment(initial);
+    await this.ensureCheckpointAlarm();
     server.send(JSON.stringify({
       type: 'hello',
       format: REALTIME_FORMAT,
@@ -270,7 +318,7 @@ export class PlayerState extends DurableObject {
       return { ok: false, reason: 'vertical-speed', verticalDistance, verticalLimit };
     }
 
-    return { ok: true, now, x, y, z, yaw, seq: nextSeq };
+    return { ok: true, now, x, y, z, yaw, seq: nextSeq, clientSentAt: finite(packet?.clientSentAt) };
   }
 
   applyAccepted(state, accepted) {
@@ -295,7 +343,8 @@ export class PlayerState extends DurableObject {
       ok: false,
       reason: validation.reason,
       seq: state.seq,
-      position: { x: state.x, y: state.y, z: state.z, yaw: state.yaw }
+      position: { x: state.x, y: state.y, z: state.z, yaw: state.yaw },
+      clientSentAt: validation?.clientSentAt ?? null
     };
   }
 
@@ -370,7 +419,8 @@ export class PlayerState extends DurableObject {
       seq: state.seq,
       checkpointed,
       checkpointCount: state.checkpointCount,
-      position: { x: state.x, y: state.y, z: state.z, yaw: state.yaw }
+      position: { x: state.x, y: state.y, z: state.z, yaw: state.yaw },
+      clientSentAt: validation.clientSentAt ?? null
     }));
   }
 
@@ -384,6 +434,7 @@ export class PlayerState extends DurableObject {
     }
 
     this.applyAccepted(this.httpState, validation);
+    await this.ensureCheckpointAlarm();
     let checkpointed = false;
     if (this.httpState.dirty && validation.now - this.httpState.lastCheckpointAt >= CHECKPOINT_INTERVAL_MS) {
       checkpointed = await this.checkpointState(this.httpState, 'periodic-http-fallback');
@@ -394,7 +445,8 @@ export class PlayerState extends DurableObject {
       accepted: true,
       seq: this.httpState.seq,
       checkpointed,
-      position: { x: this.httpState.x, y: this.httpState.y, z: this.httpState.z, yaw: this.httpState.yaw }
+      position: { x: this.httpState.x, y: this.httpState.y, z: this.httpState.z, yaw: this.httpState.yaw },
+      clientSentAt: validation.clientSentAt ?? null
     }, 202);
   }
 
@@ -408,8 +460,25 @@ export class PlayerState extends DurableObject {
       } catch (_) {}
     }
     if (!best) best = this.stateFromHeaders(request);
-    const saved = await this.checkpointState(best, 'logout');
+    const checkpointReason = String(request.headers.get('x-ironvale-checkpoint-reason') || 'explicit-http').slice(0, 32);
+    const saved = await this.checkpointState(best, checkpointReason);
     return json({ ok: true, saved, checkpointCount: best.checkpointCount || 0 });
+  }
+
+  async alarm() {
+    const best = this.latestAuthorityState();
+    if (best?.state) {
+      await this.checkpointState(best.state, 'periodic-alarm');
+      if (best.socket) {
+        try { best.socket.serializeAttachment(best.state); } catch (_) {}
+      } else {
+        this.httpState = best.state;
+      }
+    }
+    const hasLiveSocket = this.ctx.getWebSockets().some(ws => {
+      try { return !(ws.deserializeAttachment()?.superseded); } catch { return false; }
+    });
+    if (hasLiveSocket || this.httpState?.dirty) await this.ctx.storage.setAlarm(Date.now() + CHECKPOINT_INTERVAL_MS);
   }
 
   async webSocketClose(ws, code, reason) {
