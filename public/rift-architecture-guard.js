@@ -1,6 +1,6 @@
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 
-export const IRONVALE_ARCHITECTURE_GUARD_FORMAT = 'ironvale-architecture-guard-v1';
+export const IRONVALE_ARCHITECTURE_GUARD_FORMAT = 'ironvale-architecture-guard-v2';
 
 const PATCH = Symbol.for('ironvale.architecture-guard.patched');
 const INSTANCE_PATCH = Symbol('ironvale.architecture-guard.instance');
@@ -11,7 +11,8 @@ const state = {
   installedAt: new Date().toISOString(),
   runs: 0,
   lastRunAt: null,
-  lastCheck: null
+  lastCheck: null,
+  lastGeometryCheck: null
 };
 
 function statusCheck(id, status, detail = '') {
@@ -60,6 +61,35 @@ async function movementD1Check(instance) {
   return check;
 }
 
+async function geometryGuardCheck(instance) {
+  const geometry = await provider(instance, 'geometry-guard', 2);
+  if (!geometry) {
+    const check = statusCheck('geometry.guard-repairs', 'warn', 'Geometry guard diagnostics provider unavailable');
+    state.lastGeometryCheck = { at: new Date().toISOString(), status: 'warn', providerAvailable: false };
+    return check;
+  }
+  const validations = Number(geometry.validationCount) || 0;
+  const repairs = Number(geometry.repairCount) || 0;
+  const rejections = Number(geometry.rejectionCount) || 0;
+  const status = repairs > 0 || rejections > 0 ? 'fail' : 'pass';
+  const check = statusCheck(
+    'geometry.guard-repairs',
+    status,
+    `${validations} geometry validation(s) · ${repairs} safety repair(s) · ${rejections} rejection(s)${repairs ? ` · last repair=${geometry.lastRepair?.mesh || 'unknown'}` : ''}${rejections ? ` · last rejection=${geometry.lastRejection?.mesh || 'unknown'}` : ''}`
+  );
+  state.lastGeometryCheck = {
+    at: new Date().toISOString(),
+    status,
+    providerAvailable: true,
+    validations,
+    repairs,
+    rejections,
+    lastRepair: geometry.lastRepair || null,
+    lastRejection: geometry.lastRejection || null
+  };
+  return check;
+}
+
 if (!RiftDiagnostics.prototype[PATCH]) {
   Object.defineProperty(RiftDiagnostics.prototype, PATCH, { value: true });
   const nativeRunValidation = RiftDiagnostics.prototype.runValidation;
@@ -69,14 +99,25 @@ if (!RiftDiagnostics.prototype[PATCH]) {
       this.validator = async () => {
         const base = await baseValidator();
         const baseChecks = Array.isArray(base) ? base : Array.isArray(base?.checks) ? base.checks : [];
-        const architectureCheck = await movementD1Check(this);
+        const [architectureCheck, geometryCheck] = await Promise.all([
+          movementD1Check(this),
+          geometryGuardCheck(this)
+        ]);
         state.runs += 1;
         state.lastRunAt = new Date().toISOString();
-        return [...baseChecks.filter(check => check?.id !== 'architecture.movement-zero-d1'), architectureCheck];
+        return [
+          ...baseChecks.filter(check => !['architecture.movement-zero-d1', 'geometry.guard-repairs'].includes(check?.id)),
+          architectureCheck,
+          geometryCheck
+        ];
       };
       Object.defineProperty(this, INSTANCE_PATCH, { value: true });
       try {
-        this.registerProvider?.('architecture-guard', () => ({ ...state, lastCheck: state.lastCheck ? { ...state.lastCheck } : null }));
+        this.registerProvider?.('architecture-guard', () => ({
+          ...state,
+          lastCheck: state.lastCheck ? { ...state.lastCheck } : null,
+          lastGeometryCheck: state.lastGeometryCheck ? { ...state.lastGeometryCheck } : null
+        }));
       } catch (_) {}
     }
     return nativeRunValidation.call(this, reason);
@@ -85,5 +126,9 @@ if (!RiftDiagnostics.prototype[PATCH]) {
 
 window.IronvaleArchitectureGuard = Object.freeze({
   format: state.format,
-  status: () => ({ ...state, lastCheck: state.lastCheck ? { ...state.lastCheck } : null })
+  status: () => ({
+    ...state,
+    lastCheck: state.lastCheck ? { ...state.lastCheck } : null,
+    lastGeometryCheck: state.lastGeometryCheck ? { ...state.lastGeometryCheck } : null
+  })
 });
