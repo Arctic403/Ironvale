@@ -414,8 +414,42 @@ export class RiftDiagnostics {
   async exportDump(level = 1, reason = 'manual') {
     const dump = await this.createDump(level, reason);
     const name = this._download(dump);
-    this.record('dump', 'Exported diagnostic dump', { level: dump.level, name });
+    this.record('dump', 'Exported raw diagnostic dump', { level: dump.level, name, encoding: 'json-pretty' });
     return dump;
+  }
+
+  async _downloadCompressed(dump, filename = null) {
+    if (typeof CompressionStream !== 'function') throw new Error('Lossless GZIP export is not supported by this browser.');
+    const level = clampLevel(dump?.level);
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const name = filename || 'ironvale-dump-l' + level + '-' + stamp + '.json.gz';
+    const json = JSON.stringify(dump) + '\n';
+    const rawBytes = new TextEncoder().encode(json).byteLength;
+    const compressedStream = new Blob([json], { type: 'application/json' }).stream().pipeThrough(new CompressionStream('gzip'));
+    const blob = await new Response(compressedStream).blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    return {
+      name,
+      encoding: 'gzip',
+      rawBytes,
+      compressedBytes: blob.size,
+      ratio: rawBytes ? blob.size / rawBytes : 1
+    };
+  }
+
+  async exportCompressedDump(level = 1, reason = 'manual-compressed') {
+    const dump = await this.createDump(level, reason);
+    const exported = await this._downloadCompressed(dump);
+    this.record('dump', 'Exported lossless compressed diagnostic dump', { level: dump.level, ...exported });
+    return { dump, export: exported };
   }
 
   exportLastCrash() {
