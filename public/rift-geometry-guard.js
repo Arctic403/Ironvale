@@ -1,6 +1,6 @@
 import { RiftEngine } from './rift-engine.js?v=20260901-engine-blackbox-r1';
 
-export const IRONVALE_GEOMETRY_GUARD_FORMAT = 'ironvale-geometry-guard-v1';
+export const IRONVALE_GEOMETRY_GUARD_FORMAT = 'ironvale-geometry-guard-v2';
 
 const PATCH_MARK = Symbol.for('ironvale.geometry-guard-patched');
 const CAPSULE_KIND = 'character-fallback';
@@ -42,6 +42,9 @@ function validateIndexBounds(mesh, geometry) {
     if (!Number.isInteger(index) || index < 0 || index >= vertexCount) {
       const error = new Error(`Geometry index out of bounds for ${meshName(mesh)}: index=${index} at offset=${offset}, vertexCount=${vertexCount}`);
       error.code = 'IRONVALE_GEOMETRY_INDEX_OOB';
+      error.index = index;
+      error.offset = offset;
+      error.vertexCount = vertexCount;
       throw error;
     }
     if (index > maxIndex) maxIndex = index;
@@ -55,7 +58,8 @@ function validateIndexBounds(mesh, geometry) {
   };
 }
 
-function shouldRepairLegacyCapsule(mesh, geometry) {
+function shouldRepairLegacyCapsule(mesh, geometry, error) {
+  if (error?.code !== 'IRONVALE_GEOMETRY_INDEX_OOB') return false;
   if (mesh?.kind !== CAPSULE_KIND || mesh?.label !== CAPSULE_LABEL) return false;
   try {
     const { indices, stride, vertexCount } = geometryMetrics(geometry);
@@ -65,11 +69,10 @@ function shouldRepairLegacyCapsule(mesh, geometry) {
   }
 }
 
-function repairLegacyCapsule(mesh, geometry) {
-  if (!shouldRepairLegacyCapsule(mesh, geometry)) return geometry;
+function rebuildLegacyCapsule(mesh, geometry, sourceError) {
   const { vertices, stride, vertexCount } = geometryMetrics(geometry);
   const ringCount = vertexCount / CAPSULE_RADIAL;
-  if (!Number.isInteger(ringCount) || ringCount < 2) return geometry;
+  if (!Number.isInteger(ringCount) || ringCount < 2) throw sourceError;
 
   const repaired = new Uint16Array((ringCount - 1) * CAPSULE_RADIAL * 6);
   let offset = 0;
@@ -89,19 +92,37 @@ function repairLegacyCapsule(mesh, geometry) {
     }
   }
 
+  const repairedGeometry = { ...geometry, vertices, indices: repaired, vertexStride: stride };
+  validateIndexBounds(mesh, repairedGeometry);
   state.repairCount += 1;
   state.lastRepair = {
     at: isoNow(),
     mesh: meshName(mesh),
     kind: mesh?.kind || null,
     repair: 'capsule-ring-wrap-v1',
+    trigger: {
+      code: sourceError?.code || null,
+      index: Number.isFinite(Number(sourceError?.index)) ? Number(sourceError.index) : null,
+      offset: Number.isFinite(Number(sourceError?.offset)) ? Number(sourceError.offset) : null,
+      vertexCount: Number.isFinite(Number(sourceError?.vertexCount)) ? Number(sourceError.vertexCount) : vertexCount
+    },
     radial: CAPSULE_RADIAL,
     rings: ringCount,
     vertexCount,
     indexCount: repaired.length
   };
   mesh.geometryGuardRepair = 'capsule-ring-wrap-v1';
-  return { ...geometry, vertices, indices: repaired, vertexStride: stride };
+  return repairedGeometry;
+}
+
+function validateOrRepair(mesh, geometry) {
+  try {
+    return { geometry, metrics: validateIndexBounds(mesh, geometry), repaired: false };
+  } catch (error) {
+    if (!shouldRepairLegacyCapsule(mesh, geometry, error)) throw error;
+    const repairedGeometry = rebuildLegacyCapsule(mesh, geometry, error);
+    return { geometry: repairedGeometry, metrics: validateIndexBounds(mesh, repairedGeometry), repaired: true };
+  }
 }
 
 const proto = RiftEngine?.prototype;
@@ -111,13 +132,11 @@ if (proto && !proto[PATCH_MARK]) {
 
   Object.defineProperty(proto, PATCH_MARK, { value: true });
   proto._upload = function guardedGeometryUpload(mesh, geometry) {
-    let prepared = geometry;
     try {
-      prepared = repairLegacyCapsule(mesh, geometry);
-      const metrics = validateIndexBounds(mesh, prepared);
+      const prepared = validateOrRepair(mesh, geometry);
       state.validationCount += 1;
-      mesh.geometryGuardMetrics = metrics;
-      return nativeUpload.call(this, mesh, prepared);
+      mesh.geometryGuardMetrics = prepared.metrics;
+      return nativeUpload.call(this, mesh, prepared.geometry);
     } catch (error) {
       state.rejectionCount += 1;
       state.lastRejection = {
@@ -143,8 +162,10 @@ function registerProvider() {
   diagnostics.registerProvider('geometry-guard', () => ({
     ...state,
     policy: {
+      validateBeforeRepair: true,
       rejectsOutOfBoundsIndicesBeforeWebGL: true,
-      repairsKnownLegacyFallbackCapsule: true,
+      repairsKnownLegacyFallbackCapsuleOnlyWhenInvalid: true,
+      healthyGeometryRepairCountMustStayZero: true,
       capsuleRepair: 'd = (ring + 1) * radial + next'
     }
   }));
