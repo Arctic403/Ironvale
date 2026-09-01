@@ -32,6 +32,9 @@
       "run"
     ],
     "fallback": "capsule remains active if character loading fails",
-    "runClipRequired": true
+    "runClipRequired": true,
+    "walkSpeedMps": 7.2,
+    "sprintSpeedMps": 12,
+    "sprintValidation": "equal-time horizontal displacement must be at least 1.35x walk"
   }
 }
