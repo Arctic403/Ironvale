@@ -1,4 +1,4 @@
-import { RiftEngine } from './rift-engine.js?v=20260901-terrain-lock-r2';
+import { RiftEngine } from './rift-engine.js?v=20260901-terrain-lock-r3';
 import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';

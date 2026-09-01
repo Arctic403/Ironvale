@@ -54,6 +54,8 @@ void main() {
 
 const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
+precision highp sampler2D;
+precision highp sampler2DArray;
 in vec3 vNormal;
 in vec3 vColor;
 in vec3 vWorld;
