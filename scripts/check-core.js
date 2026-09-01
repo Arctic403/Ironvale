@@ -124,6 +124,9 @@ if (!terrainMaterials.includes('class RiftTerrainMaterialRuntime') || !terrainMa
 const diagnosticsRuntime = fs.readFileSync('public/rift-diagnostics.js', 'utf8');
 if (!diagnosticsRuntime.includes('class RiftDiagnostics') || !diagnosticsRuntime.includes('automatic-crash') || !diagnosticsRuntime.includes('l1Quick') || !diagnosticsRuntime.includes('l2Runtime') || !diagnosticsRuntime.includes('l3Deep') || !diagnosticsRuntime.includes('credentialsIncluded: false')) failures.push('three-layer sanitized diagnostics runtime');
 if (!diagnosticsRuntime.includes('getConsoleTelemetry(') || !diagnosticsRuntime.includes('_installConsoleTelemetry(')) failures.push('console warning/error telemetry');
+if (!diagnosticsRuntime.includes("captureErrors: snapshotError ?") || !diagnosticsRuntime.includes("'Snapshot provider failed'")) failures.push('diagnostic snapshot failure isolation');
+if (!diagnosticsRuntime.includes('sanitizeString(error.message') || !diagnosticsRuntime.includes("match => sanitizeUrl(match)")) failures.push('diagnostic error/url secret redaction');
+if (!diagnosticsRuntime.includes("Minimal automatic crash dump stored") || !diagnosticsRuntime.includes("candidates.push(minimal)")) failures.push('progressive automatic crash dump storage fallback');
 if (!renderer.includes('vertexBufferVertices') || !renderer.includes("format:srgb?'SRGB8_ALPHA8':'RGBA8'")) failures.push('renderer vertex/texture-format telemetry');
 if (!app.includes('wasmArtifactDiagnostics()') || !app.includes('deviceCapabilityDiagnostics()') || !app.includes('consoleTelemetry: diagnostics.getConsoleTelemetry(true)')) failures.push('deep artifact/device/console telemetry');
 if (world.diagnostics?.blackBoxCompleteness !== 'max-v1' || !world.diagnostics?.deepTelemetry?.includes('native-failure-history')) failures.push('max black-box diagnostics world contract');
