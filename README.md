@@ -26,3 +26,13 @@ Ironvale's terrain management layer is now `RiftLandscape`, an Unreal-Landscape-
 RiftLandscape organizes the world as **128 m components → 64 m render sections → 1 m source samples**. Sculpting writes into an active non-destructive edit layer, and enabled layers are composited back into the native heightfield. Layer enable/disable, ordering, locking, undo/redo snapshots and sparse draft serialization are first-class. Legacy `rift-terrain-edit-v2` drafts migrate into the default Sculpt layer.
 
 The landscape also owns sparse material weightmaps (grass/dirt/rock/gravel/mud/path slots), spline metadata hooks for future roads/rivers, dirty-component tracking, component streaming keys, collision-LOD policy hooks, and LOD hysteresis so section detail does not flap at distance thresholds. Material weight data and splines are foundation data in this milestone; terrain shader blending and spline deformation come on top of this architecture rather than replacing it.
+
+## RiftLandscape v3 terrain lock
+
+`RiftLandscape v3` is the frozen terrain foundation used before Ironvale moves into world-object authoring. Six terrain material layers now carry normalized weightmaps into a WebGL2 texture-array splat shader. Each layer can stream pinned RiftAssets albedo, OpenGL normal and roughness maps; the runtime downsizes the source 1K textures to a 512px GPU set for mobile memory pressure while retaining color fallbacks if a remote texture is unavailable.
+
+Landscape splines are Catmull-Rom smoothed and expose add/move/remove point editing, width/falloff and non-destructive flatten deformation. Edit layers can be renamed, reordered, hidden, locked, opacity-adjusted and deleted with layer-aware undo/redo and versioned draft migration.
+
+Terrain rendering now has per-component streaming plans, per-section frustum visibility, adaptive LOD hysteresis and a debug overlay for component/section/LOD inspection. Collision exposes real 1/2/4m distance-based sampling paths while keeping near-player support on the authoritative native heightfield. Mobile landscape rendering uses an adaptive 1.0–1.5 device-pixel-ratio cap based on rolling frame time.
+
+The locked format is `rift-landscape-v3` with `rift-landscape-edits-v2`. Older v2 landscape documents and v1 landscape edit drafts remain accepted through migration/validation paths.

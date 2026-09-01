@@ -29,10 +29,13 @@ if (world.terrain?.chunkSize !== 64 || world.terrain?.sectionSize !== 64) failur
 if (world.terrain?.componentSize !== 128) failures.push('terrain components must be 128m');
 if (JSON.stringify(world.terrain?.lod?.steps) !== JSON.stringify([1,2,4,8,16])) failures.push('adaptive terrain LOD steps');
 if (world.terrain?.lod?.neighborMaxLevelDelta !== 1 || world.terrain?.lod?.seamMode !== 'edge-morph') failures.push('terrain LOD seam contract');
-if (world.terrain?.landscape?.format !== 'rift-landscape-v2') failures.push('RiftLandscape v2 config');
+if (world.terrain?.landscape?.format !== 'rift-landscape-v3') failures.push('RiftLandscape v3 config');
 if (!Array.isArray(world.terrain?.landscape?.editLayers) || world.terrain.landscape.editLayers[0]?.id !== 'sculpt') failures.push('landscape edit layers');
 if (!Array.isArray(world.terrain?.landscape?.materialLayers) || world.terrain.landscape.materialLayers.length < 4) failures.push('landscape material weight layers');
 if (!(Number(world.terrain?.landscape?.lodHysteresis) > 0)) failures.push('landscape LOD hysteresis');
+if (!world.terrain.landscape.materialLayers.every(layer => typeof layer.texture === 'string' && typeof layer.normal === 'string' && typeof layer.roughness === 'string')) failures.push('terrain PBR texture sets');
+if (world.metadata?.terrainFoundationLocked !== true || world.metadata?.terrainSchemaVersion !== 3) failures.push('terrain foundation lock metadata');
+if (world.metadata?.frustumCulling !== true || world.metadata?.componentStreamingRuntime !== true || world.metadata?.collisionLodRuntime !== true) failures.push('terrain runtime optimization metadata');
 if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
 if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
 if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
@@ -40,9 +43,16 @@ if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('
 const app = fs.readFileSync('public/app.js', 'utf8');
 if (!app.includes('function updateTerrainLod(') || !app.includes('terrain.planSectionLods(')) failures.push('adaptive terrain LOD controller');
 if (!app.includes("import { RiftLandscape } from './rift-landscape.js?v=") || !app.includes('new RiftLandscape(worldDocument.terrain)')) failures.push('RiftLandscape runtime integration');
-if (!app.includes("ironvale:terrain:draft:v3") || !app.includes('serializeLandscapeEdits') || !app.includes('captureEditState')) failures.push('layer-aware terrain persistence/undo');
+if (!app.includes("ironvale:terrain:draft:v4") || !app.includes('serializeLandscapeEdits') || !app.includes('captureEditState')) failures.push('layer-aware terrain persistence/undo');
 if (!app.includes('refreshTerrainLayerControls') || !app.includes("$('#terrain-edit-layer')")) failures.push('terrain edit layer controls');
 if (!app.includes('function rebuildDirtyTerrainSections(')) failures.push('dirty terrain section rebuilds');
+if (!app.includes('createRiftTerrainMaterialRuntime') || !app.includes('terrainMaterialRuntime.loadInitial')) failures.push('terrain PBR material runtime hookup');
+if (!app.includes('function updateTerrainMeshVisibility(') || !app.includes('engine.isSphereVisible')) failures.push('terrain frustum culling');
+if (!app.includes('function refreshTerrainStreamPlan(') || !app.includes('planComponentStreaming')) failures.push('terrain component streaming runtime');
+if (!app.includes('function setTerrainDebug(') || !app.includes('createTerrainDebugOverlayGeometry')) failures.push('terrain debug overlay');
+if (!app.includes('function updateTerrainPerformance(') || !app.includes('MOBILE_TERRAIN_PIXEL_RATIO_MAX')) failures.push('mobile terrain performance controller');
+if (!app.includes('function updateActiveEditLayerName(') || !app.includes('function deleteActiveEditLayer(')) failures.push('terrain edit layer management');
+if (!app.includes('function moveLastSplinePointToReticle(') || !app.includes('function removeLastSplinePoint(')) failures.push('spline point editing tools');
 if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
 if (!app.includes('function applyBrushAtReticle(')) failures.push('reticle sculpt action');
@@ -69,6 +79,9 @@ if (!indexHtml.includes('id="combat-hud"') || !indexHtml.includes('id="rotate-de
 if (!indexHtml.includes('id="terrain-edit-layer"') || !indexHtml.includes('id="add-terrain-edit-layer"')) failures.push('RiftLandscape edit-layer UI');
 if (!indexHtml.includes('id="terrain-material-layer"') || !indexHtml.includes('data-brush="paint"') || !indexHtml.includes('data-brush="erase-material"')) failures.push('landscape material paint tools');
 if (!indexHtml.includes('id="terrain-spline"') || !indexHtml.includes('id="add-spline-point"') || !indexHtml.includes('id="spline-width"')) failures.push('landscape spline tools');
+if (!indexHtml.includes('id="terrain-layer-name"') || !indexHtml.includes('id="terrain-layer-opacity"') || !indexHtml.includes('id="delete-terrain-edit-layer"')) failures.push('landscape layer management tools');
+if (!indexHtml.includes('id="move-spline-point"') || !indexHtml.includes('id="remove-spline-point"')) failures.push('landscape spline point tools');
+if (!indexHtml.includes('id="terrain-debug-toggle"') || !indexHtml.includes('id="terrain-debug-readout"')) failures.push('terrain debug tools');
 if (!styles.includes('overflow-y:auto') || !styles.includes('scrollbar-gutter:stable') || !styles.includes('.terrain-tools::-webkit-scrollbar')) failures.push('scrollable terrain tools panel');
 if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
 
@@ -78,14 +91,23 @@ if (!characterRuntime.includes('DEFAULT_CHARACTER_MODEL_URL') || !characterRunti
 if (!characterRuntime.includes('accessor.bufferView != null') || !characterRuntime.includes('if (accessor.sparse)') || !characterRuntime.includes('sparse.indices') || !characterRuntime.includes('sparse.values')) failures.push('glTF zero-base/sparse accessor support');
 const renderer = fs.readFileSync('public/rift-engine.js', 'utf8');
 if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTexture') || !renderer.includes('createSkin(') || !renderer.includes('createTexture(')) failures.push('GPU character skinning/texturing');
+if (!renderer.includes('sampler2DArray uTerrainAlbedoArray') || !renderer.includes('uTerrainNormalArray') || !renderer.includes('uTerrainRoughnessArray') || !renderer.includes('createTextureArray(')) failures.push('GPU terrain PBR splat renderer');
+if (!renderer.includes('isSphereVisible(') || !renderer.includes('setPixelRatioCap(')) failures.push('renderer culling/performance controls');
+const terrainMaterials = fs.readFileSync('public/rift-terrain-materials.js', 'utf8');
+if (!terrainMaterials.includes('class RiftTerrainMaterialRuntime') || !terrainMaterials.includes('updateTextureArrayLayer') || !terrainMaterials.includes('resizeWidth')) failures.push('terrain material streaming runtime');
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 const landscape = fs.readFileSync('public/rift-landscape.js', 'utf8');
 if (!landscape.includes('paintMaterial(') || !landscape.includes('sampleMaterialWeights(') || !landscape.includes('sampleMaterialColor(') || !landscape.includes('buildSurfaceSectionGeometry(')) failures.push('visible landscape material weight blending');
-if (!landscape.includes('appendSplinePoint(') || !landscape.includes('_applySplineDeformation(') || !landscape.includes('updateSpline(')) failures.push('landscape spline deformation');
+if (!landscape.includes('_normalizeMaterialWeightsAtIndex(') || !landscape.includes('terrainWeights0') || !landscape.includes('terrainWeights1')) failures.push('normalized GPU terrain splat weights');
+if (!landscape.includes('appendSplinePoint(') || !landscape.includes('_applySplineDeformation(') || !landscape.includes('updateSpline(') || !landscape.includes('smoothSplinePolyline(')) failures.push('landscape spline deformation');
+if (!landscape.includes('updateSplinePoint(') || !landscape.includes('removeSplinePoint(')) failures.push('landscape spline point editing');
 if (!landscape.includes('captureEditState(') || !landscape.includes('serializeLandscapeEdits(') || !landscape.includes('importLegacyManualEdits(')) failures.push('RiftLandscape persistence architecture');
 if (!landscape.includes('planSectionLods(cameraX, cameraZ, previousPlan') || !landscape.includes('lodHysteresis')) failures.push('RiftLandscape LOD hysteresis');
 if (!landscape.includes('consumeDirtyComponents(') || !landscape.includes('streamKey')) failures.push('RiftLandscape component streaming hooks');
+if (!landscape.includes('planComponentStreaming(') || !landscape.includes('sectionRenderSphere(')) failures.push('RiftLandscape active streaming/culling plan');
+if (!landscape.includes('collisionLodStepAt(') || !landscape.includes('sampleHeightAtLod(') || !landscape.includes('supportAtPointCollision(')) failures.push('RiftLandscape collision LOD runtime');
+if (!landscape.includes('setEditLayerOpacity(') || !landscape.includes('validateLandscape(')) failures.push('RiftLandscape layer management/validation');
 if (!landscape.includes('setSpline(') || !landscape.includes('removeSpline(')) failures.push('RiftLandscape spline data hooks');
 if (!terrain.includes("import { RiftCore } from './rift-core.js'")) failures.push('terrain is not backed by RiftCore WASM');
 if (!terrain.includes('NATIVE.rift_terrain_apply_brush')) failures.push('terrain brush not native');

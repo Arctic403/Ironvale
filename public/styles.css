@@ -52,6 +52,14 @@ button{touch-action:manipulation}
 .landscape-spline-tools{margin-top:12px;padding-top:10px;border-top:1px solid #ffffff14}
 .landscape-spline-tools>strong{display:block;margin-bottom:7px;font-size:11px;color:#b8c9bc}
 .landscape-spline-tools .history-grid{margin-top:7px}
+.layer-management{margin-top:8px;padding:9px;border:1px solid #ffffff12;border-radius:10px;background:#0a120d99}
+.layer-management>input{height:36px;padding:0 9px;border:1px solid #ffffff20;border-radius:8px;background:#101b15;color:#f1f6f2;outline:none}
+.layer-action-grid{display:grid;grid-template-columns:42px 42px 1fr 1fr;gap:6px;margin-top:7px}
+.layer-action-grid button{min-height:34px}
+.layer-management>label{margin-top:8px}
+.terrain-debug-tools{margin-top:12px;padding-top:10px;border-top:1px solid #ffffff14}
+.terrain-debug-tools small{display:block;margin-top:7px;color:#9fb0a3;font:700 10px/1.35 monospace;white-space:pre-line}
+#terrain-debug-toggle.active{border-color:#f0c46c;background:#4c3a19}
 .history-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
 .terrain-tools .wide{width:100%;margin-top:8px}
 .terrain-tools .danger{border-color:#d26a6480;color:#ffd2ce;background:#321816}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101a16">
   <title>Ironvale</title>
-  <link rel="stylesheet" href="/styles.css?v=20260831-landscape-tools-r2">
+  <link rel="stylesheet" href="/styles.css?v=20260901-terrain-lock-r1">
 </head>
 <body>
   <section id="auth-screen" class="screen">
@@ -71,6 +71,17 @@
         <label class="landscape-layer-label">Edit Layer <select id="terrain-edit-layer" aria-label="Terrain edit layer"></select></label>
         <button id="add-terrain-edit-layer" type="button">+ Layer</button>
       </div>
+      <div class="layer-management">
+        <input id="terrain-layer-name" maxlength="32" aria-label="Terrain layer name" placeholder="Layer name">
+        <div class="layer-action-grid">
+          <button id="terrain-layer-up" type="button" aria-label="Move layer up">↑</button>
+          <button id="terrain-layer-down" type="button" aria-label="Move layer down">↓</button>
+          <button id="terrain-layer-visible" type="button">Visible</button>
+          <button id="terrain-layer-lock" type="button">Lock</button>
+        </div>
+        <label>Opacity <span id="terrain-layer-opacity-value">100%</span><input id="terrain-layer-opacity" type="range" min="0" max="1" step="0.05" value="1"></label>
+        <button id="delete-terrain-edit-layer" class="wide danger" type="button">Delete Edit Layer</button>
+      </div>
 
       <label class="landscape-layer-label landscape-material-label">Material <select id="terrain-material-layer" aria-label="Terrain material layer"></select></label>
 
@@ -78,9 +89,15 @@
         <strong>Landscape Spline</strong>
         <label class="landscape-layer-label">Spline <select id="terrain-spline" aria-label="Landscape spline"></select></label>
         <div class="history-grid"><button id="new-terrain-spline" type="button">New Spline</button><button id="add-spline-point" type="button">Add Point</button></div>
+        <div class="history-grid"><button id="move-spline-point" type="button">Move Last</button><button id="remove-spline-point" type="button">Remove Last</button></div>
         <label>Width <span id="spline-width-value">6m</span><input id="spline-width" type="range" min="2" max="24" step="1" value="6"></label>
         <label>Falloff <span id="spline-falloff-value">4m</span><input id="spline-falloff" type="range" min="0" max="16" step="1" value="4"></label>
         <button id="clear-terrain-spline" class="wide" type="button">Clear Spline Points</button>
+      </div>
+
+      <div class="terrain-debug-tools">
+        <button id="terrain-debug-toggle" class="wide" type="button">Terrain Debug</button>
+        <small id="terrain-debug-readout">Debug overlay off.</small>
       </div>
 
       <label>Radius <span id="radius-value">10m</span><input id="brush-radius" type="range" min="2" max="40" step="1" value="10"></label>
@@ -128,6 +145,6 @@
     <div class="look-hint">Swipe: look · tap enemy: target</div>
   </main>
 
-  <script type="module" src="/app.js?v=20260831-landscape-tools-r2"></script>
+  <script type="module" src="/app.js?v=20260901-terrain-lock-r1"></script>
 </body>
 </html>

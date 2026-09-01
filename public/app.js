@@ -1,5 +1,6 @@
 import { RiftEngine } from './rift-engine.js?v=20260831-character-freecam-r2';
-import { RiftLandscape } from './rift-landscape.js?v=20260831-rift-landscape-v3';
+import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
+import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';
 
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
@@ -27,10 +28,20 @@ const freecamSpeedInput = $('#freecam-speed');
 const freecamSpeedValue = $('#freecam-speed-value');
 const editLayerSelect = $('#terrain-edit-layer');
 const addEditLayerButton = $('#add-terrain-edit-layer');
+const editLayerNameInput = $('#terrain-layer-name');
+const editLayerUpButton = $('#terrain-layer-up');
+const editLayerDownButton = $('#terrain-layer-down');
+const editLayerVisibleButton = $('#terrain-layer-visible');
+const editLayerLockButton = $('#terrain-layer-lock');
+const editLayerOpacityInput = $('#terrain-layer-opacity');
+const editLayerOpacityValue = $('#terrain-layer-opacity-value');
+const deleteEditLayerButton = $('#delete-terrain-edit-layer');
 const materialLayerSelect = $('#terrain-material-layer');
 const splineSelect = $('#terrain-spline');
 const newSplineButton = $('#new-terrain-spline');
 const addSplinePointButton = $('#add-spline-point');
+const moveSplinePointButton = $('#move-spline-point');
+const removeSplinePointButton = $('#remove-spline-point');
 const clearSplineButton = $('#clear-terrain-spline');
 const splineWidthInput = $('#spline-width');
 const splineWidthValue = $('#spline-width-value');
@@ -44,11 +55,13 @@ const targetName = $('#target-name');
 const lockTargetButton = $('#lock-target-button');
 const basicAttackButton = $('#basic-attack-button');
 const lookHint = $('.look-hint');
+const terrainDebugToggle = $('#terrain-debug-toggle');
+const terrainDebugReadout = $('#terrain-debug-readout');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
-const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v3';
-const LEGACY_LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v2';
+const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v4';
+const LEGACY_LOCAL_DRAFT_KEYS = ['ironvale:terrain:draft:v3', 'ironvale:terrain:draft:v2'];
 const MAX_HISTORY = 10;
 const LONG_PRESS_MS = 260;
 const LOOK_START_PX = 9;
@@ -77,6 +90,10 @@ const TARGET_TAP_MAX_MS = 260;
 const TARGET_TAP_MAX_PX = 9;
 const TARGET_PICK_MAX_DISTANCE = 80;
 const AUTO_ATTACK_RANGE = 5.5;
+const MOBILE_TERRAIN_PIXEL_RATIO_MAX = 1.5;
+const MOBILE_TERRAIN_PIXEL_RATIO_MIN = 1.0;
+const TERRAIN_PERF_SAMPLE_FRAMES = 90;
+const TERRAIN_DEBUG_UPDATE_MS = 250;
 
 let authMode = 'login';
 let engine = null;
@@ -84,7 +101,15 @@ let terrain = null;
 let worldDocument = null;
 let terrainMeshes = new Map();
 let terrainLodPlan = new Map();
+let terrainStreamPlan = null;
+let terrainMaterialRuntime = null;
+let terrainDebugEnabled = false;
+let terrainDebugMesh = null;
+let lastTerrainDebugUpdate = 0;
 let lastTerrainLodRefresh = 0;
+let terrainPerfFrameCount = 0;
+let terrainPerfFrameMs = 0;
+let terrainPerfAverageMs = 0;
 let playerMesh = null;
 let playerCharacter = null;
 let playerVisualFeetAnchored = false;
@@ -174,13 +199,24 @@ editLayerSelect?.addEventListener('change', () => {
 });
 addEditLayerButton?.addEventListener('click', () => {
   if (!terrain?.createEditLayer) return;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
   const created = terrain.createEditLayer(`Layer ${terrain.listEditLayers().length + 1}`);
   refreshTerrainLayerControls();
+  saveDraftSilently();
   editorStatus.textContent = `Created non-destructive terrain layer: ${created?.name || 'Layer'}.`;
 });
+editLayerNameInput?.addEventListener('change', updateActiveEditLayerName);
+editLayerUpButton?.addEventListener('click', () => moveActiveEditLayer(-1));
+editLayerDownButton?.addEventListener('click', () => moveActiveEditLayer(1));
+editLayerVisibleButton?.addEventListener('click', toggleActiveEditLayerVisibility);
+editLayerLockButton?.addEventListener('click', toggleActiveEditLayerLock);
+editLayerOpacityInput?.addEventListener('change', updateActiveEditLayerOpacity);
+deleteEditLayerButton?.addEventListener('click', deleteActiveEditLayer);
 materialLayerSelect?.addEventListener('change', () => {
   if (!terrain?.setActiveMaterialLayer?.(materialLayerSelect.value)) return;
   refreshTerrainLayerControls();
+  void terrainMaterialRuntime?.loadLayer?.(materialLayerSelect.value);
   editorStatus.textContent = `Painting terrain material: ${terrain.activeMaterialLayer?.name || materialLayerSelect.value}.`;
 });
 splineSelect?.addEventListener('change', () => {
@@ -189,7 +225,10 @@ splineSelect?.addEventListener('change', () => {
 });
 newSplineButton?.addEventListener('click', createTerrainSpline);
 addSplinePointButton?.addEventListener('click', addSplinePointAtReticle);
+moveSplinePointButton?.addEventListener('click', moveLastSplinePointToReticle);
+removeSplinePointButton?.addEventListener('click', removeLastSplinePoint);
 clearSplineButton?.addEventListener('click', clearActiveTerrainSpline);
+terrainDebugToggle?.addEventListener('click', () => setTerrainDebug(!terrainDebugEnabled));
 splineWidthInput?.addEventListener('change', updateActiveSplineSettings);
 splineFalloffInput?.addEventListener('change', updateActiveSplineSettings);
 $('#undo-terrain').addEventListener('click', undoTerrain);
@@ -276,11 +315,19 @@ async function startWorld(url) {
   if (!response.ok) throw new Error(`Terrain failed to load (${response.status})`);
   worldDocument = await response.json();
   terrain = new RiftLandscape(worldDocument.terrain);
+  const terrainValidation = terrain.validateLandscape?.();
+  if (terrainValidation && !terrainValidation.ok) throw new Error(`Terrain validation failed: ${terrainValidation.errors.join('; ')}`);
   restoreLocalDraft();
   refreshTerrainLayerControls();
   engine = new RiftEngine(canvas);
   engine.environment.fogNear = 320;
   engine.environment.fogFar = 1200;
+  engine.setPixelRatioCap(isMobileLandscapeGameplay() ? MOBILE_TERRAIN_PIXEL_RATIO_MAX : 2);
+  const materialTextureSize = clamp(Math.trunc(Number(worldDocument?.terrain?.landscape?.mobilePerformance?.materialTextureSize) || 512), 128, 1024);
+  terrainMaterialRuntime = createRiftTerrainMaterialRuntime(engine, terrain, { size: materialTextureSize });
+  void terrainMaterialRuntime.loadInitial().then(() => {
+    if (terrainMaterialRuntime?.terrain === terrain) terrainStatus.textContent = `${terrainStatus.textContent} · terrain PBR ready`;
+  });
   const spawn = worldDocument?.anchors?.starter_spawn || { x: 320, z: 320 };
   if (!terrain.containsXZ(player.x, player.z)) {
     player.x = spawn.x;
@@ -313,12 +360,21 @@ function stopWorld() {
   cancelGesture();
   cancelAnimationFrame(animationFrame);
   animationFrame = 0;
+  if (terrainMaterialRuntime) terrainMaterialRuntime.destroy();
+  terrainMaterialRuntime = null;
   if (engine) engine.destroy();
   engine = null;
   terrain = null;
   worldDocument = null;
   terrainMeshes = new Map();
   terrainLodPlan = new Map();
+  terrainStreamPlan = null;
+  terrainDebugEnabled = false;
+  terrainDebugMesh = null;
+  lastTerrainDebugUpdate = 0;
+  terrainPerfFrameCount = 0;
+  terrainPerfFrameMs = 0;
+  terrainPerfAverageMs = 0;
   lastTerrainLodRefresh = 0;
   playerMesh = null;
   playerCharacter = null;
@@ -336,6 +392,8 @@ function stopWorld() {
   hardLockEnabled = false;
   viewportCameraProfile = '';
   worldScreen.classList.remove('freecam');
+  terrainDebugToggle?.classList.remove('active');
+  if (terrainDebugReadout) terrainDebugReadout.textContent = 'Debug overlay off.';
   freecamButton.classList.remove('active');
   freecamButton.textContent = 'Freecam';
   reticle.hidden = true;
@@ -362,6 +420,45 @@ function sectionSignature(section, neighbors) {
   ].join(':');
 }
 
+function refreshTerrainStreamPlan(cameraX = player.x, cameraZ = player.z) {
+  terrainStreamPlan = terrain?.planComponentStreaming?.(cameraX, cameraZ) || null;
+  return terrainStreamPlan;
+}
+
+function sectionIsStreamed(section) {
+  return !terrainStreamPlan?.render || terrainStreamPlan.render.has(section.componentId);
+}
+
+function removeUnstreamedTerrainMeshes() {
+  if (!engine || !terrainStreamPlan?.render) return;
+  for (const [key, entry] of terrainMeshes) {
+    if (terrainStreamPlan.render.has(entry.componentId)) continue;
+    if (entry.mesh) engine.removeMesh(entry.mesh);
+    terrainMeshes.delete(key);
+  }
+}
+
+function updateTerrainMeshVisibility(now = performance.now()) {
+  if (!engine || !terrain) return;
+  let visible = 0;
+  for (const [key, entry] of terrainMeshes) {
+    const section = terrainLodPlan.get(key);
+    if (!section || !sectionIsStreamed(section)) {
+      if (entry.mesh) entry.mesh.visible = false;
+      continue;
+    }
+    const sphere = terrain.sectionRenderSphere?.(section);
+    const inView = sphere ? engine.isSphereVisible(sphere.center, sphere.radius) : true;
+    entry.mesh.visible = inView;
+    if (inView) visible += 1;
+  }
+  if (terrainDebugEnabled && now - lastTerrainDebugUpdate >= TERRAIN_DEBUG_UPDATE_MS) {
+    lastTerrainDebugUpdate = now;
+    rebuildTerrainDebugOverlay();
+    refreshTerrainDebugReadout(visible);
+  }
+}
+
 function buildTerrainSection(section, plan = terrainLodPlan, force = false) {
   if (!engine || !terrain || !section) return;
   const key = section.key;
@@ -378,15 +475,19 @@ function buildTerrainSection(section, plan = terrainLodPlan, force = false) {
   );
   if (existing?.mesh) {
     engine.updateMesh(existing.mesh, entry.geometry || entry);
+    terrainMaterialRuntime?.attach(existing.mesh);
     existing.lodStep = section.lodStep;
     existing.signature = signature;
     existing.componentId = section.componentId;
+    existing.triangles = Number(entry.triangles) || 0;
   } else {
+    const mesh = engine.addMesh(entry.geometry || entry, { terrainMaterial: terrainMaterialRuntime?.material || null });
     terrainMeshes.set(key, {
-      mesh: engine.addMesh(entry.geometry || entry),
+      mesh,
       lodStep: section.lodStep,
       signature,
-      componentId: section.componentId
+      componentId: section.componentId,
+      triangles: Number(entry.triangles) || 0
     });
   }
 }
@@ -396,11 +497,17 @@ function rebuildTerrainMeshes() {
   for (const entry of terrainMeshes.values()) if (entry?.mesh) engine.removeMesh(entry.mesh);
   terrainMeshes.clear();
 
-  terrainLodPlan = terrain.planSectionLods(player.x, player.z);
-  for (const section of terrainLodPlan.values()) buildTerrainSection(section, terrainLodPlan, true);
+  const cameraX = Number(lastCameraPosition?.[0]);
+  const cameraZ = Number(lastCameraPosition?.[2]);
+  const originX = Number.isFinite(cameraX) ? cameraX : player.x;
+  const originZ = Number.isFinite(cameraZ) ? cameraZ : player.z;
+  refreshTerrainStreamPlan(originX, originZ);
+  terrainLodPlan = terrain.planSectionLods(originX, originZ);
+  for (const section of terrainLodPlan.values()) if (sectionIsStreamed(section)) buildTerrainSection(section, terrainLodPlan, true);
   terrain.consumeDirtySections();
   lastTerrainLodRefresh = performance.now();
   rebuildBrushMarker();
+  updateTerrainMeshVisibility(lastTerrainLodRefresh);
 }
 
 function lodSummary() {
@@ -416,18 +523,22 @@ function lodSummary() {
 
 function updateTerrainLod(now = performance.now(), force = false) {
   if (!engine || !terrain) return;
-  if (!force && now - lastTerrainLodRefresh < TERRAIN_LOD_REFRESH_MS) return;
+  if (!force && now - lastTerrainLodRefresh < TERRAIN_LOD_REFRESH_MS) {
+    updateTerrainMeshVisibility(now);
+    return;
+  }
   lastTerrainLodRefresh = now;
 
   const cameraX = Number(lastCameraPosition?.[0]);
   const cameraZ = Number(lastCameraPosition?.[2]);
-  const nextPlan = terrain.planSectionLods(
-    Number.isFinite(cameraX) ? cameraX : player.x,
-    Number.isFinite(cameraZ) ? cameraZ : player.z,
-    terrainLodPlan
-  );
+  const resolvedX = Number.isFinite(cameraX) ? cameraX : player.x;
+  const resolvedZ = Number.isFinite(cameraZ) ? cameraZ : player.z;
+  refreshTerrainStreamPlan(resolvedX, resolvedZ);
+  removeUnstreamedTerrainMeshes();
 
+  const nextPlan = terrain.planSectionLods(resolvedX, resolvedZ, terrainLodPlan);
   for (const section of nextPlan.values()) {
+    if (!sectionIsStreamed(section)) continue;
     const neighbors = terrain.sectionNeighborLods(nextPlan, section.sectionX, section.sectionZ, section.lodStep);
     const signature = sectionSignature(section, neighbors);
     const existing = terrainMeshes.get(section.key);
@@ -435,16 +546,19 @@ function updateTerrainLod(now = performance.now(), force = false) {
   }
 
   terrainLodPlan = nextPlan;
+  updateTerrainMeshVisibility(now);
 }
 
 function rebuildDirtyTerrainSections() {
   if (!engine || !terrain) return;
   if (!terrainLodPlan.size) terrainLodPlan = terrain.planSectionLods(player.x, player.z);
+  if (!terrainStreamPlan) refreshTerrainStreamPlan(player.x, player.z);
   const dirty = terrain.consumeDirtySections();
   for (const key of dirty) {
     const section = terrainLodPlan.get(key);
-    if (section) buildTerrainSection(section, terrainLodPlan, true);
+    if (section && sectionIsStreamed(section)) buildTerrainSection(section, terrainLodPlan, true);
   }
+  updateTerrainMeshVisibility();
 }
 
 function rebuildTerrainArea(x, z, radius) {
@@ -453,9 +567,17 @@ function rebuildTerrainArea(x, z, radius) {
   rebuildDirtyTerrainSections();
 }
 
+function collisionSupportHeight(x, z, aroundY, options = {}) {
+  if (!terrain) return null;
+  if (terrain.supportAtPointCollision) {
+    return terrain.supportAtPointCollision(x, z, aroundY, player.x, player.z, options)?.height ?? null;
+  }
+  return terrain.supportAtPoint(x, z, aroundY, options);
+}
+
 function snapPlayerToSupport() {
   if (!terrain) return;
-  const surface = terrain.supportAtPoint(player.x, player.z, player.y - .9, { maxRise: 1000, maxDrop: 10000 });
+  const surface = collisionSupportHeight(player.x, player.z, player.y - .9, { maxRise: 1000, maxDrop: 10000 });
   if (surface != null) {
     player.y = surface + .9;
     player.vy = 0;
@@ -580,6 +702,7 @@ function frame(now) {
   updateCamera();
   updateTerrainLod(now);
   updateReticleTarget();
+  updateTerrainPerformance(dt);
   engine.render();
 
   coords.textContent = freecamEnabled
@@ -591,6 +714,23 @@ function frame(now) {
     savePosition();
   }
   animationFrame = requestAnimationFrame(frame);
+}
+
+function updateTerrainPerformance(dt) {
+  if (!engine) return;
+  terrainPerfFrameCount += 1;
+  terrainPerfFrameMs += dt * 1000;
+  if (terrainPerfFrameCount < TERRAIN_PERF_SAMPLE_FRAMES) return;
+  terrainPerfAverageMs = terrainPerfFrameMs / terrainPerfFrameCount;
+  terrainPerfFrameCount = 0;
+  terrainPerfFrameMs = 0;
+
+  if (isMobileLandscapeGameplay()) {
+    let cap = Number(engine.pixelRatioCap) || MOBILE_TERRAIN_PIXEL_RATIO_MAX;
+    if (terrainPerfAverageMs > 22 && cap > MOBILE_TERRAIN_PIXEL_RATIO_MIN) cap -= .25;
+    else if (terrainPerfAverageMs < 15 && cap < MOBILE_TERRAIN_PIXEL_RATIO_MAX) cap += .25;
+    engine.setPixelRatioCap(clamp(cap, MOBILE_TERRAIN_PIXEL_RATIO_MIN, MOBILE_TERRAIN_PIXEL_RATIO_MAX));
+  }
 }
 
 function updateKeyboardInput() {
@@ -621,7 +761,7 @@ function updatePlayer(dt) {
     const speed = 7.2;
     const nextX = clamp(player.x + dx * speed * dt, terrain.origin[0] + .5, terrain.origin[0] + terrain.width - .5);
     const nextZ = clamp(player.z + dz * speed * dt, terrain.origin[2] + .5, terrain.origin[2] + terrain.depth - .5);
-    const support = terrain.supportAtPoint(nextX, nextZ, player.y - .9, { maxRise: .9, maxDrop: 3.2 });
+    const support = collisionSupportHeight(nextX, nextZ, player.y - .9, { maxRise: .9, maxDrop: 3.2 });
     player.x = nextX;
     player.z = nextZ;
     player.yaw = Math.atan2(dx, dz);
@@ -635,7 +775,7 @@ function updatePlayer(dt) {
   if (!player.grounded) {
     player.vy -= 18 * dt;
     player.y += player.vy * dt;
-    const support = terrain.supportAtPoint(player.x, player.z, player.y - .9, { maxRise: .35, maxDrop: 1.5 });
+    const support = collisionSupportHeight(player.x, player.z, player.y - .9, { maxRise: .35, maxDrop: 1.5 });
     if (support != null && player.y - .9 <= support + .25) {
       player.y = support + .9;
       player.vy = 0;
@@ -670,10 +810,12 @@ function applyViewportCameraProfile(force = false) {
     orbitCamera.distance = MOBILE_LANDSCAPE_DISTANCE;
     orbitCamera.fov = MOBILE_LANDSCAPE_FOV;
     orbitCamera.pitch = MOBILE_LANDSCAPE_PITCH;
+    engine?.setPixelRatioCap(Math.min(MOBILE_TERRAIN_PIXEL_RATIO_MAX, engine.pixelRatioCap || MOBILE_TERRAIN_PIXEL_RATIO_MAX));
   } else {
     orbitCamera.distance = DEFAULT_ORBIT_DISTANCE;
     orbitCamera.fov = Math.PI / 3;
     orbitCamera.pitch = .34;
+    engine?.setPixelRatioCap(2);
   }
   if (engine && !freecamEnabled) updateOrbitCamera();
 }
@@ -1414,7 +1556,7 @@ function serializeTerrainEdits() {
 
 function applySerializedEdits(data) {
   if (!terrain || !data) return false;
-  if (data.format === 'rift-landscape-edits-v1') return terrain.applySerializedLandscapeEdits?.(data) === true;
+  if (String(data.format || '').startsWith('rift-landscape-edits-v')) return terrain.applySerializedLandscapeEdits?.(data) === true;
   if (data.format === 'rift-terrain-edit-v2') return terrain.importLegacyManualEdits?.(data) === true;
   return false;
 }
@@ -1436,8 +1578,13 @@ function restoreLocalDraft() {
   try {
     const current = localStorage.getItem(LOCAL_DRAFT_KEY);
     if (current && applySerializedEdits(JSON.parse(current))) return;
-    const legacy = localStorage.getItem(LEGACY_LOCAL_DRAFT_KEY);
-    if (legacy && applySerializedEdits(JSON.parse(legacy))) saveDraftSilently();
+    for (const key of LEGACY_LOCAL_DRAFT_KEYS) {
+      const legacy = localStorage.getItem(key);
+      if (legacy && applySerializedEdits(JSON.parse(legacy))) {
+        saveDraftSilently();
+        return;
+      }
+    }
   } catch {}
 }
 
@@ -1470,7 +1617,10 @@ function resetTerrain() {
   pushUndo(captureTerrainState());
   redoStack.length = 0;
   terrain = new RiftLandscape(worldDocument.terrain);
-  try { localStorage.removeItem(LOCAL_DRAFT_KEY); localStorage.removeItem(LEGACY_LOCAL_DRAFT_KEY); } catch {}
+  try {
+    localStorage.removeItem(LOCAL_DRAFT_KEY);
+    for (const key of LEGACY_LOCAL_DRAFT_KEYS) localStorage.removeItem(key);
+  } catch {}
   rebuildTerrainMeshes();
   snapPlayerToSupport();
   updateReticleTarget();
@@ -1479,26 +1629,112 @@ function resetTerrain() {
   editorStatus.textContent = 'Back to a perfectly flat blank canvas.';
 }
 
+function commitTerrainManagementEdit(label, mutation, { rebuild = true } = {}) {
+  if (!terrain || typeof mutation !== 'function') return false;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  const changed = mutation();
+  if (changed === false || changed == null) {
+    undoStack.pop();
+    return false;
+  }
+  if (rebuild) rebuildDirtyTerrainSections();
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = label;
+  return true;
+}
+
+function activeEditLayerInfo() {
+  return (terrain?.listEditLayers?.() || []).find(layer => layer.id === terrain.activeEditLayerId) || null;
+}
+
+function updateActiveEditLayerName() {
+  const layer = activeEditLayerInfo();
+  if (!layer || !editLayerNameInput) return;
+  const name = editLayerNameInput.value.trim();
+  if (!name || name === layer.name) return;
+  commitTerrainManagementEdit(`Renamed terrain layer to ${name}.`, () => terrain.renameEditLayer(layer.id, name), { rebuild: false });
+}
+
+function moveActiveEditLayer(direction) {
+  const layers = terrain?.listEditLayers?.() || [];
+  const layer = activeEditLayerInfo();
+  if (!layer) return;
+  const target = clamp(layer.order + Math.sign(Number(direction) || 0), 0, layers.length - 1);
+  if (target === layer.order) return;
+  commitTerrainManagementEdit(`Moved ${layer.name} to layer ${target + 1}.`, () => terrain.moveEditLayer(layer.id, target));
+}
+
+function toggleActiveEditLayerVisibility() {
+  const layer = activeEditLayerInfo();
+  if (!layer) return;
+  commitTerrainManagementEdit(`${layer.name} ${layer.enabled ? 'hidden' : 'visible'}.`, () => terrain.setEditLayerEnabled(layer.id, !layer.enabled));
+}
+
+function toggleActiveEditLayerLock() {
+  const layer = activeEditLayerInfo();
+  if (!layer) return;
+  commitTerrainManagementEdit(`${layer.name} ${layer.locked ? 'unlocked' : 'locked'}.`, () => terrain.setEditLayerLocked(layer.id, !layer.locked), { rebuild: false });
+}
+
+function updateActiveEditLayerOpacity() {
+  const layer = activeEditLayerInfo();
+  if (!layer || !editLayerOpacityInput) return;
+  const opacity = clamp(Number(editLayerOpacityInput.value), 0, 1);
+  if (Math.abs(opacity - layer.opacity) < .001) return;
+  commitTerrainManagementEdit(`${layer.name} opacity ${Math.round(opacity * 100)}%.`, () => terrain.setEditLayerOpacity(layer.id, opacity));
+}
+
+function deleteActiveEditLayer() {
+  const layers = terrain?.listEditLayers?.() || [];
+  const layer = activeEditLayerInfo();
+  if (!layer || layers.length <= 1) return;
+  commitTerrainManagementEdit(`Deleted terrain layer ${layer.name}.`, () => terrain.deleteEditLayer(layer.id));
+}
+
 function refreshTerrainLayerControls() {
   const layers = terrain?.listEditLayers?.() || [];
   if (editLayerSelect) {
     editLayerSelect.replaceChildren(...layers.map(layer => {
       const option = document.createElement('option');
       option.value = layer.id;
-      option.textContent = `${layer.name}${layer.locked ? ' 🔒' : ''}`;
-      option.disabled = layer.locked;
+      option.textContent = `${layer.name}${layer.locked ? ' 🔒' : ''}${layer.enabled ? '' : ' · hidden'}`;
       return option;
     }));
     if (terrain?.activeEditLayerId) editLayerSelect.value = terrain.activeEditLayerId;
   }
   if (addEditLayerButton) addEditLayerButton.disabled = !terrain?.createEditLayer;
+  const activeLayer = layers.find(layer => layer.id === terrain?.activeEditLayerId) || null;
+  if (editLayerNameInput) {
+    editLayerNameInput.disabled = !activeLayer;
+    editLayerNameInput.value = activeLayer?.name || '';
+  }
+  if (editLayerUpButton) editLayerUpButton.disabled = !activeLayer || activeLayer.order <= 0;
+  if (editLayerDownButton) editLayerDownButton.disabled = !activeLayer || activeLayer.order >= layers.length - 1;
+  if (editLayerVisibleButton) {
+    editLayerVisibleButton.disabled = !activeLayer;
+    editLayerVisibleButton.classList.toggle('active', Boolean(activeLayer?.enabled));
+    editLayerVisibleButton.textContent = activeLayer?.enabled ? 'Visible' : 'Hidden';
+  }
+  if (editLayerLockButton) {
+    editLayerLockButton.disabled = !activeLayer;
+    editLayerLockButton.classList.toggle('active', Boolean(activeLayer?.locked));
+    editLayerLockButton.textContent = activeLayer?.locked ? 'Locked' : 'Lock';
+  }
+  if (editLayerOpacityInput) {
+    editLayerOpacityInput.disabled = !activeLayer;
+    editLayerOpacityInput.value = String(activeLayer?.opacity ?? 1);
+  }
+  if (editLayerOpacityValue) editLayerOpacityValue.textContent = `${Math.round((activeLayer?.opacity ?? 1) * 100)}%`;
+  if (deleteEditLayerButton) deleteEditLayerButton.disabled = !activeLayer || layers.length <= 1;
 
   const materials = terrain?.listMaterialLayers?.() || [];
   if (materialLayerSelect) {
     materialLayerSelect.replaceChildren(...materials.map(layer => {
       const option = document.createElement('option');
       option.value = layer.id;
-      option.textContent = `${layer.name}${layer.base ? ' · base' : ''}`;
+      option.textContent = `${layer.name}${layer.base ? ' · base' : ''}${layer.texture ? ' · PBR' : ''}`;
       return option;
     }));
     if (terrain?.activeMaterialLayerId) materialLayerSelect.value = terrain.activeMaterialLayerId;
@@ -1528,6 +1764,8 @@ function refreshTerrainLayerControls() {
   if (splineWidthValue) splineWidthValue.textContent = `${activeSpline ? Number(activeSpline.width || 6).toFixed(0) : 0}m`;
   if (splineFalloffValue) splineFalloffValue.textContent = `${activeSpline ? Number(activeSpline.falloff || 4).toFixed(0) : 0}m`;
   if (addSplinePointButton) addSplinePointButton.disabled = !terrain?.appendSplinePoint;
+  if (moveSplinePointButton) moveSplinePointButton.disabled = !activeSpline?.points?.length;
+  if (removeSplinePointButton) removeSplinePointButton.disabled = !activeSpline?.points?.length;
   if (clearSplineButton) clearSplineButton.disabled = !activeSpline || !(activeSpline.points?.length);
   if (newSplineButton) newSplineButton.disabled = !terrain?.createSpline;
 }
@@ -1567,6 +1805,44 @@ function addSplinePointAtReticle() {
   refreshTerrainLayerControls();
   saveDraftSilently();
   editorStatus.textContent = `${spline?.name || 'Spline'} point added · ${spline?.points?.length || 0} points.`;
+}
+
+function moveLastSplinePointToReticle() {
+  const spline = terrain?.activeSpline;
+  if (!terrain?.updateSplinePoint || !spline?.points?.length) return;
+  if (!freecamEnabled) {
+    editorStatus.textContent = 'Enter Freecam to move spline points.';
+    return;
+  }
+  updateCamera();
+  updateReticleTarget();
+  if (!reticleHit) {
+    editorStatus.textContent = 'Aim the centered reticle at terrain first.';
+    return;
+  }
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  terrain.updateSplinePoint(spline.id, spline.points.length - 1, { x: reticleHit.x, y: reticleHit.y, z: reticleHit.z });
+  rebuildDirtyTerrainSections();
+  snapPlayerToSupport();
+  updateReticleTarget();
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = `${spline.name} last point moved.`;
+}
+
+function removeLastSplinePoint() {
+  const spline = terrain?.activeSpline;
+  if (!terrain?.removeSplinePoint || !spline?.points?.length) return;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  terrain.removeSplinePoint(spline.id, spline.points.length - 1);
+  rebuildDirtyTerrainSections();
+  snapPlayerToSupport();
+  updateReticleTarget();
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = `${spline.name} last point removed.`;
 }
 
 function clearActiveTerrainSpline() {
@@ -1747,6 +2023,107 @@ function applyCameraLookDelta(camera, dx, dy, minPitch, maxPitch) {
 
 function freecamForward() {
   return cameraForward(freecam.yaw, freecam.pitch);
+}
+
+function setTerrainDebug(enabled) {
+  terrainDebugEnabled = Boolean(enabled) && Boolean(engine) && Boolean(terrain);
+  terrainDebugToggle?.classList.toggle('active', terrainDebugEnabled);
+  if (!terrainDebugEnabled) {
+    if (terrainDebugMesh && engine) engine.removeMesh(terrainDebugMesh);
+    terrainDebugMesh = null;
+    if (terrainDebugReadout) terrainDebugReadout.textContent = 'Debug overlay off.';
+    return;
+  }
+  rebuildTerrainDebugOverlay();
+  refreshTerrainDebugReadout();
+}
+
+function refreshTerrainDebugReadout(visibleOverride = null) {
+  if (!terrainDebugReadout || !terrain) return;
+  let visible = Number.isFinite(Number(visibleOverride)) ? Number(visibleOverride) : 0;
+  let triangles = 0;
+  for (const entry of terrainMeshes.values()) {
+    if (entry.mesh?.visible) {
+      if (!Number.isFinite(Number(visibleOverride))) visible += 1;
+      triangles += Number(entry.triangles) || 0;
+    }
+  }
+  const activeComponents = terrainStreamPlan?.active?.size ?? terrain.componentCounts().x * terrain.componentCounts().z;
+  const preloadComponents = terrainStreamPlan?.preload?.size ?? 0;
+  const collision = terrain.collisionLodStepAt?.(
+    player.x, player.z,
+    Number(lastCameraPosition?.[0]) || player.x,
+    Number(lastCameraPosition?.[2]) || player.z
+  ) ?? 1;
+  const fps = terrainPerfAverageMs > 0 ? Math.round(1000 / terrainPerfAverageMs) : 0;
+  terrainDebugReadout.textContent =
+    `sections ${visible}/${terrainMeshes.size} · tris ${Math.round(triangles).toLocaleString()}\n` +
+    `components active ${activeComponents} + preload ${preloadComponents} · collision LOD ${collision}m\n` +
+    `render ${engine?.pixelRatioCap?.toFixed?.(2) || '1.00'}x cap · ${fps ? `${fps} fps avg` : 'warming up'}`;
+}
+
+function debugStrip(vertices, indices, ax, az, bx, bz, width, color) {
+  const ay = (terrain?.sampleHeight(ax, az) ?? terrain?.baseHeight ?? 0) + .08;
+  const by = (terrain?.sampleHeight(bx, bz) ?? terrain?.baseHeight ?? 0) + .08;
+  const dx = bx - ax, dz = bz - az;
+  const length = Math.hypot(dx, dz) || 1;
+  const px = -dz / length * width * .5, pz = dx / length * width * .5;
+  const base = vertices.length / 9;
+  for (const [x, y, z] of [
+    [ax + px, ay, az + pz], [ax - px, ay, az - pz],
+    [bx + px, by, bz + pz], [bx - px, by, bz - pz]
+  ]) vertices.push(x, y, z, 0, 1, 0, color[0], color[1], color[2]);
+  indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+}
+
+function createTerrainDebugOverlayGeometry() {
+  if (!terrain) return null;
+  const vertices = [];
+  const indices = [];
+  const lodColors = [
+    [0.25, 1.0, 0.35],
+    [0.35, 0.75, 1.0],
+    [1.0, 0.85, 0.25],
+    [1.0, 0.55, 0.18],
+    [1.0, 0.28, 0.28]
+  ];
+  for (const [key, section] of terrainLodPlan) {
+    if (!sectionIsStreamed(section)) continue;
+    const entry = terrainMeshes.get(key);
+    if (!entry) continue;
+    const b = section.bounds;
+    const color = lodColors[Math.max(0, Math.min(lodColors.length - 1, section.lodLevel || 0))];
+    debugStrip(vertices, indices, b.minX, b.minZ, b.maxX, b.minZ, .16, color);
+    debugStrip(vertices, indices, b.maxX, b.minZ, b.maxX, b.maxZ, .16, color);
+    debugStrip(vertices, indices, b.maxX, b.maxZ, b.minX, b.maxZ, .16, color);
+    debugStrip(vertices, indices, b.minX, b.maxZ, b.minX, b.minZ, .16, color);
+  }
+  for (const componentId of terrainStreamPlan?.active || []) {
+    const match = /^component-(\d+)-(\d+)$/.exec(componentId);
+    if (!match) continue;
+    const component = terrain.getComponentDescriptor(Number(match[1]), Number(match[2]));
+    const b = component.bounds;
+    const color = [0.95, 0.95, 1.0];
+    debugStrip(vertices, indices, b.minX, b.minZ, b.maxX, b.minZ, .34, color);
+    debugStrip(vertices, indices, b.maxX, b.minZ, b.maxX, b.maxZ, .34, color);
+    debugStrip(vertices, indices, b.maxX, b.maxZ, b.minX, b.maxZ, .34, color);
+    debugStrip(vertices, indices, b.minX, b.maxZ, b.minX, b.minZ, .34, color);
+  }
+  if (!indices.length) return null;
+  const IndexType = vertices.length / 9 > 65535 ? Uint32Array : Uint16Array;
+  return { vertices: new Float32Array(vertices), indices: new IndexType(indices), vertexStride: 9 };
+}
+
+function rebuildTerrainDebugOverlay() {
+  if (!engine) return;
+  if (terrainDebugMesh) {
+    engine.removeMesh(terrainDebugMesh);
+    terrainDebugMesh = null;
+  }
+  if (!terrainDebugEnabled) return;
+  const geometry = createTerrainDebugOverlayGeometry();
+  if (!geometry) return;
+  terrainDebugMesh = engine.addMesh(geometry);
 }
 
 function createRingGeometry(radius) {

@@ -6,6 +6,8 @@ layout(location=2) in vec3 aColor;
 layout(location=3) in vec2 aUv;
 layout(location=4) in vec4 aJoints;
 layout(location=5) in vec4 aWeights;
+layout(location=6) in vec4 aTerrainWeights0;
+layout(location=7) in vec2 aTerrainWeights1;
 uniform mat4 uProjection;
 uniform mat4 uView;
 uniform mat4 uModel;
@@ -15,6 +17,8 @@ out vec3 vNormal;
 out vec3 vColor;
 out vec3 vWorld;
 out vec2 vUv;
+out vec4 vTerrainWeights0;
+out vec2 vTerrainWeights1;
 
 mat4 jointMatrix(float indexValue) {
   int row = int(indexValue + 0.5);
@@ -43,6 +47,8 @@ void main() {
   vNormal = normalize(mat3(uModel) * localNormal);
   vColor = aColor;
   vUv = aUv;
+  vTerrainWeights0 = aTerrainWeights0;
+  vTerrainWeights1 = aTerrainWeights1;
   gl_Position = uProjection * uView * world;
 }`;
 
@@ -52,6 +58,8 @@ in vec3 vNormal;
 in vec3 vColor;
 in vec3 vWorld;
 in vec2 vUv;
+in vec4 vTerrainWeights0;
+in vec2 vTerrainWeights1;
 uniform vec3 uLightDirection;
 uniform vec3 uFogColor;
 uniform vec3 uCamera;
@@ -61,17 +69,75 @@ uniform vec3 uTint;
 uniform vec4 uBaseColorFactor;
 uniform int uTextured;
 uniform sampler2D uBaseColorTexture;
+uniform int uTerrainMaterial;
+uniform int uTerrainLayerCount;
+uniform sampler2DArray uTerrainAlbedoArray;
+uniform sampler2DArray uTerrainNormalArray;
+uniform sampler2DArray uTerrainRoughnessArray;
+uniform float uTerrainTileMeters[6];
 out vec4 outColor;
+
+float terrainWeight(int index) {
+  if (index == 0) return vTerrainWeights0.x;
+  if (index == 1) return vTerrainWeights0.y;
+  if (index == 2) return vTerrainWeights0.z;
+  if (index == 3) return vTerrainWeights0.w;
+  if (index == 4) return vTerrainWeights1.x;
+  if (index == 5) return vTerrainWeights1.y;
+  return 0.0;
+}
+
 void main() {
   vec4 surface = uBaseColorFactor;
-  if (uTextured != 0) surface *= texture(uBaseColorTexture, vUv);
-  surface.rgb *= vColor * uTint;
+  vec3 shadingNormal = normalize(vNormal);
+  float roughness = 0.82;
+
+  if (uTerrainMaterial != 0) {
+    vec3 albedo = vec3(0.0);
+    vec3 tangentNormal = vec3(0.0);
+    float rough = 0.0;
+    float weightTotal = 0.0;
+    for (int layer = 0; layer < 6; layer += 1) {
+      if (layer >= uTerrainLayerCount) break;
+      float weight = max(0.0, terrainWeight(layer));
+      if (weight <= 0.0001) continue;
+      float tileMeters = max(0.5, uTerrainTileMeters[layer]);
+      vec2 tileUv = vWorld.xz / tileMeters;
+      albedo += texture(uTerrainAlbedoArray, vec3(tileUv, float(layer))).rgb * weight;
+      tangentNormal += (texture(uTerrainNormalArray, vec3(tileUv, float(layer))).xyz * 2.0 - 1.0) * weight;
+      rough += texture(uTerrainRoughnessArray, vec3(tileUv, float(layer))).r * weight;
+      weightTotal += weight;
+    }
+    if (weightTotal > 0.0001) {
+      albedo /= weightTotal;
+      tangentNormal /= weightTotal;
+      roughness = clamp(rough / weightTotal, 0.04, 1.0);
+      vec3 n = normalize(vNormal);
+      vec3 tangent = vec3(1.0, 0.0, 0.0) - n * dot(n, vec3(1.0, 0.0, 0.0));
+      if (dot(tangent, tangent) < 0.0001) tangent = vec3(0.0, 0.0, 1.0) - n * dot(n, vec3(0.0, 0.0, 1.0));
+      tangent = normalize(tangent);
+      vec3 bitangent = normalize(cross(n, tangent));
+      shadingNormal = normalize(tangent * tangentNormal.x + bitangent * tangentNormal.y + n * max(0.05, tangentNormal.z));
+      surface = vec4(albedo * vColor * uTint, 1.0);
+    } else {
+      surface.rgb *= vColor * uTint;
+    }
+  } else {
+    if (uTextured != 0) surface *= texture(uBaseColorTexture, vUv);
+    surface.rgb *= vColor * uTint;
+  }
+
   if (surface.a < 0.08) discard;
-  vec3 n = normalize(vNormal);
-  float diffuse = max(dot(n, normalize(-uLightDirection)), 0.0);
+  vec3 n = normalize(shadingNormal);
+  vec3 lightDirection = normalize(-uLightDirection);
+  float diffuse = max(dot(n, lightDirection), 0.0);
   float hemi = n.y * 0.18 + 0.42;
   float light = 0.38 + diffuse * 0.48 + hemi;
-  vec3 lit = surface.rgb * light;
+  vec3 viewDirection = normalize(uCamera - vWorld);
+  vec3 halfVector = normalize(lightDirection + viewDirection);
+  float specPower = mix(54.0, 7.0, roughness);
+  float specular = pow(max(dot(n, halfVector), 0.0), specPower) * (1.0 - roughness) * 0.22;
+  vec3 lit = surface.rgb * light + vec3(specular);
   float distanceToCamera = distance(vWorld, uCamera);
   float fog = smoothstep(uFogNear, uFogFar, distanceToCamera);
   outColor = vec4(mix(lit, uFogColor, fog), surface.a);
@@ -141,7 +207,7 @@ export class RiftEngine {
     this.canvas=canvas;
     this.gl=canvas.getContext('webgl2',{antialias:options.antialias!==false,alpha:false,depth:true,powerPreference:'high-performance'});
     if(!this.gl) throw new Error('WebGL2 is required for Rift Engine');
-    const gl=this.gl; this.program=createProgram(gl); this.meshes=new Set(); this.textures=new Set(); this.skins=new Set(); this.projection=new Float32Array(16); this.view=new Float32Array(16); this.model=new Float32Array(16);
+    const gl=this.gl; this.program=createProgram(gl); this.meshes=new Set(); this.textures=new Set(); this.textureArrays=new Set(); this.skins=new Set(); this.projection=new Float32Array(16); this.view=new Float32Array(16); this.model=new Float32Array(16); this.pixelRatioCap=2;
     this.camera={position:[160,22,178],target:[160,10,160],fov:Math.PI/3,near:0.08,far:650};
     this.environment={clear:options.clear||[0.56,0.72,0.86],fog:options.fog||[0.64,0.75,0.82],fogNear:120,fogFar:420,light:[0.45,-1,0.28]};
     this.viewport={rect:null,cssWidth:1,cssHeight:1,width:1,height:1,aspect:1,pixelRatio:1};
@@ -149,7 +215,10 @@ export class RiftEngine {
       projection:gl.getUniformLocation(this.program,'uProjection'),view:gl.getUniformLocation(this.program,'uView'),model:gl.getUniformLocation(this.program,'uModel'),
       light:gl.getUniformLocation(this.program,'uLightDirection'),fogColor:gl.getUniformLocation(this.program,'uFogColor'),fogNear:gl.getUniformLocation(this.program,'uFogNear'),fogFar:gl.getUniformLocation(this.program,'uFogFar'),camera:gl.getUniformLocation(this.program,'uCamera'),tint:gl.getUniformLocation(this.program,'uTint'),
       baseColorFactor:gl.getUniformLocation(this.program,'uBaseColorFactor'),textured:gl.getUniformLocation(this.program,'uTextured'),baseColorTexture:gl.getUniformLocation(this.program,'uBaseColorTexture'),
-      skinned:gl.getUniformLocation(this.program,'uSkinned'),jointMatrices:gl.getUniformLocation(this.program,'uJointMatrices')
+      skinned:gl.getUniformLocation(this.program,'uSkinned'),jointMatrices:gl.getUniformLocation(this.program,'uJointMatrices'),
+      terrainMaterial:gl.getUniformLocation(this.program,'uTerrainMaterial'),terrainLayerCount:gl.getUniformLocation(this.program,'uTerrainLayerCount'),
+      terrainAlbedoArray:gl.getUniformLocation(this.program,'uTerrainAlbedoArray'),terrainNormalArray:gl.getUniformLocation(this.program,'uTerrainNormalArray'),terrainRoughnessArray:gl.getUniformLocation(this.program,'uTerrainRoughnessArray'),
+      terrainTileMeters:gl.getUniformLocation(this.program,'uTerrainTileMeters[0]')
     };
     this.whiteTexture=this._createWhiteTexture();
     gl.enable(gl.DEPTH_TEST);
@@ -174,6 +243,30 @@ export class RiftEngine {
     gl.texImage2D(gl.TEXTURE_2D,0,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,image);
     gl.generateMipmap(gl.TEXTURE_2D);gl.bindTexture(gl.TEXTURE_2D,null);this.textures.add(texture);return texture;
   }
+
+  createTextureArray(width,height,layers,{srgb=false}={}){
+    const gl=this.gl,w=Math.max(1,Math.trunc(width)),h=Math.max(1,Math.trunc(height)),depth=Math.max(1,Math.trunc(layers)),levels=Math.floor(Math.log2(Math.max(w,h)))+1;
+    const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D_ARRAY,texture);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY,levels,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,w,h,depth);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
+    const resource={texture,width:w,height:h,layers:depth,levels,srgb:Boolean(srgb)};this.textureArrays.add(resource);return resource;
+  }
+  fillTextureArrayLayer(resource,layer,rgba){
+    if(!resource||!this.textureArrays.has(resource))return;
+    const index=Math.max(0,Math.min(resource.layers-1,Math.trunc(layer)));const color=rgba||[255,255,255,255];
+    const pixels=new Uint8Array(resource.width*resource.height*4);
+    for(let i=0;i<pixels.length;i+=4){pixels[i]=color[0]??255;pixels[i+1]=color[1]??255;pixels[i+2]=color[2]??255;pixels[i+3]=color[3]??255}
+    const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D_ARRAY,resource.texture);gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,0,0,0,index,resource.width,resource.height,1,gl.RGBA,gl.UNSIGNED_BYTE,pixels);gl.generateMipmap(gl.TEXTURE_2D_ARRAY);gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
+  }
+  updateTextureArrayLayer(resource,layer,image){
+    if(!resource||!this.textureArrays.has(resource)||!image)return;
+    const index=Math.max(0,Math.min(resource.layers-1,Math.trunc(layer)));const gl=this.gl;gl.bindTexture(gl.TEXTURE_2D_ARRAY,resource.texture);
+    gl.texSubImage3D(gl.TEXTURE_2D_ARRAY,0,0,0,index,resource.width,resource.height,1,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.generateMipmap(gl.TEXTURE_2D_ARRAY);gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
+  }
+  destroyTextureArray(resource){if(!resource||!this.textureArrays.delete(resource))return;this.gl.deleteTexture(resource.texture);resource.texture=null}
+
   destroyTexture(texture){if(!texture||!this.textures.delete(texture))return;this.gl.deleteTexture(texture)}
   createSkin(jointCount){
     const count=Math.max(1,Math.trunc(Number(jointCount)||0));
@@ -191,7 +284,7 @@ export class RiftEngine {
   }
   destroySkin(skin){if(!skin||!this.skins.delete(skin))return;this.gl.deleteTexture(skin.texture);skin.texture=null}
   addMesh(geometry, options={}) {
-    const mesh={position:[...(options.position||[0,0,0])],scale:[...(options.scale||[1,1,1])],yaw:Number(options.yaw)||0,tint:[...(options.tint||[1,1,1])],baseColorFactor:[...(options.baseColorFactor||[1,1,1,1])],texture:options.texture||null,skin:options.skin||null,visible:options.visible!==false,vao:null,vertexBuffer:null,indexBuffer:null,count:0,indexType:null,stride:9,attributes:{}};
+    const mesh={position:[...(options.position||[0,0,0])],scale:[...(options.scale||[1,1,1])],yaw:Number(options.yaw)||0,tint:[...(options.tint||[1,1,1])],baseColorFactor:[...(options.baseColorFactor||[1,1,1,1])],texture:options.texture||null,skin:options.skin||null,terrainMaterial:options.terrainMaterial||null,visible:options.visible!==false,vao:null,vertexBuffer:null,indexBuffer:null,count:0,indexType:null,stride:9,attributes:{}};
     this._upload(mesh,geometry);this.meshes.add(mesh);return mesh;
   }
   updateMesh(mesh,geometry){if(this.meshes.has(mesh))this._upload(mesh,geometry)}
@@ -204,29 +297,53 @@ export class RiftEngine {
     if(Number.isInteger(data.attributes.uv)){gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,2,gl.FLOAT,false,bytes,data.attributes.uv*4)}else gl.disableVertexAttribArray(3);
     if(Number.isInteger(data.attributes.joints)){gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,4,gl.FLOAT,false,bytes,data.attributes.joints*4)}else gl.disableVertexAttribArray(4);
     if(Number.isInteger(data.attributes.weights)){gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,4,gl.FLOAT,false,bytes,data.attributes.weights*4)}else gl.disableVertexAttribArray(5);
+    if(Number.isInteger(data.attributes.terrainWeights0)){gl.enableVertexAttribArray(6);gl.vertexAttribPointer(6,4,gl.FLOAT,false,bytes,data.attributes.terrainWeights0*4)}else gl.disableVertexAttribArray(6);
+    if(Number.isInteger(data.attributes.terrainWeights1)){gl.enableVertexAttribArray(7);gl.vertexAttribPointer(7,2,gl.FLOAT,false,bytes,data.attributes.terrainWeights1*4)}else gl.disableVertexAttribArray(7);
     gl.bindVertexArray(null)
   }
   _disposeMesh(mesh){const gl=this.gl;if(mesh.vertexBuffer)gl.deleteBuffer(mesh.vertexBuffer);if(mesh.indexBuffer)gl.deleteBuffer(mesh.indexBuffer);if(mesh.vao)gl.deleteVertexArray(mesh.vao);mesh.vertexBuffer=mesh.indexBuffer=mesh.vao=null}
   setCamera(camera){if(camera.position)this.camera.position=[...camera.position];if(camera.target)this.camera.target=[...camera.target];if(Number.isFinite(camera.fov))this.camera.fov=camera.fov;if(Number.isFinite(camera.near))this.camera.near=camera.near;if(Number.isFinite(camera.far))this.camera.far=camera.far}
-  resize(pixelRatio=Math.min(devicePixelRatio||1,2)){
-    const viewport=viewportMetrics(this.canvas,pixelRatio);this.viewport=viewport;
+  resize(pixelRatio=Math.min(devicePixelRatio||1,this.pixelRatioCap)){
+    const viewport=viewportMetrics(this.canvas,Math.min(Number(pixelRatio)||1,this.pixelRatioCap));this.viewport=viewport;
     if(this.canvas.width!==viewport.width||this.canvas.height!==viewport.height){this.canvas.width=viewport.width;this.canvas.height=viewport.height}
     this.gl.viewport(0,0,viewport.width,viewport.height);return viewport
+  }
+  setPixelRatioCap(value){this.pixelRatioCap=Math.max(.75,Math.min(2,Number(value)||1));return this.pixelRatioCap}
+  isSphereVisible(center,radius=1,padding=.08){
+    const eye=this.camera.position,target=this.camera.target;
+    let fx=target[0]-eye[0],fy=target[1]-eye[1],fz=target[2]-eye[2];let fl=Math.hypot(fx,fy,fz)||1;fx/=fl;fy/=fl;fz/=fl;
+    let rx=fz,ry=0,rz=-fx;let rl=Math.hypot(rx,rz);if(rl<1e-4){rx=1;rz=0;rl=1}else{rx/=rl;rz/=rl}
+    const ux=ry*fz-rz*fy,uy=rz*fx-rx*fz,uz=rx*fy-ry*fx;
+    const vx=(center?.[0]||0)-eye[0],vy=(center?.[1]||0)-eye[1],vz=(center?.[2]||0)-eye[2];
+    const depth=vx*fx+vy*fy+vz*fz,r=Math.max(0,Number(radius)||0);
+    if(depth+r<this.camera.near||depth-r>this.camera.far||depth<=-r)return false;
+    const horizontal=vx*rx+vy*ry+vz*rz,vertical=vx*ux+vy*uy+vz*uz;
+    const aspect=Math.max(.2,this.viewport?.aspect||((this.canvas.clientWidth||1)/(this.canvas.clientHeight||1)));
+    const halfV=this.camera.fov*.5+padding,halfH=Math.atan(Math.tan(this.camera.fov*.5)*aspect)+padding;
+    const inflate=Math.asin(Math.min(.95,r/Math.max(r+1e-4,Math.hypot(vx,vy,vz))));
+    return Math.abs(Math.atan2(horizontal,Math.max(.001,depth)))<=halfH+inflate&&Math.abs(Math.atan2(vertical,Math.max(.001,depth)))<=halfV+inflate;
   }
   getViewport(){return this.viewport}
   render(){
     const gl=this.gl;const viewport=this.resize();const aspect=viewport.aspect;perspective(this.projection,this.camera.fov,aspect,this.camera.near,this.camera.far);lookAt(this.view,this.camera.position,this.camera.target);const clear=this.environment.clear;
-    gl.clearColor(clear[0],clear[1],clear[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.locations.projection,false,this.projection);gl.uniformMatrix4fv(this.locations.view,false,this.view);gl.uniform3fv(this.locations.light,this.environment.light);gl.uniform3fv(this.locations.fogColor,this.environment.fog);gl.uniform1f(this.locations.fogNear,this.environment.fogNear);gl.uniform1f(this.locations.fogFar,this.environment.fogFar);gl.uniform3fv(this.locations.camera,this.camera.position);gl.uniform1i(this.locations.baseColorTexture,0);gl.uniform1i(this.locations.jointMatrices,1);
-    gl.vertexAttrib2f(3,0,0);gl.vertexAttrib4f(4,0,0,0,0);gl.vertexAttrib4f(5,1,0,0,0);
+    gl.clearColor(clear[0],clear[1],clear[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.locations.projection,false,this.projection);gl.uniformMatrix4fv(this.locations.view,false,this.view);gl.uniform3fv(this.locations.light,this.environment.light);gl.uniform3fv(this.locations.fogColor,this.environment.fog);gl.uniform1f(this.locations.fogNear,this.environment.fogNear);gl.uniform1f(this.locations.fogFar,this.environment.fogFar);gl.uniform3fv(this.locations.camera,this.camera.position);gl.uniform1i(this.locations.baseColorTexture,0);gl.uniform1i(this.locations.jointMatrices,1);gl.uniform1i(this.locations.terrainAlbedoArray,2);gl.uniform1i(this.locations.terrainNormalArray,3);gl.uniform1i(this.locations.terrainRoughnessArray,4);
+    gl.vertexAttrib2f(3,0,0);gl.vertexAttrib4f(4,0,0,0,0);gl.vertexAttrib4f(5,1,0,0,0);gl.vertexAttrib4f(6,1,0,0,0);gl.vertexAttrib2f(7,0,0);
     for(const mesh of this.meshes){
       if(!mesh.visible||!mesh.count)continue;modelMatrix(this.model,mesh.position,mesh.yaw,mesh.scale);gl.uniformMatrix4fv(this.locations.model,false,this.model);gl.uniform3fv(this.locations.tint,mesh.tint);gl.uniform4fv(this.locations.baseColorFactor,mesh.baseColorFactor);
       gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,mesh.texture||this.whiteTexture);gl.uniform1i(this.locations.textured,mesh.texture?1:0);
       const skinned=Boolean(mesh.skin?.texture&&Number.isInteger(mesh.attributes?.joints)&&Number.isInteger(mesh.attributes?.weights));gl.uniform1i(this.locations.skinned,skinned?1:0);if(skinned){gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,mesh.skin.texture)}
+      const terrainMaterial=mesh.terrainMaterial;const terrainEnabled=Boolean(terrainMaterial?.albedoArray?.texture&&Number.isInteger(mesh.attributes?.terrainWeights0));gl.uniform1i(this.locations.terrainMaterial,terrainEnabled?1:0);
+      if(terrainEnabled){
+        gl.uniform1i(this.locations.terrainLayerCount,Math.max(1,Math.min(6,terrainMaterial.layerCount||1)));gl.uniform1fv(this.locations.terrainTileMeters,terrainMaterial.tileMeters);
+        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.albedoArray.texture);
+        gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.normalArray.texture);
+        gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.roughnessArray.texture);
+      }
       gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0)
     }
-    gl.bindVertexArray(null);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null)
+    gl.bindVertexArray(null);for(const unit of [4,3,2]){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D_ARRAY,null)}gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null)
   }
   destroy(){
-    for(const mesh of [...this.meshes])this.removeMesh(mesh);for(const skin of [...this.skins])this.destroySkin(skin);for(const texture of [...this.textures])this.destroyTexture(texture);if(this.whiteTexture)this.gl.deleteTexture(this.whiteTexture);this.whiteTexture=null;this.gl.deleteProgram(this.program);this.meshes.clear()
+    for(const mesh of [...this.meshes])this.removeMesh(mesh);for(const skin of [...this.skins])this.destroySkin(skin);for(const texture of [...this.textures])this.destroyTexture(texture);for(const textureArray of [...this.textureArrays])this.destroyTextureArray(textureArray);if(this.whiteTexture)this.gl.deleteTexture(this.whiteTexture);this.whiteTexture=null;this.gl.deleteProgram(this.program);this.meshes.clear()
   }
 }

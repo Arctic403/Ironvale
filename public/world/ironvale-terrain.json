@@ -55,7 +55,7 @@
       "authoritativeHeightfield": true
     },
     "landscape": {
-      "format": "rift-landscape-v2",
+      "format": "rift-landscape-v3",
       "editLayers": [
         {
           "id": "sculpt",
@@ -76,7 +76,12 @@
             0.25,
             0.42,
             0.23
-          ]
+          ],
+          "texture": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/grass/Grass001_1K-JPG_Color.jpg",
+          "normal": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/grass/Grass001_1K-JPG_NormalGL.jpg",
+          "roughness": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/grass/Grass001_1K-JPG_Roughness.jpg",
+          "tileMeters": 4,
+          "roughnessFactor": 0.88
         },
         {
           "id": "dirt",
@@ -86,7 +91,12 @@
             0.43,
             0.31,
             0.2
-          ]
+          ],
+          "texture": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/dirt/Ground071_1K-JPG_Color.jpg",
+          "normal": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/dirt/Ground071_1K-JPG_NormalGL.jpg",
+          "roughness": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/dirt/Ground071_1K-JPG_Roughness.jpg",
+          "tileMeters": 3.5,
+          "roughnessFactor": 0.9
         },
         {
           "id": "rock",
@@ -96,7 +106,12 @@
             0.43,
             0.45,
             0.44
-          ]
+          ],
+          "texture": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/rock/Rock051_1K-JPG_Color.jpg",
+          "normal": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/rock/Rock051_1K-JPG_NormalGL.jpg",
+          "roughness": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/rock/Rock051_1K-JPG_Roughness.jpg",
+          "tileMeters": 4,
+          "roughnessFactor": 0.72
         },
         {
           "id": "gravel",
@@ -106,7 +121,12 @@
             0.52,
             0.5,
             0.44
-          ]
+          ],
+          "texture": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/gravel/Ground064_1K-JPG_Color.jpg",
+          "normal": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/gravel/Ground064_1K-JPG_NormalGL.jpg",
+          "roughness": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/gravel/Ground064_1K-JPG_Roughness.jpg",
+          "tileMeters": 3,
+          "roughnessFactor": 0.86
         },
         {
           "id": "mud",
@@ -116,7 +136,12 @@
             0.29,
             0.23,
             0.17
-          ]
+          ],
+          "texture": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/soil/Ground066_1K-JPG_Color.jpg",
+          "normal": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/soil/Ground066_1K-JPG_NormalGL.jpg",
+          "roughness": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/soil/Ground066_1K-JPG_Roughness.jpg",
+          "tileMeters": 3.5,
+          "roughnessFactor": 0.96
         },
         {
           "id": "path",
@@ -126,7 +151,12 @@
             0.49,
             0.39,
             0.25
-          ]
+          ],
+          "texture": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/path/PavingStones131_1K-JPG_Color.jpg",
+          "normal": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/path/PavingStones131_1K-JPG_NormalGL.jpg",
+          "roughness": "https://raw.githubusercontent.com/Arctic403/RiftAssets/0a6ae2b559962bf61f1b8e252f5bd4cfbad8e3c9/ironvale/library/terrain-materials/path/PavingStones131_1K-JPG_Roughness.jpg",
+          "tileMeters": 3,
+          "roughnessFactor": 0.82
         }
       ],
       "splines": [],
@@ -134,10 +164,16 @@
       "streaming": {
         "enabled": true,
         "componentRadius": 3,
-        "preloadRing": 1
+        "preloadRing": 0
       },
       "activeMaterialLayer": "dirt",
-      "activeSpline": null
+      "activeSpline": null,
+      "mobilePerformance": {
+        "pixelRatioMin": 1.0,
+        "pixelRatioMax": 1.5,
+        "adaptiveFrames": 90,
+        "materialTextureSize": 512
+      }
     }
   },
   "anchors": {
@@ -150,7 +186,7 @@
   },
   "objects": [],
   "metadata": {
-    "worldFoundation": "rift-landscape-v2",
+    "worldFoundation": "rift-landscape-v3",
     "legacyBlocks": false,
     "voxelGrid": false,
     "blankCanvas": true,
@@ -165,6 +201,16 @@
     "landscapeSplineHooks": true,
     "visibleMaterialBlending": true,
     "landscapeSplineDeformation": true,
-    "terrainToolsScrollable": true
+    "terrainToolsScrollable": true,
+    "terrainPbrSplatting": true,
+    "terrainNormalRoughness": true,
+    "frustumCulling": true,
+    "componentStreamingRuntime": true,
+    "collisionLodRuntime": true,
+    "splinePointEditing": true,
+    "terrainLayerManagement": true,
+    "terrainDebugOverlay": true,
+    "terrainFoundationLocked": true,
+    "terrainSchemaVersion": 3
   }
 }
