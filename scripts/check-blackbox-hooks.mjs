@@ -24,7 +24,7 @@ if (!failures.length) {
   if (!hooks.includes('isCharacterResource') || !hooks.includes('isMaterialResource') || !hooks.includes('assetProvider')) failures.push('unified asset/character/material telemetry');
 
   if (!worker.includes('createBackendDiagnostic') || !worker.includes('instrumentDatabase') || !worker.includes('finalizeBackendResponse')) failures.push('worker backend black-box instrumentation');
-  if (!worker.includes("Server-Timing") || !worker.includes("name: 'd1'") || !worker.includes("name: 'auth'")) failures.push('worker compact server timing export');
+  if (!worker.includes('Server-Timing') || !worker.includes("timingMetric('d1'") || !worker.includes("timingMetric('auth'")) failures.push('worker compact server timing export');
   if (/INSERT\s+INTO\s+.*diagnostic/i.test(worker) || /CREATE TABLE[^;]*diagnostic/i.test(worker)) failures.push('backend diagnostics must not write diagnostic rows to D1');
   if (!app.includes("registerProvider('engine'") || !app.includes("registerProvider('native'")) failures.push('engine/native diagnostic providers regressed');
 }
