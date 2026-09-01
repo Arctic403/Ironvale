@@ -98,6 +98,25 @@ async function sha256Text(text) {
   return `fnv1a-${(hash >>> 0).toString(16).padStart(8, '0')}`;
 }
 
+function cloneJson(value) {
+  if (value == null) return value;
+  try { return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value)); }
+  catch (_) { return value; }
+}
+
+function normalizeLandscapeEdits(value) {
+  const clone = cloneJson(value);
+  if (clone && typeof clone === 'object' && !Array.isArray(clone)) delete clone.savedAt;
+  return clone;
+}
+
+function normalizeDraftText(text) {
+  const raw = String(text || '');
+  if (!raw) return '';
+  try { return JSON.stringify(normalizeLandscapeEdits(JSON.parse(raw))); }
+  catch (_) { return raw; }
+}
+
 async function snapshotRuntime(instance, level = 2) {
   if (!instance?.snapshotProvider) return null;
   try { return await instance.snapshotProvider(level); }
@@ -109,13 +128,13 @@ async function captureIntegrity() {
   const snapshot = await snapshotRuntime(activeInstance, 3);
   if (!snapshot || snapshot.error) throw new Error(snapshot?.error || 'Deep integrity snapshot unavailable.');
   const runtime = snapshot.runtime || {};
-  const edits = snapshot.deep?.landscapeEdits || null;
+  const edits = normalizeLandscapeEdits(snapshot.deep?.landscapeEdits || null);
   const draft = (() => { try { return localStorage.getItem('ironvale:terrain:draft:v4') || ''; } catch (_) { return ''; } })();
   return {
     at: new Date().toISOString(),
     worldId: runtime.world?.id || snapshot.quick?.worldId || null,
     terrainHash: await sha256Text(JSON.stringify(edits)),
-    draftHash: await sha256Text(draft),
+    draftHash: await sha256Text(normalizeDraftText(draft)),
     editor: {
       undoDepth: Number(runtime.editor?.undoDepth) || 0,
       redoDepth: Number(runtime.editor?.redoDepth) || 0,
