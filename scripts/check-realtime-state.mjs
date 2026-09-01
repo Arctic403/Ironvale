@@ -21,6 +21,7 @@ requireMatch(wrangler, /\[\[durable_objects\.bindings\]\][\s\S]*name\s*=\s*"PLAY
 requireMatch(wrangler, /new_sqlite_classes\s*=\s*\[\s*"PlayerState"\s*\]/, 'SQLite Durable Object migration');
 requireMatch(html, /rift-realtime\.js\?v=20260901-realtime-10hz-r1/, '10Hz realtime client module loaded');
 
+requireMatch(worker, /REALTIME_FORMAT = 'ironvale-realtime-authority-v2'/, 'realtime authority v2');
 requireMatch(worker, /export class PlayerState extends DurableObject/, 'PlayerState Durable Object class');
 requireMatch(worker, /acceptWebSocket\(/, 'hibernatable WebSocket acceptance');
 requireMatch(worker, /serializeAttachment\(/, 'hibernation-safe live state attachment');
@@ -29,7 +30,10 @@ requireMatch(worker, /webSocketMessage\(/, 'authoritative movement message handl
 requireMatch(worker, /webSocketClose\(/, 'disconnect checkpoint handler');
 requireMatch(worker, /webSocketError\(/, 'socket-error checkpoint handler');
 requireMatch(worker, /CHECKPOINT_INTERVAL_MS\s*=\s*5\s*\*\s*60\s*\*\s*1000/, 'five-minute safety checkpoint');
+requireMatch(worker, /async ensureCheckpointAlarm\(\)/, 'checkpoint alarm scheduler');
 requireMatch(worker, /async alarm\(\)/, 'Durable Object periodic alarm handler');
+requireMatch(worker, /if \(state\.dirty\) await this\.ensureCheckpointAlarm\(\)/, 'socket movement schedules alarm only when dirty');
+requireMatch(worker, /if \(remaining\?\.state\?\.dirty\) await this\.ctx\.storage\.setAlarm/, 'alarm only repeats while dirty');
 requireMatch(worker, /storage\.setAlarm\(Date\.now\(\) \+ CHECKPOINT_INTERVAL_MS\)/, 'real five-minute alarm scheduling');
 requireMatch(worker, /periodic-alarm/, 'periodic alarm D1 checkpoint reason');
 requireMatch(worker, /MAX_HORIZONTAL_SPEED_MPS\s*=\s*7\.2/, 'movement speed authority matches runtime');
@@ -40,7 +44,10 @@ requireMatch(worker, /url\.pathname === '\/api\/realtime\/checkpoint'/, 'explici
 requireMatch(worker, /routeRealtimeCheckpoint/, 'checkpoint route targets Durable Object');
 requireMatch(worker, /latestAuthorityState\(\)/, 'freshest RAM authority selection');
 requireMatch(worker, /Carry the freshest RAM authority/, 'reconnect carry-forward contract');
-requireMatch(worker, /checkpointBeforeLogout/, 'logout checkpoint');
+requireMatch(worker, /this\.httpState && Number\(this\.httpState\.lastAcceptedAt \|\| 0\) > Number\(closing\.lastAcceptedAt \|\| 0\)/, 'disconnect prefers newer HTTP fallback RAM state');
+requireMatch(worker, /this\.httpState && Number\(this\.httpState\.lastAcceptedAt \|\| 0\) > Number\(socketState\.lastAcceptedAt \|\| 0\)/, 'socket error prefers newer HTTP fallback RAM state');
+requireMatch(worker, /checkpointReason = String\(request\.headers\.get\('x-ironvale-checkpoint-reason'\)/, 'explicit checkpoint reason preserved');
+requireMatch(worker, /headers\.set\('x-ironvale-checkpoint-reason', 'logout'\)/, 'logout checkpoint reason');
 requireMatch(worker, /ON CONFLICT\(user_id\) DO UPDATE/, 'single-statement durable checkpoint');
 
 requireMatch(client, /RIFT_REALTIME_FORMAT = 'ironvale-realtime-client-v2'/, 'realtime client v2');
