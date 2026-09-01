@@ -3,9 +3,9 @@ import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
-import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-scale-contract-r1';
+import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 
-const APP_DIAGNOSTIC_BUILD = '20260901-sprint-autorun-r1';
+const APP_DIAGNOSTIC_BUILD = '20260901-sprint-speed-r2';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -104,7 +104,7 @@ const MOBILE_TERRAIN_PIXEL_RATIO_MIN = 1.0;
 const TERRAIN_PERF_SAMPLE_FRAMES = 90;
 const TERRAIN_DEBUG_UPDATE_MS = 250;
 const WALK_SPEED_MPS = 7.2;
-const SPRINT_SPEED_MPS = 10.8;
+const SPRINT_SPEED_MPS = 12;
 const AUTO_RUN_HOLD_MS = 450;
 
 let authMode = 'login';
@@ -265,6 +265,7 @@ function movementModeStatus() {
     format: IRONVALE_MOVEMENT_MODE_FORMAT,
     walkSpeedMps: WALK_SPEED_MPS,
     sprintSpeedMps: SPRINT_SPEED_MPS,
+    sprintSpeedRatio: Math.round((SPRINT_SPEED_MPS / WALK_SPEED_MPS) * 100) / 100,
     sprintEnabled,
     sprinting: playerSprinting,
     autoRun: autoRunEnabled,

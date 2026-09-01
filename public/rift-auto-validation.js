@@ -546,23 +546,42 @@ async function runFullAutoValidation() {
 
     await runStep('sprint + auto run controls', async () => {
       const movement = window.IronvaleMovementMode;
+      const playerState = window.IronvalePlayerState;
       const button = required('#sprint-button', 'Sprint button');
       if (!movement?.status || !movement?.cancel) throw new Error('Movement mode runtime unavailable');
+      if (!playerState?.status) throw new Error('Player state runtime unavailable');
       if ($('#freecam-button')?.classList.contains('active')) $('#freecam-button').click();
       movement.cancel('validator-start');
 
       const dispatch = (type, pointerId) => button.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId, pointerType: 'touch', button: 0, buttons: type === 'pointerdown' ? 1 : 0 }));
+      const position = () => playerState.status();
+      const horizontalDistance = (a, b) => Math.hypot(Number(b.x) - Number(a.x), Number(b.z) - Number(a.z));
+
+      const walkStart = position();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }));
+      await sleep(320);
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true }));
+      await sleep(90);
+      const walkEnd = position();
+      const walkDistance = horizontalDistance(walkStart, walkEnd);
+      if (walkDistance < 0.5) throw new Error('Walk displacement was too small to validate sprint speed');
+
       dispatch('pointerdown', 9321);
       await sleep(90);
       dispatch('pointerup', 9321);
       await sleep(60);
       if (!movement.status().sprintEnabled || movement.status().autoRun) throw new Error('Tap did not arm sprint');
 
+      const sprintStart = position();
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', bubbles: true }));
-      await sleep(180);
+      await sleep(320);
       if (!movement.status().sprinting) throw new Error('Sprint did not activate while moving');
       window.dispatchEvent(new KeyboardEvent('keyup', { key: 'w', bubbles: true }));
       await sleep(90);
+      const sprintEnd = position();
+      const sprintDistance = horizontalDistance(sprintStart, sprintEnd);
+      const sprintRatio = sprintDistance / Math.max(0.001, walkDistance);
+      if (sprintRatio < 1.35) throw new Error('Sprint displacement ratio ' + sprintRatio.toFixed(2) + 'x is not meaningfully faster than walk');
       if (movement.status().sprintEnabled) throw new Error('Sprint did not cancel when movement stopped');
 
       dispatch('pointerdown', 9322);
@@ -577,7 +596,7 @@ async function runFullAutoValidation() {
       dispatch('pointerup', 9323);
       await sleep(80);
       if (movement.status().autoRun || movement.status().sprintEnabled) throw new Error('Tap did not cancel Auto Run');
-      return 'tap sprint + stop-to-cancel + ' + movement.status().autoRunHoldMs + 'ms hold Auto Run path exercised';
+      return 'walk=' + walkDistance.toFixed(2) + 'm · sprint=' + sprintDistance.toFixed(2) + 'm · ratio=' + sprintRatio.toFixed(2) + 'x · ' + movement.status().autoRunHoldMs + 'ms Auto Run hold';
     });
 
     await runStep('realtime movement + checkpoint path', async () => {

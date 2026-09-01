@@ -11,6 +11,7 @@ function requireMatch(source, pattern, label) {
 const worker = read('src/realtime-entry.js');
 const client = read('public/rift-realtime.js');
 const app = read('public/app.js');
+const character = read('public/rift-character.js');
 const auto = read('public/rift-auto-validation.js');
 const architecture = read('public/rift-architecture-guard.js');
 const wrangler = read('wrangler.toml');
@@ -22,7 +23,7 @@ requireMatch(wrangler, /main\s*=\s*"src\/realtime-entry\.js"/, 'realtime Worker 
 requireMatch(wrangler, /\[\[durable_objects\.bindings\]\][\s\S]*name\s*=\s*"PLAYER_STATE"[\s\S]*class_name\s*=\s*"PlayerState"/, 'PLAYER_STATE Durable Object binding');
 requireMatch(wrangler, /new_sqlite_classes\s*=\s*\[\s*"PlayerState"\s*\]/, 'SQLite Durable Object migration');
 requireMatch(html, /rift-realtime\.js\?v=20260901-reconnect-grace-r1/, 'realtime client reconnect-grace module loaded');
-requireMatch(html, /rift-validator-guard\.js\?v=20260901-reconnect-grace-r1/, 'validator reconnect-grace module loaded');
+requireMatch(html, /rift-validator-guard\.js\?v=20260901-sprint-speed-r2/, 'validator sprint-speed module loaded');
 
 requireMatch(worker, /REALTIME_FORMAT = 'ironvale-realtime-authority-v2'/, 'realtime authority v2');
 requireMatch(worker, /export class PlayerState extends DurableObject/, 'PlayerState Durable Object class');
@@ -39,7 +40,7 @@ requireMatch(worker, /if \(state\.dirty\) await this\.ensureCheckpointAlarm\(\)/
 requireMatch(worker, /if \(remaining\?\.state\?\.dirty\) await this\.ctx\.storage\.setAlarm/, 'alarm only repeats while dirty');
 requireMatch(worker, /storage\.setAlarm\(Date\.now\(\) \+ CHECKPOINT_INTERVAL_MS\)/, 'real five-minute alarm scheduling');
 requireMatch(worker, /periodic-alarm/, 'periodic alarm D1 checkpoint reason');
-requireMatch(worker, /MAX_HORIZONTAL_SPEED_MPS\s*=\s*10\.8/, 'movement speed authority matches runtime');
+requireMatch(worker, /MAX_HORIZONTAL_SPEED_MPS\s*=\s*12/, 'movement speed authority matches runtime');
 requireMatch(worker, /horizontal-speed/, 'server-side jump/speed rejection');
 requireMatch(worker, /url\.pathname === '\/api\/character\/position'/, 'legacy compatibility route remains RAM-authoritative');
 requireMatch(worker, /routePositionFallback/, 'Durable Object HTTP movement fallback');
@@ -75,12 +76,14 @@ requireMatch(client, /visibility-hidden/, 'visibility checkpoint');
 requireMatch(app, /IronvaleRealtimeMovement\?\.publish\?\.\(\{ x: player\.x, y: player\.y, z: player\.z, yaw: player\.yaw \}\)/, 'app publishes live transform directly');
 requireMatch(app, /ironvale:movement-correction/, 'app consumes authoritative corrections');
 requireMatch(app, /WALK_SPEED_MPS\s*=\s*7\.2/, 'walk speed contract');
-requireMatch(app, /SPRINT_SPEED_MPS\s*=\s*10\.8/, 'sprint speed contract');
+requireMatch(app, /SPRINT_SPEED_MPS\s*=\s*12/, 'sprint speed contract');
 requireMatch(app, /AUTO_RUN_HOLD_MS\s*=\s*450/, 'mobile auto-run long-hold threshold');
 requireMatch(app, /function setupSprintControl\(/, 'mobile sprint pointer control');
 requireMatch(app, /autoRunEnabled \? 1 : input\.forward/, 'auto-run forward movement source');
 requireMatch(app, /movement-stopped/, 'tap sprint cancels after movement stops');
 requireMatch(app, /asset\.defaultClips\.run \|\| asset\.defaultClips\.walk/, 'run animation with walk fallback');
+requireMatch(character, /const run = chooseClip\(clipNames,[\s\S]*?\/sprint\/i,[\s\S]*?\/run\/i/, 'dedicated run clip mapping');
+requireMatch(character, /defaultClips:\s*\{ idle, walk, run \}/, 'run clip exposed to locomotion runtime');
 requireMatch(html, /id="sprint-button"/, 'sprint HUD button');
 requireMatch(styles, /\.sprint-button\.auto-run/, 'Auto Run HUD state');
 if (/lastPositionSave/.test(app) || /async function savePosition\(/.test(app) || /now - lastPositionSave > 5000/.test(app)) {
@@ -89,6 +92,8 @@ if (/lastPositionSave/.test(app) || /async function savePosition\(/.test(app) ||
 
 requireMatch(auto, /sprint \+ auto run controls/, 'auto validator exercises sprint and Auto Run');
 requireMatch(auto, /Long hold did not activate Auto Run/, 'auto validator checks long-hold Auto Run');
+requireMatch(auto, /Sprint displacement ratio/, 'auto validator measures walk versus sprint displacement');
+requireMatch(auto, /sprintRatio < 1\.35/, 'auto validator enforces meaningful sprint speed gain');
 requireMatch(auto, /Direct 10Hz publisher only emitted/, 'auto validator verifies packet cadence path');
 requireMatch(auto, /realtime\.checkpoint\('auto-validation'\)/, 'auto validator checkpoints via realtime API');
 requireMatch(auto, /source:\s*'validator-restore'/, 'validator exact player restore uses direct publisher');

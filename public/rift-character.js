@@ -470,7 +470,8 @@ export async function loadRiggedCharacterAsset(
   const clips = buildAnimationClips(animationParsed, modelParsed.document);
   const clipNames = [...clips.keys()];
   const idle = chooseClip(clipNames, [/^idle_loop$/i, /^idle$/i, /^idle_/i, /stand/i], clipNames[0] || null);
-  const walk = chooseClip(clipNames, [/^walk_loop$/i, /^walk$/i, /^walk_/i, /walking/i, /run/i], idle);
+  const walk = chooseClip(clipNames, [/^walk_loop$/i, /^walk$/i, /^walk_/i, /walking/i], idle);
+  const run = chooseClip(clipNames, [/^run_loop$/i, /^run$/i, /^run[_ -]/i, /running/i, /sprint/i, /run/i], null);
   const runtime = new RiftCharacterRuntime(modelParsed.document, skins, clips);
   runtime.update(0, idle);
   const skin = modelParsed.document.skins?.[0];
@@ -479,10 +480,11 @@ export async function loadRiggedCharacterAsset(
     primitives: built.primitives,
     runtime,
     clips: clipNames,
-    defaultClips: { idle, walk },
+    defaultClips: { idle, walk, run },
     rig: {
       skinName: skin?.name || 'Armature', jointCount: jointNames.length, jointNames, authoredForward: '+Z',
       feetAtY: built.bounds.minY * built.renderScale, sourceHeight: built.sourceHeight, renderHeight: TARGET_HEIGHT, renderScale: built.renderScale,
+      defaultClips: { idle, walk, run },
       textured: textureIndices.length > 0, animationClipCount: clipNames.length, animationReady: clipNames.length > 0
     },
     materials: built.primitives.map(entry => entry.material.name)

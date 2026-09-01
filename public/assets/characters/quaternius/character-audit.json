@@ -28,8 +28,10 @@
     "materials": "embedded glTF base-color textures + baseColorFactor",
     "locomotion": [
       "idle",
-      "walk"
+      "walk",
+      "run"
     ],
-    "fallback": "capsule remains active if character loading fails"
+    "fallback": "capsule remains active if character loading fails",
+    "runClipRequired": true
   }
 }

@@ -269,6 +269,12 @@ async function buildGuardChecks(instance) {
   const character = runtime.character || {};
   const rigOk = !character.rigged || (Number(character.rig?.jointCount) > 0 && Number(character.rig?.animationClipCount) > 0);
   checks.push(statusCheck('character.rig-runtime', rigOk ? 'pass' : 'fail', character.rigged ? `${character.rig?.jointCount || 0} joints · ${character.rig?.animationClipCount || 0} clips` : 'Fallback character visual active'));
+  if (character.rigged) {
+    const walkClip = character.rig?.defaultClips?.walk || null;
+    const runClip = character.rig?.defaultClips?.run || null;
+    const runOk = Boolean(runClip && runClip !== walkClip);
+    checks.push(statusCheck('character.run-animation', runOk ? 'pass' : 'fail', runOk ? `Run clip=${runClip} · walk clip=${walkClip || 'none'}` : `Distinct run animation unavailable · walk=${walkClip || 'none'} run=${runClip || 'none'}`));
+  }
 
   const layout = layoutSnapshot();
   const layoutStatus = layout.outOfBounds.length ? 'warn' : layout.canvasCoverage < 0.85 ? 'warn' : 'pass';
