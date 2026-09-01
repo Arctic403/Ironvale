@@ -6,6 +6,8 @@ const WORLD_MAX_X = 640;
 const WORLD_MIN_Z = 0;
 const WORLD_MAX_Z = 640;
 const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
+const RAW_D1_STATEMENT = Symbol('ironvale.raw-d1-statement');
+const SQL_D1_STATEMENT = Symbol('ironvale.sql-d1-statement');
 
 let schemaReady = false;
 
@@ -46,17 +48,172 @@ const CORE_SCHEMA = [
   )`
 ];
 
+function monotonicNow() {
+  return typeof performance?.now === 'function' ? performance.now() : Date.now();
+}
+
+function createBackendDiagnostic(request, url) {
+  return {
+    format: 'ironvale-backend-diagnostics-v1',
+    startedAt: monotonicNow(),
+    route: url.pathname,
+    method: request.method.toUpperCase(),
+    auth: 'not-checked',
+    db: {
+      calls: 0,
+      queries: 0,
+      reads: 0,
+      writes: 0,
+      batches: 0,
+      failures: 0,
+      totalMs: 0,
+      maxMs: 0
+    }
+  };
+}
+
+function sqlKind(sql) {
+  const match = String(sql || '').trim().match(/^([A-Za-z]+)/);
+  const keyword = match?.[1]?.toUpperCase() || 'UNKNOWN';
+  if (['SELECT', 'PRAGMA', 'EXPLAIN'].includes(keyword)) return 'read';
+  if (['INSERT', 'UPDATE', 'DELETE', 'REPLACE', 'CREATE', 'DROP', 'ALTER', 'VACUUM'].includes(keyword)) return 'write';
+  return 'other';
+}
+
+function noteDbQueries(diag, sqlList, durationMs, failed = false, batch = false) {
+  if (!diag?.db) return;
+  const statements = Array.isArray(sqlList) ? sqlList : [sqlList];
+  diag.db.calls += 1;
+  diag.db.queries += statements.length;
+  if (batch) diag.db.batches += 1;
+  for (const sql of statements) {
+    const kind = sqlKind(sql);
+    if (kind === 'read') diag.db.reads += 1;
+    else if (kind === 'write') diag.db.writes += 1;
+  }
+  const duration = Math.max(0, Number(durationMs) || 0);
+  diag.db.totalMs += duration;
+  diag.db.maxMs = Math.max(diag.db.maxMs, duration);
+  if (failed) diag.db.failures += 1;
+}
+
+async function timedDb(diag, sqlList, operation, batch = false) {
+  const started = monotonicNow();
+  try {
+    const value = await operation();
+    noteDbQueries(diag, sqlList, monotonicNow() - started, false, batch);
+    return value;
+  } catch (error) {
+    noteDbQueries(diag, sqlList, monotonicNow() - started, true, batch);
+    throw error;
+  }
+}
+
+function wrapPreparedStatement(statement, sql, diag) {
+  if (!statement) return statement;
+  return new Proxy(statement, {
+    get(target, property) {
+      if (property === RAW_D1_STATEMENT) return target;
+      if (property === SQL_D1_STATEMENT) return sql;
+      if (property === 'bind') {
+        return (...values) => wrapPreparedStatement(target.bind(...values), sql, diag);
+      }
+      if (['first', 'run', 'all', 'raw'].includes(property) && typeof target[property] === 'function') {
+        return (...args) => timedDb(diag, sql, () => target[property](...args), false);
+      }
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    }
+  });
+}
+
+function instrumentDatabase(database, diag) {
+  if (!database) return database;
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === 'prepare') {
+        return sql => wrapPreparedStatement(target.prepare(sql), sql, diag);
+      }
+      if (property === 'batch') {
+        return statements => {
+          const wrapped = Array.from(statements || []);
+          const sqlList = wrapped.map(statement => statement?.[SQL_D1_STATEMENT] || 'UNKNOWN');
+          const raw = wrapped.map(statement => statement?.[RAW_D1_STATEMENT] || statement);
+          return timedDb(diag, sqlList, () => target.batch(raw), true);
+        };
+      }
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    }
+  });
+}
+
+function instrumentEnvironment(env, diag) {
+  const database = instrumentDatabase(env.DB, diag);
+  return new Proxy(env, {
+    get(target, property) {
+      if (property === 'DB') return database;
+      if (property === '__ironvaleDiagnostic') return diag;
+      return target[property];
+    }
+  });
+}
+
+function setBackendAuth(env, state) {
+  const diag = env?.__ironvaleDiagnostic;
+  if (diag) diag.auth = String(state || 'unknown').slice(0, 48);
+}
+
+function timingDescription(value) {
+  return String(value || '').replace(/["\\\r\n]/g, '_').slice(0, 160);
+}
+
+function timingMetric(name, duration = null, description = '') {
+  let value = String(name);
+  if (Number.isFinite(duration)) value += `;dur=${Math.max(0, duration).toFixed(2)}`;
+  if (description) value += `;desc="${timingDescription(description)}"`;
+  return value;
+}
+
+function finalizeBackendResponse(response, diag) {
+  try {
+    const totalMs = monotonicNow() - diag.startedAt;
+    const status = Number(response?.status) || 500;
+    const db = diag.db || {};
+    const headers = new Headers(response.headers);
+    const metrics = [
+      timingMetric('ironvale', totalMs, `status=${status},method=${diag.method}`),
+      timingMetric('d1', db.totalMs || 0, `calls=${db.calls || 0},q=${db.queries || 0},r=${db.reads || 0},w=${db.writes || 0},b=${db.batches || 0},f=${db.failures || 0},max=${(db.maxMs || 0).toFixed(2)}`),
+      timingMetric('auth', null, diag.auth || 'not-checked')
+    ];
+    const existing = headers.get('Server-Timing');
+    headers.set('Server-Timing', existing ? `${existing}, ${metrics.join(', ')}` : metrics.join(', '));
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  } catch (_) {
+    return response;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
+      const diagnostic = createBackendDiagnostic(request, url);
+      const tracedEnv = instrumentEnvironment(env, diagnostic);
+      let response;
       try {
-        await ensureCoreTables(env);
-        return await handleApi(request, env, url);
+        await ensureCoreTables(tracedEnv);
+        response = await handleApi(request, tracedEnv, url);
       } catch (error) {
         console.error('Ironvale core API error', error);
-        return json({ ok: false, error: 'Internal server error' }, 500);
+        diagnostic.auth = diagnostic.auth === 'not-checked' ? 'request-error' : diagnostic.auth;
+        response = json({ ok: false, error: 'Internal server error' }, 500);
       }
+      return finalizeBackendResponse(response, diagnostic);
     }
     return env.ASSETS.fetch(request);
   }
@@ -79,18 +236,26 @@ async function handleApi(request, env, url) {
   if (method === 'PATCH' && url.pathname === '/api/character') return updateCharacter(request, env);
   if (method === 'PUT' && url.pathname === '/api/character/position') return updatePosition(request, env);
   if (method === 'GET' && url.pathname === '/api/health') return health(env);
+  setBackendAuth(env, 'not-applicable');
   return json({ ok: false, error: 'Not found' }, 404);
 }
 
 async function register(request, env) {
+  setBackendAuth(env, 'registration');
   const body = await readJson(request);
   const username = normalizeUsername(body?.username);
   const password = typeof body?.password === 'string' ? body.password : '';
   const validationError = validateCredentials(username, password);
-  if (validationError) return json({ ok: false, error: validationError }, 400);
+  if (validationError) {
+    setBackendAuth(env, 'credentials-invalid');
+    return json({ ok: false, error: validationError }, 400);
+  }
 
   const existing = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
-  if (existing) return json({ ok: false, error: 'Username is already taken' }, 409);
+  if (existing) {
+    setBackendAuth(env, 'username-taken');
+    return json({ ok: false, error: 'Username is already taken' }, 409);
+  }
 
   const userId = crypto.randomUUID();
   const saltBytes = crypto.getRandomValues(new Uint8Array(16));
@@ -105,6 +270,7 @@ async function register(request, env) {
 
   await ensureCharacter({ id: userId, username }, env);
   const session = await createSession(env, request, userId);
+  setBackendAuth(env, 'authenticated');
   return json({
     ok: true,
     user: { id: userId, username, role: 'player', createdAt: timestamp, lastActiveAt: timestamp }
@@ -112,28 +278,40 @@ async function register(request, env) {
 }
 
 async function login(request, env) {
+  setBackendAuth(env, 'login');
   const body = await readJson(request);
   const username = normalizeUsername(body?.username);
   const password = typeof body?.password === 'string' ? body.password : '';
-  if (!username || !password) return json({ ok: false, error: 'Username and password are required' }, 400);
+  if (!username || !password) {
+    setBackendAuth(env, 'credentials-missing');
+    return json({ ok: false, error: 'Username and password are required' }, 400);
+  }
 
   const user = await env.DB.prepare(`
     SELECT id, username, password_hash, password_salt, role, created_at, last_active_at, is_banned, ban_reason
     FROM users WHERE username = ?
   `).bind(username).first();
 
-  if (!user) return json({ ok: false, error: 'Invalid username or password' }, 401);
+  if (!user) {
+    setBackendAuth(env, 'credentials-invalid');
+    return json({ ok: false, error: 'Invalid username or password' }, 401);
+  }
 
   const suppliedHash = await hashPassword(password, base64ToBytes(user.password_salt));
   if (!constantTimeEqual(suppliedHash, user.password_hash)) {
+    setBackendAuth(env, 'credentials-invalid');
     return json({ ok: false, error: 'Invalid username or password' }, 401);
   }
-  if (Number(user.is_banned)) return json({ ok: false, error: user.ban_reason || 'This account is banned' }, 403);
+  if (Number(user.is_banned)) {
+    setBackendAuth(env, 'banned');
+    return json({ ok: false, error: user.ban_reason || 'This account is banned' }, 403);
+  }
 
   const timestamp = Date.now();
   await env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(timestamp, user.id).run();
   await ensureCharacter(user, env);
   const session = await createSession(env, request, user.id);
+  setBackendAuth(env, 'authenticated');
 
   return json({
     ok: true,
@@ -151,6 +329,9 @@ async function logout(request, env) {
   const rawToken = getCookie(request, SESSION_COOKIE);
   if (rawToken) {
     await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(rawToken)).run();
+    setBackendAuth(env, 'logged-out');
+  } else {
+    setBackendAuth(env, 'no-session');
   }
   return json({ ok: true }, 200, {
     'Set-Cookie': `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
@@ -236,6 +417,7 @@ async function updatePosition(request, env) {
 }
 
 async function health(env) {
+  setBackendAuth(env, 'not-applicable');
   try {
     await env.DB.prepare('SELECT 1 AS ok').first();
     return json({ ok: true, service: 'ironvale-core', database: 'connected' });
@@ -290,7 +472,10 @@ function publicUser(row) {
 
 async function authenticate(request, env) {
   const rawToken = getCookie(request, SESSION_COOKIE);
-  if (!rawToken) return null;
+  if (!rawToken) {
+    setBackendAuth(env, 'no-session');
+    return null;
+  }
   const tokenHash = await sha256(rawToken);
   const now = Date.now();
   const row = await env.DB.prepare(`
@@ -301,9 +486,13 @@ async function authenticate(request, env) {
     WHERE s.token_hash = ?
   `).bind(tokenHash).first();
 
-  if (!row) return null;
+  if (!row) {
+    setBackendAuth(env, 'session-not-found');
+    return null;
+  }
   if (Number(row.expires_at) <= now || Number(row.is_banned)) {
     await env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(row.session_id).run();
+    setBackendAuth(env, Number(row.is_banned) ? 'banned' : 'session-expired');
     return null;
   }
 
@@ -312,6 +501,7 @@ async function authenticate(request, env) {
     env.DB.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').bind(now, row.id)
   ]);
   row.last_active_at = now;
+  setBackendAuth(env, 'authenticated');
   return { user: row, sessionId: row.session_id };
 }
 
