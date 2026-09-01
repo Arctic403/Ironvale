@@ -1,10 +1,11 @@
 export const DIAGNOSTIC_DUMP_FORMAT = 'ironvale-diagnostic-dump-v1';
-export const DIAGNOSTIC_RUNTIME_FORMAT = 'ironvale-diagnostics-v1';
+export const DIAGNOSTIC_RUNTIME_FORMAT = 'ironvale-diagnostics-v2';
 export const DIAGNOSTIC_LEVELS = Object.freeze({ QUICK: 1, RUNTIME: 2, DEEP: 3 });
 
 const LAST_CRASH_KEY = 'ironvale:diagnostics:last-crash:v1';
 const SETTINGS_KEY = 'ironvale:diagnostics:settings:v1';
-const MAX_EVENTS = 120;
+const MAX_EVENTS = 160;
+const MAX_NETWORK_EVENTS = 120;
 const MAX_STRING = 120000;
 const REDACTED_KEY = /(pass(word)?|token|secret|cookie|authorization|session|credential|api[-_]?key)/i;
 
@@ -88,6 +89,8 @@ export class RiftDiagnostics {
     this.onCrash = typeof options.onCrash === 'function' ? options.onCrash : null;
     this.intervalMs = Math.max(2000, Math.trunc(Number(options.intervalMs) || 5000));
     this.events = [];
+    this.networkEvents = [];
+    this.providers = new Map();
     this.lastValidation = null;
     this.timer = 0;
     this.started = false;
@@ -100,6 +103,65 @@ export class RiftDiagnostics {
       const reason = event?.reason instanceof Error ? event.reason : new Error(String(event?.reason || 'unhandled rejection'));
       void this.captureCrash(reason, 'unhandledrejection');
     };
+    this._nativeFetch = null;
+    this._fetchWrapper = null;
+  }
+
+  _installFetchTelemetry() {
+    if (this._fetchWrapper || typeof globalThis.fetch !== 'function') return;
+    this._nativeFetch = globalThis.fetch.bind(globalThis);
+    this._fetchWrapper = async (input, init = undefined) => {
+      const started = performance.now();
+      const method = String(init?.method || (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET') || 'GET').toUpperCase();
+      const url = typeof input === 'string' || input instanceof URL ? String(input) : String(input?.url || '');
+      try {
+        const response = await this._nativeFetch(input, init);
+        this._recordNetwork({
+          at: isoNow(), method, url, ok: response.ok, status: response.status, type: response.type,
+          durationMs: performance.now() - started,
+          contentLength: Number(response.headers?.get?.('content-length')) || null,
+          contentType: response.headers?.get?.('content-type') || null,
+          cacheControl: response.headers?.get?.('cache-control') || null
+        });
+        return response;
+      } catch (error) {
+        this._recordNetwork({ at: isoNow(), method, url, ok: false, status: 0, durationMs: performance.now() - started, error: safeError(error) });
+        throw error;
+      }
+    };
+    globalThis.fetch = this._fetchWrapper;
+  }
+
+  _restoreFetchTelemetry() {
+    if (this._fetchWrapper && globalThis.fetch === this._fetchWrapper && this._nativeFetch) globalThis.fetch = this._nativeFetch;
+    this._fetchWrapper = null;
+    this._nativeFetch = null;
+  }
+
+  _recordNetwork(entry) {
+    this.networkEvents.push(sanitize(entry));
+    if (this.networkEvents.length > MAX_NETWORK_EVENTS) this.networkEvents.splice(0, this.networkEvents.length - MAX_NETWORK_EVENTS);
+  }
+
+  getNetworkTelemetry() { return sanitize(this.networkEvents); }
+
+  registerProvider(name, provider) {
+    const key = String(name || '').trim().slice(0, 80);
+    if (!key || typeof provider !== 'function') throw new Error('Diagnostic provider requires a name and function.');
+    this.providers.set(key, provider);
+    this.record('diagnostics', 'Registered diagnostic provider', { name: key });
+    return () => this.unregisterProvider(key);
+  }
+
+  unregisterProvider(name) { return this.providers.delete(String(name || '')); }
+
+  async _collectProviders(level) {
+    const output = {};
+    for (const [name, provider] of this.providers) {
+      try { output[name] = sanitize(await provider(level)); }
+      catch (error) { output[name] = { error: safeError(error) }; }
+    }
+    return output;
   }
 
   _loadAutoSetting() {
@@ -118,6 +180,7 @@ export class RiftDiagnostics {
     this.started = true;
     window.addEventListener('error', this._errorHandler);
     window.addEventListener('unhandledrejection', this._rejectionHandler);
+    this._installFetchTelemetry();
     this._restartTimer();
     queueMicrotask(() => { void this.runValidation('startup'); });
     return this;
@@ -130,6 +193,7 @@ export class RiftDiagnostics {
     this.timer = 0;
     window.removeEventListener('error', this._errorHandler);
     window.removeEventListener('unhandledrejection', this._rejectionHandler);
+    this._restoreFetchTelemetry();
   }
 
   _restartTimer() {
@@ -204,12 +268,16 @@ export class RiftDiagnostics {
     if (resolvedLevel >= 2) {
       dump.layers.l2Runtime = {
         ...(snapshot?.runtime || {}),
-        recentEvents: sanitize(this.events.slice(-40))
+        network: sanitize(this.networkEvents.slice(-24)),
+        subsystemProviders: await this._collectProviders(2),
+        recentEvents: sanitize(this.events.slice(-50))
       };
     }
     if (resolvedLevel >= 3) {
       dump.layers.l3Deep = {
         ...(snapshot?.deep || {}),
+        network: sanitize(this.networkEvents),
+        subsystemProviders: await this._collectProviders(3),
         recentEvents: sanitize(this.events.slice(-MAX_EVENTS))
       };
     }

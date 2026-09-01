@@ -49,7 +49,8 @@ if (!world.terrain.landscape.materialLayers.every(layer => typeof layer.texture 
 if (world.metadata?.terrainFoundationLocked !== true || world.metadata?.terrainSchemaVersion !== 3) failures.push('terrain foundation lock metadata');
 if (world.metadata?.frustumCulling !== true || world.metadata?.componentStreamingRuntime !== true || world.metadata?.collisionLodRuntime !== true) failures.push('terrain runtime optimization metadata');
 if (world.metadata?.automatedValidator !== true || world.metadata?.diagnosticDumpSystem !== true || world.metadata?.diagnosticDumpLayers !== 3) failures.push('automated diagnostics metadata');
-if (world.diagnostics?.format !== 'ironvale-diagnostics-v1' || world.diagnostics?.dumpFormat !== 'ironvale-diagnostic-dump-v1' || world.diagnostics?.automaticCrashDumpLevel !== 2 || world.diagnostics?.layers?.length !== 3) failures.push('three-layer diagnostic dump contract');
+if (world.metadata?.diagnosticSchemaVersion !== 2 || world.metadata?.engineBlackBoxDiagnostics !== true || world.metadata?.engineResourceInventory !== true || world.metadata?.networkTelemetry !== true || world.metadata?.nativeWasmTelemetry !== true || world.metadata?.subsystemFrameTimings !== true) failures.push('engine black-box diagnostics metadata');
+if (world.diagnostics?.format !== 'ironvale-diagnostics-v2' || world.diagnostics?.dumpFormat !== 'ironvale-diagnostic-dump-v1' || world.diagnostics?.automaticCrashDumpLevel !== 2 || world.diagnostics?.layers?.length !== 3) failures.push('three-layer diagnostic dump contract');
 if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
 if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
 if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
@@ -69,6 +70,8 @@ if (!app.includes('function updateTerrainPerformance(') || !app.includes('MOBILE
 if (!app.includes('function updateActiveEditLayerName(') || !app.includes('function deleteActiveEditLayer(')) failures.push('terrain edit layer management');
 if (!app.includes("import { RiftDiagnostics } from './rift-diagnostics.js?v=") || !app.includes('buildDiagnosticSnapshot') || !app.includes('buildDiagnosticChecks') || !app.includes('window.IronvaleDiagnostics')) failures.push('automated runtime validator integration');
 if (!app.includes("diagnostics.captureCrash(error, 'world-boot')") || !app.includes('L2 diagnostic dump saved')) failures.push('automatic boot crash dump');
+if (!app.includes('diagnosticFrameTimings') || !app.includes('storageDiagnostics') || !app.includes('cacheDiagnostics') || !app.includes('serviceWorkerDiagnostics') || !app.includes('resourceTimingDiagnostics')) failures.push('deep engine forensic runtime snapshot');
+if (!app.includes('getRiftEngineBootTelemetry') || !app.includes("registerProvider('engine'") || !app.includes("registerProvider('native'")) failures.push('engine/native diagnostic providers');
 if (!app.includes('function moveLastSplinePointToReticle(') || !app.includes('function removeLastSplinePoint(')) failures.push('spline point editing tools');
 if (!app.includes('function setFreecam(')) failures.push('freecam mode');
 if (!app.includes('function updateReticleTarget(')) failures.push('reticle targeting');
@@ -141,6 +144,11 @@ if (!terrain.includes('planSectionLods(')) failures.push('terrain LOD planner mi
 if (!terrain.includes('markDirtyRegion(')) failures.push('terrain dirty region tracking missing');
 if (!terrain.includes('NATIVE.rift_terrain_sample_height')) failures.push('terrain sampling not native');
 if (!terrain.includes('NATIVE.rift_terrain_raycast')) failures.push('native terrain raycast missing');
+
+const rendererRuntimeBlackBox = fs.readFileSync('public/rift-engine.js', 'utf8');
+if (!diagnosticsRuntime.includes("ironvale-diagnostics-v2") || !diagnosticsRuntime.includes('_installFetchTelemetry') || !diagnosticsRuntime.includes('registerProvider(') || !diagnosticsRuntime.includes('subsystemProviders')) failures.push('diagnostic network/provider runtime');
+if (!rendererRuntimeBlackBox.includes('rift-engine-telemetry-v1') || !rendererRuntimeBlackBox.includes('getRiftEngineBootTelemetry') || !rendererRuntimeBlackBox.includes('getDiagnostics(deep=false)') || !rendererRuntimeBlackBox.includes('gpuMemoryEstimate') || !rendererRuntimeBlackBox.includes('_captureGlErrors')) failures.push('renderer black-box telemetry runtime');
+if (!terrain.includes('getNativeDiagnostics(deep = false)') || !terrain.includes('memoryPages') || !terrain.includes('nativeFunctions')) failures.push('native WASM telemetry runtime');
 
 const worker = fs.readFileSync('src/index.js', 'utf8');
 const workerLower = worker.toLowerCase();

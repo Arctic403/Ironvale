@@ -111,6 +111,22 @@ export class RiftTerrain {
     this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
   }
 
+  getNativeDiagnostics(deep = false) {
+    const memoryBytes = MEMORY.buffer.byteLength;
+    const exportNames = Object.keys(NATIVE).sort();
+    const nativeFunctions = exportNames.filter(name => typeof NATIVE[name] === 'function');
+    return {
+      format: 'riftcore-native-diagnostics-v1',
+      abi: RiftCore.abi,
+      memoryBytes,
+      memoryPages: memoryBytes / 65536,
+      terrain: { columns: this.columns, rows: this.rows, sampleSpacing: this.sampleSpacing, samples: this.heights?.length || this.columns * this.rows, cells: this.manualHoles?.length || (this.columns - 1) * (this.rows - 1), revision: this.revision },
+      exportCount: exportNames.length,
+      functionCount: nativeFunctions.length,
+      ...(deep ? { exports: exportNames, nativeFunctions } : {})
+    };
+  }
+
   _bindNativeViews() {
     const samples = NATIVE.rift_terrain_sample_count();
     const cells = NATIVE.rift_terrain_cell_count();

@@ -1,10 +1,11 @@
-import { RiftEngine } from './rift-engine.js?v=20260901-terrain-lock-r3';
+import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260901-engine-blackbox-r1';
 import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
-import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostics-r1';
+import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-engine-blackbox-r1';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-scale-contract-r1';
 
+const APP_DIAGNOSTIC_BUILD = '20260901-engine-blackbox-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -137,6 +138,8 @@ let joystickActive = false;
 let selectedTargetId = null;
 let hardLockEnabled = false;
 let viewportCameraProfile = '';
+let diagnosticFrameCounter = 0;
+const diagnosticFrameTimings = { sampleEveryFrames: 15, samples: 0, movementMs: 0, animationMs: 0, cameraMs: 0, terrainLodMs: 0, reticleMs: 0, renderMs: 0, totalMs: 0, maxTotalMs: 0 };
 const combatTargets = new Map();
 
 const player = { x: 320, y: .9, z: 320, yaw: 0, vy: 0, grounded: true };
@@ -159,13 +162,20 @@ const diagnostics = new RiftDiagnostics({
   onCrash: () => refreshDiagnosticButtons()
 }).start();
 
+diagnostics.registerProvider('engine', level => engine?.getDiagnostics?.(level >= 3) || { ready: false, boot: getRiftEngineBootTelemetry() });
+diagnostics.registerProvider('native', level => terrain?.getNativeDiagnostics?.(level >= 3) || null);
+
 window.IronvaleDiagnostics = Object.freeze({
   validate: () => diagnostics.runValidation('api'),
   dump: level => diagnostics.exportDump(level || 2, 'api'),
   lastCrash: () => diagnostics.getLastCrash(),
   exportLastCrash: () => diagnostics.exportLastCrash(),
   clearLastCrash: () => { diagnostics.clearLastCrash(); refreshDiagnosticButtons(); },
-  setAuto: enabled => { const value = diagnostics.setAutoEnabled(enabled); refreshDiagnosticButtons(); return value; }
+  setAuto: enabled => { const value = diagnostics.setAutoEnabled(enabled); refreshDiagnosticButtons(); return value; },
+  record: (category, message, data, severity) => diagnostics.record(category, message, data, severity),
+  network: () => diagnostics.getNetworkTelemetry(),
+  registerProvider: (name, provider) => diagnostics.registerProvider(name, provider),
+  unregisterProvider: name => diagnostics.unregisterProvider(name)
 });
 
 document.querySelectorAll('[data-auth-tab]').forEach(button => button.addEventListener('click', () => {
@@ -340,6 +350,48 @@ function summarizeStreamPlan(plan) {
   };
 }
 
+function updateDiagnosticFrameTiming(name, ms) {
+  const value = Math.max(0, Number(ms) || 0);
+  const previous = Number(diagnosticFrameTimings[name]) || 0;
+  diagnosticFrameTimings[name] = previous ? previous * .82 + value * .18 : value;
+}
+
+async function storageDiagnostics() {
+  const result = { supported: Boolean(navigator.storage) };
+  try { if (navigator.storage?.estimate) Object.assign(result, await navigator.storage.estimate()); } catch (error) { result.estimateError = String(error?.message || error); }
+  try { if (navigator.storage?.persisted) result.persisted = await navigator.storage.persisted(); } catch (error) { result.persistedError = String(error?.message || error); }
+  if (performance.memory) result.jsHeap = { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize, jsHeapSizeLimit: performance.memory.jsHeapSizeLimit };
+  return result;
+}
+
+async function cacheDiagnostics() {
+  if (!('caches' in window)) return { supported: false, caches: [] };
+  try {
+    const names = await caches.keys();
+    const details = [];
+    for (const name of names) {
+      const cache = await caches.open(name);
+      const requests = await cache.keys();
+      details.push({ name, entries: requests.length, sampleUrls: requests.slice(0, 16).map(request => request.url) });
+    }
+    return { supported: true, caches: details };
+  } catch (error) { return { supported: true, error: String(error?.message || error), caches: [] }; }
+}
+
+async function serviceWorkerDiagnostics() {
+  if (!('serviceWorker' in navigator)) return { supported: false };
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const workerInfo = worker => worker ? { scriptURL: worker.scriptURL, state: worker.state } : null;
+    return { supported: true, controller: workerInfo(navigator.serviceWorker.controller), registration: registration ? { scope: registration.scope, active: workerInfo(registration.active), waiting: workerInfo(registration.waiting), installing: workerInfo(registration.installing), updateViaCache: registration.updateViaCache } : null };
+  } catch (error) { return { supported: true, error: String(error?.message || error) }; }
+}
+
+function resourceTimingDiagnostics() {
+  const entries = performance.getEntriesByType?.('resource') || [];
+  return entries.slice(-180).map(entry => ({ name: entry.name, initiatorType: entry.initiatorType, duration: entry.duration, startTime: entry.startTime, transferSize: entry.transferSize, encodedBodySize: entry.encodedBodySize, decodedBodySize: entry.decodedBodySize, nextHopProtocol: entry.nextHopProtocol || null }));
+}
+
 function webGlDiagnosticInfo(gl, deep = false) {
   if (!gl) return null;
   const read = parameter => { try { return gl.getParameter(parameter); } catch (_) { return null; } };
@@ -377,6 +429,9 @@ function buildDiagnosticChecks() {
     diagnosticCheck('world.scale-contract', scaleValidation.ok, scaleValidation.errors?.join('; ') || '1 unit = 1 meter'),
     diagnosticCheck('world.terrain-runtime', Boolean(terrain), terrain ? 'RiftLandscape loaded' : 'Terrain runtime missing'),
     diagnosticCheck('renderer.engine', Boolean(engine?.gl), engine?.gl ? 'WebGL2 engine ready' : 'Renderer missing'),
+    diagnosticCheck('renderer.telemetry', typeof engine?.getDiagnostics === 'function', 'Renderer black-box telemetry available'),
+    diagnosticCheck('renderer.shader-program', getRiftEngineBootTelemetry()?.program?.linked !== false, getRiftEngineBootTelemetry()?.program?.log || 'Shader program linked'),
+    diagnosticCheck('native.telemetry', typeof terrain?.getNativeDiagnostics === 'function', 'RiftCore native telemetry available'),
     diagnosticCheck('renderer.context', Boolean(engine?.gl) && !engine.gl.isContextLost?.(), engine?.gl?.isContextLost?.() ? 'WebGL context lost' : 'Context active'),
     diagnosticCheck('player.position', [player.x, player.y, player.z, player.yaw].every(Number.isFinite), 'Player transform finite'),
     diagnosticCheck('camera.position', finiteVector(lastCameraPosition) && finiteVector(lastCameraTarget), 'Camera transform finite'),
@@ -398,7 +453,8 @@ async function buildDiagnosticSnapshot(level = 1) {
   const gl = engine?.gl || null;
   const quick = {
     app: 'Ironvale',
-    diagnostics: 'ironvale-diagnostics-v1',
+    appBuild: APP_DIAGNOSTIC_BUILD,
+    diagnostics: 'ironvale-diagnostics-v2',
     phase: worldDocument ? 'world' : 'auth',
     worldId: worldDocument?.id || null,
     worldUnits: worldDocument?.units || null,
@@ -427,7 +483,7 @@ async function buildDiagnosticSnapshot(level = 1) {
     renderer: {
       ready: Boolean(engine), viewport, pixelRatioCap: engine?.pixelRatioCap ?? null, meshCount: engine?.meshes?.size ?? 0,
       textureCount: engine?.textures?.size ?? 0, textureArrayCount: engine?.textureArrays?.size ?? 0, skinCount: engine?.skins?.size ?? 0,
-      camera: engine?.camera || null, environment: engine?.environment || null, webgl: webGlDiagnosticInfo(gl, false)
+      camera: engine?.camera || null, environment: engine?.environment || null, webgl: webGlDiagnosticInfo(gl, false), telemetry: engine?.getDiagnostics?.(false) || { boot: getRiftEngineBootTelemetry() }
     },
     player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw, vy: player.vy, grounded: player.grounded, moving: playerMoving },
     character: {
@@ -435,28 +491,41 @@ async function buildDiagnosticSnapshot(level = 1) {
       rig: playerRig ? { renderHeight: playerRig.renderHeight, renderScale: playerRig.renderScale, feetAtY: playerRig.feetAtY, jointCount: playerRig.jointCount, animationClipCount: playerRig.animationClipCount, authoredForward: playerRig.authoredForward } : null
     },
     camera: { orbit: { ...orbitCamera }, freecam: { ...freecam }, lastPosition: [...lastCameraPosition], lastTarget: [...lastCameraTarget], profile: viewportCameraProfile },
-    performance: { averageFrameMs: terrainPerfAverageMs, approximateFps: terrainPerfAverageMs > 0 ? 1000 / terrainPerfAverageMs : null, mobileLandscape: isMobileLandscapeGameplay() },
+    performance: { averageFrameMs: terrainPerfAverageMs, approximateFps: terrainPerfAverageMs > 0 ? 1000 / terrainPerfAverageMs : null, mobileLandscape: isMobileLandscapeGameplay(), subsystemTimings: { ...diagnosticFrameTimings } },
     editor: { freecamEnabled, brushMode, undoDepth: undoStack.length, redoDepth: redoStack.length, reticleHit, terrainDebugEnabled },
     browser: { language: navigator.language, hardwareConcurrency: navigator.hardwareConcurrency || null, deviceMemory: navigator.deviceMemory || null, online: navigator.onLine }
   };
   if (resolvedLevel === 2) return { quick, runtime };
 
   let remoteLibraryPointer = null;
+  let coreSourceManifest = null;
   try {
     const response = await fetch('/assets/remote-library.json', { cache: 'no-store' });
     remoteLibraryPointer = response.ok ? await response.json() : { error: 'HTTP ' + response.status };
-  } catch (error) {
-    remoteLibraryPointer = { error: String(error?.message || error) };
-  }
+  } catch (error) { remoteLibraryPointer = { error: String(error?.message || error) }; }
+  try {
+    const response = await fetch('/rift-core.sources.json', { cache: 'no-store' });
+    coreSourceManifest = response.ok ? await response.json() : { error: 'HTTP ' + response.status };
+  } catch (error) { coreSourceManifest = { error: String(error?.message || error) }; }
+  const [storage, cacheState, serviceWorker] = await Promise.all([storageDiagnostics(), cacheDiagnostics(), serviceWorkerDiagnostics()]);
+  const resources = resourceTimingDiagnostics();
   const draftText = localStorage.getItem(LOCAL_DRAFT_KEY);
   const deep = {
     worldDocument,
     landscapeEdits: terrain?.serializeLandscapeEdits?.() || null,
     localDraft: { key: LOCAL_DRAFT_KEY, bytes: draftText ? new TextEncoder().encode(draftText).byteLength : 0 },
     remoteLibraryPointer,
-    renderer: { webgl: webGlDiagnosticInfo(gl, true) },
+    renderer: { webgl: webGlDiagnosticInfo(gl, true), engine: engine?.getDiagnostics?.(true) || { ready: false, boot: getRiftEngineBootTelemetry() } },
+    native: terrain?.getNativeDiagnostics?.(true) || null,
+    riftCore: { sourceManifest: coreSourceManifest, wasmResource: resources.find(entry => entry.name.includes('rift-core.wasm')) || null },
+    storage,
+    cacheState,
+    serviceWorker,
+    resourceTiming: resources,
+    loadedModules: resources.filter(entry => /(?:app|rift-[^/]+|styles)\.(?:js|css)/.test(entry.name)),
     targeting: { registeredTargets: combatTargets.size, selectedTargetId, hardLockEnabled },
-    moduleContracts: { terrainDraft: 'v4', landscape: worldDocument?.terrain?.landscape?.format || null, scale: worldDocument?.scale?.format || null }
+    diagnosticsExtensibility: { registeredProviders: [...diagnostics.providers.keys()], assetAndSceneProvidersSupported: true },
+    moduleContracts: { appBuild: APP_DIAGNOSTIC_BUILD, terrainDraft: 'v4', landscape: worldDocument?.terrain?.landscape?.format || null, scale: worldDocument?.scale?.format || null, diagnostics: 'ironvale-diagnostics-v2', engineTelemetry: 'rift-engine-telemetry-v1', nativeTelemetry: 'riftcore-native-diagnostics-v1' }
   };
   return { quick, runtime, deep };
 }
@@ -536,7 +605,7 @@ async function startWorld(url) {
   playerVisualFeetOffset = 0;
   playerRig = null;
   playerMoving = false;
-  playerMesh = engine.addMesh(createCapsuleGeometry(), { position: [player.x, player.y, player.z] });
+  playerMesh = engine.addMesh(createCapsuleGeometry(), { kind: 'character-fallback', label: 'player-capsule', position: [player.x, player.y, player.z] });
   snapPlayerToSupport();
   void installRiggedPlayerVisual();
   applyViewportCameraProfile(true);
@@ -574,6 +643,8 @@ function stopWorld() {
   terrainPerfFrameCount = 0;
   terrainPerfFrameMs = 0;
   terrainPerfAverageMs = 0;
+  diagnosticFrameCounter = 0;
+  for (const key of Object.keys(diagnosticFrameTimings)) if (key !== 'sampleEveryFrames') diagnosticFrameTimings[key] = 0;
   lastTerrainLodRefresh = 0;
   playerMesh = null;
   playerCharacter = null;
@@ -680,7 +751,7 @@ function buildTerrainSection(section, plan = terrainLodPlan, force = false) {
     existing.componentId = section.componentId;
     existing.triangles = Number(entry.triangles) || 0;
   } else {
-    const mesh = engine.addMesh(entry.geometry || entry, { terrainMaterial: terrainMaterialRuntime?.material || null });
+    const mesh = engine.addMesh(entry.geometry || entry, { kind: 'terrain', label: key, terrainMaterial: terrainMaterialRuntime?.material || null });
     terrainMeshes.set(key, {
       mesh,
       lodStep: section.lodStep,
@@ -842,6 +913,7 @@ async function installRiggedPlayerVisual() {
         texture = textures.get(textureIndex);
       }
       const human = activeEngine.addMesh(primitive.geometry, {
+        kind: 'character', label: `player-character-${meshes.length}`,
         position: [player.x, player.y - PLAYER_COLLIDER_HALF_HEIGHT, player.z],
         yaw: player.yaw,
         scale: [renderScale, renderScale, renderScale],
@@ -894,16 +966,27 @@ function frame(now) {
   if (!engine || !terrain) return;
   const dt = Math.min(.05, Math.max(.001, (now - lastFrame) / 1000));
   lastFrame = now;
+  const sampleTimings = (++diagnosticFrameCounter % diagnosticFrameTimings.sampleEveryFrames) === 0;
+  const timingStart = sampleTimings ? performance.now() : 0;
+  let timingMark = timingStart;
+  const markTiming = name => { if (!sampleTimings) return; const next = performance.now(); updateDiagnosticFrameTiming(name, next - timingMark); timingMark = next; };
   updateKeyboardInput();
   if (freecamEnabled) updateFreecam(dt);
   else updatePlayer(dt);
+  markTiming('movementMs');
   updatePlayerCharacterAnimation(dt);
+  markTiming('animationMs');
   if (!freecamEnabled) updateHardLockCamera(dt);
   updateCamera();
+  markTiming('cameraMs');
   updateTerrainLod(now);
+  markTiming('terrainLodMs');
   updateReticleTarget();
+  markTiming('reticleMs');
   updateTerrainPerformance(dt);
   engine.render();
+  markTiming('renderMs');
+  if (sampleTimings) { const total = performance.now() - timingStart; updateDiagnosticFrameTiming('totalMs', total); diagnosticFrameTimings.maxTotalMs = Math.max(diagnosticFrameTimings.maxTotalMs, total); diagnosticFrameTimings.samples += 1; }
 
   coords.textContent = freecamEnabled
     ? `CAM ${freecam.x.toFixed(1)}, ${freecam.y.toFixed(1)}, ${freecam.z.toFixed(1)}`

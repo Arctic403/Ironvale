@@ -217,7 +217,12 @@
     "automatedValidator": true,
     "diagnosticDumpSystem": true,
     "diagnosticDumpLayers": 3,
-    "diagnosticSchemaVersion": 1
+    "diagnosticSchemaVersion": 2,
+    "engineBlackBoxDiagnostics": true,
+    "engineResourceInventory": true,
+    "networkTelemetry": true,
+    "nativeWasmTelemetry": true,
+    "subsystemFrameTimings": true
   },
   "scale": {
     "format": "rift-scale-v1",
@@ -243,7 +248,7 @@
     }
   },
   "diagnostics": {
-    "format": "ironvale-diagnostics-v1",
+    "format": "ironvale-diagnostics-v2",
     "autoValidator": true,
     "validatorIntervalMs": 5000,
     "dumpFormat": "ironvale-diagnostic-dump-v1",
@@ -261,7 +266,7 @@
       {
         "level": 3,
         "id": "deep",
-        "purpose": "sanitized forensic world/edit/runtime snapshot"
+        "purpose": "sanitized engine black-box forensic snapshot: renderer/GPU resources, shaders, WebGL, WASM, storage/cache/network, world/edit state and subsystem providers"
       }
     ],
     "automaticCrashDumpLevel": 2,

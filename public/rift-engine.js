@@ -145,14 +145,36 @@ void main() {
   outColor = vec4(mix(lit, uFogColor, fog), surface.a);
 }`;
 
+export const RIFT_ENGINE_TELEMETRY_FORMAT = 'rift-engine-telemetry-v1';
+const ENGINE_BOOT_TELEMETRY = {
+  format: RIFT_ENGINE_TELEMETRY_FORMAT,
+  shaders: { vertex: null, fragment: null },
+  program: null
+};
+
+function shaderFingerprint(source) {
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) { hash ^= source.charCodeAt(index); hash = Math.imul(hash, 16777619); }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+function glErrorName(gl, code) {
+  const pairs = [[gl.INVALID_ENUM,'INVALID_ENUM'],[gl.INVALID_VALUE,'INVALID_VALUE'],[gl.INVALID_OPERATION,'INVALID_OPERATION'],[gl.INVALID_FRAMEBUFFER_OPERATION,'INVALID_FRAMEBUFFER_OPERATION'],[gl.OUT_OF_MEMORY,'OUT_OF_MEMORY'],[gl.CONTEXT_LOST_WEBGL,'CONTEXT_LOST_WEBGL']];
+  return pairs.find(([value]) => value === code)?.[1] || '0x' + Number(code).toString(16);
+}
+function mipEstimateBytes(width, height, layers = 1, bytesPerPixel = 4) { return Math.ceil(Math.max(1,width) * Math.max(1,height) * Math.max(1,layers) * bytesPerPixel * 4 / 3); }
+export function getRiftEngineBootTelemetry() { return JSON.parse(JSON.stringify(ENGINE_BOOT_TELEMETRY)); }
+
 function compile(gl, type, source) {
+  const stage = type === gl.VERTEX_SHADER ? 'vertex' : 'fragment';
   const shader = gl.createShader(type);
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const message = gl.getShaderInfoLog(shader) || 'Shader compile failed';
+  const ok = Boolean(gl.getShaderParameter(shader, gl.COMPILE_STATUS));
+  const log = gl.getShaderInfoLog(shader) || '';
+  ENGINE_BOOT_TELEMETRY.shaders[stage] = { ok, log, sourceLength: source.length, lines: source.split('\n').length, fingerprint: shaderFingerprint(source) };
+  if (!ok) {
     gl.deleteShader(shader);
-    throw new Error(message);
+    throw new Error(log || stage + ' shader compile failed');
   }
   return shader;
 }
@@ -161,11 +183,11 @@ function createProgram(gl) {
   const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
   const program = gl.createProgram();
   gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
+  const linked = Boolean(gl.getProgramParameter(program, gl.LINK_STATUS));
+  const log = gl.getProgramInfoLog(program) || '';
+  ENGINE_BOOT_TELEMETRY.program = { linked, log, activeAttributes: linked ? gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES) : null, activeUniforms: linked ? gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) : null };
   gl.deleteShader(vertex); gl.deleteShader(fragment);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const message = gl.getProgramInfoLog(program) || 'Program link failed';
-    gl.deleteProgram(program); throw new Error(message);
-  }
+  if (!linked) { gl.deleteProgram(program); throw new Error(log || 'Program link failed'); }
   return program;
 }
 function perspective(out, fovy, aspect, near, far) {
@@ -209,7 +231,7 @@ export class RiftEngine {
     this.canvas=canvas;
     this.gl=canvas.getContext('webgl2',{antialias:options.antialias!==false,alpha:false,depth:true,powerPreference:'high-performance'});
     if(!this.gl) throw new Error('WebGL2 is required for Rift Engine');
-    const gl=this.gl; this.program=createProgram(gl); this.meshes=new Set(); this.textures=new Set(); this.textureArrays=new Set(); this.skins=new Set(); this.projection=new Float32Array(16); this.view=new Float32Array(16); this.model=new Float32Array(16); this.pixelRatioCap=2;
+    const gl=this.gl; this.program=createProgram(gl); this.meshes=new Set(); this.textures=new Set(); this.textureInfo=new Map(); this.textureArrays=new Set(); this.skins=new Set(); this.projection=new Float32Array(16); this.view=new Float32Array(16); this.model=new Float32Array(16); this.pixelRatioCap=2; this._resourceSequence=1; this._telemetry={format:RIFT_ENGINE_TELEMETRY_FORMAT,createdAt:Date.now(),frameNumber:0,lastFrame:null,glErrors:[],contextEvents:[]}; this._contextLostHandler=()=>{this._telemetry.contextEvents.push({at:new Date().toISOString(),type:'lost'});}; this._contextRestoredHandler=()=>{this._telemetry.contextEvents.push({at:new Date().toISOString(),type:'restored'});}; canvas.addEventListener('webglcontextlost',this._contextLostHandler); canvas.addEventListener('webglcontextrestored',this._contextRestoredHandler);
     this.camera={position:[160,22,178],target:[160,10,160],fov:Math.PI/3,near:0.08,far:650};
     this.environment={clear:options.clear||[0.56,0.72,0.86],fog:options.fog||[0.64,0.75,0.82],fogNear:120,fogFar:420,light:[0.45,-1,0.28]};
     this.viewport={rect:null,cssWidth:1,cssHeight:1,width:1,height:1,aspect:1,pixelRatio:1};
@@ -243,7 +265,7 @@ export class RiftEngine {
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);
     gl.texImage2D(gl.TEXTURE_2D,0,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,gl.RGBA,gl.UNSIGNED_BYTE,image);
-    gl.generateMipmap(gl.TEXTURE_2D);gl.bindTexture(gl.TEXTURE_2D,null);this.textures.add(texture);return texture;
+    gl.generateMipmap(gl.TEXTURE_2D);gl.bindTexture(gl.TEXTURE_2D,null);this.textures.add(texture);const width=Math.max(1,Number(image.width||image.videoWidth)||1),height=Math.max(1,Number(image.height||image.videoHeight)||1);this.textureInfo.set(texture,{id:'tex-'+this._resourceSequence++,width,height,srgb:Boolean(srgb),mipmapped:true,estimatedBytes:mipEstimateBytes(width,height)});return texture;
   }
 
   createTextureArray(width,height,layers,{srgb=false}={}){
@@ -253,7 +275,7 @@ export class RiftEngine {
     gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_WRAP_T,gl.REPEAT);
     gl.texStorage3D(gl.TEXTURE_2D_ARRAY,levels,srgb?gl.SRGB8_ALPHA8:gl.RGBA8,w,h,depth);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY,null);
-    const resource={texture,width:w,height:h,layers:depth,levels,srgb:Boolean(srgb)};this.textureArrays.add(resource);return resource;
+    const resource={texture,width:w,height:h,layers:depth,levels,srgb:Boolean(srgb),diagnosticId:'tex-array-'+this._resourceSequence++,estimatedBytes:mipEstimateBytes(w,h,depth)};this.textureArrays.add(resource);return resource;
   }
   fillTextureArrayLayer(resource,layer,rgba){
     if(!resource||!this.textureArrays.has(resource))return;
@@ -269,14 +291,14 @@ export class RiftEngine {
   }
   destroyTextureArray(resource){if(!resource||!this.textureArrays.delete(resource))return;this.gl.deleteTexture(resource.texture);resource.texture=null}
 
-  destroyTexture(texture){if(!texture||!this.textures.delete(texture))return;this.gl.deleteTexture(texture)}
+  destroyTexture(texture){if(!texture||!this.textures.delete(texture))return;this.textureInfo.delete(texture);this.gl.deleteTexture(texture)}
   createSkin(jointCount){
     const count=Math.max(1,Math.trunc(Number(jointCount)||0));
     const gl=this.gl,texture=gl.createTexture(),matrices=new Float32Array(count*16);
     for(let joint=0;joint<count;joint+=1){const o=joint*16;matrices[o]=matrices[o+5]=matrices[o+10]=matrices[o+15]=1}
     gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,4,count,0,gl.RGBA,gl.FLOAT,matrices);gl.bindTexture(gl.TEXTURE_2D,null);
-    const skin={texture,jointCount:count,matrices};this.skins.add(skin);return skin;
+    const skin={texture,jointCount:count,matrices,diagnosticId:'skin-'+this._resourceSequence++,estimatedBytes:count*16*4};this.skins.add(skin);return skin;
   }
   updateSkin(skin,matrices){
     if(!skin||!this.skins.has(skin))return;
@@ -286,14 +308,14 @@ export class RiftEngine {
   }
   destroySkin(skin){if(!skin||!this.skins.delete(skin))return;this.gl.deleteTexture(skin.texture);skin.texture=null}
   addMesh(geometry, options={}) {
-    const mesh={position:[...(options.position||[0,0,0])],scale:[...(options.scale||[1,1,1])],yaw:Number(options.yaw)||0,tint:[...(options.tint||[1,1,1])],baseColorFactor:[...(options.baseColorFactor||[1,1,1,1])],texture:options.texture||null,skin:options.skin||null,terrainMaterial:options.terrainMaterial||null,visible:options.visible!==false,vao:null,vertexBuffer:null,indexBuffer:null,count:0,indexType:null,stride:9,attributes:{}};
+    const mesh={diagnosticId:String(options.diagnosticId||('mesh-'+this._resourceSequence++)),kind:String(options.kind||'mesh'),label:options.label==null?null:String(options.label),bounds:options.bounds||null,position:[...(options.position||[0,0,0])],scale:[...(options.scale||[1,1,1])],yaw:Number(options.yaw)||0,tint:[...(options.tint||[1,1,1])],baseColorFactor:[...(options.baseColorFactor||[1,1,1,1])],texture:options.texture||null,skin:options.skin||null,terrainMaterial:options.terrainMaterial||null,visible:options.visible!==false,vao:null,vertexBuffer:null,indexBuffer:null,count:0,indexType:null,stride:9,attributes:{},vertexCount:0,vertexBytes:0,indexBytes:0};
     this._upload(mesh,geometry);this.meshes.add(mesh);return mesh;
   }
   updateMesh(mesh,geometry){if(this.meshes.has(mesh))this._upload(mesh,geometry)}
   removeMesh(mesh){if(!this.meshes.delete(mesh))return;this._disposeMesh(mesh)}
   _upload(mesh,geometry){
     const gl=this.gl,data=normalizeGeometry(geometry);if(mesh.vao)this._disposeMesh(mesh);
-    mesh.vao=gl.createVertexArray();mesh.vertexBuffer=gl.createBuffer();mesh.indexBuffer=gl.createBuffer();mesh.count=data.indices.length;mesh.indexType=data.indices instanceof Uint32Array?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT;mesh.stride=data.stride;mesh.attributes=data.attributes;
+    mesh.vao=gl.createVertexArray();mesh.vertexBuffer=gl.createBuffer();mesh.indexBuffer=gl.createBuffer();mesh.count=data.indices.length;mesh.indexType=data.indices instanceof Uint32Array?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT;mesh.stride=data.stride;mesh.attributes=data.attributes;mesh.vertexCount=data.vertices.length/data.stride;mesh.vertexBytes=data.vertices.byteLength;mesh.indexBytes=data.indices.byteLength;
     gl.bindVertexArray(mesh.vao);gl.bindBuffer(gl.ARRAY_BUFFER,mesh.vertexBuffer);gl.bufferData(gl.ARRAY_BUFFER,data.vertices,gl.STATIC_DRAW);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,mesh.indexBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,data.indices,gl.STATIC_DRAW);
     const bytes=data.stride*4;gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,bytes,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,bytes,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,bytes,24);
     if(Number.isInteger(data.attributes.uv)){gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,2,gl.FLOAT,false,bytes,data.attributes.uv*4)}else gl.disableVertexAttribArray(3);
@@ -327,6 +349,7 @@ export class RiftEngine {
   }
   getViewport(){return this.viewport}
   render(){
+    const renderStarted=performance.now();let drawCalls=0,triangles=0,indices=0,visibleMeshes=0;
     const gl=this.gl;const viewport=this.resize();const aspect=viewport.aspect;perspective(this.projection,this.camera.fov,aspect,this.camera.near,this.camera.far);lookAt(this.view,this.camera.position,this.camera.target);const clear=this.environment.clear;
     gl.clearColor(clear[0],clear[1],clear[2],1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.locations.projection,false,this.projection);gl.uniformMatrix4fv(this.locations.view,false,this.view);gl.uniform3fv(this.locations.light,this.environment.light);gl.uniform3fv(this.locations.fogColor,this.environment.fog);gl.uniform1f(this.locations.fogNear,this.environment.fogNear);gl.uniform1f(this.locations.fogFar,this.environment.fogFar);gl.uniform3fv(this.locations.camera,this.camera.position);gl.uniform1i(this.locations.baseColorTexture,0);gl.uniform1i(this.locations.jointMatrices,1);gl.uniform1i(this.locations.terrainAlbedoArray,2);gl.uniform1i(this.locations.terrainNormalArray,3);gl.uniform1i(this.locations.terrainRoughnessArray,4);
     gl.vertexAttrib2f(3,0,0);gl.vertexAttrib4f(4,0,0,0,0);gl.vertexAttrib4f(5,1,0,0,0);gl.vertexAttrib4f(6,1,0,0,0);gl.vertexAttrib2f(7,0,0);
@@ -341,11 +364,26 @@ export class RiftEngine {
         gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.normalArray.texture);
         gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D_ARRAY,terrainMaterial.roughnessArray.texture);
       }
-      gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0)
+      gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.indexType,0);drawCalls+=1;visibleMeshes+=1;indices+=mesh.count;triangles+=Math.floor(mesh.count/3)
     }
-    gl.bindVertexArray(null);for(const unit of [4,3,2]){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D_ARRAY,null)}gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null)
+    gl.bindVertexArray(null);for(const unit of [4,3,2]){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D_ARRAY,null)}gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,null);
+    this._telemetry.frameNumber+=1;this._telemetry.lastFrame={at:new Date().toISOString(),renderMs:performance.now()-renderStarted,drawCalls,visibleMeshes,triangles,indices};if(this._telemetry.frameNumber%60===0)this._captureGlErrors('render');
+  }
+  _captureGlErrors(source='runtime'){
+    const gl=this.gl;if(!gl||gl.isContextLost?.())return;for(let index=0;index<8;index+=1){const code=gl.getError();if(code===gl.NO_ERROR)break;this._telemetry.glErrors.push({at:new Date().toISOString(),source,code,name:glErrorName(gl,code)});}if(this._telemetry.glErrors.length>80)this._telemetry.glErrors.splice(0,this._telemetry.glErrors.length-80);
+  }
+  getDiagnostics(deep=false){
+    const textureLookup=this.textureInfo;
+    const meshes=[...this.meshes].map(mesh=>({id:mesh.diagnosticId,kind:mesh.kind,label:mesh.label,visible:Boolean(mesh.visible),position:[...mesh.position],yaw:mesh.yaw,scale:[...mesh.scale],bounds:mesh.bounds,vertexCount:mesh.vertexCount,indexCount:mesh.count,triangles:Math.floor(mesh.count/3),vertexBytes:mesh.vertexBytes,indexBytes:mesh.indexBytes,stride:mesh.stride,attributes:Object.keys(mesh.attributes||{}),textureId:textureLookup.get(mesh.texture)?.id||null,skinId:mesh.skin?.diagnosticId||null,terrainMaterial:Boolean(mesh.terrainMaterial)}));
+    const textures=[...textureLookup.values()].map(info=>({...info}));
+    const textureArrays=[...this.textureArrays].map(resource=>({id:resource.diagnosticId,width:resource.width,height:resource.height,layers:resource.layers,levels:resource.levels,srgb:resource.srgb,estimatedBytes:resource.estimatedBytes}));
+    const skins=[...this.skins].map(skin=>({id:skin.diagnosticId,jointCount:skin.jointCount,estimatedBytes:skin.estimatedBytes}));
+    const meshBytes=meshes.reduce((sum,item)=>sum+(item.vertexBytes||0)+(item.indexBytes||0),0),textureBytes=textures.reduce((sum,item)=>sum+(item.estimatedBytes||0),0),arrayBytes=textureArrays.reduce((sum,item)=>sum+(item.estimatedBytes||0),0),skinBytes=skins.reduce((sum,item)=>sum+(item.estimatedBytes||0),0);
+    const program={linked:Boolean(this.gl.getProgramParameter(this.program,this.gl.LINK_STATUS)),activeAttributes:this.gl.getProgramParameter(this.program,this.gl.ACTIVE_ATTRIBUTES),activeUniforms:this.gl.getProgramParameter(this.program,this.gl.ACTIVE_UNIFORMS)};
+    if(deep){program.attributes=[];program.uniforms=[];for(let i=0;i<program.activeAttributes;i+=1){const info=this.gl.getActiveAttrib(this.program,i);if(info)program.attributes.push({name:info.name,size:info.size,type:info.type});}for(let i=0;i<program.activeUniforms;i+=1){const info=this.gl.getActiveUniform(this.program,i);if(info)program.uniforms.push({name:info.name,size:info.size,type:info.type});}}
+    return {format:RIFT_ENGINE_TELEMETRY_FORMAT,boot:getRiftEngineBootTelemetry(),frameNumber:this._telemetry.frameNumber,lastFrame:this._telemetry.lastFrame,camera:{...this.camera,position:[...this.camera.position],target:[...this.camera.target]},environment:{...this.environment},viewport:{...this.viewport,rect:null},pixelRatioCap:this.pixelRatioCap,program,contextLost:Boolean(this.gl.isContextLost?.()),contextEvents:[...this._telemetry.contextEvents],glErrors:[...this._telemetry.glErrors],resources:{meshes:meshes.length,textures2D:textures.length,textureArrays:textureArrays.length,skins:skins.length,gpuMemoryEstimate:{meshBuffers:meshBytes,textures2D:textureBytes,textureArrays:arrayBytes,skins:skinBytes,total:meshBytes+textureBytes+arrayBytes+skinBytes,note:'Estimated logical GPU resource bytes only; WebGL does not expose exact physical GPU allocation.'}},...(deep?{inventory:{meshes,textures2D:textures,textureArrays,skins}}:{})};
   }
   destroy(){
-    for(const mesh of [...this.meshes])this.removeMesh(mesh);for(const skin of [...this.skins])this.destroySkin(skin);for(const texture of [...this.textures])this.destroyTexture(texture);for(const textureArray of [...this.textureArrays])this.destroyTextureArray(textureArray);if(this.whiteTexture)this.gl.deleteTexture(this.whiteTexture);this.whiteTexture=null;this.gl.deleteProgram(this.program);this.meshes.clear()
+    this.canvas.removeEventListener('webglcontextlost',this._contextLostHandler);this.canvas.removeEventListener('webglcontextrestored',this._contextRestoredHandler);for(const mesh of [...this.meshes])this.removeMesh(mesh);for(const skin of [...this.skins])this.destroySkin(skin);for(const texture of [...this.textures])this.destroyTexture(texture);for(const textureArray of [...this.textureArrays])this.destroyTextureArray(textureArray);if(this.whiteTexture)this.gl.deleteTexture(this.whiteTexture);this.whiteTexture=null;this.gl.deleteProgram(this.program);this.meshes.clear();this.textureInfo.clear()
   }
 }
