@@ -1,0 +1,73 @@
+name: Safari Terrain Shader Hotfix
+
+on:
+  push:
+    branches: [login-boot-hotfix]
+    paths:
+      - '.github/workflows/safari-terrain-shader-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: login-boot-hotfix
+          fetch-depth: 0
+
+      - name: Patch Safari sampler precision and cache keys
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          engine = Path('public/rift-engine.js')
+          text = engine.read_text()
+          anchor = "const FRAGMENT_SHADER = `#version 300 es\nprecision highp float;\n"
+          replacement = "const FRAGMENT_SHADER = `#version 300 es\nprecision highp float;\nprecision highp sampler2D;\nprecision highp sampler2DArray;\n"
+          if anchor not in text:
+              raise SystemExit('fragment shader precision anchor not found')
+          text = text.replace(anchor, replacement, 1)
+          engine.write_text(text)
+
+          app = Path('public/app.js')
+          text = app.read_text()
+          old = "./rift-engine.js?v=20260901-terrain-lock-r2"
+          new = "./rift-engine.js?v=20260901-terrain-lock-r3"
+          if old not in text:
+              raise SystemExit('engine cache key anchor not found')
+          app.write_text(text.replace(old, new, 1))
+
+          index = Path('public/index.html')
+          text = index.read_text()
+          old = "/app.js?v=20260901-terrain-lock-r2"
+          new = "/app.js?v=20260901-terrain-lock-r3"
+          if old not in text:
+              raise SystemExit('app cache key anchor not found')
+          index.write_text(text.replace(old, new, 1))
+
+          Path('.github/workflows/safari-terrain-shader-hotfix.yml').unlink()
+          PY
+
+      - name: Verify Safari shader contract
+        shell: bash
+        run: |
+          grep -q "precision highp sampler2DArray;" public/rift-engine.js
+          grep -q "rift-engine.js?v=20260901-terrain-lock-r3" public/app.js
+          grep -q "app.js?v=20260901-terrain-lock-r3" public/index.html
+
+      - name: Verify Ironvale build
+        run: npm run build
+
+      - name: Commit verified Safari shader fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Safari terrain sampler precision"
+          git push origin HEAD:login-boot-hotfix
