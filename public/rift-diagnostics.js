@@ -359,6 +359,12 @@ export class RiftDiagnostics {
       storageNote: 'Minimal automatic crash dump stored after the full runtime dump exceeded browser storage.'
     };
     candidates.push(minimal);
+    candidates.push({
+      ...minimal,
+      validation: minimal.validation ? { status: minimal.validation.status, counts: minimal.validation.counts } : null,
+      layers: { l1Quick: { storageFallback: true } },
+      storageNote: 'Emergency crash summary stored because detailed diagnostic state exceeded browser storage.'
+    });
 
     for (const candidate of candidates) {
       try {
