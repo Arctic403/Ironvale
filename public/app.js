@@ -149,6 +149,66 @@ const input = { forward: 0, strafe: 0, keys: new Set() };
 const undoStack = [];
 const redoStack = [];
 
+const IRONVALE_EDITOR_HISTORY_FORMAT = 'ironvale-editor-history-runtime-v1';
+const IRONVALE_EDITOR_HISTORY_SNAPSHOT_FORMAT = 'ironvale-editor-history-snapshot-v1';
+const editorHistorySnapshots = new Map();
+let editorHistorySnapshotSequence = 0;
+
+function editorHistoryStatus() {
+  return {
+    format: IRONVALE_EDITOR_HISTORY_FORMAT,
+    undoDepth: undoStack.length,
+    redoDepth: redoStack.length,
+    retainedSnapshots: editorHistorySnapshots.size
+  };
+}
+
+function captureEditorHistory(label = 'external') {
+  const token = `history-${Date.now().toString(36)}-${(++editorHistorySnapshotSequence).toString(36)}`;
+  editorHistorySnapshots.set(token, {
+    undo: undoStack.slice(),
+    redo: redoStack.slice(),
+    label: String(label || 'external').slice(0, 80),
+    createdAt: new Date().toISOString()
+  });
+  while (editorHistorySnapshots.size > 4) {
+    const oldest = editorHistorySnapshots.keys().next().value;
+    editorHistorySnapshots.delete(oldest);
+  }
+  return {
+    format: IRONVALE_EDITOR_HISTORY_SNAPSHOT_FORMAT,
+    token,
+    label: String(label || 'external').slice(0, 80),
+    undoDepth: undoStack.length,
+    redoDepth: redoStack.length
+  };
+}
+
+function restoreEditorHistory(snapshotOrToken) {
+  const token = typeof snapshotOrToken === 'string' ? snapshotOrToken : snapshotOrToken?.token;
+  const snapshot = token ? editorHistorySnapshots.get(token) : null;
+  if (!snapshot) return { ok: false, error: 'history-snapshot-not-found', ...editorHistoryStatus() };
+  undoStack.length = 0;
+  redoStack.length = 0;
+  if (snapshot.undo.length) undoStack.push(...snapshot.undo);
+  if (snapshot.redo.length) redoStack.push(...snapshot.redo);
+  editorHistorySnapshots.delete(token);
+  return { ok: true, token, ...editorHistoryStatus() };
+}
+
+function discardEditorHistory(snapshotOrToken) {
+  const token = typeof snapshotOrToken === 'string' ? snapshotOrToken : snapshotOrToken?.token;
+  return Boolean(token && editorHistorySnapshots.delete(token));
+}
+
+window.IronvaleEditorHistory = Object.freeze({
+  format: IRONVALE_EDITOR_HISTORY_FORMAT,
+  capture: captureEditorHistory,
+  restore: restoreEditorHistory,
+  discard: discardEditorHistory,
+  status: editorHistoryStatus
+});
+
 let gesture = null;
 let longPressTimer = 0;
 let continuousBrushTimer = 0;
@@ -2516,7 +2576,7 @@ function createCapsuleGeometry() {
       const a = ring * radial + side;
       const b = ring * radial + next;
       const c = (ring + 1) * radial + side;
-      const d = c + 1;
+      const d = (ring + 1) * radial + next;
       indices.push(a, c, b, b, c, d);
     }
   }
