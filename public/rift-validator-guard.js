@@ -5,6 +5,7 @@ export const IRONVALE_VALIDATOR_GUARD_FORMAT = 'ironvale-validator-guard-v1';
 const PATCH_MARK = Symbol.for('ironvale.validator-guard-patched');
 const WRAPPED_INSTANCE = Symbol('ironvale.validator-guard-instance');
 const originalRunValidation = RiftDiagnostics.prototype.runValidation;
+const REALTIME_CONNECTING_GRACE_MS = 1500;
 
 let activeInstance = null;
 const guardState = {
@@ -231,8 +232,13 @@ async function buildGuardChecks(instance) {
     checks.push(statusCheck('realtime.provider', 'warn', 'Realtime diagnostics provider unavailable'));
   } else {
     const socketState = String(realtime.socketState || 'unknown');
-    const socketStatus = socketState === 'open' ? 'pass' : ['connecting', 'idle'].includes(socketState) ? 'warn' : 'fail';
-    checks.push(statusCheck('realtime.socket', socketStatus, `Realtime socket=${socketState}`));
+    const connectingAgeMs = Number(realtime.connectingAgeMs);
+    const connectingWithinGrace = socketState === 'connecting' && Number.isFinite(connectingAgeMs) && connectingAgeMs >= 0 && connectingAgeMs < REALTIME_CONNECTING_GRACE_MS;
+    const socketStatus = socketState === 'open' || connectingWithinGrace ? 'pass' : ['connecting', 'idle'].includes(socketState) ? 'warn' : 'fail';
+    const socketDetail = connectingWithinGrace
+      ? `Realtime socket=connecting · ${Math.round(connectingAgeMs)}ms/${REALTIME_CONNECTING_GRACE_MS}ms startup/reconnect grace`
+      : `Realtime socket=${socketState}`;
+    checks.push(statusCheck('realtime.socket', socketStatus, socketDetail));
     const policyOk = realtime.authority === 'server-durable-object' && realtime.d1Policy === 'load-checkpoint-only' && realtime.checkpointPolicy?.ordinaryMovementWritesToD1 === false;
     checks.push(passFail('realtime.d1-policy', policyOk, policyOk ? 'Server RAM authority; D1 load/checkpoint only' : 'Realtime/D1 authority policy mismatch'));
     const rejected = Number(realtime.rejected) || 0;

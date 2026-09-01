@@ -21,6 +21,7 @@ const state = {
   d1Policy: 'load-checkpoint-only',
   publisherMode: 'direct-meaningful-10hz',
   socketState: 'idle',
+  connectingAt: null,
   connectedAt: null,
   disconnectedAt: null,
   lastMessageAt: null,
@@ -295,10 +296,12 @@ function connect() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
 
   state.socketState = 'connecting';
+  state.connectingAt = new Date().toISOString();
   try {
     socket = new WebSocket(socketUrl());
   } catch (error) {
     state.socketState = 'error';
+    state.connectingAt = null;
     state.lastError = String(error?.message || error || 'WebSocket construction failed').slice(0, 160);
     if (!disconnectedSincePerf) disconnectedSincePerf = performance.now();
     scheduleReconnect();
@@ -307,6 +310,7 @@ function connect() {
 
   socket.addEventListener('open', () => {
     state.socketState = 'open';
+    state.connectingAt = null;
     state.connectedAt = new Date().toISOString();
     state.disconnectedAt = null;
     state.lastError = null;
@@ -344,6 +348,7 @@ function connect() {
 
   socket.addEventListener('error', () => {
     state.socketState = 'error';
+    state.connectingAt = null;
     state.lastError = 'WebSocket transport error';
     if (!disconnectedSincePerf) disconnectedSincePerf = performance.now();
   });
@@ -351,6 +356,7 @@ function connect() {
   socket.addEventListener('close', event => {
     const wasOpen = state.socketState === 'open';
     state.socketState = 'closed';
+    state.connectingAt = null;
     state.disconnectedAt = new Date().toISOString();
     if (!disconnectedSincePerf) disconnectedSincePerf = performance.now();
     socket = null;
@@ -366,6 +372,7 @@ function closeSocket(reason = 'client-close') {
   try { socket.close(1000, String(reason).slice(0, 64)); } catch (_) {}
   socket = null;
   state.socketState = 'closed';
+  state.connectingAt = null;
   state.disconnectedAt = new Date().toISOString();
   if (!disconnectedSincePerf) disconnectedSincePerf = performance.now();
 }
@@ -455,9 +462,15 @@ window.fetch = async function ironvaleRealtimeFetch(input, init = undefined) {
 
 function realtimeStatus() {
   const now = Date.now();
+  const socketState = socket?.readyState === WebSocket.OPEN ? 'open' : state.socketState;
+  const connectingAtMs = Date.parse(state.connectingAt || '');
+  const connectingAgeMs = socketState === 'connecting' && Number.isFinite(connectingAtMs)
+    ? Math.max(0, now - connectingAtMs)
+    : null;
   return {
     ...state,
-    socketState: socket?.readyState === WebSocket.OPEN ? 'open' : state.socketState,
+    socketState,
+    connectingAgeMs,
     lastAckAgeMs: state.lastMessageAt ? Math.max(0, now - Date.parse(state.lastMessageAt)) : null,
     pendingPosition: pendingPosition ? { ...pendingPosition } : null,
     lastPublishedPosition: lastPublishedPosition ? { ...lastPublishedPosition } : null,
@@ -513,6 +526,7 @@ window.IronvaleRealtimeMovement = Object.freeze({
 window.addEventListener('online', connect);
 window.addEventListener('offline', () => {
   state.socketState = 'offline';
+  state.connectingAt = null;
   state.disconnectedAt = new Date().toISOString();
   if (!disconnectedSincePerf) disconnectedSincePerf = performance.now();
 });

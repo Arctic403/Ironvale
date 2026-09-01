@@ -16,11 +16,13 @@ const architecture = read('public/rift-architecture-guard.js');
 const wrangler = read('wrangler.toml');
 const html = read('public/index.html');
 const styles = read('public/styles.css');
+const validatorGuard = read('public/rift-validator-guard.js');
 
 requireMatch(wrangler, /main\s*=\s*"src\/realtime-entry\.js"/, 'realtime Worker entrypoint');
 requireMatch(wrangler, /\[\[durable_objects\.bindings\]\][\s\S]*name\s*=\s*"PLAYER_STATE"[\s\S]*class_name\s*=\s*"PlayerState"/, 'PLAYER_STATE Durable Object binding');
 requireMatch(wrangler, /new_sqlite_classes\s*=\s*\[\s*"PlayerState"\s*\]/, 'SQLite Durable Object migration');
-requireMatch(html, /rift-realtime\.js\?v=20260901-realtime-10hz-r1/, '10Hz realtime client module loaded');
+requireMatch(html, /rift-realtime\.js\?v=20260901-reconnect-grace-r1/, 'realtime client reconnect-grace module loaded');
+requireMatch(html, /rift-validator-guard\.js\?v=20260901-reconnect-grace-r1/, 'validator reconnect-grace module loaded');
 
 requireMatch(worker, /REALTIME_FORMAT = 'ironvale-realtime-authority-v2'/, 'realtime authority v2');
 requireMatch(worker, /export class PlayerState extends DurableObject/, 'PlayerState Durable Object class');
@@ -63,6 +65,8 @@ requireMatch(client, /legacyFetchBridgeCompatibilityOnly:\s*true/, 'legacy fetch
 requireMatch(client, /appLegacyHeartbeatRemoved:\s*true/, 'legacy app heartbeat removal exposed');
 requireMatch(client, /fallbackMaxHz:\s*1000 \/ FALLBACK_MIN_INTERVAL_MS/, 'bounded HTTP fallback rate');
 requireMatch(client, /lastRttMs/, 'RTT telemetry');
+requireMatch(client, /connectingAt:\s*null/, 'realtime connecting timestamp telemetry');
+requireMatch(client, /connectingAgeMs/, 'realtime connecting age telemetry');
 requireMatch(client, /ordinaryMovementWritesToD1:\s*false/, 'D1 movement-write policy exposed to diagnostics');
 requireMatch(client, /durableObjectAlarm:\s*true/, 'alarm checkpoint policy exposed');
 requireMatch(client, /pagehide/, 'page hide checkpoint');
@@ -91,6 +95,9 @@ requireMatch(auto, /source:\s*'validator-restore'/, 'validator exact player rest
 requireMatch(auto, /exercisesDirectRealtimePublisher:\s*true/, 'auto validation policy declares direct publisher coverage');
 requireMatch(architecture, /publisherDeclared/, 'runtime architecture validator checks publisher mode');
 requireMatch(architecture, /direct-meaningful-10hz/, 'runtime validator requires direct 10Hz mode');
+requireMatch(validatorGuard, /REALTIME_CONNECTING_GRACE_MS\s*=\s*1500/, 'validator 1.5s realtime connecting grace');
+requireMatch(validatorGuard, /connectingWithinGrace/, 'validator recognizes bounded connecting transition');
+requireMatch(validatorGuard, /socketState === 'open' \|\| connectingWithinGrace/, 'brief connecting state passes only inside grace window');
 
 const movementRoute = worker.match(/if \(method === 'PUT' && url\.pathname === '\/api\/character\/position'\)[\s\S]*?\n\s*}/)?.[0] || '';
 if (/env\.DB\.(?:prepare|batch)/.test(movementRoute)) {
