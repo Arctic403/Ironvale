@@ -221,7 +221,7 @@ export class RiftDiagnostics {
     try {
       let json = JSON.stringify(dump);
       if (json.length > 900000) {
-        const reduced = structuredClone ? structuredClone(dump) : JSON.parse(json);
+        const reduced = typeof structuredClone === 'function' ? structuredClone(dump) : JSON.parse(json);
         if (reduced.layers?.l2Runtime?.recentEvents) reduced.layers.l2Runtime.recentEvents = reduced.layers.l2Runtime.recentEvents.slice(-15);
         reduced.storageNote = 'Automatic crash dump reduced to fit browser storage.';
         json = JSON.stringify(reduced);

@@ -384,7 +384,7 @@ function buildDiagnosticChecks() {
     diagnosticCheck('terrain.meshes', terrainMeshes.size > 0, terrainMeshes.size + ' terrain meshes'),
     diagnosticCheck('terrain.lod-plan', terrainLodPlan.size > 0, terrainLodPlan.size + ' planned sections'),
     diagnosticCheck('terrain.streaming', Boolean(terrainStreamPlan?.render?.size), (terrainStreamPlan?.render?.size || 0) + ' render components'),
-    diagnosticCheck('character.visual', Boolean(playerCharacter?.meshes?.length), playerCharacter?.meshes?.length ? 'Rigged visual active' : 'Capsule fallback active', 'warn')
+    diagnosticCheck('character.visual', Boolean(playerMesh), playerCharacter?.meshes?.length ? 'Rigged visual active' : playerMesh ? 'Fallback/player visual active' : 'No player visual')
   );
   return checks;
 }
