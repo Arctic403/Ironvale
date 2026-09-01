@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const read = path => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const index = read('public/index.html');
+const app = read('public/app.js');
 const geometryGuard = read('public/rift-geometry-guard.js');
 const glTripwire = read('public/rift-gl-tripwire.js');
 const historyBridge = read('public/rift-history-bridge.js');
@@ -27,8 +28,14 @@ assert(glIndex > appIndex, 'GL tripwire must load after app engine module');
 assert(architectureIndex < validatorIndex, 'architecture guard must wrap diagnostics before validator guard');
 assert(validatorIndex < historyIndex && historyIndex < autoIndex, 'history bridge must load after validator guard and before auto validation');
 
-assert(geometryGuard.includes("CAPSULE_LABEL = 'player-capsule'"), 'fallback capsule repair target missing');
-assert(geometryGuard.includes('const d = (ring + 1) * CAPSULE_RADIAL + next'), 'capsule ring seam wrap fix missing');
+assert(app.includes('function createCapsuleGeometry()'), 'fallback capsule generator missing');
+assert(app.includes('const d = (ring + 1) * radial + next;'), 'fallback capsule source must wrap the next-ring seam directly');
+assert(app.includes("IRONVALE_EDITOR_HISTORY_FORMAT = 'ironvale-editor-history-runtime-v1'"), 'explicit editor history runtime format missing');
+assert(app.includes('window.IronvaleEditorHistory = Object.freeze'), 'explicit editor history runtime API missing');
+assert(app.includes('captureEditorHistory') && app.includes('restoreEditorHistory'), 'editor history capture/restore API incomplete');
+
+assert(geometryGuard.includes("CAPSULE_LABEL = 'player-capsule'"), 'fallback capsule safety-net target missing');
+assert(geometryGuard.includes('const d = (ring + 1) * CAPSULE_RADIAL + next'), 'capsule safety-net seam repair missing');
 assert(geometryGuard.includes('index >= vertexCount'), 'generic out-of-bounds index rejection missing');
 assert(geometryGuard.includes('IRONVALE_GEOMETRY_INDEX_OOB'), 'descriptive geometry bounds error missing');
 assert(geometryGuard.includes('rejectsOutOfBoundsIndicesBeforeWebGL: true'), 'geometry guard policy assertion missing');
@@ -39,13 +46,14 @@ assert(glTripwire.includes('drawElements'), 'tripwire must instrument drawElemen
 assert(glTripwire.includes('meshSnapshot'), 'tripwire must capture mesh context');
 assert(glTripwire.includes('state.armedFrames'), 'tripwire must be bounded in time');
 
-assert(historyBridge.includes("TERRAIN_HISTORY_FORMAT = 'rift-landscape-state-v1'"), 'history bridge must identify real terrain history states');
-assert(historyBridge.includes('isTerrainHistoryState'), 'history bridge terrain-state filter missing');
-assert(historyBridge.includes('filteredNonHistoryPushes'), 'history bridge must track ignored diagnostic-array pushes');
-assert(historyBridge.includes('baselineUndo') && historyBridge.includes('baselineRedo'), 'history bridge must retain both baseline stacks');
-assert(historyBridge.includes('restoreHistory();\n      const integrity = await nativeCaptureIntegrity'), 'history must restore before post-test integrity snapshot');
-assert(historyBridge.includes('ignoresDiagnosticJournalArrays: true'), 'history bridge must reject diagnostic journal look-alike arrays');
-assert(historyBridge.includes('arrayHooksOnlyDuringAutoRun: true'), 'history array hooks must be scoped to auto validation');
+assert(historyBridge.includes("IRONVALE_HISTORY_BRIDGE_FORMAT = 'ironvale-history-bridge-v3'"), 'explicit history bridge version missing');
+assert(historyBridge.includes('IronvaleEditorHistory'), 'history bridge must use the app-owned history runtime API');
+assert(historyBridge.includes('opaqueSnapshotTokens: true'), 'history bridge must use opaque runtime snapshot tokens');
+assert(historyBridge.includes('globalArrayPrototypeHooks: false'), 'history bridge must declare global array hooks disabled');
+assert(historyBridge.includes('diagnosticJournalInterception: false'), 'history bridge must not intercept diagnostic journal arrays');
+assert(historyBridge.includes("restoreHistory('pre-integrity')"), 'history must restore before post-test integrity snapshot');
+assert(!historyBridge.includes('Array.prototype.push ='), 'history bridge must not patch Array.prototype.push');
+assert(!historyBridge.includes('Array.prototype.pop ='), 'history bridge must not patch Array.prototype.pop');
 
 assert(architectureGuard.includes('architecture.movement-zero-d1'), 'zero-D1 movement validator check missing');
 assert(architectureGuard.includes("MOVEMENT_ROUTE = '/api/character/position'"), 'movement route guard missing');
