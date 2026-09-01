@@ -1,4 +1,4 @@
-import { RiftEngine } from './rift-engine.js?v=20260831-character-freecam-r2';
+import { RiftEngine } from './rift-engine.js?v=20260901-terrain-lock-r2';
 import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';
@@ -301,8 +301,9 @@ async function bootSession() {
     orbitCamera.yaw = wrapAngle(player.yaw + Math.PI);
     await startWorld(data.world?.url || '/world/ironvale-terrain.json');
   } catch (error) {
-    console.error(error);
+    console.error('Ironvale world boot failed.', error);
     showAuth();
+    setAuthStatus(`World boot failed: ${String(error?.message || error || 'unknown error').slice(0, 180)}`, true);
   }
 }
 
