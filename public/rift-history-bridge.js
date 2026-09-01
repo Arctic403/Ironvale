@@ -1,6 +1,4 @@
-export const IRONVALE_HISTORY_BRIDGE_FORMAT = 'ironvale-history-bridge-v2';
-
-const TERRAIN_HISTORY_FORMAT = 'rift-landscape-state-v1';
+export const IRONVALE_HISTORY_BRIDGE_FORMAT = 'ironvale-history-bridge-v3';
 
 const state = {
   format: IRONVALE_HISTORY_BRIDGE_FORMAT,
@@ -8,199 +6,114 @@ const state = {
   runId: null,
   active: false,
   captureCount: 0,
-  undoCaptured: false,
-  redoCaptured: false,
+  apiAvailable: false,
   baselineUndoDepth: null,
   baselineRedoDepth: null,
+  snapshotToken: null,
   restored: false,
   restoreAt: null,
   restoreError: null,
-  filteredNonHistoryPushes: 0,
-  filteredNonHistoryPops: 0
+  recoveryRestores: 0
 };
 
-let undoRef = null;
-let redoRef = null;
-let baselineUndo = [];
-let baselineRedo = [];
-let operationPhase = null;
+let baselineSnapshot = null;
 let providerRegistered = false;
 let guardWrapped = false;
-let arrayHooksInstalled = false;
-let nativePush = Array.prototype.push;
-let nativePop = Array.prototype.pop;
+let recoveryTimer = 0;
 
 function isoNow() { return new Date().toISOString(); }
 function short(error) { return String(error?.message || error || 'unknown error').slice(0, 240); }
 function record(message, data = null, severity = 'info') {
   try { window.IronvaleDiagnostics?.record?.('history-bridge', message, data, severity); } catch (_) {}
 }
-function cloneStack(stack) { return Array.isArray(stack) ? stack.slice() : []; }
-function isTerrainHistoryState(value) { return Boolean(value && typeof value === 'object' && value.format === TERRAIN_HISTORY_FORMAT); }
-function stackLooksLikeTerrainHistory(stack) {
-  if (!Array.isArray(stack) || stack.length === 0) return false;
-  return isTerrainHistoryState(stack[stack.length - 1]);
-}
 function currentAutoStatus() {
   try { return window.IronvaleAutoValidation?.status?.() || null; } catch (_) { return null; }
+}
+function historyRuntime() {
+  return window.IronvaleEditorHistory || null;
+}
+function historyStatus() {
+  try { return historyRuntime()?.status?.() || null; } catch (_) { return null; }
 }
 function beginRun(runId) {
   state.runId = runId || `auto-${Date.now()}`;
   state.active = true;
   state.captureCount = 0;
-  state.undoCaptured = false;
-  state.redoCaptured = false;
+  state.apiAvailable = Boolean(historyRuntime()?.capture && historyRuntime()?.restore);
   state.baselineUndoDepth = null;
   state.baselineRedoDepth = null;
+  state.snapshotToken = null;
   state.restored = false;
   state.restoreAt = null;
   state.restoreError = null;
-  state.filteredNonHistoryPushes = 0;
-  state.filteredNonHistoryPops = 0;
-  undoRef = null;
-  redoRef = null;
-  baselineUndo = [];
-  baselineRedo = [];
-  installArrayHooks();
+  baselineSnapshot = null;
+  installRecoveryWatch();
 }
 function finishRun() {
   state.active = false;
-  operationPhase = null;
-  uninstallArrayHooks();
+  baselineSnapshot = null;
+  if (recoveryTimer) clearInterval(recoveryTimer);
+  recoveryTimer = 0;
 }
-function installArrayHooks() {
-  if (arrayHooksInstalled) return;
-  arrayHooksInstalled = true;
-  nativePush = Array.prototype.push;
-  nativePop = Array.prototype.pop;
-
-  Array.prototype.push = function ironvaleHistoryPush(...items) {
-    const terrainHistoryPush = items.some(isTerrainHistoryState);
-    if (state.active && operationPhase && terrainHistoryPush) {
-      if (operationPhase === 'undo') {
-        redoRef = this;
-        state.redoCaptured = true;
-      } else if (operationPhase === 'redo') {
-        undoRef = this;
-        state.undoCaptured = true;
-      }
-    } else if (state.active && operationPhase && !terrainHistoryPush) {
-      state.filteredNonHistoryPushes += 1;
+function installRecoveryWatch() {
+  if (recoveryTimer) clearInterval(recoveryTimer);
+  recoveryTimer = setInterval(() => {
+    if (!state.active) return;
+    const auto = currentAutoStatus();
+    if (auto?.running) return;
+    if (baselineSnapshot && !state.restored) {
+      restoreHistory('recovery');
+      state.recoveryRestores += 1;
     }
-    return nativePush.apply(this, items);
-  };
-
-  Array.prototype.pop = function ironvaleHistoryPop() {
-    const terrainHistoryPop = stackLooksLikeTerrainHistory(this);
-    if (state.active && operationPhase && terrainHistoryPop) {
-      if (operationPhase === 'undo') {
-        undoRef = this;
-        state.undoCaptured = true;
-      } else if (operationPhase === 'redo') {
-        redoRef = this;
-        state.redoCaptured = true;
-      }
-    } else if (state.active && operationPhase && !terrainHistoryPop) {
-      state.filteredNonHistoryPops += 1;
-    }
-    return nativePop.call(this);
-  };
+    finishRun();
+  }, 250);
 }
-function uninstallArrayHooks() {
-  if (!arrayHooksInstalled) return;
-  if (Array.prototype.push?.name === 'ironvaleHistoryPush') Array.prototype.push = nativePush;
-  if (Array.prototype.pop?.name === 'ironvaleHistoryPop') Array.prototype.pop = nativePop;
-  arrayHooksInstalled = false;
-}
-function installButtonPhaseHooks() {
-  const attach = () => {
-    const undo = document.querySelector('#undo-terrain');
-    const redo = document.querySelector('#redo-terrain');
-    if (!undo || !redo) { setTimeout(attach, 100); return; }
-    if (!undo.dataset.ironvaleHistoryBridge) {
-      undo.dataset.ironvaleHistoryBridge = '1';
-      undo.addEventListener('click', () => {
-        if (!state.active) return;
-        operationPhase = 'undo';
-        queueMicrotask(() => { if (operationPhase === 'undo') operationPhase = null; });
-      }, true);
-    }
-    if (!redo.dataset.ironvaleHistoryBridge) {
-      redo.dataset.ironvaleHistoryBridge = '1';
-      redo.addEventListener('click', () => {
-        if (!state.active) return;
-        operationPhase = 'redo';
-        queueMicrotask(() => { if (operationPhase === 'redo') operationPhase = null; });
-      }, true);
-    }
-  };
-  attach();
-}
-function clickProbe(kind) {
-  const button = document.querySelector(kind === 'undo' ? '#undo-terrain' : '#redo-terrain');
-  if (!button) throw new Error(`${kind} button unavailable`);
-  operationPhase = kind;
-  button.click();
-  operationPhase = null;
-}
-function captureBaselineFromIntegrity(integrity) {
-  const undoDepth = Number(integrity?.editor?.undoDepth) || 0;
-  const redoDepth = Number(integrity?.editor?.redoDepth) || 0;
-  state.baselineUndoDepth = undoDepth;
-  state.baselineRedoDepth = redoDepth;
-
-  if (undoDepth > 0) {
-    clickProbe('undo');
-    clickProbe('redo');
-  } else if (redoDepth > 0) {
-    clickProbe('redo');
-    clickProbe('undo');
-  }
-
-  baselineUndo = undoRef ? cloneStack(undoRef) : [];
-  baselineRedo = redoRef ? cloneStack(redoRef) : [];
-  if (undoDepth === 0) baselineUndo = [];
-  if (redoDepth === 0) baselineRedo = [];
-
-  const depthMatches = (!undoRef || undoRef.length === undoDepth) && (!redoRef || redoRef.length === redoDepth);
-  record('Captured auto-test terrain history baseline', {
+function captureBaseline(integrity) {
+  const runtime = historyRuntime();
+  if (!runtime?.capture || !runtime?.restore) throw new Error('IronvaleEditorHistory runtime API unavailable');
+  state.apiAvailable = true;
+  baselineSnapshot = runtime.capture(`auto-validation:${state.runId}`);
+  if (!baselineSnapshot?.token) throw new Error('Editor history runtime did not return a snapshot token');
+  state.snapshotToken = baselineSnapshot.token;
+  state.baselineUndoDepth = Number(integrity?.editor?.undoDepth) || 0;
+  state.baselineRedoDepth = Number(integrity?.editor?.redoDepth) || 0;
+  const runtimeState = historyStatus();
+  const depthsMatch = Number(runtimeState?.undoDepth) === state.baselineUndoDepth && Number(runtimeState?.redoDepth) === state.baselineRedoDepth;
+  record('Captured exact editor history through app runtime API', {
     runId: state.runId,
-    undoDepth,
-    redoDepth,
-    undoRef: Boolean(undoRef),
-    redoRef: Boolean(redoRef),
-    terrainHistoryFormat: TERRAIN_HISTORY_FORMAT,
-    depthMatches
-  }, depthMatches ? 'info' : 'warn');
+    token: state.snapshotToken,
+    undoDepth: state.baselineUndoDepth,
+    redoDepth: state.baselineRedoDepth,
+    runtimeUndoDepth: runtimeState?.undoDepth ?? null,
+    runtimeRedoDepth: runtimeState?.redoDepth ?? null,
+    depthsMatch
+  }, depthsMatch ? 'info' : 'warn');
 }
-function restoreHistory() {
+function restoreHistory(reason = 'integrity') {
   try {
-    if (undoRef) {
-      undoRef.length = 0;
-      if (baselineUndo.length) nativePush.apply(undoRef, baselineUndo);
-    } else if ((state.baselineUndoDepth || 0) !== 0) {
-      throw new Error('Undo terrain-history stack reference was not captured');
-    }
-    if (redoRef) {
-      redoRef.length = 0;
-      if (baselineRedo.length) nativePush.apply(redoRef, baselineRedo);
-    } else if ((state.baselineRedoDepth || 0) !== 0) {
-      throw new Error('Redo terrain-history stack reference was not captured');
-    }
+    if (!baselineSnapshot) return { ok: true, skipped: true, ...historyStatus() };
+    const runtime = historyRuntime();
+    if (!runtime?.restore) throw new Error('IronvaleEditorHistory restore API unavailable');
+    const result = runtime.restore(baselineSnapshot);
+    if (!result?.ok) throw new Error(result?.error || 'Editor history restore failed');
     state.restored = true;
     state.restoreAt = isoNow();
     state.restoreError = null;
-    record('Restored exact pre-test terrain undo/redo history before integrity snapshot', {
+    state.snapshotToken = null;
+    baselineSnapshot = null;
+    record('Restored exact pre-test editor history through app runtime API', {
       runId: state.runId,
-      undoDepth: undoRef?.length ?? state.baselineUndoDepth,
-      redoDepth: redoRef?.length ?? state.baselineRedoDepth,
-      filteredNonHistoryPushes: state.filteredNonHistoryPushes,
-      filteredNonHistoryPops: state.filteredNonHistoryPops
+      reason,
+      undoDepth: result.undoDepth,
+      redoDepth: result.redoDepth,
+      retainedSnapshots: result.retainedSnapshots
     });
+    return result;
   } catch (error) {
     state.restored = false;
     state.restoreError = short(error);
-    record('Failed to restore exact pre-test terrain history', { runId: state.runId, error: state.restoreError }, 'error');
+    record('Failed to restore exact pre-test editor history', { runId: state.runId, reason, error: state.restoreError }, 'error');
+    return { ok: false, error: state.restoreError, ...historyStatus() };
   }
 }
 function wrapValidatorGuard() {
@@ -218,17 +131,17 @@ function wrapValidatorGuard() {
 
       if (state.captureCount === 1) {
         const integrity = await nativeCaptureIntegrity(...args);
-        try { captureBaselineFromIntegrity(integrity); }
+        try { captureBaseline(integrity); }
         catch (error) {
           state.restoreError = `baseline capture: ${short(error)}`;
-          record('Terrain history baseline probe failed', { runId: state.runId, error: state.restoreError }, 'warn');
+          record('Editor history baseline capture failed', { runId: state.runId, error: state.restoreError }, 'error');
         }
         return integrity;
       }
 
-      // Critical ordering: exact history is restored BEFORE the auto validator reads
-      // undoDepth/redoDepth for its post-test integrity comparison.
-      restoreHistory();
+      // Restore the real private undo/redo stacks through app.js before the
+      // validator reads its post-test undoDepth/redoDepth values.
+      restoreHistory('pre-integrity');
       const integrity = await nativeCaptureIntegrity(...args);
       if (state.captureCount >= 2) finishRun();
       return integrity;
@@ -241,28 +154,33 @@ function registerProvider() {
   if (providerRegistered) return;
   const diagnostics = window.IronvaleDiagnostics;
   if (!diagnostics?.registerProvider) { setTimeout(registerProvider, 100); return; }
-  diagnostics.registerProvider('history-bridge', () => ({
-    ...state,
-    currentUndoDepth: undoRef?.length ?? null,
-    currentRedoDepth: redoRef?.length ?? null,
-    policy: {
-      exactBaselineRestore: true,
-      restoreBeforeIntegritySnapshot: true,
-      terrainStateUntouchedByBridge: true,
-      terrainHistoryFormat: TERRAIN_HISTORY_FORMAT,
-      ignoresDiagnosticJournalArrays: true,
-      arrayHooksOnlyDuringAutoRun: true
-    }
-  }));
+  diagnostics.registerProvider('history-bridge', () => {
+    const runtime = historyStatus();
+    return {
+      ...state,
+      currentUndoDepth: runtime?.undoDepth ?? null,
+      currentRedoDepth: runtime?.redoDepth ?? null,
+      retainedSnapshots: runtime?.retainedSnapshots ?? null,
+      runtimeFormat: runtime?.format || historyRuntime()?.format || null,
+      policy: {
+        exactBaselineRestore: true,
+        restoreBeforeIntegritySnapshot: true,
+        appOwnedPrivateStacks: true,
+        opaqueSnapshotTokens: true,
+        globalArrayPrototypeHooks: false,
+        diagnosticJournalInterception: false,
+        recoveryRestoreIfRunAborts: true
+      }
+    };
+  });
   providerRegistered = true;
 }
 
-installButtonPhaseHooks();
 wrapValidatorGuard();
 registerProvider();
 
 window.IronvaleHistoryBridge = Object.freeze({
   format: state.format,
-  status: () => ({ ...state, currentUndoDepth: undoRef?.length ?? null, currentRedoDepth: redoRef?.length ?? null }),
-  restore: restoreHistory
+  status: () => ({ ...state, ...historyStatus() }),
+  restore: () => restoreHistory('manual')
 });
