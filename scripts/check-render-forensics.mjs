@@ -55,9 +55,12 @@ assert(historyBridge.includes("restoreHistory('pre-integrity')"), 'history must 
 assert(!historyBridge.includes('Array.prototype.push ='), 'history bridge must not patch Array.prototype.push');
 assert(!historyBridge.includes('Array.prototype.pop ='), 'history bridge must not patch Array.prototype.pop');
 
+assert(architectureGuard.includes("IRONVALE_ARCHITECTURE_GUARD_FORMAT = 'ironvale-architecture-guard-v2'"), 'architecture guard v2 missing');
 assert(architectureGuard.includes('architecture.movement-zero-d1'), 'zero-D1 movement validator check missing');
 assert(architectureGuard.includes("MOVEMENT_ROUTE = '/api/character/position'"), 'movement route guard missing');
 assert(architectureGuard.includes('d1Calls > 0 || d1Writes > 0 || d1Failures > 0'), 'movement D1 guard must fail on any D1 activity');
 assert(architectureGuard.includes('ordinaryMovementWritesToD1 === false'), 'movement authority policy assertion missing');
+assert(architectureGuard.includes("'geometry.guard-repairs'"), 'zero-repair geometry validator check missing');
+assert(architectureGuard.includes("repairs > 0 || rejections > 0 ? 'fail' : 'pass'"), 'geometry validator must fail if the safety net repairs or rejects a mesh');
 
 console.log('Ironvale renderer forensics verification passed.');
