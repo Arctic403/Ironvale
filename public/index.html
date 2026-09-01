@@ -105,13 +105,20 @@
         <strong>Diagnostics</strong>
         <small id="diagnostic-status" data-status="idle">Validator starting…</small>
         <div class="history-grid"><button id="diagnostic-run" type="button">Validate Now</button><button id="diagnostic-auto" type="button">Auto Validator: On</button></div>
-        <div class="diagnostic-dump-grid" aria-label="Diagnostic dump layers">
-          <button data-diagnostic-dump="1" type="button">L1 Quick</button>
-          <button data-diagnostic-dump="2" type="button">L2 Runtime</button>
-          <button data-diagnostic-dump="3" type="button">L3 Deep</button>
+        <small>Raw JSON</small>
+        <div class="diagnostic-dump-grid" aria-label="Raw diagnostic dump layers">
+          <button data-diagnostic-dump="1" type="button">L1 Raw</button>
+          <button data-diagnostic-dump="2" type="button">L2 Raw</button>
+          <button data-diagnostic-dump="3" type="button">L3 Raw</button>
+        </div>
+        <small>Lossless GZIP</small>
+        <div class="diagnostic-dump-grid" aria-label="Lossless compressed diagnostic dump layers">
+          <button data-diagnostic-compressed="1" type="button">L1 GZIP</button>
+          <button data-diagnostic-compressed="2" type="button">L2 GZIP</button>
+          <button data-diagnostic-compressed="3" type="button">L3 GZIP</button>
         </div>
         <button id="diagnostic-last-crash" class="wide" type="button" hidden>Export Last Crash</button>
-        <small>Automatic checks stay silent. Crashes save an L2 dump; L3 is the full sanitized forensic snapshot.</small>
+        <small>Raw exports remain available for every level. GZIP contains the same captured data losslessly. Crashes save an L2 dump.</small>
       </div>
 
       <label>Radius <span id="radius-value">10m</span><input id="brush-radius" type="range" min="2" max="40" step="1" value="10"></label>
@@ -159,6 +166,6 @@
     <div class="look-hint">Swipe: look · tap enemy: target</div>
   </main>
 
-  <script type="module" src="/app.js?v=20260901-engine-blackbox-r1"></script>
+  <script type="module" src="/app.js?v=20260901-diagnostic-gzip-r2"></script>
 </body>
 </html>
