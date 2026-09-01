@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/one-shot-sprint-autorun.yml'
       - 'scripts/apply-sprint-autorun.mjs'
+  workflow_dispatch:
 
 permissions:
   contents: write
