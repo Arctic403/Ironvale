@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node --check src/index.js && node --check src/realtime-entry.js && node --check public/app.js && node --check public/rift-character.js && node --check public/rift-diagnostics.js && node --check public/rift-diagnostic-hooks.js && node --check public/rift-realtime.js && node --check public/rift-auto-validation.js && node --check public/rift-engine.js && node --check public/rift-core.js && node --check public/rift-terrain.js && node --check public/rift-landscape.js && node --check public/rift-terrain-materials.js && node --check public/rift-scale.js && node scripts/check-native.mjs && node scripts/check-core.js && node scripts/check-blackbox-hooks.mjs && node scripts/check-realtime-state.mjs",
+    "build": "node --check src/index.js && node --check src/realtime-entry.js && node --check public/app.js && node --check public/rift-character.js && node --check public/rift-diagnostics.js && node --check public/rift-diagnostic-hooks.js && node --check public/rift-realtime.js && node --check public/rift-validator-guard.js && node --check public/rift-auto-validation.js && node --check public/rift-engine.js && node --check public/rift-core.js && node --check public/rift-terrain.js && node --check public/rift-landscape.js && node --check public/rift-terrain-materials.js && node --check public/rift-scale.js && node scripts/check-native.mjs && node scripts/check-core.js && node scripts/check-blackbox-hooks.mjs && node scripts/check-realtime-state.mjs && node scripts/check-validator-evidence.mjs",
     "build:native": "node scripts/build-native.mjs",
     "check:native": "node scripts/check-native.mjs",
     "dev": "wrangler dev",
