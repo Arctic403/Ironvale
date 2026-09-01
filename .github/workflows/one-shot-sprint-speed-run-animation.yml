@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Normalize current validator patch target
+        run: sed -i "s/Capsule fallback active/Fallback character visual active/g" scripts/apply-sprint-speed-run-animation.mjs
       - name: Apply sprint speed and run animation patch
         run: node scripts/apply-sprint-speed-run-animation.mjs
       - name: Verify changed JavaScript syntax
