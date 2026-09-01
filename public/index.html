@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101a16">
   <title>Ironvale</title>
-  <link rel="stylesheet" href="/styles.css?v=20260831-rift-landscape-v2">
+  <link rel="stylesheet" href="/styles.css?v=20260831-landscape-tools-r2">
 </head>
 <body>
   <section id="auth-screen" class="screen">
@@ -63,11 +63,24 @@
         <button data-brush="flatten">Flatten</button>
         <button data-brush="hole">Cut Hole</button>
         <button data-brush="unhole">Fill Hole</button>
+        <button data-brush="paint">Paint</button>
+        <button data-brush="erase-material">Erase Paint</button>
       </div>
 
       <div class="landscape-layer-row">
         <label class="landscape-layer-label">Edit Layer <select id="terrain-edit-layer" aria-label="Terrain edit layer"></select></label>
         <button id="add-terrain-edit-layer" type="button">+ Layer</button>
+      </div>
+
+      <label class="landscape-layer-label landscape-material-label">Material <select id="terrain-material-layer" aria-label="Terrain material layer"></select></label>
+
+      <div class="landscape-spline-tools">
+        <strong>Landscape Spline</strong>
+        <label class="landscape-layer-label">Spline <select id="terrain-spline" aria-label="Landscape spline"></select></label>
+        <div class="history-grid"><button id="new-terrain-spline" type="button">New Spline</button><button id="add-spline-point" type="button">Add Point</button></div>
+        <label>Width <span id="spline-width-value">6m</span><input id="spline-width" type="range" min="2" max="24" step="1" value="6"></label>
+        <label>Falloff <span id="spline-falloff-value">4m</span><input id="spline-falloff" type="range" min="0" max="16" step="1" value="4"></label>
+        <button id="clear-terrain-spline" class="wide" type="button">Clear Spline Points</button>
       </div>
 
       <label>Radius <span id="radius-value">10m</span><input id="brush-radius" type="range" min="2" max="40" step="1" value="10"></label>
@@ -115,6 +128,6 @@
     <div class="look-hint">Swipe: look · tap enemy: target</div>
   </main>
 
-  <script type="module" src="/app.js?v=20260831-rift-landscape-v2"></script>
+  <script type="module" src="/app.js?v=20260831-landscape-tools-r2"></script>
 </body>
 </html>

@@ -71,32 +71,62 @@
         {
           "id": "grass",
           "name": "Grass",
-          "defaultWeight": 255
+          "defaultWeight": 255,
+          "color": [
+            0.25,
+            0.42,
+            0.23
+          ]
         },
         {
           "id": "dirt",
           "name": "Dirt",
-          "defaultWeight": 0
+          "defaultWeight": 0,
+          "color": [
+            0.43,
+            0.31,
+            0.2
+          ]
         },
         {
           "id": "rock",
           "name": "Rock",
-          "defaultWeight": 0
+          "defaultWeight": 0,
+          "color": [
+            0.43,
+            0.45,
+            0.44
+          ]
         },
         {
           "id": "gravel",
           "name": "Gravel",
-          "defaultWeight": 0
+          "defaultWeight": 0,
+          "color": [
+            0.52,
+            0.5,
+            0.44
+          ]
         },
         {
           "id": "mud",
           "name": "Mud",
-          "defaultWeight": 0
+          "defaultWeight": 0,
+          "color": [
+            0.29,
+            0.23,
+            0.17
+          ]
         },
         {
           "id": "path",
           "name": "Path",
-          "defaultWeight": 0
+          "defaultWeight": 0,
+          "color": [
+            0.49,
+            0.39,
+            0.25
+          ]
         }
       ],
       "splines": [],
@@ -105,7 +135,9 @@
         "enabled": true,
         "componentRadius": 3,
         "preloadRing": 1
-      }
+      },
+      "activeMaterialLayer": "dirt",
+      "activeSpline": null
     }
   },
   "anchors": {
@@ -130,6 +162,9 @@
     "lodSeamStitching": true,
     "nonDestructiveTerrainLayers": true,
     "materialWeightmaps": true,
-    "landscapeSplineHooks": true
+    "landscapeSplineHooks": true,
+    "visibleMaterialBlending": true,
+    "landscapeSplineDeformation": true,
+    "terrainToolsScrollable": true
   }
 }

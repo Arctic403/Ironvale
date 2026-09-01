@@ -14,6 +14,8 @@ The active world is a blank 640×640 continuous heightfield with 1 m authoring s
 
 Sculpting marks only overlapping/adjacent terrain sections dirty, so edits rebuild localized meshes instead of the whole world. Collision continues to query the full native heightfield near gameplay while exposing distance-based collision-LOD hooks for future broad-phase/streaming work.
 
+RiftLandscape now exposes visible weight-blended terrain materials and Freecam-authored landscape splines. Material paint/erase edits are stored with the landscape draft and immediately recolor rebuilt terrain sections. Spline control points flatten/deform the heightfield through the non-destructive landscape composition pass, with editable width and falloff. The mobile Terrain Tools panel is vertically scrollable so all controls remain reachable in landscape orientation.
+
 The former RiftBlock/RiftSection voxel world, Downtown tile worlds, Blueprint/building pipelines, legacy editors/builders, AI Builder, combat, inventory, quests, codex and other old gameplay systems are not part of this branch.
 
 

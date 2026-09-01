@@ -67,6 +67,9 @@ const indexHtml = fs.readFileSync('public/index.html', 'utf8');
 const styles = fs.readFileSync('public/styles.css', 'utf8');
 if (!indexHtml.includes('id="combat-hud"') || !indexHtml.includes('id="rotate-device"') || !indexHtml.includes('data-ability-slot="1"')) failures.push('landscape RPG HUD markup');
 if (!indexHtml.includes('id="terrain-edit-layer"') || !indexHtml.includes('id="add-terrain-edit-layer"')) failures.push('RiftLandscape edit-layer UI');
+if (!indexHtml.includes('id="terrain-material-layer"') || !indexHtml.includes('data-brush="paint"') || !indexHtml.includes('data-brush="erase-material"')) failures.push('landscape material paint tools');
+if (!indexHtml.includes('id="terrain-spline"') || !indexHtml.includes('id="add-spline-point"') || !indexHtml.includes('id="spline-width"')) failures.push('landscape spline tools');
+if (!styles.includes('overflow-y:auto') || !styles.includes('scrollbar-gutter:stable') || !styles.includes('.terrain-tools::-webkit-scrollbar')) failures.push('scrollable terrain tools panel');
 if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
@@ -78,7 +81,8 @@ if (!renderer.includes('uJointMatrices') || !renderer.includes('uBaseColorTextur
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 const landscape = fs.readFileSync('public/rift-landscape.js', 'utf8');
-if (!landscape.includes('class RiftLandscape extends RiftTerrain') || !landscape.includes('recomposeEditLayers(') || !landscape.includes('paintMaterial(')) failures.push('RiftLandscape edit/weight architecture');
+if (!landscape.includes('paintMaterial(') || !landscape.includes('sampleMaterialWeights(') || !landscape.includes('sampleMaterialColor(') || !landscape.includes('buildSurfaceSectionGeometry(')) failures.push('visible landscape material weight blending');
+if (!landscape.includes('appendSplinePoint(') || !landscape.includes('_applySplineDeformation(') || !landscape.includes('updateSpline(')) failures.push('landscape spline deformation');
 if (!landscape.includes('captureEditState(') || !landscape.includes('serializeLandscapeEdits(') || !landscape.includes('importLegacyManualEdits(')) failures.push('RiftLandscape persistence architecture');
 if (!landscape.includes('planSectionLods(cameraX, cameraZ, previousPlan') || !landscape.includes('lodHysteresis')) failures.push('RiftLandscape LOD hysteresis');
 if (!landscape.includes('consumeDirtyComponents(') || !landscape.includes('streamKey')) failures.push('RiftLandscape component streaming hooks');
@@ -103,4 +107,4 @@ if (failures.length) {
   console.error('Ironvale core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: RiftLandscape v2 edit layers + material weights + component LOD hysteresis/streaming hooks + C++/WASM terrain + mobile RPG camera/character runtime.');
+console.log('Ironvale core verified: RiftLandscape v2 edit layers + visible material painting + spline terrain deformation + scrollable mobile tools + component LOD hysteresis + C++/WASM terrain + RPG runtime.');

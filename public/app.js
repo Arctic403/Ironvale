@@ -1,5 +1,5 @@
 import { RiftEngine } from './rift-engine.js?v=20260831-character-freecam-r2';
-import { RiftLandscape } from './rift-landscape.js?v=20260831-rift-landscape-v2';
+import { RiftLandscape } from './rift-landscape.js?v=20260831-rift-landscape-v3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260831-character-sparse-r1';
 
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
@@ -27,6 +27,15 @@ const freecamSpeedInput = $('#freecam-speed');
 const freecamSpeedValue = $('#freecam-speed-value');
 const editLayerSelect = $('#terrain-edit-layer');
 const addEditLayerButton = $('#add-terrain-edit-layer');
+const materialLayerSelect = $('#terrain-material-layer');
+const splineSelect = $('#terrain-spline');
+const newSplineButton = $('#new-terrain-spline');
+const addSplinePointButton = $('#add-spline-point');
+const clearSplineButton = $('#clear-terrain-spline');
+const splineWidthInput = $('#spline-width');
+const splineWidthValue = $('#spline-width-value');
+const splineFalloffInput = $('#spline-falloff');
+const splineFalloffValue = $('#spline-falloff-value');
 const reticle = $('#terrain-reticle');
 const altitudeControls = $('#freecam-altitude');
 const combatHud = $('#combat-hud');
@@ -169,6 +178,20 @@ addEditLayerButton?.addEventListener('click', () => {
   refreshTerrainLayerControls();
   editorStatus.textContent = `Created non-destructive terrain layer: ${created?.name || 'Layer'}.`;
 });
+materialLayerSelect?.addEventListener('change', () => {
+  if (!terrain?.setActiveMaterialLayer?.(materialLayerSelect.value)) return;
+  refreshTerrainLayerControls();
+  editorStatus.textContent = `Painting terrain material: ${terrain.activeMaterialLayer?.name || materialLayerSelect.value}.`;
+});
+splineSelect?.addEventListener('change', () => {
+  if (!terrain?.setActiveSpline?.(splineSelect.value)) return;
+  refreshTerrainLayerControls();
+});
+newSplineButton?.addEventListener('click', createTerrainSpline);
+addSplinePointButton?.addEventListener('click', addSplinePointAtReticle);
+clearSplineButton?.addEventListener('click', clearActiveTerrainSpline);
+splineWidthInput?.addEventListener('change', updateActiveSplineSettings);
+splineFalloffInput?.addEventListener('change', updateActiveSplineSettings);
 $('#undo-terrain').addEventListener('click', undoTerrain);
 $('#redo-terrain').addEventListener('click', redoTerrain);
 $('#save-terrain').addEventListener('click', saveDraft);
@@ -1031,12 +1054,31 @@ function applySingleBrushStamp() {
 function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately = false) {
   if (!terrain || !reticleHit) return;
   const radius = Number(radiusInput.value);
+  const strength = Number(strengthInput.value) * strengthScale;
+
+  if (brushMode === 'paint' || brushMode === 'erase-material') {
+    const painted = terrain.paintMaterial?.({
+      layerId: terrain.activeMaterialLayerId,
+      x: reticleHit.x,
+      z: reticleHit.z,
+      radius,
+      strength: Math.min(1, Math.max(0.01, strength * 0.35)),
+      erase: brushMode === 'erase-material'
+    });
+    if (!painted) return;
+    rebuildDirtyTerrainSections();
+    updateReticleTarget();
+    if (saveImmediately) saveDraftSilently();
+    terrainStatus.textContent = `RiftLandscape · ${terrain.activeMaterialLayer?.name || 'Material'} ${brushMode === 'erase-material' ? 'erase' : 'paint'} · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
+    return;
+  }
+
   const brush = {
     mode: brushMode,
     x: reticleHit.x,
     z: reticleHit.z,
     radius,
-    strength: Number(strengthInput.value) * strengthScale
+    strength
   };
   if (brushMode === 'flatten') brush.targetHeight = Number.isFinite(flattenY) ? flattenY : reticleHit.y;
   terrain.applyBrush(brush);
@@ -1438,17 +1480,122 @@ function resetTerrain() {
 }
 
 function refreshTerrainLayerControls() {
-  if (!editLayerSelect) return;
   const layers = terrain?.listEditLayers?.() || [];
-  editLayerSelect.replaceChildren(...layers.map(layer => {
-    const option = document.createElement('option');
-    option.value = layer.id;
-    option.textContent = `${layer.name}${layer.locked ? ' 🔒' : ''}`;
-    option.disabled = layer.locked;
-    return option;
-  }));
-  if (terrain?.activeEditLayerId) editLayerSelect.value = terrain.activeEditLayerId;
-  addEditLayerButton.disabled = !terrain?.createEditLayer;
+  if (editLayerSelect) {
+    editLayerSelect.replaceChildren(...layers.map(layer => {
+      const option = document.createElement('option');
+      option.value = layer.id;
+      option.textContent = `${layer.name}${layer.locked ? ' 🔒' : ''}`;
+      option.disabled = layer.locked;
+      return option;
+    }));
+    if (terrain?.activeEditLayerId) editLayerSelect.value = terrain.activeEditLayerId;
+  }
+  if (addEditLayerButton) addEditLayerButton.disabled = !terrain?.createEditLayer;
+
+  const materials = terrain?.listMaterialLayers?.() || [];
+  if (materialLayerSelect) {
+    materialLayerSelect.replaceChildren(...materials.map(layer => {
+      const option = document.createElement('option');
+      option.value = layer.id;
+      option.textContent = `${layer.name}${layer.base ? ' · base' : ''}`;
+      return option;
+    }));
+    if (terrain?.activeMaterialLayerId) materialLayerSelect.value = terrain.activeMaterialLayerId;
+    materialLayerSelect.disabled = materials.length === 0;
+  }
+
+  const splines = terrain?.listSplines?.() || [];
+  if (splineSelect) {
+    splineSelect.replaceChildren(...splines.map(spline => {
+      const option = document.createElement('option');
+      option.value = spline.id;
+      option.textContent = `${spline.name} · ${spline.pointCount} pts`;
+      return option;
+    }));
+    if (terrain?.activeSplineId) splineSelect.value = terrain.activeSplineId;
+    splineSelect.disabled = splines.length === 0;
+  }
+  const activeSpline = terrain?.activeSpline || null;
+  if (splineWidthInput) {
+    splineWidthInput.disabled = !activeSpline;
+    if (activeSpline) splineWidthInput.value = String(Number(activeSpline.width) || 6);
+  }
+  if (splineFalloffInput) {
+    splineFalloffInput.disabled = !activeSpline;
+    if (activeSpline) splineFalloffInput.value = String(Number(activeSpline.falloff) || 4);
+  }
+  if (splineWidthValue) splineWidthValue.textContent = `${activeSpline ? Number(activeSpline.width || 6).toFixed(0) : 0}m`;
+  if (splineFalloffValue) splineFalloffValue.textContent = `${activeSpline ? Number(activeSpline.falloff || 4).toFixed(0) : 0}m`;
+  if (addSplinePointButton) addSplinePointButton.disabled = !terrain?.appendSplinePoint;
+  if (clearSplineButton) clearSplineButton.disabled = !activeSpline || !(activeSpline.points?.length);
+  if (newSplineButton) newSplineButton.disabled = !terrain?.createSpline;
+}
+
+function createTerrainSpline() {
+  if (!terrain?.createSpline) return;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  const created = terrain.createSpline(`Spline ${terrain.listSplines().length + 1}`, {
+    width: Number(splineWidthInput?.value) || 6,
+    falloff: Number(splineFalloffInput?.value) || 4
+  });
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = `Created ${created?.name || 'landscape spline'}. Aim the Freecam reticle and tap Add Point.`;
+}
+
+function addSplinePointAtReticle() {
+  if (!terrain?.appendSplinePoint) return;
+  if (!freecamEnabled) {
+    editorStatus.textContent = 'Enter Freecam to place landscape spline points.';
+    return;
+  }
+  updateCamera();
+  updateReticleTarget();
+  if (!reticleHit) {
+    editorStatus.textContent = 'Aim the centered reticle at terrain first.';
+    return;
+  }
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  if (!terrain.activeSplineId) terrain.createSpline(`Spline ${terrain.listSplines().length + 1}`);
+  const spline = terrain.appendSplinePoint(terrain.activeSplineId, { x: reticleHit.x, y: reticleHit.y, z: reticleHit.z });
+  rebuildDirtyTerrainSections();
+  snapPlayerToSupport();
+  updateReticleTarget();
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = `${spline?.name || 'Spline'} point added · ${spline?.points?.length || 0} points.`;
+}
+
+function clearActiveTerrainSpline() {
+  if (!terrain?.activeSplineId || !terrain?.clearSpline) return;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  terrain.clearSpline(terrain.activeSplineId);
+  rebuildDirtyTerrainSections();
+  snapPlayerToSupport();
+  updateReticleTarget();
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = 'Active landscape spline cleared.';
+}
+
+function updateActiveSplineSettings() {
+  if (!terrain?.activeSplineId || !terrain?.updateSpline) return;
+  pushUndo(captureTerrainState());
+  redoStack.length = 0;
+  terrain.updateSpline(terrain.activeSplineId, {
+    width: Number(splineWidthInput?.value) || 6,
+    falloff: Number(splineFalloffInput?.value) || 4
+  });
+  rebuildDirtyTerrainSections();
+  snapPlayerToSupport();
+  updateReticleTarget();
+  refreshTerrainLayerControls();
+  saveDraftSilently();
+  editorStatus.textContent = 'Landscape spline width/falloff updated.';
 }
 
 function refreshEditorLabels() {
@@ -1463,7 +1610,7 @@ function refreshEditorLabels() {
 }
 
 function brushModeLabel(mode) {
-  return ({ raise: 'Raise', lower: 'Lower', smooth: 'Smooth', flatten: 'Flatten', hole: 'Cut Hole', unhole: 'Fill Hole' })[mode] || mode;
+  return ({ raise: 'Raise', lower: 'Lower', smooth: 'Smooth', flatten: 'Flatten', hole: 'Cut Hole', unhole: 'Fill Hole', paint: 'Paint Material', 'erase-material': 'Erase Material' })[mode] || mode;
 }
 
 function rebuildBrushMarker() {

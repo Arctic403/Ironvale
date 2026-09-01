@@ -8,16 +8,26 @@ const DEFAULT_EDIT_LAYERS = Object.freeze([
 ]);
 
 const DEFAULT_MATERIAL_LAYERS = Object.freeze([
-  { id: 'grass', name: 'Grass', defaultWeight: 255 },
-  { id: 'dirt', name: 'Dirt', defaultWeight: 0 },
-  { id: 'rock', name: 'Rock', defaultWeight: 0 },
-  { id: 'gravel', name: 'Gravel', defaultWeight: 0 },
-  { id: 'mud', name: 'Mud', defaultWeight: 0 },
-  { id: 'path', name: 'Path', defaultWeight: 0 }
+  { id: 'grass', name: 'Grass', defaultWeight: 255, color: [0.25, 0.42, 0.23] },
+  { id: 'dirt', name: 'Dirt', defaultWeight: 0, color: [0.43, 0.31, 0.20] },
+  { id: 'rock', name: 'Rock', defaultWeight: 0, color: [0.43, 0.45, 0.44] },
+  { id: 'gravel', name: 'Gravel', defaultWeight: 0, color: [0.52, 0.50, 0.44] },
+  { id: 'mud', name: 'Mud', defaultWeight: 0, color: [0.29, 0.23, 0.17] },
+  { id: 'path', name: 'Path', defaultWeight: 0, color: [0.49, 0.39, 0.25] }
 ]);
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 function smooth01(value) { const t = clamp(value, 0, 1); return t * t * (3 - 2 * t); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function distanceToSegment2D(px, pz, a, b) {
+  const abx = b.x - a.x;
+  const abz = b.z - a.z;
+  const denom = abx * abx + abz * abz;
+  const t = denom > 1e-8 ? clamp(((px - a.x) * abx + (pz - a.z) * abz) / denom, 0, 1) : 0;
+  const x = lerp(a.x, b.x, t);
+  const z = lerp(a.z, b.z, t);
+  return { distance: Math.hypot(px - x, pz - z), t, x, z };
+}
 function cleanId(value, fallback = 'layer') {
   const text = String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
   return text || fallback;
@@ -80,6 +90,15 @@ export class RiftLandscape extends RiftTerrain {
     this.baseMaterialLayerId = this.materialLayers.has(cleanId(landscape.baseMaterialLayer || 'grass'))
       ? cleanId(landscape.baseMaterialLayer || 'grass')
       : this.materialLayers.keys().next().value || null;
+    const requestedMaterial = cleanId(landscape.activeMaterialLayer || 'dirt');
+    this.activeMaterialLayerId = this.materialLayers.has(requestedMaterial)
+      ? requestedMaterial
+      : (this.materialLayers.has('dirt') ? 'dirt' : this.baseMaterialLayerId);
+    const requestedSpline = cleanId(landscape.activeSpline || '');
+    this.activeSplineId = this.splines.some(entry => cleanId(entry.id) === requestedSpline)
+      ? requestedSpline
+      : (this.splines[0]?.id || null);
+    if (this.splines.length) this.recomposeEditLayers();
   }
 
   _createEditLayerFromDefinition(definition = {}) {
@@ -113,6 +132,9 @@ export class RiftLandscape extends RiftTerrain {
       texture: definition.texture || null,
       normal: definition.normal || null,
       roughness: definition.roughness ?? null,
+      color: Array.isArray(definition.color) && definition.color.length >= 3
+        ? definition.color.slice(0, 3).map(value => clamp(Number(value) || 0, 0, 1))
+        : [0.4, 0.4, 0.4],
       weights: new Uint8Array(this.manualDelta.length)
     };
     this.materialLayers.set(id, layer);
@@ -135,6 +157,26 @@ export class RiftLandscape extends RiftTerrain {
   }
 
   get activeEditLayer() { return this.editLayers.get(this.activeEditLayerId) || null; }
+
+  listMaterialLayers() {
+    return [...this.materialLayers.values()].map(layer => ({
+      id: layer.id,
+      name: layer.name,
+      color: [...layer.color],
+      base: layer.id === this.baseMaterialLayerId,
+      active: layer.id === this.activeMaterialLayerId
+    }));
+  }
+
+  get activeMaterialLayer() { return this.materialLayers.get(this.activeMaterialLayerId) || null; }
+
+  setActiveMaterialLayer(id) {
+    const key = cleanId(id);
+    if (!this.materialLayers.has(key)) return false;
+    this.activeMaterialLayerId = key;
+    this.revision += 1;
+    return true;
+  }
 
   setActiveEditLayer(id) {
     const key = cleanId(id);
@@ -274,6 +316,7 @@ export class RiftLandscape extends RiftTerrain {
         else if (operation < 0) this.manualHoles[i] = 0;
       }
     }
+    this._applySplineDeformation();
     super.rebuildFromManualDelta();
     this.markAllComponentsDirty();
   }
@@ -282,6 +325,8 @@ export class RiftLandscape extends RiftTerrain {
     return {
       format: 'rift-landscape-state-v1',
       activeEditLayerId: this.activeEditLayerId,
+      activeMaterialLayerId: this.activeMaterialLayerId,
+      activeSplineId: this.activeSplineId,
       editLayerOrder: [...this.editLayerOrder],
       editLayers: this.editLayerOrder.map(id => {
         const layer = this.editLayers.get(id);
@@ -302,6 +347,7 @@ export class RiftLandscape extends RiftTerrain {
         texture: layer.texture,
         normal: layer.normal,
         roughness: layer.roughness,
+        color: [...layer.color],
         weights: new Uint8Array(layer.weights)
       })),
       splines: this.splines.map(copySpline),
@@ -330,7 +376,13 @@ export class RiftLandscape extends RiftTerrain {
         if (source.weights?.length === layer.weights.length) layer.weights.set(source.weights);
       }
     }
+    const requestedMaterial = cleanId(state.activeMaterialLayerId || this.activeMaterialLayerId || '');
+    this.activeMaterialLayerId = this.materialLayers.has(requestedMaterial)
+      ? requestedMaterial
+      : (this.materialLayers.has('dirt') ? 'dirt' : this.baseMaterialLayerId);
     this.splines = Array.isArray(state.splines) ? state.splines.map(copySpline) : [];
+    const requestedSpline = cleanId(state.activeSplineId || '');
+    this.activeSplineId = this.splines.some(entry => entry.id === requestedSpline) ? requestedSpline : (this.splines[0]?.id || null);
     this.recomposeEditLayers();
     return true;
   }
@@ -345,6 +397,8 @@ export class RiftLandscape extends RiftTerrain {
       sampleSpacing: this.sampleSpacing,
       savedAt: Date.now(),
       activeEditLayer: this.activeEditLayerId,
+      activeMaterialLayer: this.activeMaterialLayerId,
+      activeSpline: this.activeSplineId,
       editLayers: this.editLayerOrder.map(id => {
         const layer = this.editLayers.get(id);
         return {
@@ -361,6 +415,7 @@ export class RiftLandscape extends RiftTerrain {
         id: layer.id,
         name: layer.name,
         defaultWeight: layer.defaultWeight,
+        color: [...layer.color],
         weights: sparseInt(layer.weights)
       })),
       splines: this.splines.map(copySpline)
@@ -388,7 +443,13 @@ export class RiftLandscape extends RiftTerrain {
         applySparse(layer.weights, source.weights, value => clamp(Math.round(Number(value) || 0), 0, 255));
       }
     }
+    const requestedMaterial = cleanId(data.activeMaterialLayer || this.activeMaterialLayerId || '');
+    this.activeMaterialLayerId = this.materialLayers.has(requestedMaterial)
+      ? requestedMaterial
+      : (this.materialLayers.has('dirt') ? 'dirt' : this.baseMaterialLayerId);
     this.splines = Array.isArray(data.splines) ? data.splines.map(copySpline) : [];
+    const requestedSpline = cleanId(data.activeSpline || '');
+    this.activeSplineId = this.splines.some(entry => entry.id === requestedSpline) ? requestedSpline : (this.splines[0]?.id || null);
     this.recomposeEditLayers();
     return true;
   }
@@ -408,8 +469,30 @@ export class RiftLandscape extends RiftTerrain {
     return true;
   }
 
+  _materialWeightBytesAtIndex(index) {
+    const result = {};
+    const baseId = this.baseMaterialLayerId || this.materialLayers.keys().next().value || null;
+    let nonBaseTotal = 0;
+    for (const layer of this.materialLayers.values()) {
+      if (layer.id === baseId) continue;
+      const value = clamp(Number(layer.weights[index]) || 0, 0, 255);
+      result[layer.id] = value;
+      nonBaseTotal += value;
+    }
+    if (nonBaseTotal > 255) {
+      const scale = 255 / nonBaseTotal;
+      nonBaseTotal = 0;
+      for (const id of Object.keys(result)) {
+        result[id] = Math.round(result[id] * scale);
+        nonBaseTotal += result[id];
+      }
+    }
+    if (baseId) result[baseId] = clamp(255 - nonBaseTotal, 0, 255);
+    return result;
+  }
+
   paintMaterial(brush = {}) {
-    const id = cleanId(brush.layerId || brush.material || '');
+    const id = cleanId(brush.layerId || brush.material || this.activeMaterialLayerId || '');
     const layer = this.materialLayers.get(id);
     if (!layer) return false;
     const x = Number(brush.x) || 0;
@@ -418,6 +501,8 @@ export class RiftLandscape extends RiftTerrain {
     const strength = clamp(Number(brush.strength) || 0.25, 0, 1);
     const erase = Boolean(brush.erase);
     const indices = this._sampleIndicesInBrush(x, z, radius);
+    const nonBaseLayers = [...this.materialLayers.values()].filter(entry => entry.id !== this.baseMaterialLayerId);
+
     for (const index of indices) {
       const ix = index % this.columns;
       const iz = Math.floor(index / this.columns);
@@ -426,7 +511,34 @@ export class RiftLandscape extends RiftTerrain {
       const distance = Math.hypot(wx - x, wz - z);
       const falloff = smooth01(1 - distance / radius);
       const amount = Math.round(255 * strength * falloff);
-      layer.weights[index] = clamp(layer.weights[index] + (erase ? -amount : amount), 0, 255);
+      if (!amount) continue;
+
+      if (id === this.baseMaterialLayerId) {
+        if (erase) continue;
+        const total = nonBaseLayers.reduce((sum, entry) => sum + entry.weights[index], 0);
+        if (!total) continue;
+        const targetTotal = Math.max(0, total - amount);
+        const scale = targetTotal / total;
+        for (const entry of nonBaseLayers) entry.weights[index] = Math.round(entry.weights[index] * scale);
+        continue;
+      }
+
+      if (erase) {
+        layer.weights[index] = Math.max(0, layer.weights[index] - amount);
+        continue;
+      }
+
+      const targetWeight = Math.min(255, layer.weights[index] + amount);
+      let otherTotal = 0;
+      for (const entry of nonBaseLayers) if (entry.id !== id) otherTotal += entry.weights[index];
+      const maxOther = Math.max(0, 255 - targetWeight);
+      if (otherTotal > maxOther && otherTotal > 0) {
+        const scale = maxOther / otherTotal;
+        for (const entry of nonBaseLayers) {
+          if (entry.id !== id) entry.weights[index] = Math.round(entry.weights[index] * scale);
+        }
+      }
+      layer.weights[index] = targetWeight;
     }
     this.markDirtyRegion(x, z, radius);
     this._markDirtyComponentsFromSections();
@@ -438,41 +550,176 @@ export class RiftLandscape extends RiftTerrain {
     if (!this.containsXZ(x, z)) return {};
     const ix = clamp(Math.round((x - this.origin[0]) / this.sampleSpacing), 0, this.columns - 1);
     const iz = clamp(Math.round((z - this.origin[2]) / this.sampleSpacing), 0, this.rows - 1);
-    const index = iz * this.columns + ix;
+    const bytes = this._materialWeightBytesAtIndex(iz * this.columns + ix);
     const result = {};
     let total = 0;
-    for (const layer of this.materialLayers.values()) {
-      const explicit = layer.weights[index];
-      const value = explicit || layer.defaultWeight || 0;
-      result[layer.id] = value;
-      total += value;
-    }
-    if (total > 0) for (const id of Object.keys(result)) result[id] = result[id] / total;
+    for (const value of Object.values(bytes)) total += value;
+    if (!total) return result;
+    for (const [id, value] of Object.entries(bytes)) result[id] = value / total;
     return result;
   }
 
-  setSpline(spline = {}) {
+  sampleMaterialColor(x, z) {
+    const weights = this.sampleMaterialWeights(x, z);
+    const color = [0, 0, 0];
+    let total = 0;
+    for (const [id, weight] of Object.entries(weights)) {
+      const layer = this.materialLayers.get(id);
+      if (!layer || weight <= 0) continue;
+      color[0] += layer.color[0] * weight;
+      color[1] += layer.color[1] * weight;
+      color[2] += layer.color[2] * weight;
+      total += weight;
+    }
+    return total > 0 ? color : [0.36, 0.40, 0.34];
+  }
+
+  listSplines() {
+    return this.splines.map((entry, index) => ({
+      id: entry.id,
+      name: entry.name,
+      enabled: entry.enabled !== false,
+      width: Number(entry.width) || 6,
+      falloff: Number(entry.falloff) || 4,
+      strength: Number(entry.strength ?? 1),
+      offset: Number(entry.offset) || 0,
+      pointCount: Array.isArray(entry.points) ? entry.points.length : 0,
+      active: entry.id === this.activeSplineId,
+      order: index
+    }));
+  }
+
+  get activeSpline() { return this.splines.find(entry => entry.id === this.activeSplineId) || null; }
+
+  setActiveSpline(id) {
+    const key = cleanId(id);
+    if (!this.splines.some(entry => entry.id === key)) return false;
+    this.activeSplineId = key;
+    this.revision += 1;
+    return true;
+  }
+
+  createSpline(name = 'Landscape Spline', options = {}) {
+    let baseId = cleanId(options.id || name || `spline-${this.splines.length + 1}`, `spline-${this.splines.length + 1}`);
+    let id = baseId;
+    let suffix = 2;
+    while (this.splines.some(entry => entry.id === id)) id = `${baseId}-${suffix++}`;
+    const spline = this.setSpline({
+      id,
+      name,
+      enabled: true,
+      width: Number(options.width) || 6,
+      falloff: Number(options.falloff) || 4,
+      strength: Number(options.strength ?? 1),
+      offset: Number(options.offset) || 0,
+      points: []
+    }, { recompose: false });
+    this.activeSplineId = spline.id;
+    this.revision += 1;
+    return copySpline(spline);
+  }
+
+  setSpline(spline = {}, { recompose = true } = {}) {
     const id = cleanId(spline.id || `spline-${this.splines.length + 1}`, `spline-${this.splines.length + 1}`);
     const normalized = {
       ...copySpline(spline),
       id,
       name: String(spline.name || id),
       enabled: spline.enabled !== false,
-      points: Array.isArray(spline.points) ? spline.points.map(copySpline) : []
+      width: Math.max(this.sampleSpacing, Number(spline.width) || 6),
+      falloff: Math.max(0, Number(spline.falloff) || 4),
+      strength: clamp(Number(spline.strength ?? 1), 0, 1),
+      offset: Number(spline.offset) || 0,
+      mode: 'flatten',
+      points: Array.isArray(spline.points) ? spline.points.map(point => ({
+        x: Number(point?.x ?? point?.[0]) || 0,
+        y: Number.isFinite(Number(point?.y ?? point?.[1])) ? Number(point?.y ?? point?.[1]) : this.baseHeight,
+        z: Number(point?.z ?? point?.[2]) || 0
+      })) : []
     };
     const index = this.splines.findIndex(entry => entry.id === id);
     if (index >= 0) this.splines[index] = normalized;
     else this.splines.push(normalized);
-    this.revision += 1;
+    if (!this.activeSplineId) this.activeSplineId = id;
+    if (recompose) this.recomposeEditLayers();
+    else this.revision += 1;
     return normalized;
+  }
+
+  updateSpline(id, patch = {}) {
+    const key = cleanId(id);
+    const current = this.splines.find(entry => entry.id === key);
+    if (!current) return null;
+    return this.setSpline({ ...current, ...copySpline(patch), id: key });
+  }
+
+  appendSplinePoint(id, point = {}) {
+    const key = cleanId(id || this.activeSplineId || '');
+    const current = this.splines.find(entry => entry.id === key);
+    if (!current) return null;
+    const next = copySpline(current);
+    next.points = Array.isArray(next.points) ? next.points : [];
+    next.points.push({
+      x: Number(point.x ?? point[0]) || 0,
+      y: Number.isFinite(Number(point.y ?? point[1])) ? Number(point.y ?? point[1]) : this.baseHeight,
+      z: Number(point.z ?? point[2]) || 0
+    });
+    this.activeSplineId = key;
+    return this.setSpline(next);
+  }
+
+  clearSpline(id) {
+    const key = cleanId(id || this.activeSplineId || '');
+    const current = this.splines.find(entry => entry.id === key);
+    if (!current) return false;
+    this.setSpline({ ...current, points: [] });
+    return true;
   }
 
   removeSpline(id) {
     const key = cleanId(id);
     const before = this.splines.length;
     this.splines = this.splines.filter(entry => entry.id !== key);
-    if (this.splines.length !== before) this.revision += 1;
-    return this.splines.length !== before;
+    if (this.splines.length === before) return false;
+    if (this.activeSplineId === key) this.activeSplineId = this.splines[0]?.id || null;
+    this.recomposeEditLayers();
+    return true;
+  }
+
+  _applySplineDeformation() {
+    if (!this.splines.length) return;
+    for (const spline of this.splines) {
+      if (spline?.enabled === false || !Array.isArray(spline?.points) || spline.points.length < 2) continue;
+      const halfWidth = Math.max(this.sampleSpacing * 0.5, (Number(spline.width) || 6) * 0.5);
+      const falloff = Math.max(0, Number(spline.falloff) || 4);
+      const influenceRadius = halfWidth + falloff;
+      const strength = clamp(Number(spline.strength ?? 1), 0, 1);
+      const offset = Number(spline.offset) || 0;
+      for (let segment = 0; segment < spline.points.length - 1; segment += 1) {
+        const a = spline.points[segment];
+        const b = spline.points[segment + 1];
+        const minIx = clamp(Math.floor((Math.min(a.x, b.x) - influenceRadius - this.origin[0]) / this.sampleSpacing), 0, this.columns - 1);
+        const maxIx = clamp(Math.ceil((Math.max(a.x, b.x) + influenceRadius - this.origin[0]) / this.sampleSpacing), 0, this.columns - 1);
+        const minIz = clamp(Math.floor((Math.min(a.z, b.z) - influenceRadius - this.origin[2]) / this.sampleSpacing), 0, this.rows - 1);
+        const maxIz = clamp(Math.ceil((Math.max(a.z, b.z) + influenceRadius - this.origin[2]) / this.sampleSpacing), 0, this.rows - 1);
+        for (let iz = minIz; iz <= maxIz; iz += 1) {
+          for (let ix = minIx; ix <= maxIx; ix += 1) {
+            const wx = this.origin[0] + ix * this.sampleSpacing;
+            const wz = this.origin[2] + iz * this.sampleSpacing;
+            const hit = distanceToSegment2D(wx, wz, a, b);
+            if (hit.distance > influenceRadius) continue;
+            const influence = hit.distance <= halfWidth
+              ? 1
+              : (falloff > 0 ? smooth01(1 - (hit.distance - halfWidth) / falloff) : 0);
+            if (influence <= 0) continue;
+            const index = iz * this.columns + ix;
+            const currentHeight = this.baseHeight + this.manualDelta[index];
+            const targetHeight = lerp(Number(a.y) || 0, Number(b.y) || 0, hit.t) + offset;
+            this.manualDelta[index] += (targetHeight - currentHeight) * strength * influence;
+          }
+        }
+      }
+    }
   }
 
   _markDirtyComponentsFromSections() {
@@ -578,6 +825,21 @@ export class RiftLandscape extends RiftTerrain {
     return plan;
   }
 
+  buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep = 1, neighborLods = null) {
+    const entry = super.buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep, neighborLods);
+    const vertices = entry?.geometry?.vertices;
+    const stride = Number(entry?.geometry?.vertexStride) || 9;
+    if (vertices && stride >= 9) {
+      for (let offset = 0; offset + 8 < vertices.length; offset += stride) {
+        const color = this.sampleMaterialColor(vertices[offset], vertices[offset + 2]);
+        vertices[offset + 6] = color[0];
+        vertices[offset + 7] = color[1];
+        vertices[offset + 8] = color[2];
+      }
+    }
+    return entry;
+  }
+
   getStats() {
     return {
       ...super.getStats(),
@@ -585,7 +847,9 @@ export class RiftLandscape extends RiftTerrain {
       editLayers: this.editLayerOrder.length,
       activeEditLayer: this.activeEditLayerId,
       materialLayers: this.materialLayers.size,
+      activeMaterialLayer: this.activeMaterialLayerId,
       splines: this.splines.length,
+      activeSpline: this.activeSplineId,
       lodHysteresis: this.lodHysteresis,
       streaming: { ...this.streaming }
     };
