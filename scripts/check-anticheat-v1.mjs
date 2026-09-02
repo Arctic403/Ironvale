@@ -74,9 +74,14 @@ for (const token of [
   'automaticBan: false',
   'suspiciousCaseWritesOnly: true'
 ]) assert(worker.includes(token), `worker missing ${token}`);
+assert(worker.includes("if (!write && configured && supplied && constantTimeEqual(configured, supplied))"), 'service-key reviewer must remain read-only');
+assert(worker.includes("if (reviewer.kind !== 'admin' || !reviewer.auth)"), 'case mutation must remain admin-only');
+assert(worker.includes("if (!state?.userId || !shouldPersistAntiCheatCase(state.antiCheat)) return false;"), 'ordinary movement must skip case persistence before D1');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS anti_cheat_cases'), 'manual D1 schema missing anti-cheat cases');
+assert(!fs.existsSync('scripts/apply-anticheat-v1.mjs'), 'temporary anti-cheat patcher must be removed');
+assert(!fs.existsSync('.github/workflows/apply-anticheat-v1.yml'), 'temporary anti-cheat workflow must be removed');
 const build = String(pkg.scripts?.build || '');
 assert(build.includes('node --check src/anticheat.js'), 'core build missing anti-cheat syntax check');
 assert(build.includes('node scripts/check-anticheat-v1.mjs'), 'core build missing anti-cheat contract check');
 
-console.log(`Ironvale Anti-Cheat v1 verified: normal=${normalSummary.score}, loop=${botSummary.score}, no auto-ban, sparse suspicious-case persistence.`);
+console.log(`Ironvale Anti-Cheat v1 verified: normal=${normalSummary.score}, loop=${botSummary.score}, no auto-ban, sparse suspicious-case persistence, reviewer boundaries locked.`);
