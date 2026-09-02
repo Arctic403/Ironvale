@@ -661,10 +661,19 @@ async function runFullAutoValidation() {
         if (body?.monitor?.stateResidentInRam !== true) throw new Error('Anti-cheat monitor is not attached to live RAM authority');
         if (body?.authority?.source !== 'live-ram' || body?.authority?.realtimeFormat !== 'ironvale-realtime-authority-v2') throw new Error('RAM authority status mismatch');
         if (body?.authority?.integrityStatus !== 'attested' || body?.authority?.integrityBuildId !== integrity.buildId) throw new Error('Integrity ticket is not bound to RAM authority');
+        const zoneAuthority = body?.zoneAuthority || {};
+        if (zoneAuthority?.format !== 'ironvale-zone-authority-v1' || zoneAuthority?.enabled !== true || zoneAuthority?.source !== 'zone-durable-object-ram') throw new Error('Zone RAM authority unavailable');
+        if (zoneAuthority?.storagePolicy !== 'ram-only-ephemeral-presence' || zoneAuthority?.d1Writes !== false || zoneAuthority?.durableStorageWrites !== false || zoneAuthority?.interestManagement !== true) throw new Error('Zone authority persistence policy mismatch');
         const policy = body?.policy || {};
         if (policy.automaticBan !== false || policy.aiAuthority !== 'recommendation-only' || policy.ramAuthority !== 'final' || policy.ordinaryMovementWritesToD1 !== false || policy.suspiciousCaseWritesOnly !== true) throw new Error('Anti-cheat authority policy mismatch');
         const bridge = body?.bridge || {};
         if (bridge.mode !== 'github-oidc-read-only' || bridge.exactWorkflowBound !== true || bridge.writeAuthority !== 'admin-only') throw new Error('AI review bridge policy mismatch');
+        const nearbyResponse = await fetch('/api/realtime/nearby?radius=96&limit=64', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: integrityApi.transportHeaders() });
+        const nearby = await nearbyResponse.json().catch(() => ({}));
+        if (!nearbyResponse.ok || nearby?.ok !== true || nearby?.format !== 'ironvale-zone-nearby-v1' || nearby?.authority !== 'ironvale-zone-authority-v1' || nearby?.source !== 'zone-durable-object-ram') throw new Error(nearby?.error || 'Nearby interest-management smoke failed');
+        const nearbySummary = { ...nearby };
+        delete nearbySummary.nearby;
+        nearbySummary.nearbyCount = Array.isArray(nearby.nearby) ? nearby.nearby.length : 0;
         state.securitySmoke = {
           format: 'ironvale-security-smoke-v1',
           status: 'pass',
@@ -672,11 +681,13 @@ async function runFullAutoValidation() {
           httpStatus: response.status,
           integrity: { attested: true, buildId: integrity.buildId, runtimeStatus: integrity.runtimeStatus },
           authority: { ...body.authority },
+          zoneAuthority: { ...body.zoneAuthority },
+          nearby: { ...nearbySummary },
           monitor: { ...body.monitor },
           policy: { ...policy },
           bridge: { ...bridge }
         };
-        return 'RAM anti-cheat active · integrity bound · AI review bridge read-only · samples=' + (body.monitor.observedSamples || 0);
+        return 'RAM anti-cheat active · zone=' + zoneAuthority.zoneId + ' · nearby zones=' + nearby.scannedZones + ' · integrity bound · AI review read-only · samples=' + (body.monitor.observedSamples || 0);
       } catch (error) {
         state.securitySmoke = { format: 'ironvale-security-smoke-v1', status: 'fail', completedAt, error: shortError(error) };
         throw error;

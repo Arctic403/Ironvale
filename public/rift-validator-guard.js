@@ -251,6 +251,12 @@ async function buildGuardChecks(instance) {
     checks.push(passFail('security.ai-review-bridge', bridgeOk, bridgeOk ? 'GitHub OIDC AI review bridge is exact-workflow-bound and read-only' : 'AI review bridge contract mismatch'));
     const integrityBound = smoke.integrity?.attested === true && smoke.authority?.integrityStatus === 'attested' && Boolean(smoke.integrity?.buildId) && smoke.integrity?.buildId === smoke.authority?.integrityBuildId;
     checks.push(passFail('security.integrity-binding', integrityBound, integrityBound ? ('Integrity ' + smoke.integrity.buildId + ' bound to RAM authority') : 'Integrity/RAM binding mismatch'));
+    const zone = smoke.zoneAuthority || {};
+    const zoneOk = zone.format === 'ironvale-zone-authority-v1' && zone.enabled === true && zone.source === 'zone-durable-object-ram' && zone.storagePolicy === 'ram-only-ephemeral-presence' && zone.d1Writes === false && zone.durableStorageWrites === false;
+    checks.push(passFail('architecture.zone-authority', zoneOk, zoneOk ? ('Zone ' + zone.zoneId + ' · ' + zone.zoneSizeMeters + 'm · RAM-only shared presence') : 'World/zone RAM authority unavailable or persistence policy mismatch'));
+    const interest = smoke.nearby || {};
+    const interestOk = interest.format === 'ironvale-zone-nearby-v1' && interest.authority === 'ironvale-zone-authority-v1' && interest.source === 'zone-durable-object-ram' && Number(interest.scannedZones) >= 1 && Number(interest.radiusMeters) > 0;
+    checks.push(passFail('architecture.interest-management', interestOk, interestOk ? (interest.scannedZones + ' zone(s) scanned within ' + interest.radiusMeters + 'm · nearby=' + (interest.nearbyCount || 0)) : 'Bounded nearby interest-management smoke unavailable'));
   }
 
   if (!realtime) {

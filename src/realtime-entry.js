@@ -3,6 +3,8 @@ import { DurableObject } from 'cloudflare:workers';
 import { EXPECTED_INTEGRITY_BUILD_ID, EXPECTED_INTEGRITY_MANIFEST_DIGEST, EXPECTED_INTEGRITY_FILE_COUNT } from './integrity-build.js';
 import { ANTICHEAT_SCHEMA, antiCheatEvidence, antiCheatSummary, createAntiCheatState, markAntiCheatCasePersisted, observeAcceptedMovement, observeRejectedMovement, shouldPersistAntiCheatCase } from './anticheat.js';
 import { verifyGitHubAntiCheatOidc } from './github-oidc.js';
+import { ZONE_AUTHORITY_FORMAT, ZONE_NEARBY_FORMAT, ZONE_SIZE_METERS, ZONE_PRESENCE_TTL_MS, ZONE_MOVEMENT_SYNC_MS, ZONE_CLIENT_HEARTBEAT_MS, ZONE_DEFAULT_INTEREST_RADIUS_METERS, ZONE_MAX_NEARBY, normalizedInterestRadius, zoneIdForPosition, zoneIdsForInterest } from './zone-contract.js';
+export { ZoneState } from './zone-authority.js';
 
 const SESSION_COOKIE = 'ironvale_session';
 const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
@@ -129,6 +131,12 @@ function playerStateStub(env, userId) {
   return env.PLAYER_STATE.get(id);
 }
 
+function zoneStateStub(env, zoneId) {
+  if (!env.ZONE_STATE) throw new Error('ZONE_STATE binding unavailable');
+  const id = env.ZONE_STATE.idFromName(String(zoneId));
+  return env.ZONE_STATE.get(id);
+}
+
 function internalStateHeaders(auth, request, integrity = null) {
   const headers = new Headers();
   headers.set('x-ironvale-user-id', auth.userId);
@@ -215,6 +223,18 @@ async function routeAntiCheatSessionStatus(request, env) {
   return stub.fetch(new Request('https://player-state/anticheat-status', { method: 'GET', headers }));
 }
 
+async function routeRealtimeNearby(request, env) {
+  const auth = await loadSessionState(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const integrity = await verifyIntegrityTransport(request, auth);
+  if (!integrity.ok) return json({ ok: false, error: integrity.reason }, 428);
+  const sourceUrl = new URL(request.url);
+  const internalUrl = new URL('https://player-state/nearby');
+  if (sourceUrl.searchParams.has('radius')) internalUrl.searchParams.set('radius', sourceUrl.searchParams.get('radius'));
+  if (sourceUrl.searchParams.has('limit')) internalUrl.searchParams.set('limit', sourceUrl.searchParams.get('limit'));
+  const headers = internalStateHeaders(auth, request, integrity);
+  return playerStateStub(env, auth.userId).fetch(new Request(internalUrl, { method: 'GET', headers }));
+}
 function mutatingApiRequiresIntegrity(method, pathname) {
   if (!pathname.startsWith('/api/')) return false;
   if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
@@ -425,6 +445,8 @@ export default {
     if (method === 'GET' && url.pathname === '/api/integrity/challenge') return routeIntegrityChallenge(request, env);
     if (method === 'POST' && url.pathname === '/api/integrity/attest') return routeIntegrityAttest(request, env);
 
+    if (method === 'GET' && url.pathname === '/api/realtime/nearby') return routeRealtimeNearby(request, env);
+
     if (url.pathname === '/api/realtime/movement') {
       return routeRealtimeSocket(request, env);
     }
@@ -492,6 +514,16 @@ export class PlayerState extends DurableObject {
       integrityBuildId: String(request.headers.get('x-ironvale-integrity-build') || ''),
       integrityManifestDigest: String(request.headers.get('x-ironvale-integrity-digest') || ''),
       integrityExpiresAt: finite(request.headers.get('x-ironvale-integrity-expires'), 0),
+      zoneAuthority: {
+        format: ZONE_AUTHORITY_FORMAT,
+        zoneId: null,
+        lastSyncAt: 0,
+        syncCount: 0,
+        handoffCount: 0,
+        nearbyReads: 0,
+        lastReason: null,
+        lastError: null
+      },
       antiCheat: createAntiCheatState(now)
     };
   }
@@ -521,15 +553,143 @@ export class PlayerState extends DurableObject {
     if (url.pathname === '/position' && request.method === 'POST') return this.position(request);
     if (url.pathname === '/checkpoint' && request.method === 'POST') return this.checkpointRequest(request);
     if (url.pathname === '/anticheat-status' && request.method === 'GET') return this.antiCheatStatus(request);
+    if (url.pathname === '/nearby' && request.method === 'GET') return this.nearbyInterest(request);
     return json({ ok: false, error: 'Not found' }, 404);
   }
 
-  antiCheatStatus(request) {
+  async leaveZone(state, zoneId = state?.zoneAuthority?.zoneId) {
+    if (!state?.userId || !state?.sessionId || !zoneId || !this.env.ZONE_STATE) return false;
+    try {
+      const response = await zoneStateStub(this.env, zoneId).fetch(new Request('https://zone-state/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: state.userId, sessionId: state.sessionId })
+      }));
+      return response.ok;
+    } catch (_) { return false; }
+  }
+
+  async syncZoneMembership(state, { force = false, reason = 'movement' } = {}) {
+    if (!state?.userId || !state?.sessionId || !this.env.ZONE_STATE) return { ok: false, error: 'zone-binding-unavailable' };
+    const now = Date.now();
+    const zone = state.zoneAuthority || { format: ZONE_AUTHORITY_FORMAT, zoneId: null, lastSyncAt: 0, syncCount: 0, handoffCount: 0, nearbyReads: 0, lastReason: null, lastError: null };
+    const nextZoneId = zoneIdForPosition(state.x, state.z);
+    const zoneChanged = Boolean(zone.zoneId && zone.zoneId !== nextZoneId);
+    const due = force || zoneChanged || !zone.zoneId || now - Number(zone.lastSyncAt || 0) >= ZONE_MOVEMENT_SYNC_MS;
+    if (!due) return { ok: true, skipped: true, zoneId: zone.zoneId, zoneChanged: false };
+    if (zoneChanged) await this.leaveZone(state, zone.zoneId);
+    try {
+      const response = await zoneStateStub(this.env, nextZoneId).fetch(new Request('https://zone-state/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zoneId: nextZoneId,
+          userId: state.userId,
+          username: state.username,
+          sessionId: state.sessionId,
+          x: state.x, y: state.y, z: state.z, yaw: state.yaw,
+          seq: state.seq, acceptedAt: state.lastAcceptedAt
+        })
+      }));
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || body?.ok !== true) throw new Error(body?.error || ('zone-presence-http-' + response.status));
+      zone.zoneId = nextZoneId;
+      zone.lastSyncAt = now;
+      zone.syncCount = Number(zone.syncCount || 0) + 1;
+      if (zoneChanged) zone.handoffCount = Number(zone.handoffCount || 0) + 1;
+      zone.lastReason = String(reason || 'movement').slice(0, 32);
+      zone.lastError = null;
+      state.zoneAuthority = zone;
+      return { ...body, zoneChanged };
+    } catch (error) {
+      zone.lastError = String(error?.message || error || 'zone-sync-failed').slice(0, 160);
+      state.zoneAuthority = zone;
+      return { ok: false, error: zone.lastError, zoneId: nextZoneId, zoneChanged };
+    }
+  }
+
+  async zoneStatus(state) {
+    const synced = await this.syncZoneMembership(state, { force: true, reason: 'status' });
+    const zoneId = state?.zoneAuthority?.zoneId || zoneIdForPosition(state?.x, state?.z);
+    let live = null;
+    try {
+      const response = await zoneStateStub(this.env, zoneId).fetch(new Request('https://zone-state/status'));
+      live = response.ok ? await response.json().catch(() => null) : null;
+    } catch (_) {}
+    return {
+      format: ZONE_AUTHORITY_FORMAT,
+      enabled: Boolean(this.env.ZONE_STATE),
+      source: 'zone-durable-object-ram',
+      zoneId,
+      zoneSizeMeters: ZONE_SIZE_METERS,
+      presenceTtlMs: ZONE_PRESENCE_TTL_MS,
+      movementSyncMs: ZONE_MOVEMENT_SYNC_MS,
+      clientHeartbeatMs: ZONE_CLIENT_HEARTBEAT_MS,
+      defaultInterestRadiusMeters: ZONE_DEFAULT_INTEREST_RADIUS_METERS,
+      syncCount: Number(state?.zoneAuthority?.syncCount) || 0,
+      handoffCount: Number(state?.zoneAuthority?.handoffCount) || 0,
+      nearbyReads: Number(state?.zoneAuthority?.nearbyReads) || 0,
+      memberCount: Number(live?.memberCount) || 0,
+      storagePolicy: live?.storagePolicy || 'ram-only-ephemeral-presence',
+      d1Writes: false,
+      durableStorageWrites: false,
+      interestManagement: true,
+      lastSyncOk: synced?.ok === true,
+      lastError: state?.zoneAuthority?.lastError || null
+    };
+  }
+
+  async nearbyInterest(request) {
+    const selected = this.latestAuthorityState();
+    const state = selected?.state || this.stateFromHeaders(request);
+    const requestedUserId = String(request.headers.get('x-ironvale-user-id') || '');
+    if (!requestedUserId || String(state?.userId || '') !== requestedUserId) return json({ ok: false, error: 'Session state mismatch' }, 403);
+    await this.syncZoneMembership(state, { force: true, reason: 'nearby-query' });
+    const url = new URL(request.url);
+    const radius = normalizedInterestRadius(url.searchParams.get('radius'));
+    const limit = Math.max(1, Math.min(ZONE_MAX_NEARBY, Math.trunc(finite(url.searchParams.get('limit'), ZONE_MAX_NEARBY))));
+    const zoneIds = zoneIdsForInterest(state.x, state.z, radius);
+    const responses = await Promise.all(zoneIds.map(async zoneId => {
+      try {
+        const response = await zoneStateStub(this.env, zoneId).fetch(new Request('https://zone-state/nearby', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: state.x, z: state.z, radius, limit, excludeUserId: state.userId })
+        }));
+        return response.ok ? await response.json().catch(() => null) : null;
+      } catch (_) { return null; }
+    }));
+    const nearest = new Map();
+    for (const result of responses) {
+      for (const member of Array.isArray(result?.nearby) ? result.nearby : []) {
+        const previous = nearest.get(member.userId);
+        if (!previous || Number(member.distanceMeters) < Number(previous.distanceMeters)) nearest.set(member.userId, member);
+      }
+    }
+    const nearby = [...nearest.values()].sort((a, b) => Number(a.distanceMeters) - Number(b.distanceMeters)).slice(0, limit);
+    state.zoneAuthority.nearbyReads = Number(state.zoneAuthority.nearbyReads || 0) + 1;
+    if (selected?.socket) { try { selected.socket.serializeAttachment(state); } catch (_) {} } else this.httpState = state;
+    return json({
+      ok: true,
+      format: ZONE_NEARBY_FORMAT,
+      authority: ZONE_AUTHORITY_FORMAT,
+      source: 'zone-durable-object-ram',
+      centerZoneId: state.zoneAuthority.zoneId,
+      scannedZones: zoneIds.length,
+      radiusMeters: radius,
+      limit,
+      nearby
+    });
+  }
+
+  async antiCheatStatus(request) {
     const selected = this.latestAuthorityState();
     const state = selected?.state || this.stateFromHeaders(request);
     const requestedUserId = String(request.headers.get('x-ironvale-user-id') || '');
     if (!requestedUserId || String(state?.userId || '') !== requestedUserId) return json({ ok: false, error: 'Session state mismatch' }, 403);
     const summary = antiCheatSummary(state.antiCheat);
+    const zoneAuthority = await this.zoneStatus(state);
+    if (selected?.socket) { try { selected.socket.serializeAttachment(state); } catch (_) {} } else this.httpState = state;
     return json({
       ok: true,
       format: 'ironvale-anticheat-session-status-v1',
@@ -554,6 +714,7 @@ export class PlayerState extends DurableObject {
         rejected: Number(state.rejected) || 0,
         checkpointCount: Number(state.checkpointCount) || 0
       },
+      zoneAuthority,
       monitor: {
         format: summary.format,
         enabled: true,
@@ -583,6 +744,7 @@ export class PlayerState extends DurableObject {
         sessionId: initial.sessionId,
         sessionExpiresAt: initial.sessionExpiresAt,
         antiCheat: sameSession ? carried.state.antiCheat : initial.antiCheat,
+        zoneAuthority: sameSession ? carried.state.zoneAuthority : initial.zoneAuthority,
         integrityStatus: initial.integrityStatus,
         integrityBuildId: initial.integrityBuildId,
         integrityManifestDigest: initial.integrityManifestDigest,
@@ -601,6 +763,7 @@ export class PlayerState extends DurableObject {
       } catch (_) {}
     }
     this.httpState = null;
+    await this.syncZoneMembership(initial, { force: true, reason: 'connect' });
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -614,6 +777,7 @@ export class PlayerState extends DurableObject {
       checkpointIntervalMs: CHECKPOINT_INTERVAL_MS,
       validator: 'server-authoritative',
       antiCheatPolicy: { enabled: true, serverPrivate: true, automaticBan: ANTICHEAT_POLICY.automaticBan },
+      zoneAuthority: { format: ZONE_AUTHORITY_FORMAT, source: 'zone-durable-object-ram', zoneId: initial.zoneAuthority?.zoneId || null, zoneSizeMeters: ZONE_SIZE_METERS, presenceHeartbeatMs: ZONE_CLIENT_HEARTBEAT_MS, movementSyncMs: ZONE_MOVEMENT_SYNC_MS, d1Writes: false },
       integrity: { status: initial.integrityStatus, buildId: initial.integrityBuildId, expiresAt: initial.integrityExpiresAt }
     }));
     return new Response(null, { status: 101, webSocket: client });
@@ -767,6 +931,13 @@ export class PlayerState extends DurableObject {
     const state = ws.deserializeAttachment();
     if (!state || state.superseded) return;
 
+    if (packet?.type === 'presence') {
+      await this.syncZoneMembership(state, { force: true, reason: 'client-presence' });
+      ws.serializeAttachment(state);
+      ws.send(JSON.stringify({ type: 'presence', ok: true, zoneAuthority: { format: ZONE_AUTHORITY_FORMAT, zoneId: state.zoneAuthority?.zoneId || null, syncCount: Number(state.zoneAuthority?.syncCount) || 0, handoffCount: Number(state.zoneAuthority?.handoffCount) || 0 } }));
+      return;
+    }
+
     if (packet?.type === 'checkpoint') {
       const saved = await this.checkpointState(state, String(packet.reason || 'client-checkpoint').slice(0, 32));
       ws.serializeAttachment(state);
@@ -786,6 +957,9 @@ export class PlayerState extends DurableObject {
     }
 
     this.applyAccepted(state, validation);
+    const nextZoneId = zoneIdForPosition(state.x, state.z);
+    const zoneChanged = state.zoneAuthority?.zoneId !== nextZoneId;
+    await this.syncZoneMembership(state, { force: zoneChanged, reason: zoneChanged ? 'zone-handoff' : 'movement' });
     await this.persistAntiCheatCaseIfNeeded(state);
     if (state.dirty) await this.ensureCheckpointAlarm();
     let checkpointed = false;
@@ -815,6 +989,9 @@ export class PlayerState extends DurableObject {
     }
 
     this.applyAccepted(this.httpState, validation);
+    const nextZoneId = zoneIdForPosition(this.httpState.x, this.httpState.z);
+    const zoneChanged = this.httpState.zoneAuthority?.zoneId !== nextZoneId;
+    await this.syncZoneMembership(this.httpState, { force: zoneChanged, reason: zoneChanged ? 'zone-handoff' : 'movement' });
     await this.persistAntiCheatCaseIfNeeded(this.httpState);
     await this.ensureCheckpointAlarm();
     let checkpointed = false;
@@ -865,6 +1042,8 @@ export class PlayerState extends DurableObject {
       if (closing && !closing.superseded) {
         const fallback = this.httpState && Number(this.httpState.lastAcceptedAt || 0) > Number(closing.lastAcceptedAt || 0) ? this.httpState : closing;
         await this.checkpointState(fallback, 'disconnect');
+        await this.leaveZone(fallback, fallback.zoneAuthority?.zoneId);
+        if (fallback?.zoneAuthority) fallback.zoneAuthority.zoneId = null;
         if (fallback === this.httpState) this.httpState = fallback;
       }
     } catch (error) {

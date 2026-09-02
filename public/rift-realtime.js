@@ -13,6 +13,7 @@ const YAW_EPSILON_RADIANS = 0.005;
 const FALLBACK_GRACE_MS = 1500;
 const FALLBACK_MIN_INTERVAL_MS = 500;
 const MAX_PENDING_ACKS = 64;
+const ZONE_PRESENCE_HEARTBEAT_MS = 15 * 1000;
 
 const baseFetch = window.fetch.bind(window);
 const worldScreen = document.querySelector('#world-screen');
@@ -51,7 +52,11 @@ const state = {
   rttSamples: 0,
   lastAck: null,
   lastPublishedPosition: null,
-  pendingPosition: null
+  pendingPosition: null,
+  presenceHeartbeatsSent: 0,
+  presenceHeartbeatsAcked: 0,
+  lastPresenceHeartbeatAt: null,
+  zoneAuthority: null
 };
 
 let socket = null;
@@ -62,6 +67,7 @@ let lastDispatchPerf = 0;
 let disconnectedSincePerf = 0;
 let lastFallbackPerf = 0;
 let fallbackInFlight = false;
+let presenceTimer = 0;
 let pendingPosition = null;
 let lastPublishedPosition = null;
 const pendingAcks = new Map();
@@ -84,6 +90,27 @@ function shouldConnect() {
 
 function socketOpen() {
   return socket?.readyState === WebSocket.OPEN;
+}
+
+function stopPresenceHeartbeat() {
+  clearInterval(presenceTimer);
+  presenceTimer = 0;
+}
+
+function sendPresenceHeartbeat() {
+  if (!socketOpen()) return false;
+  try {
+    socket.send(JSON.stringify({ type: 'presence', clientSentAt: Date.now() }));
+    state.presenceHeartbeatsSent += 1;
+    state.lastPresenceHeartbeatAt = new Date().toISOString();
+    return true;
+  } catch (_) { return false; }
+}
+
+function startPresenceHeartbeat() {
+  stopPresenceHeartbeat();
+  if (!socketOpen()) return;
+  presenceTimer = setInterval(sendPresenceHeartbeat, ZONE_PRESENCE_HEARTBEAT_MS);
 }
 
 function finitePosition(position) {
@@ -298,7 +325,8 @@ function scheduleReconnect() {
 
 function connect() {
   if (!shouldConnect()) return;
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+  if (socket?.readyState === WebSocket.OPEN) { startPresenceHeartbeat(); return; }
+  if (socket?.readyState === WebSocket.CONNECTING) return;
 
   state.socketState = 'connecting';
   state.connectingAt = new Date().toISOString();
@@ -322,6 +350,8 @@ function connect() {
     disconnectedSincePerf = 0;
     reconnectDelay = RECONNECT_MIN_MS;
     record('Realtime movement authority connected', { transport: 'websocket', d1Policy: state.d1Policy, publisherMode: state.publisherMode });
+    startPresenceHeartbeat();
+    queueMicrotask(sendPresenceHeartbeat);
     if (pendingPosition) queueMicrotask(() => flushPending(true));
   });
 
@@ -337,6 +367,12 @@ function connect() {
       checkpointed: Boolean(message?.checkpointed),
       reason: message?.reason ? String(message.reason).slice(0, 64) : null
     };
+
+    if ((message?.type === 'hello' || message?.type === 'presence') && message?.zoneAuthority) state.zoneAuthority = { ...(state.zoneAuthority || {}), ...message.zoneAuthority };
+    if (message?.type === 'presence') {
+      state.presenceHeartbeatsAcked += 1;
+      return;
+    }
 
     if (message?.type === 'accepted') {
       state.accepted += 1;
@@ -359,6 +395,7 @@ function connect() {
   });
 
   socket.addEventListener('close', event => {
+    stopPresenceHeartbeat();
     const wasOpen = state.socketState === 'open';
     state.socketState = 'closed';
     state.connectingAt = null;
@@ -371,6 +408,7 @@ function connect() {
 }
 
 function closeSocket(reason = 'client-close') {
+  stopPresenceHeartbeat();
   clearTimeout(reconnectTimer);
   reconnectTimer = 0;
   if (!socket) return;
@@ -507,6 +545,15 @@ function realtimeStatus() {
       appLegacyHeartbeatRemoved: true
     },
     integrity: IronvaleIntegrity.status(),
+    zoneAuthorityPolicy: {
+      format: 'ironvale-zone-authority-v1',
+      source: 'zone-durable-object-ram',
+      presenceHeartbeatMs: ZONE_PRESENCE_HEARTBEAT_MS,
+      movementPacketsDoNotFanOutAt10Hz: true,
+      immediateZoneHandoff: true,
+      nearbyInterestOnDemand: true,
+      d1Writes: false
+    },
     checkpointPolicy: {
       periodicSafetyMs: 5 * 60 * 1000,
       durableObjectAlarm: true,
@@ -550,6 +597,7 @@ window.addEventListener('ironvale:integrity-refreshed', () => { closeSocket('int
 window.addEventListener('ironvale:integrity-failed', () => closeSocket('integrity-failed'));
 window.addEventListener('online', connect);
 window.addEventListener('offline', () => {
+  stopPresenceHeartbeat();
   state.socketState = 'offline';
   state.connectingAt = null;
   state.disconnectedAt = new Date().toISOString();

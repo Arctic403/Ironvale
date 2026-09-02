@@ -49,8 +49,8 @@ requireToken(diagnostics, '|token|ticket|', 'diagnostic object/string ticket red
 requireToken(diagnosticHooks, 'token|ticket|secret', 'diagnostic resource URL ticket redaction');
 
 requireToken(html, '/app.js?v=20260902-security-smoke-r1', 'app cache bust');
-requireToken(html, '/rift-realtime.js?v=20260902-integrity-v1', 'realtime cache bust');
-requireToken(html, '/rift-validator-guard.js?v=20260902-security-smoke-r1', 'validator cache bust');
+requireToken(html, '/rift-realtime.js?v=20260902-zone-authority-r1', 'realtime cache bust');
+requireToken(html, '/rift-validator-guard.js?v=20260902-zone-authority-r1', 'validator cache bust');
 
 if (manifest.format !== 'ironvale-integrity-manifest-v1') throw new Error('Integrity manifest format mismatch.');
 if (manifest.algorithm !== 'SHA-256') throw new Error('Integrity manifest algorithm mismatch.');

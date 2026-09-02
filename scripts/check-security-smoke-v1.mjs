@@ -50,12 +50,12 @@ assert(guard.includes("provider(instance, 'security-smoke', 2)"), 'validator mus
 
 for (const token of [
   '/app.js?v=20260902-security-smoke-r1',
-  '/rift-validator-guard.js?v=20260902-security-smoke-r1',
-  '/rift-auto-validation.js?v=20260902-draft-restore-r1'
+  '/rift-validator-guard.js?v=20260902-zone-authority-r1',
+  '/rift-auto-validation.js?v=20260902-zone-authority-r1'
 ]) assert(html.includes(token), `cache bust missing ${token}`);
 assert(app.includes("APP_DIAGNOSTIC_BUILD = '20260902-security-smoke-r1'"), 'diagnostic build tag not bumped');
 assert(integrityCheck.includes('/app.js?v=20260902-security-smoke-r1'), 'integrity verifier app cache contract stale');
-assert(integrityCheck.includes('/rift-validator-guard.js?v=20260902-security-smoke-r1'), 'integrity verifier validator cache contract stale');
+assert(integrityCheck.includes('/rift-validator-guard.js?v=20260902-zone-authority-r1'), 'integrity verifier validator cache contract stale');
 
 const build = String(pkg.scripts?.build || '');
 assert(build.includes('node scripts/check-security-smoke-v1.mjs'), 'core build missing security smoke verifier');

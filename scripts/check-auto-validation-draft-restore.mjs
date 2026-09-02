@@ -16,7 +16,7 @@ for (const token of [
 ]) assert(auto.includes(token), 'missing ' + token);
 assert(auto.indexOf('draftBaseline = captureDraftBaseline()') < auto.indexOf('state.baselineIntegrity = await window.IronvaleValidatorGuard.captureIntegrity()'), 'draft baseline must be captured immediately before integrity baseline');
 assert(auto.indexOf("if (!restoreDraftBaseline(draftBaseline)) throw new Error('Unable to restore exact terrain draft baseline')") < auto.indexOf('state.finalIntegrity = await window.IronvaleValidatorGuard.captureIntegrity()'), 'exact draft must be restored before final integrity capture');
-assert(html.includes('/rift-auto-validation.js?v=20260902-draft-restore-r1'), 'Safari cache-bust missing');
+assert(html.includes('/rift-auto-validation.js?v=20260902-zone-authority-r1'), 'Safari cache-bust missing');
 assert(String(pkg.scripts?.build || '').includes('node scripts/check-auto-validation-draft-restore.mjs'), 'build verifier missing');
 assert(!fs.existsSync('scripts/apply-auto-validation-draft-restore.mjs'), 'temporary patcher must be removed');
 assert(!fs.existsSync('.github/workflows/apply-auto-validation-draft-restore.yml'), 'temporary workflow must be removed');

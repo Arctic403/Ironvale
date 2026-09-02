@@ -13,6 +13,14 @@ database_id = "118e392b-e9d4-4d81-9a4f-ee2a2b3865cc"
 name = "PLAYER_STATE"
 class_name = "PlayerState"
 
+[[durable_objects.bindings]]
+name = "ZONE_STATE"
+class_name = "ZoneState"
+
 [[migrations]]
 tag = "player-state-v1"
 new_sqlite_classes = ["PlayerState"]
+
+[[migrations]]
+tag = "zone-state-v1"
+new_sqlite_classes = ["ZoneState"]
