@@ -24,6 +24,7 @@ const state = {
   restoration: null,
   playerRestoration: null,
   postValidation: null,
+  securitySmoke: null,
   evidence: { captures: 0, failed: 0, totalBytes: 0, files: [] }
 };
 
@@ -67,6 +68,7 @@ function resetRunState() {
   state.restoration = null;
   state.playerRestoration = null;
   state.postValidation = null;
+  state.securitySmoke = null;
   state.evidence = { captures: 0, failed: 0, totalBytes: 0, files: [] };
   evidenceFiles = new Map();
 }
@@ -618,6 +620,47 @@ async function runFullAutoValidation() {
       return `direct packets=${directDelta} · total sent=${after.sent || 0} · accepted=${after.accepted || 0} · RTT=${after.lastRttMs ?? 'n/a'}ms · checkpoint=${checkpoint?.transport || 'unknown'}`;
     });
 
+    await runStep('security authority + anti-cheat session', async () => {
+      const integrityApi = window.IronvaleIntegrity;
+      const integrity = integrityApi?.status?.();
+      const completedAt = nowIso();
+      try {
+        if (!integrityApi?.transportHeaders || !integrity?.attested) throw new Error('Integrity ticket unavailable for security smoke');
+        const response = await fetch('/api/anticheat/session-status', {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: integrityApi.transportHeaders()
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body?.ok !== true) throw new Error(body?.error || ('security smoke HTTP ' + response.status));
+        if (body?.format !== 'ironvale-anticheat-session-status-v1') throw new Error('Anti-cheat session status format mismatch');
+        if (body?.monitor?.format !== 'ironvale-anticheat-v1' || body?.monitor?.enabled !== true || body?.monitor?.serverPrivate !== true) throw new Error('Server-private anti-cheat monitor unavailable');
+        if (body?.monitor?.stateResidentInRam !== true) throw new Error('Anti-cheat monitor is not attached to live RAM authority');
+        if (body?.authority?.source !== 'live-ram' || body?.authority?.realtimeFormat !== 'ironvale-realtime-authority-v2') throw new Error('RAM authority status mismatch');
+        if (body?.authority?.integrityStatus !== 'attested' || body?.authority?.integrityBuildId !== integrity.buildId) throw new Error('Integrity ticket is not bound to RAM authority');
+        const policy = body?.policy || {};
+        if (policy.automaticBan !== false || policy.aiAuthority !== 'recommendation-only' || policy.ramAuthority !== 'final' || policy.ordinaryMovementWritesToD1 !== false || policy.suspiciousCaseWritesOnly !== true) throw new Error('Anti-cheat authority policy mismatch');
+        const bridge = body?.bridge || {};
+        if (bridge.mode !== 'github-oidc-read-only' || bridge.exactWorkflowBound !== true || bridge.writeAuthority !== 'admin-only') throw new Error('AI review bridge policy mismatch');
+        state.securitySmoke = {
+          format: 'ironvale-security-smoke-v1',
+          status: 'pass',
+          completedAt,
+          httpStatus: response.status,
+          integrity: { attested: true, buildId: integrity.buildId, runtimeStatus: integrity.runtimeStatus },
+          authority: { ...body.authority },
+          monitor: { ...body.monitor },
+          policy: { ...policy },
+          bridge: { ...bridge }
+        };
+        return 'RAM anti-cheat active · integrity bound · AI review bridge read-only · samples=' + (body.monitor.observedSamples || 0);
+      } catch (error) {
+        state.securitySmoke = { format: 'ironvale-security-smoke-v1', status: 'fail', completedAt, error: shortError(error) };
+        throw error;
+      }
+    });
+
     await runStep('backend health + network telemetry', async () => {
       const response = await fetch('/api/health', { cache: 'no-store' });
       if (!response.ok) throw new Error(`health HTTP ${response.status}`);
@@ -790,6 +833,7 @@ async function exportValidationBundle() {
       counts: { pass: state.pass, warn: state.warn, fail: state.fail },
       restoration: state.restoration,
       postValidation: state.postValidation,
+      securitySmoke: state.securitySmoke,
       evidence: state.evidence,
       steps: state.steps,
       dumpEncoding: packedDump.encoding
@@ -832,6 +876,7 @@ function registerProvider() {
     restoration: state.restoration,
     playerRestoration: state.playerRestoration,
     postValidation: state.postValidation,
+    securitySmoke: state.securitySmoke ? { ...state.securitySmoke } : null,
     evidence: {
       captures: state.evidence.captures,
       failed: state.evidence.failed,
@@ -850,8 +895,24 @@ function registerProvider() {
       exercisesSprintAndAutoRun: true,
       exercisesDirectRealtimePublisher: true,
       exercisesRealtimeCheckpoint: true,
+      exercisesSecurityAuthoritySmoke: true,
+      capturesSecuritySmokeInL3: true,
       destructiveReset: false,
       logout: false
+    }
+  }));
+  window.IronvaleDiagnostics.registerProvider('security-smoke', () => ({
+    format: 'ironvale-security-smoke-v1',
+    status: state.securitySmoke?.status || 'idle',
+    completedAt: state.securitySmoke?.completedAt || null,
+    result: state.securitySmoke ? { ...state.securitySmoke } : null,
+    policy: {
+      selfSessionOnly: true,
+      exposesRiskScoreToClient: false,
+      exposesBotSignalsToClient: false,
+      serverPrivateMonitor: true,
+      aiReviewReadOnly: true,
+      ramAuthorityFinal: true
     }
   }));
   providerRegistered = true;

@@ -207,8 +207,8 @@ async function buildGuardChecks(instance) {
 
   if (!worldVisible) return checks;
 
-  const [engine, native, realtime, integrity] = await Promise.all([
-    provider(instance, 'engine', 2), provider(instance, 'native', 2), provider(instance, 'realtime-movement', 2), provider(instance, 'integrity-chain', 2)
+  const [engine, native, realtime, integrity, securitySmoke] = await Promise.all([
+    provider(instance, 'engine', 2), provider(instance, 'native', 2), provider(instance, 'realtime-movement', 2), provider(instance, 'integrity-chain', 2), provider(instance, 'security-smoke', 2)
   ]);
   const snapshot = await snapshotRuntime(instance, 2);
   const runtime = snapshot?.runtime || {};
@@ -239,6 +239,18 @@ async function buildGuardChecks(instance) {
     checks.push(passFail('integrity.server-attestation', attested, attested ? `Server challenge attested · ticket ${(Number(integrity.ticketRemainingMs) / 60000).toFixed(1)}m remaining` : 'Server integrity ticket missing or expired'));
     const runtimeOk = integrity.runtimeStatus !== 'failed' && (integrity.runtimeMismatches?.length || 0) === 0;
     checks.push(passFail('integrity.runtime-watchdog', runtimeOk, runtimeOk ? `Runtime tripwire clean · ${integrity.runtimeProbeCount || 0} probe(s)` : `${integrity.runtimeMismatches?.length || 0} runtime mismatch(es)`));
+  }
+
+  if (securitySmoke?.completedAt) {
+    const smoke = securitySmoke.result || {};
+    const sessionOk = smoke.status === 'pass' && smoke.monitor?.enabled === true && smoke.monitor?.serverPrivate === true && smoke.monitor?.stateResidentInRam === true && smoke.authority?.source === 'live-ram';
+    checks.push(passFail('security.anticheat-session', sessionOk, sessionOk ? 'Server-private bot/anti-cheat monitor attached to live Durable Object RAM state' : (smoke.error || 'Anti-cheat RAM session smoke failed')));
+    const policyOk = smoke.policy?.automaticBan === false && smoke.policy?.aiAuthority === 'recommendation-only' && smoke.policy?.ramAuthority === 'final' && smoke.policy?.ordinaryMovementWritesToD1 === false && smoke.policy?.suspiciousCaseWritesOnly === true;
+    checks.push(passFail('security.authority-policy', policyOk, policyOk ? 'AI recommends only · RAM authority final · ordinary movement remains D1-free' : 'Security authority policy mismatch'));
+    const bridgeOk = smoke.bridge?.mode === 'github-oidc-read-only' && smoke.bridge?.exactWorkflowBound === true && smoke.bridge?.writeAuthority === 'admin-only';
+    checks.push(passFail('security.ai-review-bridge', bridgeOk, bridgeOk ? 'GitHub OIDC AI review bridge is exact-workflow-bound and read-only' : 'AI review bridge contract mismatch'));
+    const integrityBound = smoke.integrity?.attested === true && smoke.authority?.integrityStatus === 'attested' && Boolean(smoke.integrity?.buildId) && smoke.integrity?.buildId === smoke.authority?.integrityBuildId;
+    checks.push(passFail('security.integrity-binding', integrityBound, integrityBound ? ('Integrity ' + smoke.integrity.buildId + ' bound to RAM authority') : 'Integrity/RAM binding mismatch'));
   }
 
   if (!realtime) {

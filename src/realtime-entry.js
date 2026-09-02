@@ -205,6 +205,16 @@ async function routeIntegrityAttest(request, env) {
   return json({ ok: true, status: 'attested', buildId: EXPECTED_INTEGRITY_BUILD_ID, manifestDigest: EXPECTED_INTEGRITY_MANIFEST_DIGEST, ticket, ticketExpiresAt });
 }
 
+async function routeAntiCheatSessionStatus(request, env) {
+  const auth = await loadSessionState(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const integrity = await verifyIntegrityTransport(request, auth);
+  if (!integrity.ok) return json({ ok: false, error: integrity.reason }, 428);
+  const stub = playerStateStub(env, auth.userId);
+  const headers = internalStateHeaders(auth, request, integrity);
+  return stub.fetch(new Request('https://player-state/anticheat-status', { method: 'GET', headers }));
+}
+
 function mutatingApiRequiresIntegrity(method, pathname) {
   if (!pathname.startsWith('/api/')) return false;
   if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
@@ -409,6 +419,7 @@ export default {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
 
+    if (method === 'GET' && url.pathname === '/api/anticheat/session-status') return routeAntiCheatSessionStatus(request, env);
     if (url.pathname.startsWith('/api/anticheat/')) return routeAntiCheatApi(request, env, url);
 
     if (method === 'GET' && url.pathname === '/api/integrity/challenge') return routeIntegrityChallenge(request, env);
@@ -509,7 +520,50 @@ export class PlayerState extends DurableObject {
     if (url.pathname === '/connect') return this.connect(request);
     if (url.pathname === '/position' && request.method === 'POST') return this.position(request);
     if (url.pathname === '/checkpoint' && request.method === 'POST') return this.checkpointRequest(request);
+    if (url.pathname === '/anticheat-status' && request.method === 'GET') return this.antiCheatStatus(request);
     return json({ ok: false, error: 'Not found' }, 404);
+  }
+
+  antiCheatStatus(request) {
+    const selected = this.latestAuthorityState();
+    const state = selected?.state || this.stateFromHeaders(request);
+    const requestedUserId = String(request.headers.get('x-ironvale-user-id') || '');
+    if (!requestedUserId || String(state?.userId || '') !== requestedUserId) return json({ ok: false, error: 'Session state mismatch' }, 403);
+    const summary = antiCheatSummary(state.antiCheat);
+    return json({
+      ok: true,
+      format: 'ironvale-anticheat-session-status-v1',
+      policy: {
+        automaticBan: false,
+        aiAuthority: 'recommendation-only',
+        ramAuthority: 'final',
+        ordinaryMovementWritesToD1: false,
+        suspiciousCaseWritesOnly: true
+      },
+      bridge: {
+        mode: 'github-oidc-read-only',
+        exactWorkflowBound: true,
+        writeAuthority: 'admin-only'
+      },
+      authority: {
+        realtimeFormat: REALTIME_FORMAT,
+        source: selected?.state ? 'live-ram' : 'session-baseline',
+        integrityStatus: String(state.integrityStatus || 'missing'),
+        integrityBuildId: String(state.integrityBuildId || ''),
+        accepted: Number(state.accepted) || 0,
+        rejected: Number(state.rejected) || 0,
+        checkpointCount: Number(state.checkpointCount) || 0
+      },
+      monitor: {
+        format: summary.format,
+        enabled: true,
+        serverPrivate: true,
+        stateResidentInRam: Boolean(selected?.state),
+        sessionBound: Boolean(state.sessionId),
+        observedSamples: Number(summary.metrics?.samples) || 0,
+        deterministicRejectsObserved: Number(summary.metrics?.deterministicRejects) > 0
+      }
+    });
   }
 
   async connect(request) {

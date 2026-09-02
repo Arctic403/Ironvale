@@ -6,7 +6,7 @@ import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzi
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 import { IronvaleIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-const APP_DIAGNOSTIC_BUILD = '20260902-integrity-v1';
+const APP_DIAGNOSTIC_BUILD = '20260902-security-smoke-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
