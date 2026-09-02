@@ -32,7 +32,17 @@ jobs:
           test "$oidc_token" != "null"
 
           auth=(-H "Authorization: Bearer $oidc_token")
-          curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/summary" > anticheat-review/summary.json
+          summary_ok=0
+          for attempt in $(seq 1 12); do
+            if curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/summary" > anticheat-review/summary.json; then
+              summary_ok=1
+              break
+            fi
+            echo "Live Worker not ready for OIDC review yet (attempt $attempt/12)"
+            sleep 5
+          done
+          test "$summary_ok" -eq 1
+
           curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/cases?status=all&minRisk=30&limit=50" > anticheat-review/cases.json
 
           jq -r '.cases[] | select(.riskScore >= 60) | .id' anticheat-review/cases.json | head -n 10 | while IFS= read -r case_id; do
