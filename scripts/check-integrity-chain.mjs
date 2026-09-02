@@ -63,9 +63,18 @@ for (const required of ['/app.js', '/rift-integrity.js', '/rift-realtime.js', '/
 requireToken(server, manifest.buildId, 'server build id matches manifest');
 requireToken(server, manifest.digest, 'server manifest digest matches manifest');
 
+for (const stagingPath of [
+  'scripts/apply-integrity-chain-v1.mjs',
+  'scripts/apply-integrity-ticket-redaction.mjs',
+  '.github/workflows/apply-integrity-chain-v1.yml',
+  '.github/workflows/apply-integrity-ticket-redaction.yml'
+]) {
+  if (fs.existsSync(stagingPath)) throw new Error(`Integrity staging file must be removed: ${stagingPath}`);
+}
+
 const build = String(pkg.scripts?.build || '');
 for (const token of ['node --check public/rift-integrity.js', 'node --check src/integrity-build.js', 'node scripts/generate-integrity-manifest.mjs --check', 'node scripts/check-integrity-chain.mjs']) {
   if (!build.includes(token)) throw new Error(`Core build missing ${token}`);
 }
 
-console.log(`Ironvale Integrity Chain v1 verified: ${manifest.buildId} · ${manifest.fileCount} critical files · RAM authority remains final · diagnostic tickets redacted.`);
+console.log(`Ironvale Integrity Chain v1 verified: ${manifest.buildId} · ${manifest.fileCount} critical files · RAM authority remains final · diagnostic tickets redacted · staging clean.`);
