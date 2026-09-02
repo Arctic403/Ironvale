@@ -37,8 +37,11 @@ for (const token of [
   'retention-days: 1'
 ]) assert(workflow.includes(token), `review workflow missing ${token}`);
 
+assert(!fs.existsSync('scripts/apply-ai-anticheat-oidc.mjs'), 'temporary AI bridge patcher must be removed');
+assert(!fs.existsSync('.github/workflows/apply-ai-anticheat-oidc.yml'), 'temporary AI bridge apply workflow must be removed');
+
 const build = String(pkg.scripts?.build || '');
 assert(build.includes('node --check src/github-oidc.js'), 'core build missing OIDC syntax check');
 assert(build.includes('node scripts/check-ai-anticheat-bridge.mjs'), 'core build missing AI bridge contract check');
 
-console.log('Ironvale AI anti-cheat bridge verified: signed GitHub OIDC, exact repo/workflow/ref, read-only AI access, one-day evidence snapshots.');
+console.log('Ironvale AI anti-cheat bridge verified: signed GitHub OIDC, exact repo/workflow/ref, read-only AI access, one-day evidence snapshots, staging clean.');
