@@ -218,7 +218,7 @@ guard = replaceOnce(guard,
     const bridgeOk = smoke.bridge?.mode === 'github-oidc-read-only' && smoke.bridge?.exactWorkflowBound === true && smoke.bridge?.writeAuthority === 'admin-only';
     checks.push(passFail('security.ai-review-bridge', bridgeOk, bridgeOk ? 'GitHub OIDC AI review bridge is exact-workflow-bound and read-only' : 'AI review bridge contract mismatch'));
     const integrityBound = smoke.integrity?.attested === true && smoke.authority?.integrityStatus === 'attested' && Boolean(smoke.integrity?.buildId) && smoke.integrity?.buildId === smoke.authority?.integrityBuildId;
-    checks.push(passFail('security.integrity-binding', integrityBound, integrityBound ? `Integrity ${smoke.integrity.buildId} bound to RAM authority` : 'Integrity/RAM binding mismatch'));
+    checks.push(passFail('security.integrity-binding', integrityBound, integrityBound ? ('Integrity ' + smoke.integrity.buildId + ' bound to RAM authority') : 'Integrity/RAM binding mismatch'));
   }
 
   if (!realtime) {`,
