@@ -1,3 +1,4 @@
+// v2: reviewer-contract compatible OIDC bridge patch
 import fs from 'node:fs';
 
 const read = path => fs.readFileSync(path, 'utf8');
