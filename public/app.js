@@ -1,12 +1,12 @@
 import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260901-engine-blackbox-r1';
-import { RiftLandscape } from './rift-landscape.js?v=20260902-dirty-region-r1';
+import { RiftLandscape } from './rift-landscape.js?v=20260902-terrain-pack-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 import { IronvaleIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-const APP_DIAGNOSTIC_BUILD = '20260902-security-smoke-r1';
+const APP_DIAGNOSTIC_BUILD = '20260902-terrain-pack-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -171,6 +171,8 @@ function recordTerrainEditSample(sample = {}) {
     mutationMs: terrainEditRound(sample.mutationMs),
     nativeMeshBuildMs: terrainEditRound(sample.nativeMeshBuildMs),
     meshCopyMs: terrainEditRound(sample.meshCopyMs),
+    materialPackMs: terrainEditRound(sample.materialPackMs),
+    indexCopyMs: terrainEditRound(sample.indexCopyMs),
     meshBuildWallMs: terrainEditRound(sample.meshBuildWallMs),
     gpuUploadSubmitMs: terrainEditRound(sample.gpuUploadSubmitMs),
     visibilityMs: terrainEditRound(sample.visibilityMs),
@@ -180,14 +182,17 @@ function recordTerrainEditSample(sample = {}) {
     skippedUnstreamedSections: Math.max(0, Math.trunc(Number(sample.skippedUnstreamedSections) || 0)),
     vertexBytes: Math.max(0, Math.trunc(Number(sample.vertexBytes) || 0)),
     indexBytes: Math.max(0, Math.trunc(Number(sample.indexBytes) || 0)),
-    bytesUploaded: Math.max(0, Math.trunc(Number(sample.bytesUploaded) || 0))
+    bytesUploaded: Math.max(0, Math.trunc(Number(sample.bytesUploaded) || 0)),
+    intermediateVertexBytesAvoided: Math.max(0, Math.trunc(Number(sample.intermediateVertexBytesAvoided) || 0)),
+    materialFastPathVertices: Math.max(0, Math.trunc(Number(sample.materialFastPathVertices) || 0)),
+    materialFallbackVertices: Math.max(0, Math.trunc(Number(sample.materialFallbackVertices) || 0))
   };
   terrainEditSamples.push(normalized);
   if (terrainEditSamples.length > TERRAIN_EDIT_SAMPLE_LIMIT) terrainEditSamples.splice(0, terrainEditSamples.length - TERRAIN_EDIT_SAMPLE_LIMIT);
   return normalized;
 }
 function terrainEditPerformanceStatus(deep = false) {
-  const metrics = ['totalMs','mutationMs','nativeMeshBuildMs','meshCopyMs','meshBuildWallMs','gpuUploadSubmitMs','visibilityMs'];
+  const metrics = ['totalMs','mutationMs','nativeMeshBuildMs','meshCopyMs','materialPackMs','indexCopyMs','meshBuildWallMs','gpuUploadSubmitMs','visibilityMs'];
   const percentiles = {};
   for (const metric of metrics) {
     const values = terrainEditSamples.map(sample => Number(sample[metric]) || 0);
@@ -196,8 +201,11 @@ function terrainEditPerformanceStatus(deep = false) {
   const totals = terrainEditSamples.reduce((out, sample) => {
     out.dirtySections += sample.dirtySections; out.rebuiltSections += sample.rebuiltSections; out.skippedUnstreamedSections += sample.skippedUnstreamedSections;
     out.vertexBytes += sample.vertexBytes; out.indexBytes += sample.indexBytes; out.bytesUploaded += sample.bytesUploaded;
+    out.intermediateVertexBytesAvoided += sample.intermediateVertexBytesAvoided;
+    out.materialFastPathVertices += sample.materialFastPathVertices;
+    out.materialFallbackVertices += sample.materialFallbackVertices;
     return out;
-  }, { dirtySections: 0, rebuiltSections: 0, skippedUnstreamedSections: 0, vertexBytes: 0, indexBytes: 0, bytesUploaded: 0 });
+  }, { dirtySections: 0, rebuiltSections: 0, skippedUnstreamedSections: 0, vertexBytes: 0, indexBytes: 0, bytesUploaded: 0, intermediateVertexBytesAvoided: 0, materialFastPathVertices: 0, materialFallbackVertices: 0 });
   return {
     format: TERRAIN_EDIT_PERF_FORMAT,
     sampleCount: terrainEditSamples.length,
@@ -210,6 +218,8 @@ function terrainEditPerformanceStatus(deep = false) {
       nativeMutation: true,
       nativeMeshBuild: true,
       wasmToJsCopy: true,
+      directWasmToFinalPbrPack: true,
+      exactGridMaterialFastPath: true,
       gpuUploadSubmission: true,
       dirtySections: true,
       bytesUploaded: true,
@@ -1107,11 +1117,16 @@ function buildTerrainSection(section, plan = terrainLodPlan, force = false) {
     built: true,
     nativeMeshBuildMs: Number(entry.buildTelemetry?.nativeBuildMs) || 0,
     meshCopyMs: Number(entry.buildTelemetry?.copyMs) || 0,
+    materialPackMs: Number(entry.buildTelemetry?.materialPackMs) || 0,
+    indexCopyMs: Number(entry.buildTelemetry?.indexCopyMs) || 0,
     meshBuildWallMs,
     gpuUploadSubmitMs,
     vertexBytes,
     indexBytes,
-    bytesUploaded: vertexBytes + indexBytes
+    bytesUploaded: vertexBytes + indexBytes,
+    intermediateVertexBytesAvoided: Number(entry.buildTelemetry?.intermediateVertexBytesAvoided) || 0,
+    materialFastPathVertices: Number(entry.buildTelemetry?.materialFastPathVertices) || 0,
+    materialFallbackVertices: Number(entry.buildTelemetry?.materialFallbackVertices) || 0
   };
 }
 
@@ -1173,7 +1188,7 @@ function updateTerrainLod(now = performance.now(), force = false) {
 }
 
 function rebuildDirtyTerrainSections() {
-  const profile = { dirtySections: 0, rebuiltSections: 0, skippedUnstreamedSections: 0, nativeMeshBuildMs: 0, meshCopyMs: 0, meshBuildWallMs: 0, gpuUploadSubmitMs: 0, visibilityMs: 0, vertexBytes: 0, indexBytes: 0, bytesUploaded: 0 };
+  const profile = { dirtySections: 0, rebuiltSections: 0, skippedUnstreamedSections: 0, nativeMeshBuildMs: 0, meshCopyMs: 0, materialPackMs: 0, indexCopyMs: 0, meshBuildWallMs: 0, gpuUploadSubmitMs: 0, visibilityMs: 0, vertexBytes: 0, indexBytes: 0, bytesUploaded: 0, intermediateVertexBytesAvoided: 0, materialFastPathVertices: 0, materialFallbackVertices: 0 };
   if (!engine || !terrain) return profile;
   if (!terrainLodPlan.size) terrainLodPlan = terrain.planSectionLods(player.x, player.z);
   if (!terrainStreamPlan) refreshTerrainStreamPlan(player.x, player.z);
@@ -1185,10 +1200,13 @@ function rebuildDirtyTerrainSections() {
     const built = buildTerrainSection(section, terrainLodPlan, true) || {};
     if (!built.built) continue;
     profile.rebuiltSections += 1;
-    for (const metric of ['nativeMeshBuildMs','meshCopyMs','meshBuildWallMs','gpuUploadSubmitMs']) profile[metric] += Number(built[metric]) || 0;
+    for (const metric of ['nativeMeshBuildMs','meshCopyMs','materialPackMs','indexCopyMs','meshBuildWallMs','gpuUploadSubmitMs']) profile[metric] += Number(built[metric]) || 0;
     profile.vertexBytes += Number(built.vertexBytes) || 0;
     profile.indexBytes += Number(built.indexBytes) || 0;
     profile.bytesUploaded += Number(built.bytesUploaded) || 0;
+    profile.intermediateVertexBytesAvoided += Number(built.intermediateVertexBytesAvoided) || 0;
+    profile.materialFastPathVertices += Number(built.materialFastPathVertices) || 0;
+    profile.materialFallbackVertices += Number(built.materialFallbackVertices) || 0;
   }
   const visibilityStarted = performance.now();
   updateTerrainMeshVisibility();

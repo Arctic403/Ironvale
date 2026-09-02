@@ -500,7 +500,7 @@ export class RiftTerrain {
     return { x: view[0], y: view[1], z: view[2], distance: view[3] };
   }
 
-  buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep = 1, neighborLods = null) {
+  _buildSurfaceSectionNative(sectionX, sectionZ, lodStep = 1, neighborLods = null) {
     const step = Math.max(1, Math.trunc(lodStep));
     const neighbors = neighborLods || { north: step, east: step, south: step, west: step };
     const build = NATIVE.rift_terrain_build_section || NATIVE.rift_terrain_build_chunk;
@@ -519,26 +519,45 @@ export class RiftTerrain {
       : build(Math.trunc(sectionX), Math.trunc(sectionZ), this.sectionSize, step);
     assertNative(ok, `RiftCore could not build terrain section ${sectionX}:${sectionZ}.`);
     const nativeBuildMs = performance.now() - nativeBuildStarted;
-    const copyStarted = performance.now();
-
     const vertexFloatCount = NATIVE.rift_mesh_vertex_float_count();
     const indexCount = NATIVE.rift_mesh_index_count();
-    const vertexView = new Float32Array(MEMORY.buffer, NATIVE.rift_mesh_vertices_ptr(), vertexFloatCount);
-    const indexView = new Uint32Array(MEMORY.buffer, NATIVE.rift_mesh_indices_ptr(), indexCount);
-    const vertices = new Float32Array(vertexView);
+    return {
+      step,
+      neighbors: { ...neighbors },
+      nativeBuildMs,
+      vertexView: new Float32Array(MEMORY.buffer, NATIVE.rift_mesh_vertices_ptr(), vertexFloatCount),
+      indexView: new Uint32Array(MEMORY.buffer, NATIVE.rift_mesh_indices_ptr(), indexCount)
+    };
+  }
+
+  buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep = 1, neighborLods = null) {
+    const native = this._buildSurfaceSectionNative(sectionX, sectionZ, lodStep, neighborLods);
+    const copyStarted = performance.now();
+    const vertices = new Float32Array(native.vertexView);
     const vertexCount = vertices.length / 9;
-    const indices = vertexCount > 65535 ? new Uint32Array(indexView) : Uint16Array.from(indexView);
+    const indices = vertexCount > 65535 ? new Uint32Array(native.indexView) : Uint16Array.from(native.indexView);
     const copyMs = performance.now() - copyStarted;
     return {
-      buildTelemetry: { nativeBuildMs, copyMs, vertexBytes: vertices.byteLength, indexBytes: indices.byteLength },
+      buildTelemetry: {
+        nativeBuildMs: native.nativeBuildMs,
+        copyMs,
+        materialPackMs: 0,
+        indexCopyMs: copyMs,
+        sourceVertexBytes: native.vertexView.byteLength,
+        intermediateVertexBytesAvoided: 0,
+        materialFastPathVertices: 0,
+        materialFallbackVertices: 0,
+        vertexBytes: vertices.byteLength,
+        indexBytes: indices.byteLength
+      },
       id: `terrain-section-${sectionX}-${sectionZ}`,
       sectionX,
       sectionZ,
       chunkX: sectionX,
       chunkZ: sectionZ,
-      lod: step,
-      lodStep: step,
-      neighborLods: { ...neighbors },
+      lod: native.step,
+      lodStep: native.step,
+      neighborLods: native.neighbors,
       geometry: { vertices, indices, vertexStride: 9 },
       triangles: indices.length / 3
     };

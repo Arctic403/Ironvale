@@ -4,13 +4,13 @@
   "files": [
     {
       "path": "/app.js",
-      "sha256": "4e0dc071d809e85976a937f3a86a12d41b49290f783b3c5febdd6b3f46cff801",
-      "size": 121440
+      "sha256": "813caa35882c8e6951d439a2fcc02583437249c40d45ad6de122525dd9f569ac",
+      "size": 123136
     },
     {
       "path": "/index.html",
-      "sha256": "2b653c2c98a425b2c575cf87cb07c49a9f47bfdf4b0aa21da8cde190db020c8f",
-      "size": 10086
+      "sha256": "d5f5a46c3e48a768b2e89944be578289c4d09fb5d6fe8ea0d5a03006d43a6972",
+      "size": 10084
     },
     {
       "path": "/rift-architecture-guard.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "/rift-landscape.js",
-      "sha256": "b164b77cc69396c2e3f8ebb0ce4c0eaf4535532f3091d49921e2a2f71df91f88",
-      "size": 49613
+      "sha256": "d9b90b05bebf591da49071708981a0897ca533d3f3700ee8fd7b719882cadab7",
+      "size": 52366
     },
     {
       "path": "/rift-realtime.js",
@@ -99,8 +99,8 @@
     },
     {
       "path": "/rift-terrain.js",
-      "sha256": "943c73fd02e90bdfc5f65e1207aeaa825797f6971220f4204a94208fe2bd5c49",
-      "size": 27286
+      "sha256": "bee3455e54f1abfc86a68a2924f30db2e246e43415f75b81bb5e7ec412a4ddb1",
+      "size": 27872
     },
     {
       "path": "/rift-validator-guard.js",
@@ -108,7 +108,7 @@
       "size": 24281
     }
   ],
-  "buildId": "iv-f6e3deb604cde7e028c14696",
-  "digest": "f6e3deb604cde7e028c146967c0404548c745870f42758935d86346021f45d30",
+  "buildId": "iv-7021c70fe5883afcf288ca46",
+  "digest": "7021c70fe5883afcf288ca4691196663f0f1faf52adc255bc08ac8a286689851",
   "fileCount": 21
 }

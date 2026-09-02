@@ -1,4 +1,4 @@
-import { RiftTerrain } from './rift-terrain.js?v=20260902-dirty-region-r1';
+import { RiftTerrain } from './rift-terrain.js?v=20260902-terrain-pack-r1';
 
 export const RIFT_LANDSCAPE_FORMAT = 'rift-landscape-v3';
 export const RIFT_LANDSCAPE_EDIT_FORMAT = 'rift-landscape-edits-v2';
@@ -1048,42 +1048,112 @@ export class RiftLandscape extends RiftTerrain {
   }
 
   buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep = 1, neighborLods = null) {
-    const entry = super.buildSurfaceSectionGeometry(sectionX, sectionZ, lodStep, neighborLods);
-    const source = entry?.geometry?.vertices;
-    const sourceStride = Number(entry?.geometry?.vertexStride) || 9;
-    if (!source || sourceStride < 9) return entry;
-    const materialIds = this.materialLayerIds().slice(0, 6);
+    // Phase 2 terrain edit path: consume the native WASM scratch mesh directly
+    // into the final PBR vertex layout. Avoid the old 9-float intermediate copy
+    // and avoid object-heavy bilinear material sampling for exact grid vertices.
+    const native = this._buildSurfaceSectionNative(sectionX, sectionZ, lodStep, neighborLods);
+    const source = native.vertexView;
+    const sourceStride = 9;
     const targetStride = 17;
     const count = Math.floor(source.length / sourceStride);
     const vertices = new Float32Array(count * targetStride);
+    const materialIds = this.materialLayerIds().slice(0, 6);
+    const materialLayers = materialIds.map(id => this.materialLayers.get(id) || null);
+    const baseLayerIndex = materialIds.indexOf(this.baseMaterialLayerId);
+    const gridEpsilon = 0.0001;
+    let materialFastPathVertices = 0;
+    let materialFallbackVertices = 0;
+    const materialPackStarted = performance.now();
+
     for (let vertex = 0; vertex < count; vertex += 1) {
       const input = vertex * sourceStride;
       const output = vertex * targetStride;
       for (let i = 0; i < 9; i += 1) vertices[output + i] = source[input + i];
-      const x = source[input], z = source[input + 2];
+      const x = source[input];
+      const z = source[input + 2];
       vertices[output + 9] = x;
       vertices[output + 10] = z;
-      const weights = this.sampleMaterialWeights(x, z);
-      let weightTotal = 0;
-      for (let layer = 0; layer < 6; layer += 1) {
-        const value = materialIds[layer] ? Math.max(0, Number(weights[materialIds[layer]]) || 0) : 0;
-        vertices[output + 11 + layer] = value;
-        weightTotal += value;
+
+      const gx = (x - this.origin[0]) / this.sampleSpacing;
+      const gz = (z - this.origin[2]) / this.sampleSpacing;
+      const ix = Math.round(gx);
+      const iz = Math.round(gz);
+      const exactGrid = baseLayerIndex >= 0 &&
+        ix >= 0 && iz >= 0 && ix < this.columns && iz < this.rows &&
+        Math.abs(gx - ix) <= gridEpsilon && Math.abs(gz - iz) <= gridEpsilon;
+
+      if (exactGrid) {
+        const sampleIndex = iz * this.columns + ix;
+        let nonBaseTotal = 0;
+        for (let layer = 0; layer < materialLayers.length; layer += 1) {
+          if (layer === baseLayerIndex) continue;
+          nonBaseTotal += Math.max(0, Number(materialLayers[layer]?.weights?.[sampleIndex]) || 0);
+        }
+        const nonBaseScale = nonBaseTotal > 255 ? 255 / nonBaseTotal : 1;
+        const scaledNonBaseTotal = Math.min(255, nonBaseTotal * nonBaseScale);
+        for (let layer = 0; layer < 6; layer += 1) {
+          let value = 0;
+          if (layer < materialLayers.length) {
+            value = layer === baseLayerIndex
+              ? Math.max(0, 255 - scaledNonBaseTotal)
+              : Math.max(0, Number(materialLayers[layer]?.weights?.[sampleIndex]) || 0) * nonBaseScale;
+          }
+          vertices[output + 11 + layer] = value / 255;
+        }
+        materialFastPathVertices += 1;
+      } else {
+        const weights = this.sampleMaterialWeights(x, z);
+        let weightTotal = 0;
+        for (let layer = 0; layer < 6; layer += 1) {
+          const value = materialIds[layer] ? Math.max(0, Number(weights[materialIds[layer]]) || 0) : 0;
+          vertices[output + 11 + layer] = value;
+          weightTotal += value;
+        }
+        if (weightTotal <= 0) vertices[output + 11] = 1;
+        materialFallbackVertices += 1;
       }
-      if (weightTotal <= 0) vertices[output + 11] = 1;
-      // Terrain PBR albedo is already color-correct. Keep vertex color neutral so
-      // the splat textures are not darkened a second time by the generic mesh shader.
+
+      // PBR albedo is already color-correct; generic vertex tint stays neutral.
       vertices[output + 6] = 1;
       vertices[output + 7] = 1;
       vertices[output + 8] = 1;
     }
-    entry.geometry = {
-      ...entry.geometry,
-      vertices,
-      vertexStride: targetStride,
-      attributes: { ...(entry.geometry.attributes || {}), uv: 9, terrainWeights0: 11, terrainWeights1: 15 }
+    const materialPackMs = performance.now() - materialPackStarted;
+
+    const indexCopyStarted = performance.now();
+    const indices = count > 65535 ? new Uint32Array(native.indexView) : Uint16Array.from(native.indexView);
+    const indexCopyMs = performance.now() - indexCopyStarted;
+    const intermediateVertexBytesAvoided = source.byteLength;
+
+    return {
+      buildTelemetry: {
+        nativeBuildMs: native.nativeBuildMs,
+        copyMs: materialPackMs + indexCopyMs,
+        materialPackMs,
+        indexCopyMs,
+        sourceVertexBytes: source.byteLength,
+        intermediateVertexBytesAvoided,
+        materialFastPathVertices,
+        materialFallbackVertices,
+        vertexBytes: vertices.byteLength,
+        indexBytes: indices.byteLength
+      },
+      id: `terrain-section-${sectionX}-${sectionZ}`,
+      sectionX,
+      sectionZ,
+      chunkX: sectionX,
+      chunkZ: sectionZ,
+      lod: native.step,
+      lodStep: native.step,
+      neighborLods: native.neighbors,
+      geometry: {
+        vertices,
+        indices,
+        vertexStride: targetStride,
+        attributes: { uv: 9, terrainWeights0: 11, terrainWeights1: 15 }
+      },
+      triangles: indices.length / 3
     };
-    return entry;
   }
 
   validateLandscape() {
