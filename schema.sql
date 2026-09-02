@@ -48,3 +48,28 @@ CREATE TABLE IF NOT EXISTS rift_characters (
   updated_at INTEGER NOT NULL,
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
+-- Sparse server-side anti-cheat cases. Ordinary movement remains RAM-only; only suspicious sessions are promoted here.
+CREATE TABLE IF NOT EXISTS anti_cheat_cases (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  session_id TEXT,
+  username TEXT,
+  status TEXT NOT NULL DEFAULT 'open',
+  risk_score INTEGER NOT NULL DEFAULT 0,
+  risk_band TEXT NOT NULL DEFAULT 'normal',
+  watch_level TEXT NOT NULL DEFAULT 'summary',
+  primary_signal TEXT,
+  summary_json TEXT NOT NULL,
+  evidence_json TEXT,
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  reviewer TEXT,
+  review_note TEXT,
+  ai_recommendation TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_anti_cheat_cases_risk ON anti_cheat_cases(risk_score DESC, last_seen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_anti_cheat_cases_user ON anti_cheat_cases(user_id, last_seen_at DESC);
+CREATE INDEX IF NOT EXISTS idx_anti_cheat_cases_status ON anti_cheat_cases(status, risk_score DESC);

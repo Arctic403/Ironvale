@@ -165,7 +165,7 @@ function evaluate(state, now = Date.now()) {
   if (state.integrityRejects) add('integrity-rejects', Math.min(30, 15 + Math.max(0, state.integrityRejects - 1) * 5), `${state.integrityRejects} integrity/session rejection(s)`);
   if (state.staleSequenceRejects >= 3) add('sequence-anomalies', Math.min(10, state.staleSequenceRejects * 2), `${state.staleSequenceRejects} stale sequence rejection(s)`);
 
-  if (state.maxPatternRepeats >= 8) add('route-pattern-repeat', 45, `same ${PATTERN_LENGTH}-cell route fragment repeated ${state.maxPatternRepeats} times`);
+  if (state.maxPatternRepeats >= 8) add('route-pattern-repeat', 50, `same ${PATTERN_LENGTH}-cell route fragment repeated ${state.maxPatternRepeats} times`);
   else if (state.maxPatternRepeats >= 5) add('route-pattern-repeat', 30, `same ${PATTERN_LENGTH}-cell route fragment repeated ${state.maxPatternRepeats} times`);
   else if (state.maxPatternRepeats >= 3) add('route-pattern-repeat', 15, `same ${PATTERN_LENGTH}-cell route fragment repeated ${state.maxPatternRepeats} times`);
 
