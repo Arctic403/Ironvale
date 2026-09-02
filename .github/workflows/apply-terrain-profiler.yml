@@ -36,6 +36,15 @@ jobs:
           node scripts/fix-terrain-profiler-helper.mjs
           node --check scripts/apply-terrain-profiler.mjs
           node scripts/apply-terrain-profiler.mjs
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'scripts/check-realtime-state.mjs';
+          let text = fs.readFileSync(path, 'utf8');
+          const before = "requireMatch(html, /rift-validator-guard\\.js\\?v=20260901-sprint-speed-r2/, 'validator sprint-speed module loaded');";
+          const after = "requireMatch(html, /rift-validator-guard\\.js\\?v=20260901-terrain-profiler-r1/, 'validator terrain-profiler module loaded');";
+          if (!text.includes(before)) throw new Error('stale validator cache contract target missing');
+          fs.writeFileSync(path, text.replace(before, after));
+          NODE
 
       - name: Verify patched sources
         run: |
@@ -50,7 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public scripts/check-terrain-edit-profiler.mjs
+          git add public scripts/check-terrain-edit-profiler.mjs scripts/check-realtime-state.mjs
           git commit -m "Instrument terrain edit performance"
           git restore scripts/apply-terrain-profiler.mjs
           git pull --rebase origin main
