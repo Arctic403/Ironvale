@@ -20,7 +20,7 @@ for (const token of [
   'exactWorkflowBound: true',
   "writeAuthority: 'admin-only'",
   'serverPrivate: true',
-  'stateResidentInRam: true'
+  'stateResidentInRam: Boolean(selected?.state)'
 ]) assert(worker.includes(token), `server missing ${token}`);
 
 assert(worker.indexOf("url.pathname === '/api/anticheat/session-status'") < worker.indexOf("url.pathname.startsWith('/api/anticheat/')"), 'self-only session status must route before reviewer API');
@@ -58,4 +58,4 @@ assert(build.includes('node scripts/check-security-smoke-v1.mjs'), 'core build m
 assert(!fs.existsSync('scripts/apply-security-smoke-v1.mjs'), 'temporary security smoke patcher must be removed');
 assert(!fs.existsSync('.github/workflows/apply-security-smoke-v1.yml'), 'temporary security smoke workflow must be removed');
 
-console.log('Ironvale Security Smoke v1 verified: validator + full auto smoke + L3 provider + self-only RAM anti-cheat health + OIDC bridge contract.');
+console.log('Ironvale Security Smoke v1 verified: validator + full auto smoke + L3 provider + self-only dynamic RAM anti-cheat health + OIDC bridge contract.');
