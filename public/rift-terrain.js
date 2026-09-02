@@ -497,6 +497,7 @@ export class RiftTerrain {
     const step = Math.max(1, Math.trunc(lodStep));
     const neighbors = neighborLods || { north: step, east: step, south: step, west: step };
     const build = NATIVE.rift_terrain_build_section || NATIVE.rift_terrain_build_chunk;
+    const nativeBuildStarted = performance.now();
     const ok = NATIVE.rift_terrain_build_section
       ? build(
           Math.trunc(sectionX),
@@ -510,6 +511,8 @@ export class RiftTerrain {
         )
       : build(Math.trunc(sectionX), Math.trunc(sectionZ), this.sectionSize, step);
     assertNative(ok, `RiftCore could not build terrain section ${sectionX}:${sectionZ}.`);
+    const nativeBuildMs = performance.now() - nativeBuildStarted;
+    const copyStarted = performance.now();
 
     const vertexFloatCount = NATIVE.rift_mesh_vertex_float_count();
     const indexCount = NATIVE.rift_mesh_index_count();
@@ -518,7 +521,9 @@ export class RiftTerrain {
     const vertices = new Float32Array(vertexView);
     const vertexCount = vertices.length / 9;
     const indices = vertexCount > 65535 ? new Uint32Array(indexView) : Uint16Array.from(indexView);
+    const copyMs = performance.now() - copyStarted;
     return {
+      buildTelemetry: { nativeBuildMs, copyMs, vertexBytes: vertices.byteLength, indexBytes: indices.byteLength },
       id: `terrain-section-${sectionX}-${sectionZ}`,
       sectionX,
       sectionZ,

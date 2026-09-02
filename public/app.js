@@ -1,11 +1,11 @@
 import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260901-engine-blackbox-r1';
-import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-lock-r1';
+import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-profiler-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 
-const APP_DIAGNOSTIC_BUILD = '20260901-sprint-speed-r2';
+const APP_DIAGNOSTIC_BUILD = '20260901-terrain-profiler-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -147,7 +147,76 @@ let hardLockEnabled = false;
 let viewportCameraProfile = '';
 let diagnosticFrameCounter = 0;
 const diagnosticFrameTimings = { sampleEveryFrames: 15, samples: 0, movementMs: 0, animationMs: 0, cameraMs: 0, terrainLodMs: 0, reticleMs: 0, renderMs: 0, totalMs: 0, maxTotalMs: 0 };
+const TERRAIN_EDIT_PERF_FORMAT = 'ironvale-terrain-edit-performance-v1';
+const TERRAIN_EDIT_SAMPLE_LIMIT = 256;
+const terrainEditSamples = [];
+let terrainEditSequence = 0;
 const combatTargets = new Map();
+
+function terrainEditRound(value) { return Math.round((Math.max(0, Number(value) || 0) + Number.EPSILON) * 1000) / 1000; }
+function terrainEditPercentile(values, percentile) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((percentile / 100) * sorted.length) - 1));
+  return terrainEditRound(sorted[index]);
+}
+function recordTerrainEditSample(sample = {}) {
+  const normalized = {
+    sequence: ++terrainEditSequence,
+    at: new Date().toISOString(),
+    mode: String(sample.mode || 'unknown'),
+    continuous: Boolean(sample.continuous),
+    radius: Number(sample.radius) || 0,
+    mutationMs: terrainEditRound(sample.mutationMs),
+    nativeMeshBuildMs: terrainEditRound(sample.nativeMeshBuildMs),
+    meshCopyMs: terrainEditRound(sample.meshCopyMs),
+    meshBuildWallMs: terrainEditRound(sample.meshBuildWallMs),
+    gpuUploadSubmitMs: terrainEditRound(sample.gpuUploadSubmitMs),
+    visibilityMs: terrainEditRound(sample.visibilityMs),
+    totalMs: terrainEditRound(sample.totalMs),
+    dirtySections: Math.max(0, Math.trunc(Number(sample.dirtySections) || 0)),
+    rebuiltSections: Math.max(0, Math.trunc(Number(sample.rebuiltSections) || 0)),
+    skippedUnstreamedSections: Math.max(0, Math.trunc(Number(sample.skippedUnstreamedSections) || 0)),
+    vertexBytes: Math.max(0, Math.trunc(Number(sample.vertexBytes) || 0)),
+    indexBytes: Math.max(0, Math.trunc(Number(sample.indexBytes) || 0)),
+    bytesUploaded: Math.max(0, Math.trunc(Number(sample.bytesUploaded) || 0))
+  };
+  terrainEditSamples.push(normalized);
+  if (terrainEditSamples.length > TERRAIN_EDIT_SAMPLE_LIMIT) terrainEditSamples.splice(0, terrainEditSamples.length - TERRAIN_EDIT_SAMPLE_LIMIT);
+  return normalized;
+}
+function terrainEditPerformanceStatus(deep = false) {
+  const metrics = ['totalMs','mutationMs','nativeMeshBuildMs','meshCopyMs','meshBuildWallMs','gpuUploadSubmitMs','visibilityMs'];
+  const percentiles = {};
+  for (const metric of metrics) {
+    const values = terrainEditSamples.map(sample => Number(sample[metric]) || 0);
+    percentiles[metric] = { p50: terrainEditPercentile(values, 50), p95: terrainEditPercentile(values, 95), p99: terrainEditPercentile(values, 99), max: terrainEditRound(values.length ? Math.max(...values) : 0) };
+  }
+  const totals = terrainEditSamples.reduce((out, sample) => {
+    out.dirtySections += sample.dirtySections; out.rebuiltSections += sample.rebuiltSections; out.skippedUnstreamedSections += sample.skippedUnstreamedSections;
+    out.vertexBytes += sample.vertexBytes; out.indexBytes += sample.indexBytes; out.bytesUploaded += sample.bytesUploaded;
+    return out;
+  }, { dirtySections: 0, rebuiltSections: 0, skippedUnstreamedSections: 0, vertexBytes: 0, indexBytes: 0, bytesUploaded: 0 });
+  return {
+    format: TERRAIN_EDIT_PERF_FORMAT,
+    sampleCount: terrainEditSamples.length,
+    sampleLimit: TERRAIN_EDIT_SAMPLE_LIMIT,
+    continuousBrushIntervalMs: CONTINUOUS_BRUSH_MS,
+    last: terrainEditSamples.at(-1) || null,
+    percentiles,
+    totals,
+    instrumentation: {
+      nativeMutation: true,
+      nativeMeshBuild: true,
+      wasmToJsCopy: true,
+      gpuUploadSubmission: true,
+      dirtySections: true,
+      bytesUploaded: true,
+      note: 'gpuUploadSubmitMs measures CPU-side WebGL buffer upload submission, not completed GPU execution time.'
+    },
+    ...(deep ? { recent: terrainEditSamples.slice(-64) } : {})
+  };
+}
 
 const player = { x: 320, y: .9, z: 320, yaw: 0, vy: 0, grounded: true };
 const orbitCamera = { yaw: Math.PI, pitch: .34, distance: DEFAULT_ORBIT_DISTANCE, fov: Math.PI / 3 };
@@ -350,6 +419,7 @@ const diagnostics = new RiftDiagnostics({
 diagnostics.registerProvider('engine', level => engine?.getDiagnostics?.(level >= 3) || { ready: false, boot: getRiftEngineBootTelemetry() });
 diagnostics.registerProvider('native', level => terrain?.getNativeDiagnostics?.(level >= 3) || null);
 diagnostics.registerProvider('movement-mode', () => movementModeStatus());
+diagnostics.registerProvider('terrain-edit-performance', level => terrainEditPerformanceStatus(level >= 3));
 
 window.IronvaleDiagnostics = Object.freeze({
   validate: () => diagnostics.runValidation('api'),
@@ -691,7 +761,8 @@ function buildDiagnosticChecks() {
     diagnosticCheck('terrain.lod-plan', terrainLodPlan.size > 0, terrainLodPlan.size + ' planned sections'),
     diagnosticCheck('terrain.streaming', Boolean(terrainStreamPlan?.render?.size), (terrainStreamPlan?.render?.size || 0) + ' render components'),
     diagnosticCheck('character.visual', Boolean(playerMesh), playerCharacter?.meshes?.length ? 'Rigged visual active' : playerMesh ? 'Fallback/player visual active' : 'No player visual'),
-    diagnosticCheck('player.movement-mode', Boolean(sprintButton) && typeof window.IronvaleMovementMode?.status === 'function', `walk ${WALK_SPEED_MPS}m/s · sprint ${SPRINT_SPEED_MPS}m/s · auto-run hold ${AUTO_RUN_HOLD_MS}ms`)
+    diagnosticCheck('player.movement-mode', Boolean(sprintButton) && typeof window.IronvaleMovementMode?.status === 'function', `walk ${WALK_SPEED_MPS}m/s · sprint ${SPRINT_SPEED_MPS}m/s · auto-run hold ${AUTO_RUN_HOLD_MS}ms`),
+    diagnosticCheck('terrain.edit-profiler', typeof terrainEditPerformanceStatus === 'function', `${terrainEditSamples.length} terrain edit timing sample(s) captured`)
   );
   return checks;
 }
@@ -740,10 +811,10 @@ async function buildDiagnosticSnapshot(level = 1) {
     player: { x: player.x, y: player.y, z: player.z, yaw: player.yaw, vy: player.vy, grounded: player.grounded, moving: playerMoving, sprinting: playerSprinting, sprintEnabled, autoRun: autoRunEnabled, movementSpeedMps: playerSprinting ? SPRINT_SPEED_MPS : playerMoving ? WALK_SPEED_MPS : 0 },
     character: {
       rigged: Boolean(playerCharacter?.meshes?.length), meshCount: playerCharacter?.meshes?.length || (playerMesh ? 1 : 0),
-      rig: playerRig ? { renderHeight: playerRig.renderHeight, renderScale: playerRig.renderScale, feetAtY: playerRig.feetAtY, jointCount: playerRig.jointCount, animationClipCount: playerRig.animationClipCount, authoredForward: playerRig.authoredForward } : null
+      rig: playerRig ? { renderHeight: playerRig.renderHeight, renderScale: playerRig.renderScale, feetAtY: playerRig.feetAtY, jointCount: playerRig.jointCount, animationClipCount: playerRig.animationClipCount, authoredForward: playerRig.authoredForward, defaultClips: playerRig.defaultClips ? { ...playerRig.defaultClips } : null } : null
     },
     camera: { orbit: { ...orbitCamera }, freecam: { ...freecam }, lastPosition: [...lastCameraPosition], lastTarget: [...lastCameraTarget], profile: viewportCameraProfile },
-    performance: { averageFrameMs: terrainPerfAverageMs, approximateFps: terrainPerfAverageMs > 0 ? 1000 / terrainPerfAverageMs : null, mobileLandscape: isMobileLandscapeGameplay(), subsystemTimings: { ...diagnosticFrameTimings } },
+    performance: { averageFrameMs: terrainPerfAverageMs, approximateFps: terrainPerfAverageMs > 0 ? 1000 / terrainPerfAverageMs : null, mobileLandscape: isMobileLandscapeGameplay(), subsystemTimings: { ...diagnosticFrameTimings }, terrainEdit: terrainEditPerformanceStatus(false) },
     editor: { freecamEnabled, brushMode, undoDepth: undoStack.length, redoDepth: redoStack.length, reticleHit, terrainDebugEnabled },
     browser: { language: navigator.language, hardwareConcurrency: navigator.hardwareConcurrency || null, deviceMemory: navigator.deviceMemory || null, online: navigator.onLine }
   };
@@ -778,6 +849,7 @@ async function buildDiagnosticSnapshot(level = 1) {
     resourceTiming: resources,
     loadedModules: resources.filter(entry => /(?:app|rift-[^/]+|styles)\.(?:js|css)/.test(entry.name)),
     targeting: { registeredTargets: combatTargets.size, selectedTargetId, hardLockEnabled },
+    terrainEditPerformance: terrainEditPerformanceStatus(true),
     diagnosticsExtensibility: { registeredProviders: [...diagnostics.providers.keys()], assetAndSceneProvidersSupported: true },
     moduleContracts: { appBuild: APP_DIAGNOSTIC_BUILD, terrainDraft: 'v4', landscape: worldDocument?.terrain?.landscape?.format || null, scale: worldDocument?.scale?.format || null, diagnostics: 'ironvale-diagnostics-v2', engineTelemetry: 'rift-engine-telemetry-v1', nativeTelemetry: 'riftcore-native-diagnostics-v1' }
   };
@@ -904,6 +976,8 @@ function stopWorld() {
   terrainPerfFrameMs = 0;
   terrainPerfAverageMs = 0;
   diagnosticFrameCounter = 0;
+  terrainEditSamples.length = 0;
+  terrainEditSequence = 0;
   for (const key of Object.keys(diagnosticFrameTimings)) if (key !== 'sampleEveryFrames') diagnosticFrameTimings[key] = 0;
   lastTerrainLodRefresh = 0;
   playerMesh = null;
@@ -991,36 +1065,42 @@ function updateTerrainMeshVisibility(now = performance.now()) {
 }
 
 function buildTerrainSection(section, plan = terrainLodPlan, force = false) {
-  if (!engine || !terrain || !section) return;
+  if (!engine || !terrain || !section) return { built: false };
   const key = section.key;
   const neighbors = terrain.sectionNeighborLods(plan, section.sectionX, section.sectionZ, section.lodStep);
   const signature = sectionSignature(section, neighbors);
   const existing = terrainMeshes.get(key);
-  if (!force && existing?.signature === signature) return;
+  if (!force && existing?.signature === signature) return { built: false };
 
-  const entry = terrain.buildSurfaceSectionGeometry(
-    section.sectionX,
-    section.sectionZ,
-    section.lodStep,
-    neighbors
-  );
+  const geometryStarted = performance.now();
+  const entry = terrain.buildSurfaceSectionGeometry(section.sectionX, section.sectionZ, section.lodStep, neighbors);
+  const meshBuildWallMs = performance.now() - geometryStarted;
+  const geometry = entry.geometry || entry;
+  const vertexBytes = Number(geometry?.vertices?.byteLength) || 0;
+  const indexBytes = Number(geometry?.indices?.byteLength) || 0;
+  const uploadStarted = performance.now();
   if (existing?.mesh) {
-    engine.updateMesh(existing.mesh, entry.geometry || entry);
+    engine.updateMesh(existing.mesh, geometry);
     terrainMaterialRuntime?.attach(existing.mesh);
     existing.lodStep = section.lodStep;
     existing.signature = signature;
     existing.componentId = section.componentId;
     existing.triangles = Number(entry.triangles) || 0;
   } else {
-    const mesh = engine.addMesh(entry.geometry || entry, { kind: 'terrain', label: key, terrainMaterial: terrainMaterialRuntime?.material || null });
-    terrainMeshes.set(key, {
-      mesh,
-      lodStep: section.lodStep,
-      signature,
-      componentId: section.componentId,
-      triangles: Number(entry.triangles) || 0
-    });
+    const mesh = engine.addMesh(geometry, { kind: 'terrain', label: key, terrainMaterial: terrainMaterialRuntime?.material || null });
+    terrainMeshes.set(key, { mesh, lodStep: section.lodStep, signature, componentId: section.componentId, triangles: Number(entry.triangles) || 0 });
   }
+  const gpuUploadSubmitMs = performance.now() - uploadStarted;
+  return {
+    built: true,
+    nativeMeshBuildMs: Number(entry.buildTelemetry?.nativeBuildMs) || 0,
+    meshCopyMs: Number(entry.buildTelemetry?.copyMs) || 0,
+    meshBuildWallMs,
+    gpuUploadSubmitMs,
+    vertexBytes,
+    indexBytes,
+    bytesUploaded: vertexBytes + indexBytes
+  };
 }
 
 function rebuildTerrainMeshes() {
@@ -1081,15 +1161,27 @@ function updateTerrainLod(now = performance.now(), force = false) {
 }
 
 function rebuildDirtyTerrainSections() {
-  if (!engine || !terrain) return;
+  const profile = { dirtySections: 0, rebuiltSections: 0, skippedUnstreamedSections: 0, nativeMeshBuildMs: 0, meshCopyMs: 0, meshBuildWallMs: 0, gpuUploadSubmitMs: 0, visibilityMs: 0, vertexBytes: 0, indexBytes: 0, bytesUploaded: 0 };
+  if (!engine || !terrain) return profile;
   if (!terrainLodPlan.size) terrainLodPlan = terrain.planSectionLods(player.x, player.z);
   if (!terrainStreamPlan) refreshTerrainStreamPlan(player.x, player.z);
   const dirty = terrain.consumeDirtySections();
+  profile.dirtySections = dirty.length;
   for (const key of dirty) {
     const section = terrainLodPlan.get(key);
-    if (section && sectionIsStreamed(section)) buildTerrainSection(section, terrainLodPlan, true);
+    if (!section || !sectionIsStreamed(section)) { profile.skippedUnstreamedSections += 1; continue; }
+    const built = buildTerrainSection(section, terrainLodPlan, true) || {};
+    if (!built.built) continue;
+    profile.rebuiltSections += 1;
+    for (const metric of ['nativeMeshBuildMs','meshCopyMs','meshBuildWallMs','gpuUploadSubmitMs']) profile[metric] += Number(built[metric]) || 0;
+    profile.vertexBytes += Number(built.vertexBytes) || 0;
+    profile.indexBytes += Number(built.indexBytes) || 0;
+    profile.bytesUploaded += Number(built.bytesUploaded) || 0;
   }
+  const visibilityStarted = performance.now();
   updateTerrainMeshVisibility();
+  profile.visibilityMs = performance.now() - visibilityStarted;
+  return profile;
 }
 
 function rebuildTerrainArea(x, z, radius) {
@@ -1749,40 +1841,37 @@ function applySingleBrushStamp() {
 
 function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately = false) {
   if (!terrain || !reticleHit) return;
+  const stampStarted = performance.now();
   const radius = Number(radiusInput.value);
   const strength = Number(strengthInput.value) * strengthScale;
+  let mutationMs = 0;
+  let rebuild = null;
+  const continuous = !saveImmediately && Boolean(gesture?.mode === 'sculpt');
 
   if (brushMode === 'paint' || brushMode === 'erase-material') {
-    const painted = terrain.paintMaterial?.({
-      layerId: terrain.activeMaterialLayerId,
-      x: reticleHit.x,
-      z: reticleHit.z,
-      radius,
-      strength: Math.min(1, Math.max(0.01, strength * 0.35)),
-      erase: brushMode === 'erase-material'
-    });
+    const mutationStarted = performance.now();
+    const painted = terrain.paintMaterial?.({ layerId: terrain.activeMaterialLayerId, x: reticleHit.x, z: reticleHit.z, radius, strength: Math.min(1, Math.max(0.01, strength * 0.35)), erase: brushMode === 'erase-material' });
+    mutationMs = performance.now() - mutationStarted;
     if (!painted) return;
-    rebuildDirtyTerrainSections();
+    rebuild = rebuildDirtyTerrainSections();
     updateReticleTarget();
+    const sample = recordTerrainEditSample({ mode: brushMode, continuous, radius, mutationMs, ...rebuild, totalMs: performance.now() - stampStarted });
     if (saveImmediately) saveDraftSilently();
-    terrainStatus.textContent = `RiftLandscape · ${terrain.activeMaterialLayer?.name || 'Material'} ${brushMode === 'erase-material' ? 'erase' : 'paint'} · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
+    terrainStatus.textContent = 'RiftLandscape · ' + (terrain.activeMaterialLayer?.name || 'Material') + ' ' + (brushMode === 'erase-material' ? 'erase' : 'paint') + ' · edit ' + terrain.revision + ' · ' + (lodSummary() || 'adaptive LOD') + ' · edit ' + sample.totalMs.toFixed(1) + 'ms';
     return;
   }
 
-  const brush = {
-    mode: brushMode,
-    x: reticleHit.x,
-    z: reticleHit.z,
-    radius,
-    strength
-  };
+  const brush = { mode: brushMode, x: reticleHit.x, z: reticleHit.z, radius, strength };
   if (brushMode === 'flatten') brush.targetHeight = Number.isFinite(flattenY) ? flattenY : reticleHit.y;
+  const mutationStarted = performance.now();
   terrain.applyBrush(brush);
-  rebuildDirtyTerrainSections();
+  mutationMs = performance.now() - mutationStarted;
+  rebuild = rebuildDirtyTerrainSections();
   snapPlayerToSupport();
   updateReticleTarget();
+  const sample = recordTerrainEditSample({ mode: brushMode, continuous, radius, mutationMs, ...rebuild, totalMs: performance.now() - stampStarted });
   if (saveImmediately) saveDraftSilently();
-  terrainStatus.textContent = `RiftLandscape · ${terrain.activeEditLayer?.name || 'Sculpt'} · edit ${terrain.revision} · ${lodSummary() || 'adaptive LOD'}`;
+  terrainStatus.textContent = 'RiftLandscape · ' + (terrain.activeEditLayer?.name || 'Sculpt') + ' · edit ' + terrain.revision + ' · ' + (lodSummary() || 'adaptive LOD') + ' · edit ' + sample.totalMs.toFixed(1) + 'ms';
 }
 
 function updateReticleVisual() {

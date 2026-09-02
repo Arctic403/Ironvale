@@ -1,4 +1,4 @@
-import { RiftTerrain } from './rift-terrain.js?v=20260831-landscape-v2';
+import { RiftTerrain } from './rift-terrain.js?v=20260901-terrain-profiler-r1';
 
 export const RIFT_LANDSCAPE_FORMAT = 'rift-landscape-v3';
 export const RIFT_LANDSCAPE_EDIT_FORMAT = 'rift-landscape-edits-v2';

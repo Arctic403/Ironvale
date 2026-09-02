@@ -260,7 +260,13 @@ async function buildGuardChecks(instance) {
   const expectedSections = Number(stats.surfaceSections) || 0;
   const meshes = Number(runtime.terrain?.meshCount) || 0;
   const lodPlan = Number(runtime.terrain?.lodPlanSize) || 0;
-  if (expectedSections) checks.push(passFail('terrain.section-coverage', meshes === expectedSections && lodPlan === expectedSections, `${meshes}/${expectedSections} meshes · ${lodPlan}/${expectedSections} LOD entries`));
+  const renderedComponents = Array.isArray(runtime.terrain?.streamPlan?.render) ? runtime.terrain.streamPlan.render.length : 0;
+  const sectionsPerComponent = Math.max(1, Number(stats.sectionsPerComponent) || 1);
+  const expectedStreamedMeshes = renderedComponents > 0 ? Math.min(expectedSections, renderedComponents * sectionsPerComponent * sectionsPerComponent) : expectedSections;
+  if (expectedSections) {
+    const coverageOk = lodPlan === expectedSections && meshes === expectedStreamedMeshes;
+    checks.push(passFail('terrain.section-coverage', coverageOk, meshes + '/' + expectedStreamedMeshes + ' streamed meshes · ' + lodPlan + '/' + expectedSections + ' LOD entries · ' + (renderedComponents || 'all') + ' render component(s)'));
+  }
 
   const viewport = runtime.renderer?.viewport || null;
   const viewportOk = viewport && Number(viewport.cssWidth) > 0 && Number(viewport.cssHeight) > 0 && Number(viewport.width) > 0 && Number(viewport.height) > 0 && Number(viewport.aspect) > 0;
