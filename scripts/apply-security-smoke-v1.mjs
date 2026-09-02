@@ -9,12 +9,6 @@ function replaceOnce(source, before, after, label) {
   if (count !== 1) throw new Error(`Security smoke patch ${label}: expected 1 match, found ${count}`);
   return source.replace(before, after);
 }
-function replaceExpected(source, before, after, expected, label) {
-  if (source.includes(after) && !source.includes(before)) return source;
-  const count = source.split(before).length - 1;
-  if (count !== expected) throw new Error(`Security smoke patch ${label}: expected ${expected} matches, found ${count}`);
-  return source.split(before).join(after);
-}
 
 let worker = read('src/realtime-entry.js');
 worker = replaceOnce(worker,
@@ -95,14 +89,20 @@ worker = replaceOnce(worker,
 write('src/realtime-entry.js', worker);
 
 let auto = read('public/rift-auto-validation.js');
-auto = replaceExpected(auto,
+auto = replaceOnce(auto,
 `  postValidation: null,
   evidence:`,
 `  postValidation: null,
   securitySmoke: null,
   evidence:`,
-2,
 'auto state security smoke');
+auto = replaceOnce(auto,
+`  state.postValidation = null;
+  state.evidence = { captures: 0, failed: 0, totalBytes: 0, files: [] };`,
+`  state.postValidation = null;
+  state.securitySmoke = null;
+  state.evidence = { captures: 0, failed: 0, totalBytes: 0, files: [] };`,
+'auto reset security smoke');
 
 auto = replaceOnce(auto,
 `    await runStep('backend health + network telemetry', async () => {`,
