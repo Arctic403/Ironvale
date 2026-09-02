@@ -44,13 +44,13 @@
     },
     {
       "path": "/rift-diagnostic-hooks.js",
-      "sha256": "b4f46555991fd91a8bdc3ee5d425b896c3e861383b71d0956b545ec270d47a6d",
-      "size": 15820
+      "sha256": "f964408edfe29643541959053fdc734e15a7523f02073ea07f2653862323eb97",
+      "size": 15827
     },
     {
       "path": "/rift-diagnostics.js",
-      "sha256": "345ad47e44da12ad61c5ec642421377aeb0bd212c07bba4d7cf5f187ad67ec52",
-      "size": 19801
+      "sha256": "32bbab9ffc81fc99cef3356ce9f5dd635def9a438efc793ec14ad26ff7f2b477",
+      "size": 19815
     },
     {
       "path": "/rift-engine.js",
@@ -108,7 +108,7 @@
       "size": 21389
     }
   ],
-  "buildId": "iv-0507e21310e707667318786c",
-  "digest": "0507e21310e707667318786cb5cdf073cbffc001df4fecade6ec8bb015354715",
+  "buildId": "iv-65b0a26f7241f11d22bca1f8",
+  "digest": "65b0a26f7241f11d22bca1f84a91c266550267f0b87ca59a3e55aa78ddaa1dda",
   "fileCount": 21
 }

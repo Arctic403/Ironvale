@@ -8,7 +8,7 @@ const MAX_EVENTS = 160;
 const MAX_NETWORK_EVENTS = 120;
 const MAX_CONSOLE_EVENTS = 120;
 const MAX_STRING = 120000;
-const REDACTED_KEY = /(?:password|passphrase|(?:access|refresh|auth|id)[-_]?token|token|(?:api|private|client)[-_]?secret|secret|authorization|cookie|session(?:[-_]?(?:id|key|token))?|credentials?|api[-_]?key)$/i;
+const REDACTED_KEY = /(?:password|passphrase|(?:access|refresh|auth|id)[-_]?token|token|ticket|(?:api|private|client)[-_]?secret|secret|authorization|cookie|session(?:[-_]?(?:id|key|token))?|credentials?|api[-_]?key)$/i;
 
 function isoNow() { return new Date().toISOString(); }
 function levelName(level) { return level === 1 ? 'quick' : level === 2 ? 'runtime' : 'deep'; }
@@ -36,7 +36,7 @@ function sanitizeUrl(raw) {
 function sanitizeString(value) {
   let text = String(value);
   if (text.length > MAX_STRING) text = text.slice(0, MAX_STRING) + '…[truncated]';
-  text = text.replace(/((?:password|passphrase|(?:access|refresh|auth|id)[-_]?token|token|(?:api|private|client)[-_]?secret|secret|cookie|authorization|session(?:[-_]?(?:id|key|token))?|credentials?|api[-_]?key)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1[REDACTED]');
+  text = text.replace(/((?:password|passphrase|(?:access|refresh|auth|id)[-_]?token|token|ticket|(?:api|private|client)[-_]?secret|secret|cookie|authorization|session(?:[-_]?(?:id|key|token))?|credentials?|api[-_]?key)\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1[REDACTED]');
   text = text.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+/gi, 'Bearer [REDACTED]');
   text = text.replace(/https?:\/\/[^\s"'<>]+/gi, match => sanitizeUrl(match));
   return text;

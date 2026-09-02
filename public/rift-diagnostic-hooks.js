@@ -48,7 +48,7 @@ function safeUrl(raw) {
     url.username = '';
     url.password = '';
     for (const key of [...url.searchParams.keys()]) {
-      if (/(?:token|secret|password|auth|session|key)/i.test(key)) url.searchParams.set(key, '[REDACTED]');
+      if (/(?:token|ticket|secret|password|auth|session|key)/i.test(key)) url.searchParams.set(key, '[REDACTED]');
     }
     return url.href;
   } catch (_) { return text(raw, 500); }
