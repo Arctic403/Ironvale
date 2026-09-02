@@ -1,3 +1,4 @@
+# final retry after verifier alignment
 name: Apply Security Smoke v1
 
 on:
