@@ -1,4 +1,4 @@
-// retry v4 after verifier cache-tag updates
+// retry v5 after dynamic RAM verifier fix
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
