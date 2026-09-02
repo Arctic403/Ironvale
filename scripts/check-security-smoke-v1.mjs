@@ -25,6 +25,8 @@ for (const token of [
 
 assert(worker.indexOf("url.pathname === '/api/anticheat/session-status'") < worker.indexOf("url.pathname.startsWith('/api/anticheat/')"), 'self-only session status must route before reviewer API');
 assert(worker.includes('verifyIntegrityTransport(request, auth)'), 'session status must require integrity ticket');
+assert(!/riskScore\s*:/.test(worker.match(/antiCheatStatus\(request\)[\s\S]*?\n\s*async connect\(request\)/)?.[0] || ''), 'self-session status must not expose bot risk score');
+assert(!/signals\s*:/.test(worker.match(/antiCheatStatus\(request\)[\s\S]*?\n\s*async connect\(request\)/)?.[0] || ''), 'self-session status must not expose bot signals');
 
 for (const token of [
   "'security authority + anti-cheat session'",
@@ -33,7 +35,9 @@ for (const token of [
   "registerProvider('security-smoke'",
   'securitySmoke: state.securitySmoke',
   'exercisesSecurityAuthoritySmoke: true',
-  'capturesSecuritySmokeInL3: true'
+  'capturesSecuritySmokeInL3: true',
+  'exposesRiskScoreToClient: false',
+  'exposesBotSignalsToClient: false'
 ]) assert(auto.includes(token), `auto validation missing ${token}`);
 
 for (const id of [
@@ -58,4 +62,4 @@ assert(build.includes('node scripts/check-security-smoke-v1.mjs'), 'core build m
 assert(!fs.existsSync('scripts/apply-security-smoke-v1.mjs'), 'temporary security smoke patcher must be removed');
 assert(!fs.existsSync('.github/workflows/apply-security-smoke-v1.yml'), 'temporary security smoke workflow must be removed');
 
-console.log('Ironvale Security Smoke v1 verified: validator + full auto smoke + L3 provider + self-only dynamic RAM anti-cheat health + OIDC bridge contract.');
+console.log('Ironvale Security Smoke v1 verified: validator + full auto smoke + L3 provider + self-only dynamic RAM anti-cheat health + OIDC bridge contract + client privacy boundary.');
