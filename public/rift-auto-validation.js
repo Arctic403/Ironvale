@@ -4,6 +4,25 @@ const MOVE_SLICE_MS = 260;
 const SYNTHETIC_POINTER_ID = 9157;
 const SCREENSHOT_MAX_WIDTH = 720;
 const SCREENSHOT_QUALITY = 0.78;
+const TERRAIN_DRAFT_KEY = 'ironvale:terrain:draft:v4';
+
+function captureDraftBaseline() {
+  try {
+    const value = localStorage.getItem(TERRAIN_DRAFT_KEY);
+    return { present: value !== null, value: value ?? '', error: null };
+  } catch (error) {
+    return { present: false, value: '', error: String(error?.message || error || 'draft capture failed') };
+  }
+}
+
+function restoreDraftBaseline(baseline) {
+  if (!baseline || baseline.error) return false;
+  try {
+    if (baseline.present) localStorage.setItem(TERRAIN_DRAFT_KEY, baseline.value);
+    else localStorage.removeItem(TERRAIN_DRAFT_KEY);
+    return true;
+  } catch (_) { return false; }
+}
 
 const state = {
   format: AUTO_VALIDATION_FORMAT,
@@ -417,6 +436,7 @@ async function runFullAutoValidation() {
   button.textContent = 'Running Full Auto Test…';
   const uiBaseline = captureUiBaseline();
   const playerBaseline = window.IronvalePlayerState?.capture?.('auto-validation') || null;
+  let draftBaseline = null;
   diagnosticsRecord('Full auto validation started', { runId: state.runId, format: AUTO_VALIDATION_FORMAT });
 
   try {
@@ -428,6 +448,8 @@ async function runFullAutoValidation() {
 
     await runStep('baseline integrity snapshot', async () => {
       if (!window.IronvaleValidatorGuard?.captureIntegrity) throw new Error('Validator guard unavailable');
+      draftBaseline = captureDraftBaseline();
+      if (draftBaseline.error) throw new Error('Terrain draft baseline unavailable: ' + draftBaseline.error);
       state.baselineIntegrity = await window.IronvaleValidatorGuard.captureIntegrity();
       return `terrain=${String(state.baselineIntegrity.terrainHash).slice(0, 12)} · undo=${state.baselineIntegrity.editor.undoDepth} redo=${state.baselineIntegrity.editor.redoDepth}`;
     });
@@ -670,6 +692,7 @@ async function runFullAutoValidation() {
     });
 
     await restoreUiBaseline(uiBaseline);
+    if (!restoreDraftBaseline(draftBaseline)) throw new Error('Unable to restore exact terrain draft baseline');
     state.playerRestoration = await restorePlayerBaseline(playerBaseline);
     await runStep('post-test restoration integrity', async () => {
       if (!state.baselineIntegrity || !window.IronvaleValidatorGuard?.captureIntegrity) throw new Error('Baseline integrity snapshot unavailable');
@@ -700,6 +723,11 @@ async function runFullAutoValidation() {
     try { await restoreUiBaseline(uiBaseline); } catch (error) {
       state.warn += 1;
       state.steps.push({ name: 'restore UI baseline', status: 'warn', durationMs: 0, detail: shortError(error), screenshot: null });
+      state.status = strongestStatus(state.status, 'warn');
+    }
+    if (draftBaseline && !restoreDraftBaseline(draftBaseline)) {
+      state.warn += 1;
+      state.steps.push({ name: 'restore terrain draft baseline', status: 'warn', durationMs: 0, detail: 'Exact local terrain draft restore failed', screenshot: null });
       state.status = strongestStatus(state.status, 'warn');
     }
     state.completedAt = nowIso();

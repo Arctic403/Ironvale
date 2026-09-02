@@ -9,8 +9,8 @@
     },
     {
       "path": "/index.html",
-      "sha256": "e4433101c043c60f453d08577411b9e11c792df9c6c41376bc1ba3ddd5e2a0bf",
-      "size": 10081
+      "sha256": "2b1fbb5085e148494e570ef525c2e1aeed01bbdd9f6378fc5e57bc53682aa5dc",
+      "size": 10080
     },
     {
       "path": "/rift-architecture-guard.js",
@@ -24,8 +24,8 @@
     },
     {
       "path": "/rift-auto-validation.js",
-      "sha256": "db739d989c5cca69b7135b103b500e45a688d0066597d6dbf6a2180421e3fa7f",
-      "size": 46283
+      "sha256": "c0ce8fcf3bc255ecf516ac03ab90d976384adf28e00ee3f594d83372e4659a47",
+      "size": 47554
     },
     {
       "path": "/rift-character.js",
@@ -108,7 +108,7 @@
       "size": 23183
     }
   ],
-  "buildId": "iv-849d87ffe72602fded806acc",
-  "digest": "849d87ffe72602fded806acc5d56fbccebf858da6a9847c11a164adc69b45f95",
+  "buildId": "iv-e1608c55c406f74dcd0cf969",
+  "digest": "e1608c55c406f74dcd0cf969a917edb7d403f51316ed6656262841744e35198e",
   "fileCount": 21
 }
