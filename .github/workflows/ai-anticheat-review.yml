@@ -16,13 +16,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Fetch live anti-cheat evidence with GitHub OIDC
+      - name: Fetch live security and anti-cheat evidence with GitHub OIDC
         shell: bash
         env:
           BASE_URL: https://riftcityv1.kc-campbell132.workers.dev
         run: |
           set -euo pipefail
           mkdir -p anticheat-review/details
+
+          curl -fsSL "$BASE_URL/api/health" > anticheat-review/health.json
+          jq -e '.ok == true and .service == "ironvale-core" and .database == "connected"' anticheat-review/health.json >/dev/null
+
+          curl -fsSL "$BASE_URL/ironvale-integrity-manifest.json" > anticheat-review/integrity-manifest.json
+          jq -e '.format == "ironvale-integrity-manifest-v1" and (.buildId | startswith("iv-")) and (.files | length) == 21' anticheat-review/integrity-manifest.json >/dev/null
+
+          self_status=""
+          for attempt in $(seq 1 12); do
+            self_status="$(curl -sS -o anticheat-review/self-session-denied.json -w '%{http_code}' "$BASE_URL/api/anticheat/session-status")"
+            if [ "$self_status" = "401" ]; then
+              break
+            fi
+            echo "Live Worker not ready for self-session security route yet: HTTP $self_status (attempt $attempt/12)"
+            sleep 5
+          done
+          test "$self_status" = "401"
+          jq -e '.ok == false and .error == "Authentication required"' anticheat-review/self-session-denied.json >/dev/null
 
           token_response="$(curl -fsSL \
             -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
@@ -42,8 +60,10 @@ jobs:
             sleep 5
           done
           test "$summary_ok" -eq 1
+          jq -e '.ok == true and .format == "ironvale-anticheat-review-summary-v1" and .policy.automaticBan == false and .policy.aiAuthority == "recommendation-only" and .policy.ramAuthority == "final"' anticheat-review/summary.json >/dev/null
 
           curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/cases?status=all&minRisk=30&limit=50" > anticheat-review/cases.json
+          jq -e '.ok == true and .format == "ironvale-anticheat-case-list-v1"' anticheat-review/cases.json >/dev/null
 
           jq -r '.cases[] | select(.riskScore >= 60) | .id' anticheat-review/cases.json | head -n 10 | while IFS= read -r case_id; do
             test -n "$case_id" || continue
@@ -51,6 +71,15 @@ jobs:
             curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/cases/$case_id" > "anticheat-review/details/$safe_id.json"
           done
 
+          jq -n \
+            --arg checkedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg buildId "$(jq -r '.buildId' anticheat-review/integrity-manifest.json)" \
+            --argjson selfSessionUnauthorizedStatus "$self_status" \
+            '{format:"ironvale-live-security-smoke-v1",checkedAt:$checkedAt,health:true,integrityManifest:true,buildId:$buildId,selfSessionUnauthorizedStatus:$selfSessionUnauthorizedStatus,oidcReviewer:true}' \
+            > anticheat-review/live-security-smoke.json
+
+          echo '=== Ironvale live security smoke ==='
+          jq -c . anticheat-review/live-security-smoke.json
           echo '=== Ironvale AI anti-cheat live summary ==='
           jq -c '{format,policy,groups}' anticheat-review/summary.json
           echo '=== Cases risk >= 30 ==='
