@@ -1,6 +1,6 @@
 name: Ironvale Core Verification
 
-# npm run build includes the permanent exact local terrain-draft restoration verifier.
+# npm run build includes exact terrain-draft restoration and scalable zone-authority regression verifiers.
 on:
   push:
     branches: [main]
