@@ -1,0 +1,47 @@
+name: Apply Zone Authority v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-zone-authority-v1.mjs'
+      - '.github/workflows/apply-zone-authority-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply zone authority and remove staging
+        run: |
+          node scripts/apply-zone-authority-v1.mjs
+          rm scripts/apply-zone-authority-v1.mjs
+          rm .github/workflows/apply-zone-authority-v1.yml
+
+      - name: Verify full core
+        run: npm run build
+
+      - name: Verify Wrangler Durable Object config
+        run: npx wrangler deploy --dry-run --outdir /tmp/ironvale-zone-dry-run
+
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'Add scalable world zone RAM authority'
+          git push origin HEAD:main
