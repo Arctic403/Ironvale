@@ -1,0 +1,49 @@
+name: Apply Terrain Dirty Region Optimization
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-terrain-dirty-region-opt.mjs'
+      - '.github/workflows/apply-terrain-dirty-region-opt.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ironvale-terrain-dirty-region-opt
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply optimization
+        run: node scripts/apply-terrain-dirty-region-opt.mjs
+
+      - name: Verify optimized sources
+        run: |
+          node --check public/rift-terrain.js
+          node scripts/check-terrain-dirty-region.mjs
+          npm run build
+
+      - name: Commit optimization
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/rift-terrain.js
+          git commit -m "Reduce terrain brush section invalidation"
+          git pull --rebase origin main
+          git push origin HEAD:main
