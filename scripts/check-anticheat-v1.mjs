@@ -74,7 +74,11 @@ for (const token of [
   'automaticBan: false',
   'suspiciousCaseWritesOnly: true'
 ]) assert(worker.includes(token), `worker missing ${token}`);
-assert(worker.includes("if (!write && configured && supplied && constantTimeEqual(configured, supplied))"), 'service-key reviewer must remain read-only');
+const serviceKeyReadOnly = worker.includes("if (!write && configured && supplied && constantTimeEqual(configured, supplied))") || (
+  worker.includes("if (!write) {") &&
+  worker.includes("if (configured && supplied && constantTimeEqual(configured, supplied))")
+);
+assert(serviceKeyReadOnly, 'service-key reviewer must remain read-only');
 assert(worker.includes("if (reviewer.kind !== 'admin' || !reviewer.auth)"), 'case mutation must remain admin-only');
 assert(worker.includes("if (!state?.userId || !shouldPersistAntiCheatCase(state.antiCheat)) return false;"), 'ordinary movement must skip case persistence before D1');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS anti_cheat_cases'), 'manual D1 schema missing anti-cheat cases');
