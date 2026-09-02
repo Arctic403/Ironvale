@@ -1,0 +1,56 @@
+name: AI Anti-Cheat Review Bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ai-anticheat-review.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch live anti-cheat evidence with GitHub OIDC
+        shell: bash
+        env:
+          BASE_URL: https://riftcityv1.kc-campbell132.workers.dev
+        run: |
+          set -euo pipefail
+          mkdir -p anticheat-review/details
+
+          token_response="$(curl -fsSL \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=ironvale-anticheat")"
+          oidc_token="$(printf '%s' "$token_response" | jq -r '.value')"
+          test -n "$oidc_token"
+          test "$oidc_token" != "null"
+
+          auth=(-H "Authorization: Bearer $oidc_token")
+          curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/summary" > anticheat-review/summary.json
+          curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/cases?status=all&minRisk=30&limit=50" > anticheat-review/cases.json
+
+          jq -r '.cases[] | select(.riskScore >= 60) | .id' anticheat-review/cases.json | head -n 10 | while IFS= read -r case_id; do
+            test -n "$case_id" || continue
+            safe_id="$(printf '%s' "$case_id" | tr -cd 'A-Za-z0-9._-')"
+            curl -fsSL "${auth[@]}" "$BASE_URL/api/anticheat/cases/$case_id" > "anticheat-review/details/$safe_id.json"
+          done
+
+          echo '=== Ironvale AI anti-cheat live summary ==='
+          jq -c '{format,policy,groups}' anticheat-review/summary.json
+          echo '=== Cases risk >= 30 ==='
+          jq -r '.cases[]? | "case=\(.id) risk=\(.riskScore) band=\(.riskBand) watch=\(.watchLevel) signal=\(.primarySignal // "none") status=\(.status)"' anticheat-review/cases.json
+          echo "detail_files=$(find anticheat-review/details -type f | wc -l | tr -d ' ')"
+
+      - name: Upload one-day review snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: anticheat-review-snapshot
+          path: anticheat-review/
+          retention-days: 1
+          if-no-files-found: error
