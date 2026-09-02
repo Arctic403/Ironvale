@@ -29,7 +29,7 @@ assert(worker.includes('verifyIntegrityTransport(request, auth)'), 'session stat
 for (const token of [
   "'security authority + anti-cheat session'",
   "'/api/anticheat/session-status'",
-  'IronvaleIntegrity.transportHeaders',
+  'integrityApi.transportHeaders',
   "registerProvider('security-smoke'",
   'securitySmoke: state.securitySmoke',
   'exercisesSecurityAuthoritySmoke: true',
