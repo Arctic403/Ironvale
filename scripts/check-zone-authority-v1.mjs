@@ -51,28 +51,38 @@ for (const token of [
   "export { ZoneState } from './zone-authority.js'",
   'function zoneStateStub(env, zoneId)',
   'async syncZoneMembership(state',
-  'async nearbyInterest(state',
+  'async nearbyInterest(request)',
   "'/api/realtime/nearby'",
   "url.pathname === '/nearby'",
   'zoneAuthority:'
 ]) assert(worker.includes(token), `player/worker integration missing ${token}`);
-assert(worker.includes('zoneChanged || now - Number(zone.lastSyncAt || 0) >= ZONE_MOVEMENT_SYNC_MS'), 'zone sync must be throttled except handoff');
-assert(worker.includes("reason: 'zone-handoff'"), 'immediate zone handoff missing');
+
+assert(
+  worker.includes('const due = force || zoneChanged || !zone.zoneId || now - Number(zone.lastSyncAt || 0) >= ZONE_MOVEMENT_SYNC_MS;'),
+  'zone sync must be immediate for first registration/handoff but throttled during ordinary movement'
+);
+assert(worker.includes("zoneChanged ? 'zone-handoff' : 'movement'"), 'immediate zone handoff missing');
 assert(worker.includes("reason: 'client-presence'"), 'stationary presence heartbeat path missing');
+assert(worker.includes('zoneIdsForInterest(state.x, state.z, radius)'), 'nearby query must scan only bounded interest zones');
+assert(worker.includes('Math.min(ZONE_MAX_NEARBY'), 'nearby results must be capped');
 
 for (const token of [
   'ZONE_PRESENCE_HEARTBEAT_MS',
   "type: 'presence'",
   'presenceHeartbeatsSent',
-  'zoneAuthorityPolicy'
+  'presenceHeartbeatsAcked',
+  'zoneAuthorityPolicy',
+  'movementPacketsDoNotFanOutAt10Hz: true',
+  'immediateZoneHandoff: true',
+  'nearbyInterestOnDemand: true'
 ]) assert(realtime.includes(token), `realtime client missing ${token}`);
 
 for (const token of [
   "'/api/realtime/nearby?radius=96&limit=64'",
-  "body?.zoneAuthority?.format !== 'ironvale-zone-authority-v1'",
+  "zoneAuthority?.format !== 'ironvale-zone-authority-v1'",
   "nearby?.format !== 'ironvale-zone-nearby-v1'",
   'zoneAuthority: { ...body.zoneAuthority',
-  'nearby: { ...nearby'
+  'nearby: { ...nearbySummary'
 ]) assert(auto.includes(token), `security smoke missing ${token}`);
 for (const id of ['architecture.zone-authority', 'architecture.interest-management']) assert(guard.includes(`'${id}'`), `validator missing ${id}`);
 
@@ -90,5 +100,8 @@ assert(build.includes('node --check src/zone-authority.js'), 'zone authority syn
 assert(build.includes('node scripts/check-zone-authority-v1.mjs'), 'zone authority regression verifier missing');
 assert(!fs.existsSync('scripts/apply-zone-authority-v1.mjs'), 'temporary zone patcher must be removed');
 assert(!fs.existsSync('.github/workflows/apply-zone-authority-v1.yml'), 'temporary zone workflow must be removed');
+assert(!fs.existsSync('.github/workflows/retry-zone-authority-v1.yml'), 'temporary retry v1 workflow must be removed');
+assert(!fs.existsSync('.github/workflows/retry-zone-authority-v2.yml'), 'temporary retry v2 workflow must be removed');
+assert(!fs.existsSync('.github/workflows/retry-zone-authority-v3.yml'), 'temporary retry v3 workflow must be removed');
 
 console.log('Ironvale Zone Authority v1 verified: 128m RAM zones + immediate handoff + low-rate presence heartbeat + bounded nearby interest + zero D1 movement/presence writes.');
