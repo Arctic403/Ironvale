@@ -1,11 +1,11 @@
 import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260901-engine-blackbox-r1';
-import { RiftLandscape } from './rift-landscape.js?v=20260901-terrain-profiler-r1';
+import { RiftLandscape } from './rift-landscape.js?v=20260902-dirty-region-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 
-const APP_DIAGNOSTIC_BUILD = '20260901-terrain-profiler-r1';
+const APP_DIAGNOSTIC_BUILD = '20260902-dirty-region-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
