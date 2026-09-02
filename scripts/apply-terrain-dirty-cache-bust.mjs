@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 
+// One-shot cache refresh for the dirty-region optimization.
 function replace(path, before, after) {
   let source = fs.readFileSync(path, 'utf8');
   if (source.includes(after)) return false;
