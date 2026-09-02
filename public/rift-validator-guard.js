@@ -207,8 +207,8 @@ async function buildGuardChecks(instance) {
 
   if (!worldVisible) return checks;
 
-  const [engine, native, realtime] = await Promise.all([
-    provider(instance, 'engine', 2), provider(instance, 'native', 2), provider(instance, 'realtime-movement', 2)
+  const [engine, native, realtime, integrity] = await Promise.all([
+    provider(instance, 'engine', 2), provider(instance, 'native', 2), provider(instance, 'realtime-movement', 2), provider(instance, 'integrity-chain', 2)
   ]);
   const snapshot = await snapshotRuntime(instance, 2);
   const runtime = snapshot?.runtime || {};
@@ -227,6 +227,19 @@ async function buildGuardChecks(instance) {
 
   const nativeFailures = Number(native?.failureCount) || 0;
   checks.push(statusCheck('native.failures', nativeFailures ? 'fail' : 'pass', nativeFailures ? `${nativeFailures} native/WASM failure(s); last=${native?.lastFailure?.message || native?.lastFailure || 'unknown'}` : 'No native/WASM failures'));
+
+  if (!integrity) {
+    checks.push(statusCheck('integrity.launch', 'fail', 'Integrity diagnostics provider unavailable'));
+    checks.push(statusCheck('integrity.server-attestation', 'fail', 'Integrity server attestation unavailable'));
+    checks.push(statusCheck('integrity.runtime-watchdog', 'fail', 'Integrity runtime watchdog unavailable'));
+  } else {
+    const launchOk = integrity.launchStatus === 'verified' && Number(integrity.filesChecked) === Number(integrity.manifestFileCount) && Number(integrity.filesChecked) > 0 && (integrity.mismatches?.length || 0) === 0;
+    checks.push(passFail('integrity.launch', launchOk, launchOk ? `${integrity.filesChecked}/${integrity.manifestFileCount} critical files match ${integrity.buildId}` : `launch=${integrity.launchStatus} · matched=${integrity.filesMatched || 0}/${integrity.manifestFileCount || 0} · mismatches=${integrity.mismatches?.length || 0}`));
+    const attested = integrity.attested === true && Number(integrity.ticketRemainingMs) > 0;
+    checks.push(passFail('integrity.server-attestation', attested, attested ? `Server challenge attested · ticket ${(Number(integrity.ticketRemainingMs) / 60000).toFixed(1)}m remaining` : 'Server integrity ticket missing or expired'));
+    const runtimeOk = integrity.runtimeStatus !== 'failed' && (integrity.runtimeMismatches?.length || 0) === 0;
+    checks.push(passFail('integrity.runtime-watchdog', runtimeOk, runtimeOk ? `Runtime tripwire clean · ${integrity.runtimeProbeCount || 0} probe(s)` : `${integrity.runtimeMismatches?.length || 0} runtime mismatch(es)`));
+  }
 
   if (!realtime) {
     checks.push(statusCheck('realtime.provider', 'warn', 'Realtime diagnostics provider unavailable'));

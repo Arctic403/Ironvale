@@ -4,8 +4,9 @@ import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
+import { IronvaleIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-const APP_DIAGNOSTIC_BUILD = '20260902-dirty-region-r1';
+const APP_DIAGNOSTIC_BUILD = '20260902-integrity-v1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -624,6 +625,11 @@ refreshEditorLabels();
 updateReticleVisual();
 refreshDiagnosticUi();
 refreshDiagnosticButtons();
+window.addEventListener('ironvale:integrity-failed', event => {
+  try { stopWorld(); } catch (_) {}
+  showAuth();
+  setAuthStatus('Integrity access denied: ' + String(event?.detail?.reason || 'runtime integrity failure'), true);
+});
 bootSession();
 
 
@@ -883,6 +889,12 @@ async function bootSession() {
   try {
     const data = await api('/api/bootstrap');
     if (!data.ok || !data.authenticated) { showAuth(); return; }
+    const integrity = await IronvaleIntegrity.ensureSession();
+    if (!integrity?.ok) {
+      showAuth();
+      setAuthStatus('Integrity check failed: ' + String(integrity?.reason || integrity?.status?.lastError || 'critical client files did not match the approved build'), true);
+      return;
+    }
     characterName.textContent = data.character.displayName || data.user.username;
     const saved = data.character.position || {};
     player.x = finiteOr(saved.x, 320);

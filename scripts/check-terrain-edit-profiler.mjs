@@ -6,5 +6,5 @@ for(const token of ['ironvale-terrain-edit-performance-v1','terrain-edit-perform
 assert(terrain.includes('buildTelemetry: { nativeBuildMs, copyMs'),'native build/copy telemetry missing');
 assert(validator.includes('expectedStreamedMeshes')&&validator.includes('streamed meshes'),'stream-aware terrain coverage missing');
 assert(app.includes('defaultClips: playerRig.defaultClips'),'character default clip telemetry missing');
-assert(index.includes('/app.js?v=20260902-dirty-region-r1') || index.includes('/app.js?v=20260901-terrain-profiler-r1'),'recognized app cache tag missing');
+assert(index.includes('/app.js?v=20260902-integrity-v1') || index.includes('/app.js?v=20260902-dirty-region-r1') || index.includes('/app.js?v=20260901-terrain-profiler-r1'),'recognized app cache tag missing');
 console.log('Ironvale terrain edit profiler verification passed.');

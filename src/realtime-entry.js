@@ -1,5 +1,6 @@
 import coreWorker from './index.js';
 import { DurableObject } from 'cloudflare:workers';
+import { EXPECTED_INTEGRITY_BUILD_ID, EXPECTED_INTEGRITY_MANIFEST_DIGEST, EXPECTED_INTEGRITY_FILE_COUNT } from './integrity-build.js';
 
 const SESSION_COOKIE = 'ironvale_session';
 const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
@@ -14,6 +15,8 @@ const MAX_VERTICAL_SPEED_MPS = 60;
 const VERTICAL_LAG_ALLOWANCE_METERS = 20;
 const MAX_Y_ABS = 10000;
 const REALTIME_FORMAT = 'ironvale-realtime-authority-v2';
+const INTEGRITY_CHALLENGE_TTL_MS = 2 * 60 * 1000;
+const INTEGRITY_TICKET_TTL_MS = 60 * 60 * 1000;
 
 function getCookie(request, name) {
   const header = request.headers.get('cookie') || '';
@@ -28,6 +31,34 @@ function bytesToBase64(bytes) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+function bytesToBase64Url(bytes) {
+  return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function constantTimeEqual(left, right) {
+  const a = String(left || '');
+  const b = String(right || '');
+  let diff = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) diff |= (a.charCodeAt(index) || 0) ^ (b.charCodeAt(index) || 0);
+  return diff === 0;
+}
+
+async function hmacSha256(secret, value) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', encoder.encode(String(secret || '')), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(String(value || '')));
+  return bytesToBase64Url(new Uint8Array(signature));
+}
+
+function challengeMessage(challenge, expiresAt) {
+  return ['challenge', challenge, expiresAt, EXPECTED_INTEGRITY_BUILD_ID, EXPECTED_INTEGRITY_MANIFEST_DIGEST].join('|');
+}
+
+function ticketMessage(challenge, expiresAt) {
+  return ['ticket', challenge, expiresAt, EXPECTED_INTEGRITY_BUILD_ID, EXPECTED_INTEGRITY_MANIFEST_DIGEST].join('|');
 }
 
 async function sha256(value) {
@@ -83,7 +114,8 @@ async function loadSessionState(request, env) {
       z: finite(row.position_z, DEFAULT_SPAWN.z),
       yaw: finite(row.yaw, DEFAULT_SPAWN.yaw)
     },
-    updatedAt: finite(row.updated_at, Date.now())
+    updatedAt: finite(row.updated_at, Date.now()),
+    rawSessionToken: rawToken
   };
 }
 
@@ -92,7 +124,7 @@ function playerStateStub(env, userId) {
   return env.PLAYER_STATE.get(id);
 }
 
-function internalStateHeaders(auth, request) {
+function internalStateHeaders(auth, request, integrity = null) {
   const headers = new Headers();
   headers.set('x-ironvale-user-id', auth.userId);
   headers.set('x-ironvale-username', auth.username);
@@ -102,18 +134,90 @@ function internalStateHeaders(auth, request) {
   headers.set('x-ironvale-z', String(auth.position.z));
   headers.set('x-ironvale-yaw', String(auth.position.yaw));
   headers.set('x-ironvale-updated-at', String(auth.updatedAt));
+  if (integrity?.ok) {
+    headers.set('x-ironvale-integrity-status', 'attested');
+    headers.set('x-ironvale-integrity-build', EXPECTED_INTEGRITY_BUILD_ID);
+    headers.set('x-ironvale-integrity-digest', EXPECTED_INTEGRITY_MANIFEST_DIGEST);
+    headers.set('x-ironvale-integrity-expires', String(integrity.expiresAt));
+  }
   if (request.headers.get('Upgrade') === 'websocket') headers.set('Upgrade', 'websocket');
   return headers;
+}
+
+function readIntegrityTransport(request) {
+  const url = new URL(request.url);
+  const read = (header, query) => request.headers.get(header) || url.searchParams.get(query) || '';
+  return {
+    buildId: read('x-ironvale-integrity-build', 'iv_build'),
+    manifestDigest: read('x-ironvale-integrity-digest', 'iv_digest'),
+    challenge: read('x-ironvale-integrity-challenge', 'iv_challenge'),
+    expiresAt: finite(read('x-ironvale-integrity-expires', 'iv_expires')),
+    ticket: read('x-ironvale-integrity-ticket', 'iv_ticket')
+  };
+}
+
+async function verifyIntegrityTransport(request, auth) {
+  const transport = readIntegrityTransport(request);
+  const now = Date.now();
+  if (!transport.ticket || !transport.challenge || !transport.expiresAt) return { ok: false, reason: 'integrity-required' };
+  if (transport.buildId !== EXPECTED_INTEGRITY_BUILD_ID || transport.manifestDigest !== EXPECTED_INTEGRITY_MANIFEST_DIGEST) return { ok: false, reason: 'integrity-build-mismatch' };
+  if (transport.expiresAt <= now) return { ok: false, reason: 'integrity-expired' };
+  const expected = await hmacSha256(auth.rawSessionToken, ticketMessage(transport.challenge, transport.expiresAt));
+  if (!constantTimeEqual(expected, transport.ticket)) return { ok: false, reason: 'integrity-ticket-invalid' };
+  return { ok: true, status: 'attested', buildId: transport.buildId, manifestDigest: transport.manifestDigest, expiresAt: transport.expiresAt };
+}
+
+async function routeIntegrityChallenge(request, env) {
+  const auth = await loadSessionState(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const challenge = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(24)));
+  const expiresAt = Date.now() + INTEGRITY_CHALLENGE_TTL_MS;
+  const challengeProof = await hmacSha256(auth.rawSessionToken, challengeMessage(challenge, expiresAt));
+  return json({ ok: true, challenge, expiresAt, challengeProof, buildId: EXPECTED_INTEGRITY_BUILD_ID, manifestDigest: EXPECTED_INTEGRITY_MANIFEST_DIGEST, fileCount: EXPECTED_INTEGRITY_FILE_COUNT });
+}
+
+async function routeIntegrityAttest(request, env) {
+  const auth = await loadSessionState(request, env);
+  if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const body = await readJson(request);
+  const challenge = String(body?.challenge || '');
+  const challengeExpiresAt = finite(body?.challengeExpiresAt);
+  const challengeProof = String(body?.challengeProof || '');
+  if (!challenge || !challengeExpiresAt || challengeExpiresAt <= Date.now()) return json({ ok: false, error: 'Integrity challenge expired' }, 409);
+  const expectedProof = await hmacSha256(auth.rawSessionToken, challengeMessage(challenge, challengeExpiresAt));
+  if (!constantTimeEqual(expectedProof, challengeProof)) return json({ ok: false, error: 'Integrity challenge invalid' }, 409);
+  const mismatches = Array.isArray(body?.mismatches) ? body.mismatches : [];
+  const approved = body?.verified === true &&
+    String(body?.buildId || '') === EXPECTED_INTEGRITY_BUILD_ID &&
+    String(body?.manifestDigest || '') === EXPECTED_INTEGRITY_MANIFEST_DIGEST &&
+    Number(body?.fileCount) === EXPECTED_INTEGRITY_FILE_COUNT &&
+    Number(body?.filesChecked) === EXPECTED_INTEGRITY_FILE_COUNT &&
+    mismatches.length === 0;
+  if (!approved) return json({ ok: false, error: 'Client build integrity denied' }, 409);
+  const ticketExpiresAt = Date.now() + INTEGRITY_TICKET_TTL_MS;
+  const ticket = await hmacSha256(auth.rawSessionToken, ticketMessage(challenge, ticketExpiresAt));
+  return json({ ok: true, status: 'attested', buildId: EXPECTED_INTEGRITY_BUILD_ID, manifestDigest: EXPECTED_INTEGRITY_MANIFEST_DIGEST, ticket, ticketExpiresAt });
+}
+
+function mutatingApiRequiresIntegrity(method, pathname) {
+  if (!pathname.startsWith('/api/')) return false;
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return false;
+  if (pathname.startsWith('/api/auth/')) return false;
+  if (pathname.startsWith('/api/integrity/')) return false;
+  if (pathname === '/api/realtime/checkpoint' || pathname === '/api/character/position') return false;
+  return true;
 }
 
 async function routeRealtimeSocket(request, env) {
   if (request.headers.get('Upgrade') !== 'websocket') return json({ ok: false, error: 'WebSocket upgrade required' }, 426);
   const auth = await loadSessionState(request, env);
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const integrity = await verifyIntegrityTransport(request, auth);
+  if (!integrity.ok) return json({ ok: false, error: integrity.reason }, 428);
   const stub = playerStateStub(env, auth.userId);
   const internal = new Request('https://player-state/connect', {
     method: 'GET',
-    headers: internalStateHeaders(auth, request)
+    headers: internalStateHeaders(auth, request, integrity)
   });
   return stub.fetch(internal);
 }
@@ -121,12 +225,14 @@ async function routeRealtimeSocket(request, env) {
 async function routePositionFallback(request, env) {
   const auth = await loadSessionState(request, env);
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const integrity = await verifyIntegrityTransport(request, auth);
+  if (!integrity.ok) return json({ ok: false, error: integrity.reason }, 428);
   const body = await readJson(request);
   const stub = playerStateStub(env, auth.userId);
   const internal = new Request('https://player-state/position', {
     method: 'POST',
     headers: {
-      ...Object.fromEntries(internalStateHeaders(auth, request)),
+      ...Object.fromEntries(internalStateHeaders(auth, request, integrity)),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body || {})
@@ -137,10 +243,12 @@ async function routePositionFallback(request, env) {
 async function routeRealtimeCheckpoint(request, env) {
   const auth = await loadSessionState(request, env);
   if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+  const integrity = await verifyIntegrityTransport(request, auth);
+  if (!integrity.ok) return json({ ok: false, error: integrity.reason }, 428);
   const body = await readJson(request);
   const reason = String(body?.reason || 'explicit-http').slice(0, 32);
   const stub = playerStateStub(env, auth.userId);
-  const headers = internalStateHeaders(auth, request);
+  const headers = internalStateHeaders(auth, request, integrity);
   headers.set('x-ironvale-checkpoint-reason', reason);
   return stub.fetch(new Request('https://player-state/checkpoint', { method: 'POST', headers }));
 }
@@ -162,6 +270,9 @@ export default {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
 
+    if (method === 'GET' && url.pathname === '/api/integrity/challenge') return routeIntegrityChallenge(request, env);
+    if (method === 'POST' && url.pathname === '/api/integrity/attest') return routeIntegrityAttest(request, env);
+
     if (url.pathname === '/api/realtime/movement') {
       return routeRealtimeSocket(request, env);
     }
@@ -178,6 +289,13 @@ export default {
 
     if (method === 'POST' && url.pathname === '/api/auth/logout') {
       await checkpointBeforeLogout(request, env);
+    }
+
+    if (mutatingApiRequiresIntegrity(method, url.pathname)) {
+      const auth = await loadSessionState(request, env);
+      if (!auth) return json({ ok: false, error: 'Authentication required' }, 401);
+      const integrity = await verifyIntegrityTransport(request, auth);
+      if (!integrity.ok) return json({ ok: false, error: integrity.reason }, 428);
     }
 
     return coreWorker.fetch(request, env, ctx);
@@ -216,7 +334,11 @@ export class PlayerState extends DurableObject {
       accepted: 0,
       rejected: 0,
       checkpointCount: 0,
-      lastRejectReason: null
+      lastRejectReason: null,
+      integrityStatus: String(request.headers.get('x-ironvale-integrity-status') || 'missing'),
+      integrityBuildId: String(request.headers.get('x-ironvale-integrity-build') || ''),
+      integrityManifestDigest: String(request.headers.get('x-ironvale-integrity-digest') || ''),
+      integrityExpiresAt: finite(request.headers.get('x-ironvale-integrity-expires'), 0)
     };
   }
 
@@ -261,6 +383,10 @@ export class PlayerState extends DurableObject {
         ...carried.state,
         username: initial.username,
         sessionExpiresAt: initial.sessionExpiresAt,
+        integrityStatus: initial.integrityStatus,
+        integrityBuildId: initial.integrityBuildId,
+        integrityManifestDigest: initial.integrityManifestDigest,
+        integrityExpiresAt: initial.integrityExpiresAt,
         superseded: false,
         connectedAt: Date.now()
       };
@@ -286,7 +412,8 @@ export class PlayerState extends DurableObject {
       format: REALTIME_FORMAT,
       position: { x: initial.x, y: initial.y, z: initial.z, yaw: initial.yaw },
       checkpointIntervalMs: CHECKPOINT_INTERVAL_MS,
-      validator: 'server-authoritative'
+      validator: 'server-authoritative',
+      integrity: { status: initial.integrityStatus, buildId: initial.integrityBuildId, expiresAt: initial.integrityExpiresAt }
     }));
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -294,6 +421,8 @@ export class PlayerState extends DurableObject {
   validateMovement(state, packet) {
     const now = Date.now();
     if (state.sessionExpiresAt <= now) return { ok: false, reason: 'session-expired', close: true };
+    if (state.integrityStatus !== 'attested' || state.integrityBuildId !== EXPECTED_INTEGRITY_BUILD_ID || state.integrityManifestDigest !== EXPECTED_INTEGRITY_MANIFEST_DIGEST) return { ok: false, reason: 'integrity-required', close: true };
+    if (Number(state.integrityExpiresAt) <= now) return { ok: false, reason: 'integrity-expired', close: true };
 
     const x = finite(packet?.x);
     const y = finite(packet?.y);

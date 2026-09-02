@@ -1,3 +1,5 @@
+import { IronvaleIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
+
 export const RIFT_REALTIME_FORMAT = 'ironvale-realtime-client-v2';
 
 const MOVEMENT_PATH = '/api/character/position';
@@ -70,11 +72,14 @@ function record(message, data = null, severity = 'info') {
 
 function socketUrl() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${location.host}${SOCKET_PATH}`;
+  const url = new URL(`${protocol}//${location.host}${SOCKET_PATH}`);
+  const integrity = IronvaleIntegrity.transportParams();
+  if (integrity) for (const [key, value] of Object.entries(integrity)) url.searchParams.set(key, value);
+  return url.href;
 }
 
 function shouldConnect() {
-  return navigator.onLine !== false && worldScreen?.hidden === false;
+  return navigator.onLine !== false && worldScreen?.hidden === false && IronvaleIntegrity.status().attested === true;
 }
 
 function socketOpen() {
@@ -199,7 +204,7 @@ async function dispatchFallbackPosition(position, source = 'direct', keepalive =
   try {
     const response = await baseFetch(MOVEMENT_PATH, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...IronvaleIntegrity.transportHeaders() },
       body: JSON.stringify(packet),
       keepalive
     });
@@ -398,7 +403,7 @@ async function checkpoint(reason = 'client', options = {}) {
     state.checkpointRequests += 1;
     const response = await baseFetch(CHECKPOINT_PATH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...IronvaleIntegrity.transportHeaders() },
       body: JSON.stringify({ reason: label }),
       keepalive: options?.keepalive === true
     });
@@ -455,7 +460,23 @@ window.fetch = async function ironvaleRealtimeFetch(input, init = undefined) {
     return response;
   }
 
-  const response = await baseFetch(input, init);
+  let nextInput = input;
+  let nextInit = init;
+  if (url?.origin === location.origin && url.pathname.startsWith('/api/') && !['/api/integrity/challenge', '/api/integrity/attest'].includes(url.pathname)) {
+    const integrityHeaders = IronvaleIntegrity.transportHeaders();
+    if (Object.keys(integrityHeaders).length) {
+      if (input instanceof Request) {
+        const headers = new Headers(input.headers);
+        for (const [key, value] of Object.entries(integrityHeaders)) headers.set(key, value);
+        nextInput = new Request(input, { headers });
+      } else {
+        const headers = new Headers(init?.headers || {});
+        for (const [key, value] of Object.entries(integrityHeaders)) headers.set(key, value);
+        nextInit = { ...(init || {}), headers };
+      }
+    }
+  }
+  const response = await baseFetch(nextInput, nextInit);
   if (url?.origin === location.origin && url.pathname === '/api/bootstrap' && response.ok) queueMicrotask(connect);
   return response;
 };
@@ -485,6 +506,7 @@ function realtimeStatus() {
       legacyFetchBridgeCompatibilityOnly: true,
       appLegacyHeartbeatRemoved: true
     },
+    integrity: IronvaleIntegrity.status(),
     checkpointPolicy: {
       periodicSafetyMs: 5 * 60 * 1000,
       durableObjectAlarm: true,
@@ -523,6 +545,9 @@ window.IronvaleRealtimeMovement = Object.freeze({
   status: realtimeStatus
 });
 
+window.addEventListener('ironvale:integrity-ready', connect);
+window.addEventListener('ironvale:integrity-refreshed', () => { closeSocket('integrity-refresh'); queueMicrotask(connect); });
+window.addEventListener('ironvale:integrity-failed', () => closeSocket('integrity-failed'));
 window.addEventListener('online', connect);
 window.addEventListener('offline', () => {
   state.socketState = 'offline';

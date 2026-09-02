@@ -22,8 +22,8 @@ const validatorGuard = read('public/rift-validator-guard.js');
 requireMatch(wrangler, /main\s*=\s*"src\/realtime-entry\.js"/, 'realtime Worker entrypoint');
 requireMatch(wrangler, /\[\[durable_objects\.bindings\]\][\s\S]*name\s*=\s*"PLAYER_STATE"[\s\S]*class_name\s*=\s*"PlayerState"/, 'PLAYER_STATE Durable Object binding');
 requireMatch(wrangler, /new_sqlite_classes\s*=\s*\[\s*"PlayerState"\s*\]/, 'SQLite Durable Object migration');
-requireMatch(html, /rift-realtime\.js\?v=20260901-reconnect-grace-r1/, 'realtime client reconnect-grace module loaded');
-requireMatch(html, /rift-validator-guard\.js\?v=20260901-terrain-profiler-r1/, 'validator terrain-profiler module loaded');
+requireMatch(html, /rift-realtime\.js\?v=20260902-integrity-v1/, 'realtime client reconnect-grace module loaded');
+requireMatch(html, /rift-validator-guard\.js\?v=20260902-integrity-v1/, 'validator terrain-profiler module loaded');
 
 requireMatch(worker, /REALTIME_FORMAT = 'ironvale-realtime-authority-v2'/, 'realtime authority v2');
 requireMatch(worker, /export class PlayerState extends DurableObject/, 'PlayerState Durable Object class');

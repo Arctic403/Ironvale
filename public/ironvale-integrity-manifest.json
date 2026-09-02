@@ -1,0 +1,114 @@
+{
+  "format": "ironvale-integrity-manifest-v1",
+  "algorithm": "SHA-256",
+  "files": [
+    {
+      "path": "/app.js",
+      "sha256": "6d3fb2d2424739f7257224fd53c8dda0c476f0ce9f5a4bbce07b783701123d71",
+      "size": 121435
+    },
+    {
+      "path": "/index.html",
+      "sha256": "47ba008eaa8002ab79488a23cb3c106882e23a6e244e4f5f971d5c14afd76747",
+      "size": 10069
+    },
+    {
+      "path": "/rift-architecture-guard.js",
+      "sha256": "6226e6f4597b7da4fe6e2b99296385992934161157b7f110687b9845dad5f51b",
+      "size": 5919
+    },
+    {
+      "path": "/rift-auto-validation-ui-hotfix.js",
+      "sha256": "0280f50aca3630c747efaed118ec064605c035b5b085e3f88053683c07736559",
+      "size": 1660
+    },
+    {
+      "path": "/rift-auto-validation.js",
+      "sha256": "e0ca22d2e4296511afec1404677a5261abacec490555eb5a00223e52ec918351",
+      "size": 42589
+    },
+    {
+      "path": "/rift-character.js",
+      "sha256": "98db81dcc92a6b061e01996d69b8412ef96d301325343809d2408b3833a13f3e",
+      "size": 28099
+    },
+    {
+      "path": "/rift-core.js",
+      "sha256": "2e9747bc538ecf9aaf471040563a05db27363a661ce32541069142f46f85c05a",
+      "size": 1514
+    },
+    {
+      "path": "/rift-core.wasm.gz",
+      "sha256": "f2cb81c789f25996bc95947367c8820aee1322625bad8c542ba0737bd3291a3c",
+      "size": 4636
+    },
+    {
+      "path": "/rift-diagnostic-hooks.js",
+      "sha256": "b4f46555991fd91a8bdc3ee5d425b896c3e861383b71d0956b545ec270d47a6d",
+      "size": 15820
+    },
+    {
+      "path": "/rift-diagnostics.js",
+      "sha256": "345ad47e44da12ad61c5ec642421377aeb0bd212c07bba4d7cf5f187ad67ec52",
+      "size": 19801
+    },
+    {
+      "path": "/rift-engine.js",
+      "sha256": "3bf41fdc4f3fb523af0aa3c6afd51ccb3975c36965e87ddfa673b40730b9355f",
+      "size": 32208
+    },
+    {
+      "path": "/rift-geometry-guard.js",
+      "sha256": "4601cf68273c5d53bf9416763ee0d08d88426940c50601cd33622c052c75caa4",
+      "size": 6782
+    },
+    {
+      "path": "/rift-gl-tripwire.js",
+      "sha256": "139e3beb966c46c5efe1670e5601a1337f9d4fe0ebfd672369648322c6d82568",
+      "size": 10473
+    },
+    {
+      "path": "/rift-history-bridge.js",
+      "sha256": "1c9210d4555051718d9eb8e9888e2b2372d0ab805eaca09ba23159390f581c2d",
+      "size": 6891
+    },
+    {
+      "path": "/rift-integrity.js",
+      "sha256": "1988c2923aaf9c12c933d73080783ab70200a3759e54ffbf966e3811925240d2",
+      "size": 13737
+    },
+    {
+      "path": "/rift-landscape.js",
+      "sha256": "b164b77cc69396c2e3f8ebb0ce4c0eaf4535532f3091d49921e2a2f71df91f88",
+      "size": 49613
+    },
+    {
+      "path": "/rift-realtime.js",
+      "sha256": "5e1abd66065889b4968c606d21e3f9d102b3710546d62156317a19af32c8f812",
+      "size": 19884
+    },
+    {
+      "path": "/rift-scale.js",
+      "sha256": "5e3e3f5c085c2a07c8ea06a58df8daf5bdd12d443d11b9e2212ef6562cc6104b",
+      "size": 4159
+    },
+    {
+      "path": "/rift-terrain-materials.js",
+      "sha256": "b7ce71b8a9e1af21c7682471a725ff8cd1b04238336763bc59a2c83c7162816a",
+      "size": 5832
+    },
+    {
+      "path": "/rift-terrain.js",
+      "sha256": "943c73fd02e90bdfc5f65e1207aeaa825797f6971220f4204a94208fe2bd5c49",
+      "size": 27286
+    },
+    {
+      "path": "/rift-validator-guard.js",
+      "sha256": "09c9f5e430ed502877681f66d6b7f27165bb4b341a50cc6d702827cf91365427",
+      "size": 21389
+    }
+  ],
+  "buildId": "iv-0507e21310e707667318786c",
+  "digest": "0507e21310e707667318786cb5cdf073cbffc001df4fecade6ec8bb015354715",
+  "fileCount": 21
+}
