@@ -1,0 +1,51 @@
+name: Apply Integrity Chain v1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/apply-integrity-chain-v1.mjs'
+      - '.github/workflows/apply-integrity-chain-v1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply Integrity Chain v1
+        run: |
+          node scripts/apply-integrity-chain-v1.mjs
+          node scripts/generate-integrity-manifest.mjs
+      - name: Verify source syntax and contracts
+        run: |
+          node --check public/rift-integrity.js
+          node --check public/app.js
+          node --check public/rift-realtime.js
+          node --check public/rift-validator-guard.js
+          node --check src/realtime-entry.js
+          node --check src/integrity-build.js
+          node scripts/generate-integrity-manifest.mjs --check
+          node scripts/check-integrity-chain.mjs
+          npm run build
+      - name: Commit Integrity Chain v1
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/app.js public/rift-realtime.js public/rift-validator-guard.js public/index.html src/realtime-entry.js src/integrity-build.js public/ironvale-integrity-manifest.json package.json scripts/check-realtime-state.mjs scripts/check-terrain-edit-profiler.mjs
+          if git diff --cached --quiet; then
+            echo 'Integrity Chain v1 already applied.'
+            exit 0
+          fi
+          git commit -m 'Add server-gated PWA integrity chain'
+          git pull --rebase origin main
+          git push origin HEAD:main
