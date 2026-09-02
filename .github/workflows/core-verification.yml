@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'schema.sql'
       - '.github/workflows/core-verification.yml'
+      - '.github/workflows/ai-anticheat-review.yml'
   pull_request:
     paths:
       - 'public/**'
@@ -20,6 +21,7 @@ on:
       - 'package.json'
       - 'schema.sql'
       - '.github/workflows/core-verification.yml'
+      - '.github/workflows/ai-anticheat-review.yml'
   workflow_dispatch:
 
 permissions:
