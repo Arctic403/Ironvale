@@ -10,6 +10,8 @@ const client = read('public/rift-integrity.js');
 const realtime = read('public/rift-realtime.js');
 const worker = read('src/realtime-entry.js');
 const validator = read('public/rift-validator-guard.js');
+const diagnostics = read('public/rift-diagnostics.js');
+const diagnosticHooks = read('public/rift-diagnostic-hooks.js');
 const html = read('public/index.html');
 const pkg = JSON.parse(read('package.json'));
 const manifest = JSON.parse(read('public/ironvale-integrity-manifest.json'));
@@ -43,6 +45,9 @@ requireToken(validator, "integrity.launch", 'validator launch integrity check');
 requireToken(validator, "integrity.server-attestation", 'validator server attestation check');
 requireToken(validator, "integrity.runtime-watchdog", 'validator runtime watchdog check');
 
+requireToken(diagnostics, '|token|ticket|', 'diagnostic object/string ticket redaction');
+requireToken(diagnosticHooks, 'token|ticket|secret', 'diagnostic resource URL ticket redaction');
+
 requireToken(html, '/app.js?v=20260902-integrity-v1', 'app cache bust');
 requireToken(html, '/rift-realtime.js?v=20260902-integrity-v1', 'realtime cache bust');
 requireToken(html, '/rift-validator-guard.js?v=20260902-integrity-v1', 'validator cache bust');
@@ -52,7 +57,7 @@ if (manifest.algorithm !== 'SHA-256') throw new Error('Integrity manifest algori
 if (!/^iv-[a-f0-9]{24}$/.test(manifest.buildId || '')) throw new Error('Integrity build id malformed.');
 if (!/^[a-f0-9]{64}$/.test(manifest.digest || '')) throw new Error('Integrity manifest digest malformed.');
 if (!Array.isArray(manifest.files) || manifest.files.length !== manifest.fileCount || manifest.files.length < 15) throw new Error('Integrity critical file coverage too small.');
-for (const required of ['/app.js', '/rift-integrity.js', '/rift-realtime.js', '/rift-core.wasm.gz']) {
+for (const required of ['/app.js', '/rift-integrity.js', '/rift-realtime.js', '/rift-core.wasm.gz', '/rift-diagnostics.js', '/rift-diagnostic-hooks.js']) {
   if (!manifest.files.some(file => file.path === required)) throw new Error(`Integrity manifest missing ${required}.`);
 }
 requireToken(server, manifest.buildId, 'server build id matches manifest');
@@ -63,4 +68,4 @@ for (const token of ['node --check public/rift-integrity.js', 'node --check src/
   if (!build.includes(token)) throw new Error(`Core build missing ${token}`);
 }
 
-console.log(`Ironvale Integrity Chain v1 verified: ${manifest.buildId} · ${manifest.fileCount} critical files · RAM authority remains final.`);
+console.log(`Ironvale Integrity Chain v1 verified: ${manifest.buildId} · ${manifest.fileCount} critical files · RAM authority remains final · diagnostic tickets redacted.`);
