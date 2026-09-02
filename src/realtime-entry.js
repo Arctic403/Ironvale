@@ -2,6 +2,7 @@ import coreWorker from './index.js';
 import { DurableObject } from 'cloudflare:workers';
 import { EXPECTED_INTEGRITY_BUILD_ID, EXPECTED_INTEGRITY_MANIFEST_DIGEST, EXPECTED_INTEGRITY_FILE_COUNT } from './integrity-build.js';
 import { ANTICHEAT_SCHEMA, antiCheatEvidence, antiCheatSummary, createAntiCheatState, markAntiCheatCasePersisted, observeAcceptedMovement, observeRejectedMovement, shouldPersistAntiCheatCase } from './anticheat.js';
+import { verifyGitHubAntiCheatOidc } from './github-oidc.js';
 
 const SESSION_COOKIE = 'ironvale_session';
 const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
@@ -227,11 +228,28 @@ async function ensureAntiCheatTables(env) {
 }
 
 async function authorizeAntiCheatReviewer(request, env, { write = false } = {}) {
-  const configured = String(env.ANTICHEAT_SERVICE_KEY || '');
-  const supplied = String(request.headers.get('x-ironvale-anticheat-key') || '');
-  if (!write && configured && supplied && constantTimeEqual(configured, supplied)) {
-    return { kind: 'service', reviewer: 'ai-anticheat-service', auth: null };
+  if (!write) {
+    const configured = String(env.ANTICHEAT_SERVICE_KEY || '');
+    const supplied = String(request.headers.get('x-ironvale-anticheat-key') || '');
+    if (configured && supplied && constantTimeEqual(configured, supplied)) {
+      return { kind: 'service', reviewer: 'ai-anticheat-service', auth: null };
+    }
+
+    const authorization = String(request.headers.get('authorization') || '');
+    const bearer = authorization.replace(/^Bearer\s+/i, '').trim();
+    if (bearer && bearer !== authorization) {
+      const oidc = await verifyGitHubAntiCheatOidc(bearer);
+      if (oidc.ok) {
+        return {
+          kind: 'github-oidc',
+          reviewer: 'ai-anticheat-github-oidc',
+          auth: null,
+          oidc: { runId: oidc.runId, runAttempt: oidc.runAttempt, actor: oidc.actor, expiresAt: oidc.expiresAt }
+        };
+      }
+    }
   }
+
   const auth = await loadSessionState(request, env);
   if (auth?.role === 'admin') return { kind: 'admin', reviewer: auth.username || 'admin', auth };
   return null;
