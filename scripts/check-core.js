@@ -33,12 +33,15 @@ try { resolveAssetScale({ units: 'mystery-units' }); } catch { rejectedUnknownAs
 if (!rejectedUnknownAssetUnits) failures.push('unknown asset units must not be guessed');
 if (world.terrain?.format !== 'rift-terrain-v1') failures.push('terrain format');
 if (world.metadata?.legacyBlocks !== false || world.metadata?.voxelGrid !== false) failures.push('terrain metadata');
-if (world.metadata?.blankCanvas !== true) failures.push('terrain must boot as blank canvas');
+if (world.metadata?.blankCanvas !== false || world.metadata?.generatedIsland !== true) failures.push('terrain must boot as generated island');
 if (world.metadata?.negativeWorldY !== true || world.metadata?.lowerBarrier !== false) failures.push('negative Y/lower barrier contract');
 if (world.terrain?.size?.[0] !== 640 || world.terrain?.size?.[1] !== 640) failures.push('terrain must be 640x640');
 if (world.terrain?.sampleSpacing !== 1) failures.push('terrain editing must retain 1m samples');
 if (world.terrain?.chunkSize !== 64 || world.terrain?.sectionSize !== 64) failures.push('terrain sections must be 64m');
 if (world.terrain?.componentSize !== 128) failures.push('terrain components must be 128m');
+if (world.terrain?.generator?.id !== 'island-v1' || world.terrain?.generator?.version !== 1) failures.push('island-v1 generator contract');
+if (!Number.isFinite(Number(world.terrain?.seed)) || world.metadata?.deterministicSeededTerrain !== true || world.metadata?.terrainGeneratorVersion !== 1) failures.push('deterministic terrain seed/version metadata');
+if (world.terrain?.generator?.autoMaterials !== true || !world.terrain?.landscape?.materialLayers?.some(layer => layer.id === 'sand')) failures.push('generated terrain material masks/sand layer');
 if (JSON.stringify(world.terrain?.lod?.steps) !== JSON.stringify([1,2,4,8,16])) failures.push('adaptive terrain LOD steps');
 if (world.terrain?.lod?.neighborMaxLevelDelta !== 1 || world.terrain?.lod?.seamMode !== 'edge-morph') failures.push('terrain LOD seam contract');
 if (world.terrain?.landscape?.format !== 'rift-landscape-v3') failures.push('RiftLandscape v3 config');
@@ -139,6 +142,7 @@ if (world.diagnostics?.blackBoxCompleteness !== 'max-v1' || !world.diagnostics?.
 
 const terrain = fs.readFileSync('public/rift-terrain.js', 'utf8');
 const landscape = fs.readFileSync('public/rift-landscape.js', 'utf8');
+if (!landscape.includes('_applyGeneratedMaterialMasks(')) failures.push('generated terrain material masks missing');
 if (!landscape.includes('paintMaterial(') || !landscape.includes('sampleMaterialWeights(') || !landscape.includes('sampleMaterialColor(') || !landscape.includes('buildSurfaceSectionGeometry(')) failures.push('visible landscape material weight blending');
 if (!landscape.includes('_normalizeMaterialWeightsAtIndex(') || !landscape.includes('terrainWeights0') || !landscape.includes('terrainWeights1')) failures.push('normalized GPU terrain splat weights');
 if (!landscape.includes('appendSplinePoint(') || !landscape.includes('_applySplineDeformation(') || !landscape.includes('updateSpline(') || !landscape.includes('smoothSplinePolyline(')) failures.push('landscape spline deformation');
@@ -151,6 +155,8 @@ if (!landscape.includes('collisionLodStepAt(') || !landscape.includes('sampleHei
 if (!landscape.includes('setEditLayerOpacity(') || !landscape.includes('validateLandscape(')) failures.push('RiftLandscape layer management/validation');
 if (!landscape.includes('setSpline(') || !landscape.includes('removeSpline(')) failures.push('RiftLandscape spline data hooks');
 if (!terrain.includes("import { RiftCore } from './rift-core.js'")) failures.push('terrain is not backed by RiftCore WASM');
+if (!terrain.includes('NATIVE.rift_terrain_generate_island')) failures.push('seeded island generator not native');
+if (!app.includes('createWaterPlaneGeometry(terrain)') || !app.includes('descriptor.generation?.id')) failures.push('island water/backend generation runtime integration');
 if (!terrain.includes('NATIVE.rift_terrain_apply_brush')) failures.push('terrain brush not native');
 if (!terrain.includes('NATIVE.rift_terrain_build_section')) failures.push('section meshing/stitching not native');
 if (!terrain.includes('planSectionLods(')) failures.push('terrain LOD planner missing');
@@ -168,6 +174,7 @@ const worker = fs.readFileSync('src/index.js', 'utf8');
 const workerLower = worker.toLowerCase();
 const forbiddenPatterns = [[/\bcombat\b/,'combat'],[/\binventory\b/,'inventory'],[/\bquest(s|_progress)?\b/,'quest'],[/ai-builder/,'ai-builder'],[/block_layout/,'block_layout'],[/riftblock/,'riftblock']];
 for (const [pattern,label] of forbiddenPatterns) if (pattern.test(workerLower)) failures.push(`worker contains ${label}`);
+if (!worker.includes("id: 'island-v1'") || !worker.includes('env.WORLD_SEED')) failures.push('backend-owned island seed contract');
 if (!worker.includes('WORLD_MAX_X = 640') || !worker.includes('WORLD_MAX_Z = 640')) failures.push('backend terrain bounds');
 if (!worker.includes('negative world space is valid')) failures.push('backend negative Y contract');
 if (/y\s*<\s*-\d+/.test(worker)) failures.push('backend lower Y barrier still present');

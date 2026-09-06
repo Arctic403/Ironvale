@@ -31,9 +31,13 @@ The old repository-bound GitHub OIDC anti-cheat review workflow was also removed
 
 ## Terrain baseline
 
-The active world is a blank **640 × 640 m** continuous heightfield with 1 m authoring samples. Components and sections are rendering/streaming partitions, not Minecraft-style cells. Negative world Y remains valid.
+The active world is a deterministic **640 × 640 m `island-v1`** continuous heightfield with 1 m authoring samples. The native RiftCore generator creates an irregular coastline, submerged ocean floor, beaches, lowlands, rolling hills, ridges, valleys, occasional cliffier coasts and flatter build-friendly regions. Components and sections remain rendering/streaming partitions, not Minecraft-style cells. Negative world Y remains valid.
 
-Terrain material slots now boot entirely from the runtime's local fallback color, flat-normal and roughness layers. The previous remote project-specific terrain texture URLs were disconnected so this baseline does not depend on the old game's asset namespace. Proper bundled local terrain textures can be added later without changing the terrain schema.
+World identity is `seed + generator version`. The default development seed is `4032026`; the backend owns the active seed through the `WORLD_SEED` Worker variable and returns it in `/api/bootstrap`. The client generates the exact heightfield locally from that authoritative contract. The same seed with `island-v1` reproduces byte-identical terrain; a different seed produces a different island. Future server creation can therefore allocate a seed without storing a full heightmap.
+
+`island-v1` also derives initial material weights from generated height/slope: sand around the shoreline, grass as the base layer, and dirt/rock/gravel/mud transitions where appropriate. These are only starting masks—RiftLandscape manual sculpt and material edit layers remain additive and persistent on top. The runtime draws a simple development water plane at the configured water level so the generated coastline reads as an island before a final water system exists.
+
+Terrain material slots still boot entirely from local fallback color, flat-normal and roughness layers. Proper bundled local terrain textures can be added later without changing the terrain schema.
 
 ## Verification
 
@@ -52,4 +56,4 @@ npm run build
 
 ## Current boundary
 
-This cleanup intentionally does **not** add harvesting, inventory, crafting, building, weapons, loot, survival meters or new world content. The next milestone should begin only from this verified foundation.
+This milestone adds only deterministic seeded island generation and its initial terrain/material presentation. It does **not** add trees, rocks/resource nodes, roads, rivers, monuments, loot, harvesting, inventory, crafting, building, weapons or survival meters. Those systems should consume the generated world contract later instead of being baked into `island-v1`.

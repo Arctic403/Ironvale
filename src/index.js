@@ -356,10 +356,22 @@ async function bootstrap(request, env) {
     world: {
       id: 'rift-survival-terrain',
       url: '/world/rift-survival-terrain.json',
-      foundation: 'rift-landscape-v2',
+      foundation: 'rift-landscape-v3',
       terrainFormat: 'rift-terrain-v1',
       size: [640, 640],
-      negativeWorldY: true
+      negativeWorldY: true,
+      generation: {
+        id: 'island-v1',
+        version: 1,
+        seed: Number.isFinite(Number(env.WORLD_SEED)) ? Math.trunc(Number(env.WORLD_SEED)) : 4032026,
+        waterLevel: 0,
+        coastWidth: 30,
+        landHeight: 13,
+        hillHeight: 12,
+        mountainHeight: 18,
+        roughness: 0.85,
+        autoMaterials: true
+      }
     }
   });
 }

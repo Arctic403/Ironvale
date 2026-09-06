@@ -1,12 +1,12 @@
 import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260901-engine-blackbox-r1';
-import { RiftLandscape } from './rift-landscape.js?v=20260902-terrain-pack-r1';
+import { RiftLandscape } from './rift-landscape.js?v=20260906-island-v1-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 import { RiftSurvivalIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-const APP_DIAGNOSTIC_BUILD = '20260902-terrain-pack-r1';
+const APP_DIAGNOSTIC_BUILD = '20260906-island-v1-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -107,6 +107,7 @@ let terrainMeshes = new Map();
 let terrainLodPlan = new Map();
 let terrainStreamPlan = null;
 let terrainMaterialRuntime = null;
+let waterMesh = null;
 let terrainDebugEnabled = false;
 let terrainDebugMesh = null;
 let lastTerrainDebugUpdate = 0;
@@ -890,7 +891,7 @@ async function bootSession() {
     player.z = finiteOr(saved.z, 320);
     player.yaw = finiteOr(saved.yaw, 0);
     orbitCamera.yaw = wrapAngle(player.yaw + Math.PI);
-    await startWorld(data.world?.url || '/world/rift-survival-terrain.json');
+    await startWorld(data.world || { url: '/world/rift-survival-terrain.json' });
   } catch (error) {
     console.error('Survival world boot failed.', error);
     const crashDump = await diagnostics.captureCrash(error, 'world-boot').catch(() => null);
@@ -900,14 +901,19 @@ async function bootSession() {
   }
 }
 
-async function startWorld(url) {
+async function startWorld(worldDescriptor) {
   stopWorld();
   authScreen.hidden = true;
   worldScreen.hidden = false;
-  terrainStatus.textContent = 'Loading blank Rift Terrain…';
+  terrainStatus.textContent = 'Generating seeded survival island…';
+  const descriptor = typeof worldDescriptor === 'string' ? { url: worldDescriptor } : (worldDescriptor || {});
+  const url = descriptor.url || '/world/rift-survival-terrain.json';
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Terrain failed to load (${response.status})`);
   worldDocument = await response.json();
+  if (descriptor.generation?.id === 'island-v1') {
+    worldDocument.terrain = { ...worldDocument.terrain, seed: Number(descriptor.generation.seed) || worldDocument.terrain.seed, generator: { ...(worldDocument.terrain.generator || {}), ...descriptor.generation } };
+  }
   const worldScaleValidation = validateWorldScaleContract(worldDocument);
   if (!worldScaleValidation.ok) throw new Error(`World scale validation failed: ${worldScaleValidation.errors.join('; ')}`);
   terrain = new RiftLandscape(worldDocument.terrain);
@@ -918,6 +924,14 @@ async function startWorld(url) {
   engine = new RiftEngine(canvas);
   engine.environment.fogNear = 320;
   engine.environment.fogFar = 1200;
+  if (terrain.generator?.id === 'island-v1') {
+    waterMesh = engine.addMesh(createWaterPlaneGeometry(terrain), {
+      kind: 'water',
+      label: 'island-water-plane',
+      baseColorFactor: [0.18, 0.42, 0.58, 1],
+      tint: [0.72, 0.9, 1]
+    });
+  }
   engine.setPixelRatioCap(isMobileLandscapeGameplay() ? MOBILE_TERRAIN_PIXEL_RATIO_MAX : 2);
   const materialTextureSize = clamp(Math.trunc(Number(worldDocument?.terrain?.landscape?.mobilePerformance?.materialTextureSize) || 512), 128, 1024);
   terrainMaterialRuntime = createRiftTerrainMaterialRuntime(engine, terrain, { size: materialTextureSize });
@@ -946,7 +960,8 @@ async function startWorld(url) {
   updateReticleVisual();
   updateReticleTarget();
   const stats = terrain.getStats?.() || {};
-  terrainStatus.textContent = `RiftLandscape · 640×640 · ${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · ${stats.editLayers ?? 1} edit layer${(stats.editLayers ?? 1) === 1 ? '' : 's'} · adaptive LOD`;
+  const generator = terrain.getGeneratorInfo?.();
+  terrainStatus.textContent = `RiftLandscape · 640×640 · ${generator ? `${generator.id} seed ${generator.seed} · ` : ''}${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · ${stats.editLayers ?? 1} edit layer${(stats.editLayers ?? 1) === 1 ? '' : 's'} · adaptive LOD`;
   diagnostics.record('world', 'World boot completed', { worldId: worldDocument?.id, terrainMeshes: terrainMeshes.size });
   void diagnostics.runValidation('world-boot');
   refreshDiagnosticButtons();
@@ -960,6 +975,7 @@ function stopWorld() {
   animationFrame = 0;
   if (terrainMaterialRuntime) terrainMaterialRuntime.destroy();
   terrainMaterialRuntime = null;
+  waterMesh = null;
   if (engine) engine.destroy();
   engine = null;
   terrain = null;
@@ -2030,8 +2046,9 @@ function resetTerrain() {
   snapPlayerToSupport();
   updateReticleTarget();
   refreshTerrainLayerControls();
-  terrainStatus.textContent = `640×640 blank terrain reset · ${lodSummary() || 'adaptive LOD'}`;
-  editorStatus.textContent = 'Back to a perfectly flat blank canvas.';
+  const generator = terrain.getGeneratorInfo?.();
+  terrainStatus.textContent = `640×640 ${generator ? `${generator.id} seed ${generator.seed}` : 'terrain'} reset · ${lodSummary() || 'adaptive LOD'}`;
+  editorStatus.textContent = generator ? 'Seeded island regenerated; manual terrain edits cleared.' : 'Terrain reset.';
 }
 
 function commitTerrainManagementEdit(label, mutation, { rebuild = true } = {}) {
@@ -2576,6 +2593,25 @@ function createRingGeometry(radius) {
     indices.push(a, c, b, b, c, d);
   }
   return { vertices: new Float32Array(vertices), indices: new Uint16Array(indices), vertexStride: 9 };
+}
+
+function createWaterPlaneGeometry(activeTerrain) {
+  const minX = activeTerrain.origin[0] - 2;
+  const minZ = activeTerrain.origin[2] - 2;
+  const maxX = activeTerrain.origin[0] + activeTerrain.width + 2;
+  const maxZ = activeTerrain.origin[2] + activeTerrain.depth + 2;
+  const y = (Number(activeTerrain.generator?.waterLevel) || 0) + 0.035;
+  const color = [0.16, 0.39, 0.54];
+  return {
+    vertices: new Float32Array([
+      minX, y, minZ, 0, 1, 0, ...color,
+      maxX, y, minZ, 0, 1, 0, ...color,
+      maxX, y, maxZ, 0, 1, 0, ...color,
+      minX, y, maxZ, 0, 1, 0, ...color
+    ]),
+    indices: new Uint16Array([0, 2, 1, 0, 3, 2]),
+    vertexStride: 9
+  };
 }
 
 function createCapsuleGeometry() {

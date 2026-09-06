@@ -1,4 +1,4 @@
-import { RiftTerrain } from './rift-terrain.js?v=20260902-terrain-pack-r1';
+import { RiftTerrain } from './rift-terrain.js?v=20260906-island-v1-r1';
 
 export const RIFT_LANDSCAPE_FORMAT = 'rift-landscape-v3';
 export const RIFT_LANDSCAPE_EDIT_FORMAT = 'rift-landscape-edits-v2';
@@ -15,7 +15,7 @@ const DEFAULT_MATERIAL_LAYERS = Object.freeze([
   { id: 'rock', name: 'Rock', defaultWeight: 0, color: [0.43, 0.45, 0.44], tileMeters: 4, roughnessFactor: 0.72 },
   { id: 'gravel', name: 'Gravel', defaultWeight: 0, color: [0.52, 0.50, 0.44], tileMeters: 3, roughnessFactor: 0.86 },
   { id: 'mud', name: 'Mud', defaultWeight: 0, color: [0.29, 0.23, 0.17], tileMeters: 3.5, roughnessFactor: 0.96 },
-  { id: 'path', name: 'Path', defaultWeight: 0, color: [0.49, 0.39, 0.25], tileMeters: 3, roughnessFactor: 0.82 }
+  { id: 'sand', name: 'Sand', defaultWeight: 0, color: [0.68, 0.60, 0.43], tileMeters: 3, roughnessFactor: 0.9 }
 ]);
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
@@ -127,6 +127,7 @@ export class RiftLandscape extends RiftTerrain {
     this.activeMaterialLayerId = this.materialLayers.has(requestedMaterial)
       ? requestedMaterial
       : (this.materialLayers.has('dirt') ? 'dirt' : this.baseMaterialLayerId);
+    if (this.generator?.id === 'island-v1' && this.generator.autoMaterials) this._applyGeneratedMaterialMasks();
     const requestedSpline = cleanId(landscape.activeSpline || '');
     this.activeSplineId = this.splines.some(entry => cleanId(entry.id) === requestedSpline)
       ? requestedSpline
@@ -175,6 +176,40 @@ export class RiftLandscape extends RiftTerrain {
     };
     this.materialLayers.set(id, layer);
     return layer;
+  }
+
+  _applyGeneratedMaterialMasks() {
+    const sand = this.materialLayers.get('sand');
+    const dirt = this.materialLayers.get('dirt');
+    const rock = this.materialLayers.get('rock');
+    const gravel = this.materialLayers.get('gravel');
+    const mud = this.materialLayers.get('mud');
+    for (const layer of this.materialLayers.values()) layer.weights.fill(0);
+    const waterLevel = Number(this.generator?.waterLevel) || 0;
+    const spacing = Math.max(0.001, this.sampleSpacing);
+    const heightAt = (ix, iz) => this.heights[clamp(iz, 0, this.rows - 1) * this.columns + clamp(ix, 0, this.columns - 1)];
+    for (let iz = 0; iz < this.rows; iz += 1) {
+      for (let ix = 0; ix < this.columns; ix += 1) {
+        const index = iz * this.columns + ix;
+        const height = this.heights[index];
+        const rel = height - waterLevel;
+        const dx = (heightAt(ix + 1, iz) - heightAt(ix - 1, iz)) / (spacing * 2);
+        const dz = (heightAt(ix, iz + 1) - heightAt(ix, iz - 1)) / (spacing * 2);
+        const slope = Math.hypot(dx, dz);
+        const beachBand = 1 - smooth01(Math.abs(rel - 0.8) / 4.2);
+        const beachSlope = 1 - smooth01((slope - 0.18) / 0.55);
+        const rockSlope = smooth01((slope - 0.42) / 0.85);
+        const highRock = smooth01((rel - 28) / 18) * 0.4;
+        const dirtSlope = smooth01((slope - 0.12) / 0.5) * (1 - rockSlope);
+        const lowMud = rel > 0 ? (1 - smooth01(rel / 5.5)) * (1 - beachBand) * (1 - rockSlope) : 0;
+        if (sand) sand.weights[index] = clamp(Math.round(255 * beachBand * beachSlope), 0, 255);
+        if (rock) rock.weights[index] = clamp(Math.round(235 * Math.max(rockSlope, highRock)), 0, 255);
+        if (dirt) dirt.weights[index] = clamp(Math.round(95 * dirtSlope), 0, 255);
+        if (gravel) gravel.weights[index] = clamp(Math.round(55 * rockSlope * (1 - highRock)), 0, 255);
+        if (mud) mud.weights[index] = clamp(Math.round(42 * lowMud), 0, 255);
+        this._normalizeMaterialWeightsAtIndex(index);
+      }
+    }
   }
 
   listEditLayers() {

@@ -2,7 +2,7 @@
   "format": "rift-world-v1",
   "version": 1,
   "id": "rift-survival-terrain",
-  "name": "Android Survival Blank Terrain",
+  "name": "Android Survival Seeded Island",
   "units": "meters",
   "terrain": {
     "format": "rift-terrain-v1",
@@ -17,7 +17,7 @@
     ],
     "sampleSpacing": 1,
     "chunkSize": 64,
-    "seed": 1,
+    "seed": 4032026,
     "baseHeight": 0,
     "maxWalkSlope": 0.82,
     "layers": [],
@@ -144,19 +144,19 @@
           "roughnessFactor": 0.96
         },
         {
-          "id": "path",
-          "name": "Path",
+          "id": "sand",
+          "name": "Sand",
           "defaultWeight": 0,
           "color": [
-            0.49,
-            0.39,
-            0.25
+            0.68,
+            0.6,
+            0.43
           ],
           "texture": "",
           "normal": "",
           "roughness": "",
           "tileMeters": 3,
-          "roughnessFactor": 0.82
+          "roughnessFactor": 0.9
         }
       ],
       "splines": [],
@@ -174,6 +174,17 @@
         "adaptiveFrames": 90,
         "materialTextureSize": 512
       }
+    },
+    "generator": {
+      "id": "island-v1",
+      "version": 1,
+      "waterLevel": 0,
+      "coastWidth": 30,
+      "landHeight": 13,
+      "hillHeight": 12,
+      "mountainHeight": 18,
+      "roughness": 0.85,
+      "autoMaterials": true
     }
   },
   "anchors": {
@@ -189,10 +200,10 @@
     "worldFoundation": "rift-landscape-v3",
     "legacyBlocks": false,
     "voxelGrid": false,
-    "blankCanvas": true,
+    "blankCanvas": false,
     "negativeWorldY": true,
     "lowerBarrier": false,
-    "description": "Blank continuous Rift terrain foundation for the Android-first survival sandbox. Negative Y is valid world space. No generated structures, props, combat content, quests, city systems or artificial lower barrier.",
+    "description": "Deterministic seeded island-v1 survival terrain with ocean floor, beaches, lowlands, hills, ridges, valleys, cliffs and flatter build-friendly regions. Manual RiftLandscape sculpt/material edit layers remain additive on top.",
     "terrainOrganization": "RiftLandscape: 128m components / 64m sections / 1m source samples / non-destructive edit layers",
     "adaptiveLod": true,
     "lodSeamStitching": true,
@@ -222,7 +233,11 @@
     "engineResourceInventory": true,
     "networkTelemetry": true,
     "nativeWasmTelemetry": true,
-    "subsystemFrameTimings": true
+    "subsystemFrameTimings": true,
+    "generatedIsland": true,
+    "terrainGenerator": "island-v1",
+    "terrainGeneratorVersion": 1,
+    "deterministicSeededTerrain": true
   },
   "scale": {
     "format": "rift-scale-v1",

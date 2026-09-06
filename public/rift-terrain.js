@@ -66,6 +66,11 @@ export function validateRiftTerrainConfig(config) {
   const columns = Math.round(Number(size[0]) / spacing) + 1;
   const rows = Math.round(Number(size[1]) / spacing) + 1;
   if (columns > 1025 || rows > 1025) failures.push('native RiftCore currently supports up to 1025 samples per terrain axis');
+  if (config?.generator != null) {
+    if (config.generator?.id !== 'island-v1') failures.push('terrain generator id must be island-v1');
+    if (!Number.isFinite(Number(config.generator?.version)) || Number(config.generator.version) !== 1) failures.push('island-v1 generator version must be 1');
+    if (!Number.isFinite(Number(config.seed))) failures.push('seeded terrain requires a finite terrain.seed');
+  }
   return { ok: failures.length === 0, failures };
 }
 
@@ -94,6 +99,18 @@ export class RiftTerrain {
     this.layers = Array.isArray(config.layers) ? config.layers : [];
     this.holes = Array.isArray(config.holes) ? config.holes : [];
     this.caves = Array.isArray(config.caves) ? config.caves : [];
+    this.generator = config.generator?.id === 'island-v1' ? {
+      id: 'island-v1',
+      version: 1,
+      seed: this.seed,
+      waterLevel: Number(config.generator.waterLevel) || 0,
+      coastWidth: Math.max(4, Number(config.generator.coastWidth) || 30),
+      landHeight: Math.max(1, Number(config.generator.landHeight) || 13),
+      hillHeight: Math.max(0, Number(config.generator.hillHeight) || 12),
+      mountainHeight: Math.max(0, Number(config.generator.mountainHeight) || 18),
+      roughness: clamp(Number(config.generator.roughness ?? 0.85), 0, 2),
+      autoMaterials: config.generator.autoMaterials !== false
+    } : null;
     this.revision = 1;
 
     assertNative(
@@ -110,8 +127,22 @@ export class RiftTerrain {
     );
     this._bindNativeViews();
 
-    if (this.layers.length) {
-      console.warn('RiftCore: procedural terrain layers are ignored by the native blank-canvas runtime. Author terrain with edit layers instead.');
+    if (this.generator) {
+      assertNative(typeof NATIVE.rift_terrain_generate_island === 'function', 'RiftCore island-v1 generator export is unavailable.');
+      assertNative(
+        NATIVE.rift_terrain_generate_island(
+          this.generator.seed,
+          this.generator.waterLevel,
+          this.generator.coastWidth,
+          this.generator.landHeight,
+          this.generator.hillHeight,
+          this.generator.mountainHeight,
+          this.generator.roughness
+        ),
+        'RiftCore failed to generate island-v1 terrain.'
+      );
+    } else if (this.layers.length) {
+      console.warn('RiftCore: legacy procedural terrain layers are ignored. Use terrain.generator for deterministic world generation or edit layers for authored sculpting.');
     }
     this._caveCache = this.caves.map((cave, index) => this._normalizeCave(cave, index));
   }
@@ -125,7 +156,7 @@ export class RiftTerrain {
       abi: RiftCore.abi,
       memoryBytes,
       memoryPages: memoryBytes / 65536,
-      terrain: { columns: this.columns, rows: this.rows, sampleSpacing: this.sampleSpacing, samples: this.heights?.length || this.columns * this.rows, cells: this.manualHoles?.length || (this.columns - 1) * (this.rows - 1), revision: this.revision },
+      terrain: { columns: this.columns, rows: this.rows, sampleSpacing: this.sampleSpacing, samples: this.heights?.length || this.columns * this.rows, cells: this.manualHoles?.length || (this.columns - 1) * (this.rows - 1), revision: this.revision, generator: this.generator ? { ...this.generator } : null },
       exportCount: exportNames.length,
       functionCount: nativeFunctions.length,
       failureCount: NATIVE_FAILURES.length,
@@ -146,6 +177,10 @@ export class RiftTerrain {
   _cellIndex(ix, iz) { return iz * (this.columns - 1) + ix; }
   _worldX(ix) { return this.origin[0] + ix * this.sampleSpacing; }
   _worldZ(iz) { return this.origin[2] + iz * this.sampleSpacing; }
+
+  getGeneratorInfo() {
+    return this.generator ? { ...this.generator } : null;
+  }
 
   containsXZ(x, z) {
     return x >= this.origin[0] && z >= this.origin[2] && x <= this.origin[0] + this.width && z <= this.origin[2] + this.depth;

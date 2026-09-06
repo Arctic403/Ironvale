@@ -30,6 +30,7 @@ float gOriginZ = 0.0f;
 float gBaseHeight = 0.0f;
 float gMaxWalkSlope = 0.78f;
 float gHeights[kMaxSamples];
+float gGeneratedBase[kMaxSamples];
 float gDelta[kMaxSamples];
 unsigned char gHoles[kMaxCells];
 float gNormal[3] = {0.0f, 1.0f, 0.0f};
@@ -56,6 +57,66 @@ inline float worldX(int ix){ return gOriginX + (float)ix*gSpacing; }
 inline float worldZ(int iz){ return gOriginZ + (float)iz*gSpacing; }
 inline bool ready(){ return gColumns>1 && gRows>1; }
 inline bool contains(float x,float z){ return ready() && x>=gOriginX && z>=gOriginZ && x<=gOriginX+(gColumns-1)*gSpacing && z<=gOriginZ+(gRows-1)*gSpacing; }
+
+unsigned int mix32(unsigned int x){
+  x ^= x >> 16; x *= 0x7feb352dU; x ^= x >> 15; x *= 0x846ca68bU; x ^= x >> 16; return x;
+}
+float hash01(int x,int z,unsigned int seed){
+  unsigned int h=mix32((unsigned int)x*0x9e3779b1U ^ (unsigned int)z*0x85ebca77U ^ seed*0xc2b2ae3dU);
+  return (float)(h & 0x00ffffffU) / 16777215.0f;
+}
+float valueNoise(float x,float z,float scale,unsigned int seed){
+  scale=maxf(1.0f,scale); float gx=x/scale,gz=z/scale; int x0=floori(gx),z0=floori(gz),x1=x0+1,z1=z0+1;
+  float tx=smoothstepf(gx-(float)x0),tz=smoothstepf(gz-(float)z0);
+  float a=hash01(x0,z0,seed),b=hash01(x1,z0,seed),c=hash01(x0,z1,seed),d=hash01(x1,z1,seed);
+  return lerpf(lerpf(a,b,tx),lerpf(c,d,tx),tz)*2.0f-1.0f;
+}
+float fbm(float x,float z,float scale,unsigned int seed){
+  float total=0.0f,amp=0.5f,norm=0.0f; float currentScale=maxf(2.0f,scale);
+  for(int octave=0;octave<5;octave++){
+    total+=valueNoise(x,z,currentScale,seed+(unsigned int)octave*0x9e3779b9U)*amp; norm+=amp; amp*=0.5f; currentScale*=0.5f;
+  }
+  return norm>0.0f?total/norm:0.0f;
+}
+float islandHeightAt(float x,float z,unsigned int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness){
+  const float width=(gColumns-1)*gSpacing,depth=(gRows-1)*gSpacing;
+  const float halfW=maxf(gSpacing,width*0.5f),halfD=maxf(gSpacing,depth*0.5f),halfMin=minf(halfW,halfD);
+  const float centerX=gOriginX+halfW,centerZ=gOriginZ+halfD;
+  const float rawNx=(x-centerX)/halfW,rawNz=(z-centerZ)/halfD;
+  float nx=rawNx,nz=rawNz;
+  const float warpX=fbm(x+131.0f,z-79.0f,220.0f,seed^0x68bc21ebU)*0.12f;
+  const float warpZ=fbm(x-47.0f,z+193.0f,240.0f,seed^0x02e5be93U)*0.12f;
+  nx=(nx+warpX)*0.95f; nz=(nz+warpZ)*1.05f;
+  const float radial=sqrtf_fast(nx*nx+nz*nz);
+  const float coastNoise=fbm(x,z,170.0f,seed^0xa511e9b3U)*0.13f + fbm(x+83.0f,z-61.0f,72.0f,seed^0x63d83595U)*0.045f;
+  float islandField=0.82f-radial+coastNoise;
+  const float edgeNorm=minf(1.0f-absf(rawNx),1.0f-absf(rawNz));
+  const float edgeLimit=(edgeNorm-0.07f)*1.5f;
+  islandField=minf(islandField,edgeLimit);
+  const float coastNorm=maxf(gSpacing/halfMin,coastWidth/halfMin);
+  if(islandField<=0.0f){
+    const float sea=smoothstepf(clampf((-islandField)/(coastNorm*2.8f),0.0f,1.0f));
+    const float seabedNoise=fbm(x,z,95.0f,seed^0x9e3779b9U)*1.6f;
+    return waterLevel-1.4f-sea*10.5f+seabedNoise*sea;
+  }
+  const float broadRise=smoothstepf(clampf(islandField/coastNorm,0.0f,1.0f));
+  const float cliffSelector=smoothstepf(clampf((fbm(x+211.0f,z+37.0f,210.0f,seed^0x51ed270bU)-0.18f)/0.42f,0.0f,1.0f));
+  const float cliffRise=smoothstepf(clampf(islandField/(coastNorm*0.34f),0.0f,1.0f));
+  const float shoreRise=lerpf(broadRise,cliffRise,cliffSelector*0.58f);
+  const float interior=smoothstepf(clampf(islandField/(coastNorm*3.2f),0.0f,1.0f));
+  const float macro=0.5f+0.5f*fbm(x,z,210.0f,seed^0x7f4a7c15U);
+  const float hills=0.5f+0.5f*fbm(x+57.0f,z-103.0f,105.0f,seed^0x94d049bbU);
+  const float ridgeNoise=fbm(x-149.0f,z+89.0f,145.0f,seed^0xd1b54a35U);
+  float ridges=1.0f-absf(ridgeNoise); ridges=ridges*ridges;
+  const float mountainZone=smoothstepf(clampf((macro-0.48f)/0.38f,0.0f,1.0f))*interior;
+  const float flatSelector=smoothstepf(clampf((fbm(x+301.0f,z-217.0f,260.0f,seed^0x165667b1U)-0.18f)/0.38f,0.0f,1.0f))*interior;
+  const float reliefDamp=1.0f-flatSelector*0.62f;
+  const float lowland=2.0f+landHeight*(0.28f+macro*0.72f);
+  const float hillRelief=hillHeight*hills*interior*reliefDamp;
+  const float mountainRelief=mountainHeight*ridges*mountainZone*reliefDamp;
+  const float fine=fbm(x+17.0f,z+29.0f,28.0f,seed^0x27d4eb2fU)*1.55f*clampf(roughness,0.0f,2.0f)*interior*reliefDamp;
+  return waterLevel+shoreRise*(2.0f+interior*(lowland+hillRelief+mountainRelief)+fine);
+}
 
 float sample(float x,float z){
   if(!contains(x,z)) return 1.0e30f;
@@ -140,7 +201,7 @@ int rift_terrain_init(int columns,int rows,float sampleSpacing,float originX,flo
   if(columns<2||rows<2||columns>kMaxColumns||rows>kMaxRows||sampleSpacing<=0.0f) return 0;
   gColumns=columns; gRows=rows; gSpacing=sampleSpacing; gOriginX=originX; gOriginZ=originZ; gBaseHeight=baseHeight; gMaxWalkSlope=clampf(maxWalkSlope,0.25f,2.5f);
   int samples=columns*rows, cells=(columns-1)*(rows-1);
-  for(int i=0;i<samples;i++){ gDelta[i]=0.0f; gHeights[i]=gBaseHeight; }
+  for(int i=0;i<samples;i++){ gDelta[i]=0.0f; gGeneratedBase[i]=gBaseHeight; gHeights[i]=gBaseHeight; }
   for(int i=0;i<cells;i++) gHoles[i]=0;
   gMeshVertexFloats=0; gMeshIndexCount=0; return 1;
 }
@@ -151,8 +212,19 @@ int rift_terrain_cell_count(){ return ready()?(gColumns-1)*(gRows-1):0; }
 unsigned int rift_terrain_heights_ptr(){ return (unsigned int)(unsigned long)gHeights; }
 unsigned int rift_terrain_delta_ptr(){ return (unsigned int)(unsigned long)gDelta; }
 unsigned int rift_terrain_holes_ptr(){ return (unsigned int)(unsigned long)gHoles; }
-void rift_terrain_reset_flat(){ if(!ready())return; int n=gColumns*gRows,c=(gColumns-1)*(gRows-1); for(int i=0;i<n;i++){gDelta[i]=0;gHeights[i]=gBaseHeight;} for(int i=0;i<c;i++)gHoles[i]=0; }
-void rift_terrain_rebuild_from_delta(){ if(!ready())return; int n=gColumns*gRows; for(int i=0;i<n;i++) gHeights[i]=gBaseHeight+gDelta[i]; }
+void rift_terrain_reset_flat(){ if(!ready())return; int n=gColumns*gRows,c=(gColumns-1)*(gRows-1); for(int i=0;i<n;i++){gDelta[i]=0;gGeneratedBase[i]=gBaseHeight;gHeights[i]=gBaseHeight;} for(int i=0;i<c;i++)gHoles[i]=0; }
+int rift_terrain_generate_island(int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness){
+  if(!ready())return 0;
+  coastWidth=clampf(coastWidth,gSpacing*4.0f,minf((gColumns-1)*gSpacing,(gRows-1)*gSpacing)*0.22f);
+  landHeight=clampf(landHeight,1.0f,80.0f); hillHeight=clampf(hillHeight,0.0f,80.0f); mountainHeight=clampf(mountainHeight,0.0f,120.0f); roughness=clampf(roughness,0.0f,2.0f);
+  const unsigned int useSeed=(unsigned int)(seed==0?1:seed); int n=gColumns*gRows,c=(gColumns-1)*(gRows-1);
+  for(int iz=0;iz<gRows;iz++)for(int ix=0;ix<gColumns;ix++){
+    int idx=hidx(ix,iz); float generated=islandHeightAt(worldX(ix),worldZ(iz),useSeed,waterLevel,coastWidth,landHeight,hillHeight,mountainHeight,roughness);
+    gGeneratedBase[idx]=generated; gDelta[idx]=0.0f; gHeights[idx]=generated;
+  }
+  for(int i=0;i<c;i++)gHoles[i]=0; gMeshVertexFloats=0; gMeshIndexCount=0; return n>0?1:0;
+}
+void rift_terrain_rebuild_from_delta(){ if(!ready())return; int n=gColumns*gRows; for(int i=0;i<n;i++) gHeights[i]=gGeneratedBase[i]+gDelta[i]; }
 float rift_terrain_sample_height(float x,float z){ return sample(x,z); }
 int rift_terrain_sample_normal(float x,float z){ if(!contains(x,z))return 0; normalAt(x,z,gNormal); return 1; }
 unsigned int rift_terrain_normal_ptr(){ return (unsigned int)(unsigned long)gNormal; }
