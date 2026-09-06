@@ -4,12 +4,12 @@
   "files": [
     {
       "path": "/app.js",
-      "sha256": "8b51e4acbbbc8c090b1079d6fc46b33b7fc1918f0049a57ac804dfd662455795",
-      "size": 115148
+      "sha256": "d4f5d47c61a4e5f74e193d6b59710af6962635f2c631eae4466c326f69912034",
+      "size": 116047
     },
     {
       "path": "/index.html",
-      "sha256": "78ddfa954029974c2996023149418bac0f69a61f2fc90491da7e842ad0ee51ea",
+      "sha256": "d1e1056c42941d6929e787e889421f2f58a7e3945896bded1e77dffddb2c70d0",
       "size": 9361
     },
     {
@@ -108,7 +108,7 @@
       "size": 24482
     }
   ],
-  "buildId": "rs-b1ee5cfd7b8fad6fc26000e4",
-  "digest": "b1ee5cfd7b8fad6fc26000e4794d19788d8d3abd3552c985eed8cf2988daf243",
+  "buildId": "rs-bfe9724921a664da0754beb2",
+  "digest": "bfe9724921a664da0754beb2a06305fc7b35d95f20477426b7ee8e24590b6ae4",
   "fileCount": 21
 }

@@ -13,8 +13,8 @@ assert(!/buildSurfaceSectionGeometry[\s\S]{0,240}super\.buildSurfaceSectionGeome
 for (const token of ['exactGrid', 'materialFastPathVertices', 'materialFallbackVertices', 'intermediateVertexBytesAvoided', 'materialPackMs', 'indexCopyMs']) assert(landscape.includes(token), 'landscape missing ' + token);
 assert(landscape.includes('this.sampleMaterialWeights(x, z)'), 'off-grid safety fallback missing');
 for (const token of ['materialPackMs','indexCopyMs','intermediateVertexBytesAvoided','materialFastPathVertices','materialFallbackVertices','directWasmToFinalPbrPack','exactGridMaterialFastPath']) assert(app.includes(token), 'profiler missing ' + token);
-assert(index.includes('/app.js?v=20260906-island-v3-r1'), 'app cache tag missing');
-assert(app.includes("APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r1'"), 'app build label missing');
+assert(index.includes('/app.js?v=20260906-island-v3-r2'), 'app cache tag missing');
+assert(app.includes("APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r2'"), 'app build label missing');
 assert(landscape.includes("./rift-terrain.js?v=20260906-island-v3-r1"), 'terrain module cache tag missing');
 assert(app.includes("./rift-landscape.js?v=20260906-island-v3-r1"), 'landscape module cache tag missing');
 assert(String(pkg.scripts?.build || '').includes('node scripts/check-terrain-material-pack.mjs'), 'permanent verifier missing from build');

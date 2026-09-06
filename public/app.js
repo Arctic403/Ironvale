@@ -6,7 +6,7 @@ import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzi
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 import { RiftSurvivalIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-const APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r1';
+const APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r2';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -944,7 +944,13 @@ async function startWorld(worldDescriptor) {
     player.z = spawn.z;
   }
 
+  // Resolve generated support and the real 5.12 km camera before the first
+  // terrain build/cull pass. RiftEngine otherwise starts on its legacy camera.
+  snapPlayerToSupport();
+  applyViewportCameraProfile(true);
+  updateOrbitCamera();
   rebuildTerrainMeshes();
+
   playerCharacter = null;
   playerVisualFeetAnchored = false;
   playerVisualFeetOffset = 0;
@@ -952,10 +958,8 @@ async function startWorld(worldDescriptor) {
   cancelMovementAssist('world-start');
   playerMoving = false;
   playerMesh = engine.addMesh(createCapsuleGeometry(), { kind: 'character-fallback', label: 'player-capsule', position: [player.x, player.y, player.z] });
-  snapPlayerToSupport();
+  updatePlayerVisualTransform();
   void installRiggedPlayerVisual();
-  applyViewportCameraProfile(true);
-  updateOrbitCamera();
   reticle.hidden = true;
   updateReticleVisual();
   updateReticleTarget();
@@ -1056,14 +1060,25 @@ function removeUnstreamedTerrainMeshes() {
 function updateTerrainMeshVisibility(now = performance.now()) {
   if (!engine || !terrain) return;
   let visible = 0;
+  const nearGroundRadius = Math.max(terrain.sectionSize * 1.5, 120);
+  const sectionDistanceToPlayer = section => {
+    const bounds = section?.bounds;
+    if (!bounds) return Infinity;
+    const dx = player.x < bounds.minX ? bounds.minX - player.x : player.x > bounds.maxX ? player.x - bounds.maxX : 0;
+    const dz = player.z < bounds.minZ ? bounds.minZ - player.z : player.z > bounds.maxZ ? player.z - bounds.maxZ : 0;
+    return Math.hypot(dx, dz);
+  };
   for (const [key, entry] of terrainMeshes) {
     const section = terrainLodPlan.get(key);
     if (!section || !sectionIsStreamed(section)) {
       if (entry.mesh) entry.mesh.visible = false;
       continue;
     }
+    // Keep the support surface around the player resident even while the first
+    // third-person camera frame is settling or a stream boundary is crossed.
+    const nearPlayer = sectionDistanceToPlayer(section) <= nearGroundRadius;
     const sphere = terrain.sectionRenderSphere?.(section);
-    const inView = sphere ? engine.isSphereVisible(sphere.center, sphere.radius) : true;
+    const inView = nearPlayer || (sphere ? engine.isSphereVisible(sphere.center, sphere.radius) : true);
     entry.mesh.visible = inView;
     if (inView) visible += 1;
   }
