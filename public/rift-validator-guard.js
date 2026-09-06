@@ -1,15 +1,15 @@
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 
-export const IRONVALE_VALIDATOR_GUARD_FORMAT = 'ironvale-validator-guard-v1';
+export const RIFT_SURVIVAL_VALIDATOR_GUARD_FORMAT = 'rift-survival-validator-guard-v1';
 
-const PATCH_MARK = Symbol.for('ironvale.validator-guard-patched');
-const WRAPPED_INSTANCE = Symbol('ironvale.validator-guard-instance');
+const PATCH_MARK = Symbol.for('rift-survival.validator-guard-patched');
+const WRAPPED_INSTANCE = Symbol('rift-survival.validator-guard-instance');
 const originalRunValidation = RiftDiagnostics.prototype.runValidation;
 const REALTIME_CONNECTING_GRACE_MS = 1500;
 
 let activeInstance = null;
 const guardState = {
-  format: IRONVALE_VALIDATOR_GUARD_FORMAT,
+  format: RIFT_SURVIVAL_VALIDATOR_GUARD_FORMAT,
   installedAt: new Date().toISOString(),
   lastRunAt: null,
   lastChecks: [],
@@ -65,7 +65,7 @@ function rectSnapshot(selector) {
 function layoutSnapshot() {
   const viewport = { width: innerWidth, height: innerHeight };
   const selectors = [
-    '#rift-canvas', '.topbar', '#terrain-tools', '#joystick', '#combat-hud',
+    '#rift-canvas', '.topbar', '#terrain-tools', '#joystick',
     '#terrain-reticle', '#freecam-altitude', '#coords'
   ];
   const rects = selectors.map(rectSnapshot).filter(Boolean);
@@ -130,7 +130,7 @@ async function captureIntegrity() {
   if (!snapshot || snapshot.error) throw new Error(snapshot?.error || 'Deep integrity snapshot unavailable.');
   const runtime = snapshot.runtime || {};
   const edits = normalizeLandscapeEdits(snapshot.deep?.landscapeEdits || null);
-  const draft = (() => { try { return localStorage.getItem('ironvale:terrain:draft:v4') || ''; } catch (_) { return ''; } })();
+  const draft = (() => { try { return localStorage.getItem('rift-survival:terrain:draft:v4') || ''; } catch (_) { return ''; } })();
   return {
     at: new Date().toISOString(),
     worldId: runtime.world?.id || snapshot.quick?.worldId || null,
@@ -247,15 +247,15 @@ async function buildGuardChecks(instance) {
     checks.push(passFail('security.anticheat-session', sessionOk, sessionOk ? 'Server-private bot/anti-cheat monitor attached to live Durable Object RAM state' : (smoke.error || 'Anti-cheat RAM session smoke failed')));
     const policyOk = smoke.policy?.automaticBan === false && smoke.policy?.aiAuthority === 'recommendation-only' && smoke.policy?.ramAuthority === 'final' && smoke.policy?.ordinaryMovementWritesToD1 === false && smoke.policy?.suspiciousCaseWritesOnly === true;
     checks.push(passFail('security.authority-policy', policyOk, policyOk ? 'AI recommends only · RAM authority final · ordinary movement remains D1-free' : 'Security authority policy mismatch'));
-    const bridgeOk = smoke.bridge?.mode === 'github-oidc-read-only' && smoke.bridge?.exactWorkflowBound === true && smoke.bridge?.writeAuthority === 'admin-only';
-    checks.push(passFail('security.ai-review-bridge', bridgeOk, bridgeOk ? 'GitHub OIDC AI review bridge is exact-workflow-bound and read-only' : 'AI review bridge contract mismatch'));
+    const bridgeOk = smoke.bridge?.mode === 'service-key-read-only' && smoke.bridge?.repositoryBound === false && smoke.bridge?.writeAuthority === 'admin-only';
+    checks.push(passFail('security.reviewer-boundary', bridgeOk, bridgeOk ? 'Service-key review is read-only; case changes remain admin-only' : 'Anti-cheat reviewer boundary mismatch'));
     const integrityBound = smoke.integrity?.attested === true && smoke.authority?.integrityStatus === 'attested' && Boolean(smoke.integrity?.buildId) && smoke.integrity?.buildId === smoke.authority?.integrityBuildId;
     checks.push(passFail('security.integrity-binding', integrityBound, integrityBound ? ('Integrity ' + smoke.integrity.buildId + ' bound to RAM authority') : 'Integrity/RAM binding mismatch'));
     const zone = smoke.zoneAuthority || {};
-    const zoneOk = zone.format === 'ironvale-zone-authority-v1' && zone.enabled === true && zone.source === 'zone-durable-object-ram' && zone.storagePolicy === 'ram-only-ephemeral-presence' && zone.d1Writes === false && zone.durableStorageWrites === false;
+    const zoneOk = zone.format === 'rift-survival-zone-authority-v1' && zone.enabled === true && zone.source === 'zone-durable-object-ram' && zone.storagePolicy === 'ram-only-ephemeral-presence' && zone.d1Writes === false && zone.durableStorageWrites === false;
     checks.push(passFail('architecture.zone-authority', zoneOk, zoneOk ? ('Zone ' + zone.zoneId + ' · ' + zone.zoneSizeMeters + 'm · RAM-only shared presence') : 'World/zone RAM authority unavailable or persistence policy mismatch'));
     const interest = smoke.nearby || {};
-    const interestOk = interest.format === 'ironvale-zone-nearby-v1' && interest.authority === 'ironvale-zone-authority-v1' && interest.source === 'zone-durable-object-ram' && Number(interest.scannedZones) >= 1 && Number(interest.radiusMeters) > 0;
+    const interestOk = interest.format === 'rift-survival-zone-nearby-v1' && interest.authority === 'rift-survival-zone-authority-v1' && interest.source === 'zone-durable-object-ram' && Number(interest.scannedZones) >= 1 && Number(interest.radiusMeters) > 0;
     checks.push(passFail('architecture.interest-management', interestOk, interestOk ? (interest.scannedZones + ' zone(s) scanned within ' + interest.radiusMeters + 'm · nearby=' + (interest.nearbyCount || 0)) : 'Bounded nearby interest-management smoke unavailable'));
   }
 
@@ -317,7 +317,7 @@ async function buildGuardChecks(instance) {
   const layoutStatus = layout.outOfBounds.length ? 'warn' : layout.canvasCoverage < 0.85 ? 'warn' : 'pass';
   checks.push(statusCheck('ui.layout', layoutStatus, layout.outOfBounds.length ? `Out-of-bounds UI: ${layout.outOfBounds.join(', ')}` : `Canvas coverage ${(layout.canvasCoverage * 100).toFixed(0)}% · visible UI in viewport`));
 
-  const auto = window.IronvaleAutoValidation?.status?.();
+  const auto = window.RiftSurvivalAutoValidation?.status?.();
   if (auto?.completedAt && !auto.running) {
     checks.push(statusCheck('auto-validation.last-run', auto.status === 'fail' ? 'fail' : auto.status === 'warn' ? 'warn' : 'pass', `Last auto run=${auto.status} · ${auto.counts?.pass ?? auto.pass ?? 0} pass · ${auto.counts?.warn ?? auto.warn ?? 0} warn · ${auto.counts?.fail ?? auto.fail ?? 0} fail`));
     const evidence = auto.evidence || {};
@@ -355,8 +355,8 @@ if (!RiftDiagnostics.prototype[PATCH_MARK]) {
   };
 }
 
-window.IronvaleValidatorGuard = Object.freeze({
-  format: IRONVALE_VALIDATOR_GUARD_FORMAT,
+window.RiftSurvivalValidatorGuard = Object.freeze({
+  format: RIFT_SURVIVAL_VALIDATOR_GUARD_FORMAT,
   status: () => ({ ...guardState, lastChecks: guardState.lastChecks.map(check => ({ ...check })) }),
   layout: layoutSnapshot,
   snapshot: async (level = 2) => {
@@ -371,4 +371,4 @@ window.IronvaleValidatorGuard = Object.freeze({
   }
 });
 
-queueMicrotask(() => { try { void window.IronvaleDiagnostics?.validate?.(); } catch (_) {} });
+queueMicrotask(() => { try { void window.RiftSurvivalDiagnostics?.validate?.(); } catch (_) {} });

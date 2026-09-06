@@ -40,4 +40,4 @@ assert(touchedSections(63, 32, 10).length === 2, '10m brush near one section edg
 assert(touchedSections(63, 63, 10).length === 4, '10m brush near a section corner should rebuild four sections');
 assert(touchedSections(32, 32, 40).length <= 4, '40m brush should not expand to a legacy 3x3 whole-section halo');
 
-console.log('Ironvale terrain dirty-region verification passed.');
+console.log('RiftSurvival terrain dirty-region verification passed.');

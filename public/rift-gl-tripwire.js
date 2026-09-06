@@ -1,8 +1,8 @@
 import { RiftEngine } from './rift-engine.js?v=20260901-engine-blackbox-r1';
 
-export const IRONVALE_GL_TRIPWIRE_FORMAT = 'ironvale-gl-tripwire-v1';
+export const RIFT_SURVIVAL_GL_TRIPWIRE_FORMAT = 'rift-survival-gl-tripwire-v1';
 
-const PATCH = Symbol.for('ironvale.gl-tripwire.patched');
+const PATCH = Symbol.for('rift-survival.gl-tripwire.patched');
 const MAX_CAPTURES = 24;
 const ARM_FRAMES = 120;
 const POST_CAPTURE_FRAMES = 3;
@@ -13,7 +13,7 @@ const WATCHED_CALLS = Object.freeze([
 ]);
 
 const state = {
-  format: IRONVALE_GL_TRIPWIRE_FORMAT,
+  format: RIFT_SURVIVAL_GL_TRIPWIRE_FORMAT,
   installedAt: new Date().toISOString(),
   armed: false,
   armedFrames: 0,
@@ -36,7 +36,7 @@ function pushRing(target, value, max = MAX_CAPTURES) {
   return value;
 }
 function record(message, data = null, severity = 'info') {
-  try { window.IronvaleDiagnostics?.record?.('gl-tripwire', message, data, severity); } catch (_) {}
+  try { window.RiftSurvivalDiagnostics?.record?.('gl-tripwire', message, data, severity); } catch (_) {}
 }
 function errorName(gl, code) {
   const pairs = [
@@ -202,7 +202,7 @@ if (!RiftEngine.prototype[PATCH]) {
 
 function registerProvider() {
   if (providerRegistered) return;
-  const diagnostics = window.IronvaleDiagnostics;
+  const diagnostics = window.RiftSurvivalDiagnostics;
   if (!diagnostics?.registerProvider) { setTimeout(registerProvider, 100); return; }
   diagnostics.registerProvider('gl-tripwire', level => ({
     format: state.format,
@@ -221,7 +221,7 @@ function registerProvider() {
   providerRegistered = true;
 }
 
-window.IronvaleGlTripwire = Object.freeze({
+window.RiftSurvivalGlTripwire = Object.freeze({
   format: state.format,
   status: () => ({ ...state, triggers: state.triggers.map(item => ({ ...item })), captures: state.captures.map(item => ({ ...item })) }),
   arm: () => arm('manual')

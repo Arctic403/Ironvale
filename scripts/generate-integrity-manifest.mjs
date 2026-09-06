@@ -4,9 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MANIFEST_PATH = path.join(ROOT, 'public', 'ironvale-integrity-manifest.json');
+const MANIFEST_PATH = path.join(ROOT, 'public', 'rift-survival-integrity-manifest.json');
 const SERVER_PATH = path.join(ROOT, 'src', 'integrity-build.js');
-const FORMAT = 'ironvale-integrity-manifest-v1';
+const FORMAT = 'rift-survival-integrity-manifest-v1';
 const ALGORITHM = 'SHA-256';
 const CRITICAL_FILES = [
   'public/index.html',
@@ -49,7 +49,7 @@ function buildOutputs() {
   });
   const canonical = { format: FORMAT, algorithm: ALGORITHM, files };
   const digest = sha256(Buffer.from(JSON.stringify(canonical)));
-  const buildId = `iv-${digest.slice(0, 24)}`;
+  const buildId = `rs-${digest.slice(0, 24)}`;
   const manifest = { ...canonical, buildId, digest, fileCount: files.length };
   const manifestText = JSON.stringify(manifest, null, 2) + '\n';
   const serverText = [
@@ -72,9 +72,9 @@ const outputs = buildOutputs();
 if (process.argv.includes('--check')) {
   checkFile(MANIFEST_PATH, outputs.manifestText, 'Integrity manifest');
   checkFile(SERVER_PATH, outputs.serverText, 'Integrity server build constants');
-  console.log(`Ironvale integrity manifest verified: ${outputs.buildId} · ${outputs.fileCount} critical files.`);
+  console.log(`Rift Survival integrity manifest verified: ${outputs.buildId} · ${outputs.fileCount} critical files.`);
 } else {
   fs.writeFileSync(MANIFEST_PATH, outputs.manifestText);
   fs.writeFileSync(SERVER_PATH, outputs.serverText);
-  console.log(`Ironvale integrity manifest generated: ${outputs.buildId} · ${outputs.fileCount} critical files.`);
+  console.log(`Rift Survival integrity manifest generated: ${outputs.buildId} · ${outputs.fileCount} critical files.`);
 }

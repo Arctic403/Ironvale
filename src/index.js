@@ -1,4 +1,4 @@
-const SESSION_COOKIE = 'ironvale_session';
+const SESSION_COOKIE = 'rift-survival_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const PASSWORD_ITERATIONS = 100_000;
 const WORLD_MIN_X = 0;
@@ -6,8 +6,8 @@ const WORLD_MAX_X = 640;
 const WORLD_MIN_Z = 0;
 const WORLD_MAX_Z = 640;
 const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
-const RAW_D1_STATEMENT = Symbol('ironvale.raw-d1-statement');
-const SQL_D1_STATEMENT = Symbol('ironvale.sql-d1-statement');
+const RAW_D1_STATEMENT = Symbol('rift-survival.raw-d1-statement');
+const SQL_D1_STATEMENT = Symbol('rift-survival.sql-d1-statement');
 
 let schemaReady = false;
 
@@ -54,7 +54,7 @@ function monotonicNow() {
 
 function createBackendDiagnostic(request, url) {
   return {
-    format: 'ironvale-backend-diagnostics-v1',
+    format: 'rift-survival-backend-diagnostics-v1',
     startedAt: monotonicNow(),
     route: url.pathname,
     method: request.method.toUpperCase(),
@@ -153,14 +153,14 @@ function instrumentEnvironment(env, diag) {
   return new Proxy(env, {
     get(target, property) {
       if (property === 'DB') return database;
-      if (property === '__ironvaleDiagnostic') return diag;
+      if (property === '__riftSurvivalDiagnostic') return diag;
       return target[property];
     }
   });
 }
 
 function setBackendAuth(env, state) {
-  const diag = env?.__ironvaleDiagnostic;
+  const diag = env?.__riftSurvivalDiagnostic;
   if (diag) diag.auth = String(state || 'unknown').slice(0, 48);
 }
 
@@ -182,7 +182,7 @@ function finalizeBackendResponse(response, diag) {
     const db = diag.db || {};
     const headers = new Headers(response.headers);
     const metrics = [
-      timingMetric('ironvale', totalMs, `status=${status},method=${diag.method}`),
+      timingMetric('rift-survival', totalMs, `status=${status},method=${diag.method}`),
       timingMetric('d1', db.totalMs || 0, `calls=${db.calls || 0},q=${db.queries || 0},r=${db.reads || 0},w=${db.writes || 0},b=${db.batches || 0},f=${db.failures || 0},max=${(db.maxMs || 0).toFixed(2)}`),
       timingMetric('auth', null, diag.auth || 'not-checked')
     ];
@@ -209,7 +209,7 @@ export default {
         await ensureCoreTables(tracedEnv);
         response = await handleApi(request, tracedEnv, url);
       } catch (error) {
-        console.error('Ironvale core API error', error);
+        console.error('RiftSurvival core API error', error);
         diagnostic.auth = diagnostic.auth === 'not-checked' ? 'request-error' : diagnostic.auth;
         response = json({ ok: false, error: 'Internal server error' }, 500);
       }
@@ -354,8 +354,8 @@ async function bootstrap(request, env) {
     user: publicUser(auth.user),
     character: publicCharacter(character),
     world: {
-      id: 'ironvale-terrain',
-      url: '/world/ironvale-terrain.json',
+      id: 'rift-survival-terrain',
+      url: '/world/rift-survival-terrain.json',
       foundation: 'rift-landscape-v2',
       terrainFormat: 'rift-terrain-v1',
       size: [640, 640],
@@ -420,9 +420,9 @@ async function health(env) {
   setBackendAuth(env, 'not-applicable');
   try {
     await env.DB.prepare('SELECT 1 AS ok').first();
-    return json({ ok: true, service: 'ironvale-core', database: 'connected' });
+    return json({ ok: true, service: 'rift-survival-core', database: 'connected' });
   } catch {
-    return json({ ok: false, service: 'ironvale-core', database: 'error' }, 503);
+    return json({ ok: false, service: 'rift-survival-core', database: 'error' }, 503);
   }
 }
 

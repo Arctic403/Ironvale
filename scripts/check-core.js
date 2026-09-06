@@ -18,7 +18,7 @@ if (fs.existsSync('public/assets/characters/quaternius/universal-base-male.glb')
 if (fs.existsSync('public/assets/characters/quaternius/universal-animation-library.glb') && fs.statSync('public/assets/characters/quaternius/universal-animation-library.glb').size !== 2714756) failures.push('character animation asset size');
 if (fs.existsSync('public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.txt') && !fs.readFileSync('public/assets/characters/quaternius/LICENSE-BASE-CHARACTERS.txt','utf8').includes('CC0 1.0')) failures.push('character CC0 license');
 
-const world = JSON.parse(fs.readFileSync('public/world/ironvale-terrain.json', 'utf8'));
+const world = JSON.parse(fs.readFileSync('public/world/rift-survival-terrain.json', 'utf8'));
 if (world.format !== 'rift-world-v1') failures.push('world format');
 const worldScaleValidation = validateWorldScaleContract(world);
 if (!worldScaleValidation.ok) failures.push(`world scale contract: ${worldScaleValidation.errors.join('; ')}`);
@@ -50,7 +50,7 @@ if (world.metadata?.terrainFoundationLocked !== true || world.metadata?.terrainS
 if (world.metadata?.frustumCulling !== true || world.metadata?.componentStreamingRuntime !== true || world.metadata?.collisionLodRuntime !== true) failures.push('terrain runtime optimization metadata');
 if (world.metadata?.automatedValidator !== true || world.metadata?.diagnosticDumpSystem !== true || world.metadata?.diagnosticDumpLayers !== 3) failures.push('automated diagnostics metadata');
 if (world.metadata?.diagnosticSchemaVersion !== 2 || world.metadata?.engineBlackBoxDiagnostics !== true || world.metadata?.engineResourceInventory !== true || world.metadata?.networkTelemetry !== true || world.metadata?.nativeWasmTelemetry !== true || world.metadata?.subsystemFrameTimings !== true) failures.push('engine black-box diagnostics metadata');
-if (world.diagnostics?.format !== 'ironvale-diagnostics-v2' || world.diagnostics?.dumpFormat !== 'ironvale-diagnostic-dump-v1' || world.diagnostics?.automaticCrashDumpLevel !== 2 || world.diagnostics?.layers?.length !== 3) failures.push('three-layer diagnostic dump contract');
+if (world.diagnostics?.format !== 'rift-survival-diagnostics-v2' || world.diagnostics?.dumpFormat !== 'rift-survival-diagnostic-dump-v1' || world.diagnostics?.automaticCrashDumpLevel !== 2 || world.diagnostics?.layers?.length !== 3) failures.push('three-layer diagnostic dump contract');
 if (!Array.isArray(world.terrain?.layers) || world.terrain.layers.length !== 0) failures.push('generated terrain layers still present');
 if (!Array.isArray(world.terrain?.caves) || world.terrain.caves.length !== 0) failures.push('generated caves still present');
 if (!Array.isArray(world.objects) || world.objects.length !== 0) failures.push('generated world objects still present');
@@ -59,7 +59,7 @@ const app = fs.readFileSync('public/app.js', 'utf8');
 if (!app.includes('function updateTerrainLod(') || !app.includes('terrain.planSectionLods(')) failures.push('adaptive terrain LOD controller');
 if (!app.includes("import { RiftLandscape } from './rift-landscape.js?v=") || !app.includes('new RiftLandscape(worldDocument.terrain)')) failures.push('RiftLandscape runtime integration');
 if (!app.includes("import { validateWorldScaleContract } from './rift-scale.js?v=") || !app.includes('validateWorldScaleContract(worldDocument)')) failures.push('world scale runtime validation');
-if (!app.includes("ironvale:terrain:draft:v4") || !app.includes('serializeLandscapeEdits') || !app.includes('captureEditState')) failures.push('layer-aware terrain persistence/undo');
+if (!app.includes("rift-survival:terrain:draft:v4") || !app.includes('serializeLandscapeEdits') || !app.includes('captureEditState')) failures.push('layer-aware terrain persistence/undo');
 if (!app.includes('refreshTerrainLayerControls') || !app.includes("$('#terrain-edit-layer')")) failures.push('terrain edit layer controls');
 if (!app.includes('function rebuildDirtyTerrainSections(')) failures.push('dirty terrain section rebuilds');
 if (!app.includes('createRiftTerrainMaterialRuntime') || !app.includes('terrainMaterialRuntime.loadInitial')) failures.push('terrain PBR material runtime hookup');
@@ -68,7 +68,7 @@ if (!app.includes('function refreshTerrainStreamPlan(') || !app.includes('planCo
 if (!app.includes('function setTerrainDebug(') || !app.includes('createTerrainDebugOverlayGeometry')) failures.push('terrain debug overlay');
 if (!app.includes('function updateTerrainPerformance(') || !app.includes('MOBILE_TERRAIN_PIXEL_RATIO_MAX')) failures.push('mobile terrain performance controller');
 if (!app.includes('function updateActiveEditLayerName(') || !app.includes('function deleteActiveEditLayer(')) failures.push('terrain edit layer management');
-if (!app.includes("import { RiftDiagnostics } from './rift-diagnostics.js?v=") || !app.includes('buildDiagnosticSnapshot') || !app.includes('buildDiagnosticChecks') || !app.includes('window.IronvaleDiagnostics')) failures.push('automated runtime validator integration');
+if (!app.includes("import { RiftDiagnostics } from './rift-diagnostics.js?v=") || !app.includes('buildDiagnosticSnapshot') || !app.includes('buildDiagnosticChecks') || !app.includes('window.RiftSurvivalDiagnostics')) failures.push('automated runtime validator integration');
 if (!app.includes("diagnostics.captureCrash(error, 'world-boot')") || !app.includes('L2 diagnostic dump saved')) failures.push('automatic boot crash dump');
 if (!app.includes('diagnosticFrameTimings') || !app.includes('storageDiagnostics') || !app.includes('cacheDiagnostics') || !app.includes('serviceWorkerDiagnostics') || !app.includes('resourceTimingDiagnostics')) failures.push('deep engine forensic runtime snapshot');
 if (!app.includes('getRiftEngineBootTelemetry') || !app.includes("registerProvider('engine'") || !app.includes("registerProvider('native'")) failures.push('engine/native diagnostic providers');
@@ -82,20 +82,21 @@ if (!app.includes('createCapsuleGeometry()')) failures.push('character visual fa
 if (!app.includes('const CHARACTER_MODEL_URL = new URL(') || !app.includes('const CHARACTER_ANIMATION_URL = new URL(')) failures.push('versioned character asset URLs');
 if (!app.includes('if (next && preserveCamera && !freecamEnabled) updateOrbitCamera();') || !app.includes('// Make the mode switch atomic: camera, center ray and reticle all agree immediately.')) failures.push('freecam atomic camera refresh');
 if (!app.includes('character fallback: ${characterError}')) failures.push('visible character fallback diagnostics');
-if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person RPG focus');
+if (!app.includes('const THIRD_PERSON_FOCUS_HEIGHT = 1.20') || !app.includes('player.y + THIRD_PERSON_FOCUS_HEIGHT')) failures.push('third-person player focus');
 if (!app.includes('const MOBILE_LANDSCAPE_DISTANCE = 6.2') || !app.includes('function applyViewportCameraProfile(') || !app.includes('isMobileLandscapeGameplay()')) failures.push('mobile landscape camera profile');
 if (!app.includes('const ORBIT_MIN_DISTANCE = 1.0') || !app.includes('const ORBIT_MAX_DISTANCE = 10.0') || !app.includes('const orbitTouches = new Map()') || !app.includes('beginPinchZoom') || !app.includes('updatePinchZoom') || !app.includes('ORBIT_PINCH_EXPONENT')) failures.push('third-person pinch zoom');
-if (!app.includes('function selectCombatTargetAtScreen(') || !app.includes('function performBasicAttack(') || !app.includes('window.IronvaleTargeting')) failures.push('tap-target RPG combat controls');
+if (app.includes('function selectCombatTargetAtScreen(') || app.includes('function performBasicAttack(') || app.includes('window.RiftSurvivalTargeting')) failures.push('legacy RPG combat runtime still present');
 if (!app.includes('function currentViewRay(') || !app.includes('terrain.raycast(ray.origin, ray.direction, 1800, .5)')) failures.push('center-view interaction ray');
 if (app.includes('reticleScreen') || app.includes('moveReticleToClient(') || app.includes('raycastTerrainAtScreen(')) failures.push('movable pointer reticle returned');
-if (!app.includes('reticle.hidden = true;') || !app.includes('reticle.hidden = !freecamEnabled;')) failures.push('reticle must be Freecam-only during normal RPG gameplay');
+if (!app.includes('reticle.hidden = true;') || !app.includes('reticle.hidden = !freecamEnabled;')) failures.push('reticle must be Freecam-only during normal player movement');
 if (/orbitCamera\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app) || /freecam\.yaw\s*[-+]=\s*dx\s*\*\s*\.005/.test(app)) failures.push('fixed-pixel camera yaw math returned');
 if (/orbitCamera\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app) || /freecam\.pitch\s*=\s*clamp\([^\n]*dy\s*\*\s*\.004/.test(app)) failures.push('fixed-pixel camera pitch math returned');
 if (/player\.y\s*<\s*-\d+/.test(app)) failures.push('client lower/death barrier still present');
 
 const indexHtml = fs.readFileSync('public/index.html', 'utf8');
 const styles = fs.readFileSync('public/styles.css', 'utf8');
-if (!indexHtml.includes('id="combat-hud"') || !indexHtml.includes('id="rotate-device"') || !indexHtml.includes('data-ability-slot="1"')) failures.push('landscape RPG HUD markup');
+if (!indexHtml.includes('id="rotate-device"') || !indexHtml.includes('id="joystick"') || !indexHtml.includes('id="sprint-button"')) failures.push('landscape mobile movement HUD markup');
+if (indexHtml.includes('id="combat-hud"') || indexHtml.includes('data-ability-slot=') || indexHtml.includes('id="basic-attack-button"')) failures.push('legacy RPG combat HUD still present');
 if (!indexHtml.includes('id="terrain-edit-layer"') || !indexHtml.includes('id="add-terrain-edit-layer"')) failures.push('RiftLandscape edit-layer UI');
 if (!indexHtml.includes('id="terrain-material-layer"') || !indexHtml.includes('data-brush="paint"') || !indexHtml.includes('data-brush="erase-material"')) failures.push('landscape material paint tools');
 if (!indexHtml.includes('id="terrain-spline"') || !indexHtml.includes('id="add-spline-point"') || !indexHtml.includes('id="spline-width"')) failures.push('landscape spline tools');
@@ -106,7 +107,8 @@ if (!indexHtml.includes('id="diagnostic-run"') || !indexHtml.includes('id="diagn
 if (!indexHtml.includes('data-diagnostic-compressed="1"') || !indexHtml.includes('data-diagnostic-compressed="2"') || !indexHtml.includes('data-diagnostic-compressed="3"')) failures.push('three-layer lossless GZIP diagnostic tools UI');
 if (!indexHtml.includes('id="auth-dump-button"')) failures.push('auth crash dump export');
 if (!styles.includes('overflow-y:auto') || !styles.includes('scrollbar-gutter:stable') || !styles.includes('.terrain-tools::-webkit-scrollbar')) failures.push('scrollable terrain tools panel');
-if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.combat-hud')) failures.push('landscape-only mobile presentation');
+if (!styles.includes('@media (orientation:portrait) and (pointer:coarse)') || !styles.includes('.joystick') || !styles.includes('.sprint-button')) failures.push('landscape-only mobile presentation');
+if (styles.includes('.combat-hud') || styles.includes('.ability-buttons') || styles.includes('.basic-attack')) failures.push('legacy RPG combat styles still present');
 
 const characterRuntime = fs.readFileSync('public/rift-character.js', 'utf8');
 if (!characterRuntime.includes('loadRiggedCharacterAsset(') || !characterRuntime.includes('buildAnimationClips(') || !characterRuntime.includes('baseColorImage') || !characterRuntime.includes('getSkinMatrices(')) failures.push('character texture/animation runtime');
@@ -158,7 +160,7 @@ if (!terrain.includes('NATIVE.rift_terrain_raycast')) failures.push('native terr
 if (!terrain.includes('NATIVE_FAILURES') || !terrain.includes('failureCount: NATIVE_FAILURES.length')) failures.push('native failure history diagnostics');
 
 const rendererRuntimeBlackBox = fs.readFileSync('public/rift-engine.js', 'utf8');
-if (!diagnosticsRuntime.includes("ironvale-diagnostics-v2") || !diagnosticsRuntime.includes('_installFetchTelemetry') || !diagnosticsRuntime.includes('registerProvider(') || !diagnosticsRuntime.includes('subsystemProviders')) failures.push('diagnostic network/provider runtime');
+if (!diagnosticsRuntime.includes("rift-survival-diagnostics-v2") || !diagnosticsRuntime.includes('_installFetchTelemetry') || !diagnosticsRuntime.includes('registerProvider(') || !diagnosticsRuntime.includes('subsystemProviders')) failures.push('diagnostic network/provider runtime');
 if (!rendererRuntimeBlackBox.includes('rift-engine-telemetry-v1') || !rendererRuntimeBlackBox.includes('getRiftEngineBootTelemetry') || !rendererRuntimeBlackBox.includes('getDiagnostics(deep=false)') || !rendererRuntimeBlackBox.includes('gpuMemoryEstimate') || !rendererRuntimeBlackBox.includes('_captureGlErrors')) failures.push('renderer black-box telemetry runtime');
 if (!terrain.includes('getNativeDiagnostics(deep = false)') || !terrain.includes('memoryPages') || !terrain.includes('nativeFunctions')) failures.push('native WASM telemetry runtime');
 
@@ -171,7 +173,7 @@ if (!worker.includes('negative world space is valid')) failures.push('backend ne
 if (/y\s*<\s*-\d+/.test(worker)) failures.push('backend lower Y barrier still present');
 
 if (failures.length) {
-  console.error('Ironvale core verification failed:', failures.join(', '));
+  console.error('Rift Survival core verification failed:', failures.join(', '));
   process.exit(1);
 }
-console.log('Ironvale core verified: RiftLandscape + C++/WASM terrain + RPG runtime + max three-layer engine black-box diagnostics.');
+console.log('Rift Survival core verified: RiftLandscape + C++/WASM terrain + character/movement runtime + max three-layer engine black-box diagnostics.');

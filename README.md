@@ -1,38 +1,55 @@
-# Ironvale
+# Android Survival Core
 
-Ironvale is intentionally a small browser game-engine core.
+This repository is the clean foundation for an **Android-first multiplayer survival sandbox**. The final game name is intentionally not baked into the runtime yet.
 
-## Runtime split
+## Direction
 
-- **RiftCore (C++ → WebAssembly, player-side):** terrain heightfield storage, sculpt brushes, height/normal/slope sampling, walkability, chunk mesh generation and terrain raycasting.
-- **Rift Web bridge (JavaScript):** touch/editor UI, PWA/browser integration, WebGL2 rendering and networking glue.
-- **Cloudflare Worker:** authentication, sessions, character persistence and future authoritative validation/sync. It does not run the real-time terrain engine.
+The target is a Rust-style survival sandbox designed around Android from the start:
 
-The committed `public/rift-core.wasm.gz` is what players download. C++ is compiled ahead of time; players do not receive a compiler. Rebuild the native artifact with `npm run build:native` when changing `native/` sources.
+- the phone runs rendering, terrain, character movement, input, camera and nearby simulation locally;
+- the backend remains authoritative for identity, persistence, accepted movement/state transitions, integrity checks and anti-cheat evidence;
+- world systems are streamed/partitioned instead of assuming the whole map is simulated at full detail on every phone;
+- gameplay systems are added only after this foundation stays clean and verifiable.
 
-The active world is a blank 640×640 continuous heightfield with 1 m authoring samples. Terrain is organized into 128 m components containing 2×2 64 m sections. Sections select adaptive LOD independently (1/2/4/8/16 m render steps), neighboring sections are constrained to one LOD level of difference, and RiftCore morphs fine edges onto coarser neighbor edges to prevent cracks. Components/sections are rendering and streaming partitions, not Minecraft-style cells. Negative world Y is valid.
+The current browser/Codespace page is a **development harness**, not the final Android shell. An APK/local runtime host can replace that shell without replacing the RiftCore terrain foundation.
 
-Sculpting marks only overlapping/adjacent terrain sections dirty, so edits rebuild localized meshes instead of the whole world. Collision continues to query the full native heightfield near gameplay while exposing distance-based collision-LOD hooks for future broad-phase/streaming work.
+## What survived the cleanup
 
-RiftLandscape now exposes visible weight-blended terrain materials and Freecam-authored landscape splines. Material paint/erase edits are stored with the landscape draft and immediately recolor rebuilt terrain sections. Spline control points flatten/deform the heightfield through the non-destructive landscape composition pass, with editable width and falloff. The mobile Terrain Tools panel is vertically scrollable so all controls remain reachable in landscape orientation.
+- **RiftCore (C++ → WebAssembly):** heightfield storage, sculpt brushes, height/normal/slope sampling, walkability, section mesh generation and terrain raycasting.
+- **RiftLandscape:** 128 m components, 64 m sections, adaptive 1/2/4/8/16 m render LOD, stitched neighbor edges, non-destructive edit layers, weightmaps and spline deformation.
+- **WebGL2 renderer:** terrain splat material path, frustum culling, adaptive mobile pixel-ratio controls and GPU diagnostics.
+- **Character foundation:** rigged Quaternius humanoid, animation playback, capsule fallback, third-person camera, joystick movement, sprint and auto-run.
+- **Realtime authority:** 10 Hz player transform publishing, Durable Object RAM authority, movement validation, 128 m zone authority and bounded nearby-interest queries.
+- **Backend foundation:** accounts, sessions, character persistence, integrity attestation, sparse anti-cheat case persistence and admin/service-key reviewer boundaries.
+- **Diagnostics:** three-layer runtime dumps, render/WASM/network telemetry, validator guards and automated regression checks.
 
-The former RiftBlock/RiftSection voxel world, Downtown tile worlds, Blueprint/building pipelines, legacy editors/builders, AI Builder, combat, inventory, quests, codex and other old gameplay systems are not part of this branch.
+## Deliberately removed
 
+The cleanup removes the old project identity and old game-specific behavior. There is no city/crime/casino/banking/quest/codex content, no legacy builders or voxel world, and no RPG target-lock / Attack / Ability 1–3 client system.
 
-## RiftLandscape v2
+The old repository-bound GitHub OIDC anti-cheat review workflow was also removed. It was tied to the previous repository identity; anti-cheat authority itself remains intact and reviewer writes are still admin-only.
 
-Ironvale's terrain management layer is now `RiftLandscape`, an Unreal-Landscape-inspired architecture over the existing RiftCore native heightfield. The native C++/WASM core still owns height sampling, sculpt math, collision queries, raycasts, section mesh generation and stitched LOD edges; RiftLandscape adds higher-level authoring and streaming state without moving hot terrain math back into JavaScript.
+## Terrain baseline
 
-RiftLandscape organizes the world as **128 m components → 64 m render sections → 1 m source samples**. Sculpting writes into an active non-destructive edit layer, and enabled layers are composited back into the native heightfield. Layer enable/disable, ordering, locking, undo/redo snapshots and sparse draft serialization are first-class. Legacy `rift-terrain-edit-v2` drafts migrate into the default Sculpt layer.
+The active world is a blank **640 × 640 m** continuous heightfield with 1 m authoring samples. Components and sections are rendering/streaming partitions, not Minecraft-style cells. Negative world Y remains valid.
 
-The landscape also owns sparse material weightmaps (grass/dirt/rock/gravel/mud/path slots), spline metadata hooks for future roads/rivers, dirty-component tracking, component streaming keys, collision-LOD policy hooks, and LOD hysteresis so section detail does not flap at distance thresholds. Material weight data and splines are foundation data in this milestone; terrain shader blending and spline deformation come on top of this architecture rather than replacing it.
+Terrain material slots now boot entirely from the runtime's local fallback color, flat-normal and roughness layers. The previous remote project-specific terrain texture URLs were disconnected so this baseline does not depend on the old game's asset namespace. Proper bundled local terrain textures can be added later without changing the terrain schema.
 
-## RiftLandscape v3 terrain lock
+## Verification
 
-`RiftLandscape v3` is the frozen terrain foundation used before Ironvale moves into world-object authoring. Six terrain material layers now carry normalized weightmaps into a WebGL2 texture-array splat shader. Each layer can stream pinned RiftAssets albedo, OpenGL normal and roughness maps; the runtime downsizes the source 1K textures to a 512px GPU set for mobile memory pressure while retaining color fallbacks if a remote texture is unavailable.
+```sh
+npm run build
+```
 
-Landscape splines are Catmull-Rom smoothed and expose add/move/remove point editing, width/falloff and non-destructive flatten deformation. Edit layers can be renamed, reordered, hidden, locked, opacity-adjusted and deleted with layer-aware undo/redo and versioned draft migration.
+The build verifies JavaScript syntax, RiftCore WASM/source synchronization, terrain/character contracts, diagnostics, realtime RAM authority, integrity, anti-cheat boundaries, zone authority and terrain material packing.
 
-Terrain rendering now has per-component streaming plans, per-section frustum visibility, adaptive LOD hysteresis and a debug overlay for component/section/LOD inspection. Collision exposes real 1/2/4m distance-based sampling paths while keeping near-player support on the authoritative native heightfield. Mobile landscape rendering uses an adaptive 1.0–1.5 device-pixel-ratio cap based on rolling frame time.
+When changing the C++ terrain core:
 
-The locked format is `rift-landscape-v3` with `rift-landscape-edits-v2`. Older v2 landscape documents and v1 landscape edit drafts remain accepted through migration/validation paths.
+```sh
+npm run build:native
+npm run build
+```
+
+## Current boundary
+
+This cleanup intentionally does **not** add harvesting, inventory, crafting, building, weapons, loot, survival meters or new world content. The next milestone should begin only from this verified foundation.

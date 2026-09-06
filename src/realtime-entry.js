@@ -2,11 +2,10 @@ import coreWorker from './index.js';
 import { DurableObject } from 'cloudflare:workers';
 import { EXPECTED_INTEGRITY_BUILD_ID, EXPECTED_INTEGRITY_MANIFEST_DIGEST, EXPECTED_INTEGRITY_FILE_COUNT } from './integrity-build.js';
 import { ANTICHEAT_SCHEMA, antiCheatEvidence, antiCheatSummary, createAntiCheatState, markAntiCheatCasePersisted, observeAcceptedMovement, observeRejectedMovement, shouldPersistAntiCheatCase } from './anticheat.js';
-import { verifyGitHubAntiCheatOidc } from './github-oidc.js';
 import { ZONE_AUTHORITY_FORMAT, ZONE_NEARBY_FORMAT, ZONE_SIZE_METERS, ZONE_PRESENCE_TTL_MS, ZONE_MOVEMENT_SYNC_MS, ZONE_CLIENT_HEARTBEAT_MS, ZONE_DEFAULT_INTEREST_RADIUS_METERS, ZONE_MAX_NEARBY, normalizedInterestRadius, zoneIdForPosition, zoneIdsForInterest } from './zone-contract.js';
 export { ZoneState } from './zone-authority.js';
 
-const SESSION_COOKIE = 'ironvale_session';
+const SESSION_COOKIE = 'rift-survival_session';
 const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
 const WORLD_MIN_X = 0;
 const WORLD_MAX_X = 640;
@@ -18,7 +17,7 @@ const HORIZONTAL_LAG_ALLOWANCE_METERS = 3.5;
 const MAX_VERTICAL_SPEED_MPS = 60;
 const VERTICAL_LAG_ALLOWANCE_METERS = 20;
 const MAX_Y_ABS = 10000;
-const REALTIME_FORMAT = 'ironvale-realtime-authority-v2';
+const REALTIME_FORMAT = 'rift-survival-realtime-authority-v2';
 const ANTICHEAT_POLICY = Object.freeze({ automaticBan: false, aiAuthority: 'recommendation-only', ramAuthority: 'final', ordinaryMovementWritesToD1: false, suspiciousCaseWritesOnly: true });
 const INTEGRITY_CHALLENGE_TTL_MS = 2 * 60 * 1000;
 const INTEGRITY_TICKET_TTL_MS = 60 * 60 * 1000;
@@ -139,20 +138,20 @@ function zoneStateStub(env, zoneId) {
 
 function internalStateHeaders(auth, request, integrity = null) {
   const headers = new Headers();
-  headers.set('x-ironvale-user-id', auth.userId);
-  headers.set('x-ironvale-username', auth.username);
-  headers.set('x-ironvale-session-id', auth.sessionId || '');
-  headers.set('x-ironvale-session-expires', String(auth.sessionExpiresAt));
-  headers.set('x-ironvale-x', String(auth.position.x));
-  headers.set('x-ironvale-y', String(auth.position.y));
-  headers.set('x-ironvale-z', String(auth.position.z));
-  headers.set('x-ironvale-yaw', String(auth.position.yaw));
-  headers.set('x-ironvale-updated-at', String(auth.updatedAt));
+  headers.set('x-rift-survival-user-id', auth.userId);
+  headers.set('x-rift-survival-username', auth.username);
+  headers.set('x-rift-survival-session-id', auth.sessionId || '');
+  headers.set('x-rift-survival-session-expires', String(auth.sessionExpiresAt));
+  headers.set('x-rift-survival-x', String(auth.position.x));
+  headers.set('x-rift-survival-y', String(auth.position.y));
+  headers.set('x-rift-survival-z', String(auth.position.z));
+  headers.set('x-rift-survival-yaw', String(auth.position.yaw));
+  headers.set('x-rift-survival-updated-at', String(auth.updatedAt));
   if (integrity?.ok) {
-    headers.set('x-ironvale-integrity-status', 'attested');
-    headers.set('x-ironvale-integrity-build', EXPECTED_INTEGRITY_BUILD_ID);
-    headers.set('x-ironvale-integrity-digest', EXPECTED_INTEGRITY_MANIFEST_DIGEST);
-    headers.set('x-ironvale-integrity-expires', String(integrity.expiresAt));
+    headers.set('x-rift-survival-integrity-status', 'attested');
+    headers.set('x-rift-survival-integrity-build', EXPECTED_INTEGRITY_BUILD_ID);
+    headers.set('x-rift-survival-integrity-digest', EXPECTED_INTEGRITY_MANIFEST_DIGEST);
+    headers.set('x-rift-survival-integrity-expires', String(integrity.expiresAt));
   }
   if (request.headers.get('Upgrade') === 'websocket') headers.set('Upgrade', 'websocket');
   return headers;
@@ -162,11 +161,11 @@ function readIntegrityTransport(request) {
   const url = new URL(request.url);
   const read = (header, query) => request.headers.get(header) || url.searchParams.get(query) || '';
   return {
-    buildId: read('x-ironvale-integrity-build', 'iv_build'),
-    manifestDigest: read('x-ironvale-integrity-digest', 'iv_digest'),
-    challenge: read('x-ironvale-integrity-challenge', 'iv_challenge'),
-    expiresAt: finite(read('x-ironvale-integrity-expires', 'iv_expires')),
-    ticket: read('x-ironvale-integrity-ticket', 'iv_ticket')
+    buildId: read('x-rift-survival-integrity-build', 'iv_build'),
+    manifestDigest: read('x-rift-survival-integrity-digest', 'iv_digest'),
+    challenge: read('x-rift-survival-integrity-challenge', 'iv_challenge'),
+    expiresAt: finite(read('x-rift-survival-integrity-expires', 'iv_expires')),
+    ticket: read('x-rift-survival-integrity-ticket', 'iv_ticket')
   };
 }
 
@@ -260,24 +259,11 @@ async function ensureAntiCheatTables(env) {
 async function authorizeAntiCheatReviewer(request, env, { write = false } = {}) {
   if (!write) {
     const configured = String(env.ANTICHEAT_SERVICE_KEY || '');
-    const supplied = String(request.headers.get('x-ironvale-anticheat-key') || '');
+    const supplied = String(request.headers.get('x-rift-survival-anticheat-key') || '');
     if (configured && supplied && constantTimeEqual(configured, supplied)) {
       return { kind: 'service', reviewer: 'ai-anticheat-service', auth: null };
     }
 
-    const authorization = String(request.headers.get('authorization') || '');
-    const bearer = authorization.replace(/^Bearer\s+/i, '').trim();
-    if (bearer && bearer !== authorization) {
-      const oidc = await verifyGitHubAntiCheatOidc(bearer);
-      if (oidc.ok) {
-        return {
-          kind: 'github-oidc',
-          reviewer: 'ai-anticheat-github-oidc',
-          auth: null,
-          oidc: { runId: oidc.runId, runAttempt: oidc.runAttempt, actor: oidc.actor, expiresAt: oidc.expiresAt }
-        };
-      }
-    }
   }
 
   const auth = await loadSessionState(request, env);
@@ -318,7 +304,7 @@ async function routeAntiCheatApi(request, env, url) {
     const grouped = await env.DB.prepare(`SELECT status, risk_band, COUNT(*) AS count, MAX(risk_score) AS max_risk FROM anti_cheat_cases GROUP BY status, risk_band ORDER BY max_risk DESC`).all();
     return json({
       ok: true,
-      format: 'ironvale-anticheat-review-summary-v1',
+      format: 'rift-survival-anticheat-review-summary-v1',
       policy: { automaticBan: false, aiAuthority: 'recommendation-only', ramAuthority: 'final', ordinaryMovementWritesToD1: false, suspiciousCaseWritesOnly: true },
       groups: grouped?.results || []
     });
@@ -339,7 +325,7 @@ async function routeAntiCheatApi(request, env, url) {
     `).bind(minRisk, status, status, limit).all();
     return json({
       ok: true,
-      format: 'ironvale-anticheat-case-list-v1',
+      format: 'rift-survival-anticheat-case-list-v1',
       policy: { automaticBan: false, aiAuthority: 'recommendation-only', ramAuthority: 'final' },
       cases: (result?.results || []).map(row => antiCheatCaseRow(row, false))
     });
@@ -351,7 +337,7 @@ async function routeAntiCheatApi(request, env, url) {
     if (!row) return json({ ok: false, error: 'Anti-cheat case not found' }, 404);
     return json({
       ok: true,
-      format: 'ironvale-anticheat-ai-review-v1',
+      format: 'rift-survival-anticheat-ai-review-v1',
       policy: { automaticBan: false, aiAuthority: 'recommendation-only', humanReviewPreferred: true, ramAuthority: 'final' },
       case: antiCheatCaseRow(row, true)
     });
@@ -418,7 +404,7 @@ async function routeRealtimeCheckpoint(request, env) {
   const reason = String(body?.reason || 'explicit-http').slice(0, 32);
   const stub = playerStateStub(env, auth.userId);
   const headers = internalStateHeaders(auth, request, integrity);
-  headers.set('x-ironvale-checkpoint-reason', reason);
+  headers.set('x-rift-survival-checkpoint-reason', reason);
   return stub.fetch(new Request('https://player-state/checkpoint', { method: 'POST', headers }));
 }
 
@@ -427,7 +413,7 @@ async function checkpointBeforeLogout(request, env) {
   if (!auth) return;
   const stub = playerStateStub(env, auth.userId);
   const headers = internalStateHeaders(auth, request);
-  headers.set('x-ironvale-checkpoint-reason', 'logout');
+  headers.set('x-rift-survival-checkpoint-reason', 'logout');
   await stub.fetch(new Request('https://player-state/checkpoint', {
     method: 'POST',
     headers
@@ -491,29 +477,29 @@ export class PlayerState extends DurableObject {
     const now = Date.now();
     return {
       format: REALTIME_FORMAT,
-      userId: String(request.headers.get('x-ironvale-user-id') || ''),
-      username: String(request.headers.get('x-ironvale-username') || 'Player').slice(0, 24),
-      sessionId: String(request.headers.get('x-ironvale-session-id') || ''),
-      sessionExpiresAt: finite(request.headers.get('x-ironvale-session-expires'), now),
-      x: finite(request.headers.get('x-ironvale-x'), DEFAULT_SPAWN.x),
-      y: finite(request.headers.get('x-ironvale-y'), DEFAULT_SPAWN.y),
-      z: finite(request.headers.get('x-ironvale-z'), DEFAULT_SPAWN.z),
-      yaw: finite(request.headers.get('x-ironvale-yaw'), DEFAULT_SPAWN.yaw),
+      userId: String(request.headers.get('x-rift-survival-user-id') || ''),
+      username: String(request.headers.get('x-rift-survival-username') || 'Player').slice(0, 24),
+      sessionId: String(request.headers.get('x-rift-survival-session-id') || ''),
+      sessionExpiresAt: finite(request.headers.get('x-rift-survival-session-expires'), now),
+      x: finite(request.headers.get('x-rift-survival-x'), DEFAULT_SPAWN.x),
+      y: finite(request.headers.get('x-rift-survival-y'), DEFAULT_SPAWN.y),
+      z: finite(request.headers.get('x-rift-survival-z'), DEFAULT_SPAWN.z),
+      yaw: finite(request.headers.get('x-rift-survival-yaw'), DEFAULT_SPAWN.yaw),
       seq: 0,
       connectedAt: now,
       lastAcceptedAt: now,
       lastCheckpointAt: now,
-      sourceUpdatedAt: finite(request.headers.get('x-ironvale-updated-at'), now),
+      sourceUpdatedAt: finite(request.headers.get('x-rift-survival-updated-at'), now),
       dirty: false,
       superseded: false,
       accepted: 0,
       rejected: 0,
       checkpointCount: 0,
       lastRejectReason: null,
-      integrityStatus: String(request.headers.get('x-ironvale-integrity-status') || 'missing'),
-      integrityBuildId: String(request.headers.get('x-ironvale-integrity-build') || ''),
-      integrityManifestDigest: String(request.headers.get('x-ironvale-integrity-digest') || ''),
-      integrityExpiresAt: finite(request.headers.get('x-ironvale-integrity-expires'), 0),
+      integrityStatus: String(request.headers.get('x-rift-survival-integrity-status') || 'missing'),
+      integrityBuildId: String(request.headers.get('x-rift-survival-integrity-build') || ''),
+      integrityManifestDigest: String(request.headers.get('x-rift-survival-integrity-digest') || ''),
+      integrityExpiresAt: finite(request.headers.get('x-rift-survival-integrity-expires'), 0),
       zoneAuthority: {
         format: ZONE_AUTHORITY_FORMAT,
         zoneId: null,
@@ -642,7 +628,7 @@ export class PlayerState extends DurableObject {
   async nearbyInterest(request) {
     const selected = this.latestAuthorityState();
     const state = selected?.state || this.stateFromHeaders(request);
-    const requestedUserId = String(request.headers.get('x-ironvale-user-id') || '');
+    const requestedUserId = String(request.headers.get('x-rift-survival-user-id') || '');
     if (!requestedUserId || String(state?.userId || '') !== requestedUserId) return json({ ok: false, error: 'Session state mismatch' }, 403);
     await this.syncZoneMembership(state, { force: true, reason: 'nearby-query' });
     const url = new URL(request.url);
@@ -685,14 +671,14 @@ export class PlayerState extends DurableObject {
   async antiCheatStatus(request) {
     const selected = this.latestAuthorityState();
     const state = selected?.state || this.stateFromHeaders(request);
-    const requestedUserId = String(request.headers.get('x-ironvale-user-id') || '');
+    const requestedUserId = String(request.headers.get('x-rift-survival-user-id') || '');
     if (!requestedUserId || String(state?.userId || '') !== requestedUserId) return json({ ok: false, error: 'Session state mismatch' }, 403);
     const summary = antiCheatSummary(state.antiCheat);
     const zoneAuthority = await this.zoneStatus(state);
     if (selected?.socket) { try { selected.socket.serializeAttachment(state); } catch (_) {} } else this.httpState = state;
     return json({
       ok: true,
-      format: 'ironvale-anticheat-session-status-v1',
+      format: 'rift-survival-anticheat-session-status-v1',
       policy: {
         automaticBan: false,
         aiAuthority: 'recommendation-only',
@@ -701,8 +687,8 @@ export class PlayerState extends DurableObject {
         suspiciousCaseWritesOnly: true
       },
       bridge: {
-        mode: 'github-oidc-read-only',
-        exactWorkflowBound: true,
+        mode: 'service-key-read-only',
+        repositoryBound: false,
         writeAuthority: 'admin-only'
       },
       authority: {
@@ -1012,7 +998,7 @@ export class PlayerState extends DurableObject {
   async checkpointRequest(request) {
     const selected = this.latestAuthorityState();
     const best = selected?.state || this.stateFromHeaders(request);
-    const checkpointReason = String(request.headers.get('x-ironvale-checkpoint-reason') || 'explicit-http').slice(0, 32);
+    const checkpointReason = String(request.headers.get('x-rift-survival-checkpoint-reason') || 'explicit-http').slice(0, 32);
     const saved = await this.checkpointState(best, checkpointReason);
     if (selected?.socket) {
       try { selected.socket.serializeAttachment(best); } catch (_) {}
@@ -1047,7 +1033,7 @@ export class PlayerState extends DurableObject {
         if (fallback === this.httpState) this.httpState = fallback;
       }
     } catch (error) {
-      console.error('Ironvale realtime disconnect checkpoint failed', error);
+      console.error('RiftSurvival realtime disconnect checkpoint failed', error);
     }
     try { ws.close(code, reason); } catch (_) {}
   }
@@ -1061,8 +1047,8 @@ export class PlayerState extends DurableObject {
         if (fallback === this.httpState) this.httpState = fallback;
       }
     } catch (checkpointError) {
-      console.error('Ironvale realtime socket checkpoint failed', checkpointError);
+      console.error('RiftSurvival realtime socket checkpoint failed', checkpointError);
     }
-    console.error('Ironvale realtime WebSocket error', error);
+    console.error('RiftSurvival realtime WebSocket error', error);
   }
 }

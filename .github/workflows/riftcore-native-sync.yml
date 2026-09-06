@@ -36,9 +36,9 @@ jobs:
           shopt -s nullglob
           parts=(.rift-patches/lodpart*)
           if [ ${#parts[@]} -gt 0 ]; then
-            cat "${parts[@]}" > /tmp/ironvale-lod.b64
-            base64 --decode /tmp/ironvale-lod.b64 > /tmp/ironvale-lod.tar.gz
-            tar -xzf /tmp/ironvale-lod.tar.gz
+            cat "${parts[@]}" > /tmp/rift-survival-lod.b64
+            base64 --decode /tmp/rift-survival-lod.b64 > /tmp/rift-survival-lod.tar.gz
+            tar -xzf /tmp/rift-survival-lod.tar.gz
             rm -f "${parts[@]}"
             rmdir .rift-patches 2>/dev/null || true
           fi
@@ -46,7 +46,7 @@ jobs:
       - name: Build RiftCore WASM
         run: npm run build:native
 
-      - name: Verify Ironvale core
+      - name: Verify survival core
         run: npm run build
 
       - name: Commit synchronized engine artifacts

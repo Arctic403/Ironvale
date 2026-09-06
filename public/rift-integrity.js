@@ -1,7 +1,7 @@
-export const IRONVALE_INTEGRITY_FORMAT = 'ironvale-integrity-chain-v1';
-export const IRONVALE_INTEGRITY_MANIFEST_FORMAT = 'ironvale-integrity-manifest-v1';
+export const RIFT_SURVIVAL_INTEGRITY_FORMAT = 'rift-survival-integrity-chain-v1';
+export const RIFT_SURVIVAL_INTEGRITY_MANIFEST_FORMAT = 'rift-survival-integrity-manifest-v1';
 
-const MANIFEST_PATH = '/ironvale-integrity-manifest.json';
+const MANIFEST_PATH = '/rift-survival-integrity-manifest.json';
 const CHALLENGE_PATH = '/api/integrity/challenge';
 const ATTEST_PATH = '/api/integrity/attest';
 const RUNTIME_PROBE_MS = 30_000;
@@ -11,7 +11,7 @@ const VERIFY_CONCURRENCY = 4;
 const nativeFetch = window.fetch.bind(window);
 
 const state = {
-  format: IRONVALE_INTEGRITY_FORMAT,
+  format: RIFT_SURVIVAL_INTEGRITY_FORMAT,
   policy: {
     clientTrusted: false,
     launchFileIntegrityTripwire: true,
@@ -86,7 +86,7 @@ function publicStatus() {
 }
 
 function record(message, data = null, severity = 'info') {
-  try { window.IronvaleDiagnostics?.record?.('integrity', message, data, severity); } catch (_) {}
+  try { window.RiftSurvivalDiagnostics?.record?.('integrity', message, data, severity); } catch (_) {}
 }
 
 function emit(name, detail = {}) {
@@ -107,7 +107,7 @@ function failIntegrity(reason, details = null, { runtime = false } = {}) {
   else state.launchStatus = 'failed';
   clearTicket();
   record('Integrity chain failed', { reason: message, details }, 'error');
-  emit('ironvale:integrity-failed', { reason: message, details });
+  emit('rift-survival:integrity-failed', { reason: message, details });
   return { ok: false, reason: message, status: publicStatus() };
 }
 
@@ -133,7 +133,7 @@ async function loadManifest(force = false) {
   const response = await nativeFetch(`${MANIFEST_PATH}?iv=${Date.now()}`, { cache: 'no-store', credentials: 'same-origin' });
   if (!response.ok) throw new Error(`Integrity manifest HTTP ${response.status}`);
   const value = await response.json();
-  if (value?.format !== IRONVALE_INTEGRITY_MANIFEST_FORMAT || value?.algorithm !== 'SHA-256') {
+  if (value?.format !== RIFT_SURVIVAL_INTEGRITY_MANIFEST_FORMAT || value?.algorithm !== 'SHA-256') {
     throw new Error('Integrity manifest format mismatch');
   }
   const canonical = canonicalManifestPayload(value);
@@ -149,7 +149,7 @@ async function loadManifest(force = false) {
 
 async function verifyOneFile(file, expectedBuildId) {
   const url = new URL(String(file.path), location.origin);
-  url.searchParams.set('__ironvale_integrity', expectedBuildId);
+  url.searchParams.set('__rift_survival_integrity', expectedBuildId);
   const response = await nativeFetch(url.href, { cache: 'no-store', credentials: 'same-origin' });
   if (!response.ok) {
     return { path: file.path, ok: false, reason: `http-${response.status}`, expected: file.sha256, actual: null, size: 0 };
@@ -210,7 +210,7 @@ async function attest(challenge, verification) {
   state.launchStatus = 'verified';
   state.lastError = null;
   record('Integrity session attested', { buildId: state.buildId, filesChecked: state.filesChecked, ticketExpiresAt: state.ticketExpiresAt });
-  emit(hadTicket ? 'ironvale:integrity-refreshed' : 'ironvale:integrity-ready', { buildId: state.buildId, ticketExpiresAt: state.ticketExpiresAt });
+  emit(hadTicket ? 'rift-survival:integrity-refreshed' : 'rift-survival:integrity-ready', { buildId: state.buildId, ticketExpiresAt: state.ticketExpiresAt });
   return { ok: true, status: publicStatus() };
 }
 
@@ -269,22 +269,22 @@ function transportHeaders() {
   const params = transportParams();
   if (!params) return {};
   return {
-    'x-ironvale-integrity-build': params.iv_build,
-    'x-ironvale-integrity-digest': params.iv_digest,
-    'x-ironvale-integrity-challenge': params.iv_challenge,
-    'x-ironvale-integrity-expires': params.iv_expires,
-    'x-ironvale-integrity-ticket': params.iv_ticket
+    'x-rift-survival-integrity-build': params.iv_build,
+    'x-rift-survival-integrity-digest': params.iv_digest,
+    'x-rift-survival-integrity-challenge': params.iv_challenge,
+    'x-rift-survival-integrity-expires': params.iv_expires,
+    'x-rift-survival-integrity-ticket': params.iv_ticket
   };
 }
 
 function runtimeContractEntries() {
   return [
-    ['integrity', window.IronvaleIntegrity, IRONVALE_INTEGRITY_FORMAT],
-    ['realtime', window.IronvaleRealtimeMovement, 'ironvale-realtime-client-v2'],
-    ['validator', window.IronvaleValidatorGuard, 'ironvale-validator-guard-v1'],
-    ['history', window.IronvaleEditorHistory, 'ironvale-editor-history-runtime-v1'],
-    ['player-state', window.IronvalePlayerState, 'ironvale-player-state-runtime-v1'],
-    ['movement-mode', window.IronvaleMovementMode, 'ironvale-movement-mode-v1']
+    ['integrity', window.RiftSurvivalIntegrity, RIFT_SURVIVAL_INTEGRITY_FORMAT],
+    ['realtime', window.RiftSurvivalRealtimeMovement, 'rift-survival-realtime-client-v2'],
+    ['validator', window.RiftSurvivalValidatorGuard, 'rift-survival-validator-guard-v1'],
+    ['history', window.RiftSurvivalEditorHistory, 'rift-survival-editor-history-runtime-v1'],
+    ['player-state', window.RiftSurvivalPlayerState, 'rift-survival-player-state-runtime-v1'],
+    ['movement-mode', window.RiftSurvivalMovementMode, 'rift-survival-movement-mode-v1']
   ];
 }
 
@@ -332,7 +332,7 @@ function armWatchdog() {
 
 function registerDiagnosticsProvider() {
   if (providerRegistered) return;
-  const diagnostics = window.IronvaleDiagnostics;
+  const diagnostics = window.RiftSurvivalDiagnostics;
   if (!diagnostics?.registerProvider) {
     setTimeout(registerDiagnosticsProvider, 100);
     return;
@@ -342,7 +342,7 @@ function registerDiagnosticsProvider() {
 }
 
 const api = Object.freeze({
-  format: IRONVALE_INTEGRITY_FORMAT,
+  format: RIFT_SURVIVAL_INTEGRITY_FORMAT,
   ensureSession,
   status: publicStatus,
   runtimeProbe,
@@ -350,8 +350,8 @@ const api = Object.freeze({
   transportHeaders
 });
 
-window.IronvaleIntegrity = api;
+window.RiftSurvivalIntegrity = api;
 registerDiagnosticsProvider();
 armWatchdog();
 
-export const IronvaleIntegrity = api;
+export const RiftSurvivalIntegrity = api;

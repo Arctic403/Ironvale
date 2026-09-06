@@ -1,0 +1,297 @@
+{
+  "format": "rift-world-v1",
+  "version": 1,
+  "id": "rift-survival-terrain",
+  "name": "Android Survival Blank Terrain",
+  "units": "meters",
+  "terrain": {
+    "format": "rift-terrain-v1",
+    "origin": [
+      0,
+      0,
+      0
+    ],
+    "size": [
+      640,
+      640
+    ],
+    "sampleSpacing": 1,
+    "chunkSize": 64,
+    "seed": 1,
+    "baseHeight": 0,
+    "maxWalkSlope": 0.82,
+    "layers": [],
+    "holes": [],
+    "caves": [],
+    "edits": [],
+    "sectionSize": 64,
+    "componentSize": 128,
+    "lod": {
+      "steps": [
+        1,
+        2,
+        4,
+        8,
+        16
+      ],
+      "distances": [
+        96,
+        192,
+        320,
+        480
+      ],
+      "neighborMaxLevelDelta": 1,
+      "refreshMs": 180,
+      "seamMode": "edge-morph"
+    },
+    "collision": {
+      "lodSteps": [
+        1,
+        2,
+        4
+      ],
+      "nearDistance": 128,
+      "mediumDistance": 256,
+      "authoritativeHeightfield": true
+    },
+    "landscape": {
+      "format": "rift-landscape-v3",
+      "editLayers": [
+        {
+          "id": "sculpt",
+          "name": "Sculpt",
+          "enabled": true,
+          "locked": false,
+          "opacity": 1
+        }
+      ],
+      "activeEditLayer": "sculpt",
+      "baseMaterialLayer": "grass",
+      "materialLayers": [
+        {
+          "id": "grass",
+          "name": "Grass",
+          "defaultWeight": 255,
+          "color": [
+            0.25,
+            0.42,
+            0.23
+          ],
+          "texture": "",
+          "normal": "",
+          "roughness": "",
+          "tileMeters": 4,
+          "roughnessFactor": 0.88
+        },
+        {
+          "id": "dirt",
+          "name": "Dirt",
+          "defaultWeight": 0,
+          "color": [
+            0.43,
+            0.31,
+            0.2
+          ],
+          "texture": "",
+          "normal": "",
+          "roughness": "",
+          "tileMeters": 3.5,
+          "roughnessFactor": 0.9
+        },
+        {
+          "id": "rock",
+          "name": "Rock",
+          "defaultWeight": 0,
+          "color": [
+            0.43,
+            0.45,
+            0.44
+          ],
+          "texture": "",
+          "normal": "",
+          "roughness": "",
+          "tileMeters": 4,
+          "roughnessFactor": 0.72
+        },
+        {
+          "id": "gravel",
+          "name": "Gravel",
+          "defaultWeight": 0,
+          "color": [
+            0.52,
+            0.5,
+            0.44
+          ],
+          "texture": "",
+          "normal": "",
+          "roughness": "",
+          "tileMeters": 3,
+          "roughnessFactor": 0.86
+        },
+        {
+          "id": "mud",
+          "name": "Mud",
+          "defaultWeight": 0,
+          "color": [
+            0.29,
+            0.23,
+            0.17
+          ],
+          "texture": "",
+          "normal": "",
+          "roughness": "",
+          "tileMeters": 3.5,
+          "roughnessFactor": 0.96
+        },
+        {
+          "id": "path",
+          "name": "Path",
+          "defaultWeight": 0,
+          "color": [
+            0.49,
+            0.39,
+            0.25
+          ],
+          "texture": "",
+          "normal": "",
+          "roughness": "",
+          "tileMeters": 3,
+          "roughnessFactor": 0.82
+        }
+      ],
+      "splines": [],
+      "lodHysteresis": 0.12,
+      "streaming": {
+        "enabled": true,
+        "componentRadius": 3,
+        "preloadRing": 0
+      },
+      "activeMaterialLayer": "dirt",
+      "activeSpline": null,
+      "mobilePerformance": {
+        "pixelRatioMin": 1,
+        "pixelRatioMax": 1.5,
+        "adaptiveFrames": 90,
+        "materialTextureSize": 512
+      }
+    }
+  },
+  "anchors": {
+    "starter_spawn": {
+      "x": 320,
+      "z": 320,
+      "facing": 0,
+      "terrainSnap": true
+    }
+  },
+  "objects": [],
+  "metadata": {
+    "worldFoundation": "rift-landscape-v3",
+    "legacyBlocks": false,
+    "voxelGrid": false,
+    "blankCanvas": true,
+    "negativeWorldY": true,
+    "lowerBarrier": false,
+    "description": "Blank continuous Rift terrain foundation for the Android-first survival sandbox. Negative Y is valid world space. No generated structures, props, combat content, quests, city systems or artificial lower barrier.",
+    "terrainOrganization": "RiftLandscape: 128m components / 64m sections / 1m source samples / non-destructive edit layers",
+    "adaptiveLod": true,
+    "lodSeamStitching": true,
+    "nonDestructiveTerrainLayers": true,
+    "materialWeightmaps": true,
+    "landscapeSplineHooks": true,
+    "visibleMaterialBlending": true,
+    "landscapeSplineDeformation": true,
+    "terrainToolsScrollable": true,
+    "terrainPbrSplatting": true,
+    "terrainNormalRoughness": true,
+    "frustumCulling": true,
+    "componentStreamingRuntime": true,
+    "collisionLodRuntime": true,
+    "splinePointEditing": true,
+    "terrainLayerManagement": true,
+    "terrainDebugOverlay": true,
+    "terrainFoundationLocked": true,
+    "terrainSchemaVersion": 3,
+    "assetScaleContract": true,
+    "assetScaleSchemaVersion": 1,
+    "automatedValidator": true,
+    "diagnosticDumpSystem": true,
+    "diagnosticDumpLayers": 3,
+    "diagnosticSchemaVersion": 2,
+    "engineBlackBoxDiagnostics": true,
+    "engineResourceInventory": true,
+    "networkTelemetry": true,
+    "nativeWasmTelemetry": true,
+    "subsystemFrameTimings": true
+  },
+  "scale": {
+    "format": "rift-scale-v1",
+    "worldUnits": "meters",
+    "metersPerWorldUnit": 1,
+    "referenceCharacterHeightMeters": 1.82,
+    "referenceColliderHeightMeters": 1.8,
+    "assetPolicy": {
+      "format": "rift-asset-scale-v1",
+      "gltfDefaultUnits": "meters",
+      "preserveAuthoredScale": true,
+      "autoGuessScale": false,
+      "allowMetadataUnitConversion": true,
+      "allowMetadataCorrectionScale": true,
+      "defaultCorrectionScale": 1,
+      "placementScaleDefault": [
+        1,
+        1,
+        1
+      ],
+      "allowNonUniformPlacementScale": true,
+      "characterPolicy": "normalize-to-reference-height"
+    }
+  },
+  "diagnostics": {
+    "format": "rift-survival-diagnostics-v2",
+    "autoValidator": true,
+    "validatorIntervalMs": 5000,
+    "dumpFormat": "rift-survival-diagnostic-dump-v1",
+    "layers": [
+      {
+        "level": 1,
+        "id": "quick",
+        "purpose": "compact failure summary and core state"
+      },
+      {
+        "level": 2,
+        "id": "runtime",
+        "purpose": "subsystem state, renderer, terrain, camera, player and recent events"
+      },
+      {
+        "level": 3,
+        "id": "deep",
+        "purpose": "sanitized engine black-box forensic snapshot: renderer/GPU resources, shaders, WebGL, WASM, storage/cache/network, world/edit state and subsystem providers"
+      }
+    ],
+    "automaticCrashDumpLevel": 2,
+    "privacy": {
+      "includeCredentials": false,
+      "includeCookies": false,
+      "redactSecretKeys": true
+    },
+    "blackBoxCompleteness": "max-v1",
+    "deepTelemetry": [
+      "mesh-resource-material-inventory",
+      "gpu-memory-estimates",
+      "draw-triangle-index-vertex-stats",
+      "shader-compile-link-logs",
+      "webgl-error-history",
+      "context-loss-history",
+      "wasm-abi-memory-exports-source-manifest-artifact-sha256",
+      "native-failure-history",
+      "frame-subsystem-timings",
+      "network-failures-timings",
+      "console-warning-error-history",
+      "storage-quota-cache-service-worker",
+      "module-cache-versions",
+      "device-capabilities",
+      "asset-scene-provider-hooks"
+    ]
+  }
+}

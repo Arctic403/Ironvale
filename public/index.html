@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101a16">
-  <title>Ironvale</title>
+  <title>Android Survival Core</title>
   <link rel="stylesheet" href="/styles.css?v=20260901-sprint-autorun-r1">
 </head>
 <body>
   <section id="auth-screen" class="screen">
     <div class="auth-card">
-      <div class="brand">IRONVALE</div>
+      <div class="brand">SURVIVAL CORE</div>
       <h1>Rift Terrain</h1>
       <p>Sign in to open the blank terrain workspace.</p>
       <div class="auth-tabs">
@@ -20,7 +20,7 @@
       <form id="auth-form">
         <input name="username" autocomplete="username" placeholder="Username" maxlength="24" required>
         <input name="password" type="password" autocomplete="current-password" placeholder="Password" maxlength="128" required>
-        <button id="auth-submit" type="submit">Enter Ironvale</button>
+        <button id="auth-submit" type="submit">Enter World</button>
       </form>
       <div id="auth-status" role="status"></div>
       <button id="auth-dump-button" class="auth-dump-button" type="button" hidden>Export Last Diagnostic Dump</button>
@@ -33,13 +33,13 @@
     <div id="rotate-device" class="rotate-device" aria-live="polite">
       <div class="rotate-device-card">
         <strong>Rotate to Landscape</strong>
-        <span>Ironvale gameplay is landscape only.</span>
+        <span>The Android survival test world is landscape only.</span>
       </div>
     </div>
 
     <div class="topbar">
       <div>
-        <strong id="character-name">Ironvale</strong>
+        <strong id="character-name">Survivor</strong>
         <span id="terrain-status">Loading terrain…</span>
       </div>
       <div class="top-actions">
@@ -148,23 +148,7 @@
       <button type="button" data-freecam-vertical="-1" aria-label="Freecam down">▼</button>
     </div>
 
-    <div id="combat-hud" class="combat-hud">
-      <div id="target-pill" class="target-pill">
-        <span>Target</span>
-        <strong id="target-name">No target</strong>
-        <button id="lock-target-button" type="button" disabled>Lock</button>
-      </div>
-      <div class="combat-actions">
-        <div class="ability-buttons" aria-label="Abilities">
-          <button type="button" data-ability-slot="1" aria-label="Ability 1">1</button>
-          <button type="button" data-ability-slot="2" aria-label="Ability 2">2</button>
-          <button type="button" data-ability-slot="3" aria-label="Ability 3">3</button>
-        </div>
-        <button id="basic-attack-button" class="basic-attack" type="button">Attack</button>
-      </div>
-    </div>
-
-    <div class="look-hint">Swipe: look · tap enemy: target</div>
+    <div class="look-hint">Swipe: look · move with the joystick</div>
   </main>
 
   <script type="module" src="/rift-geometry-guard.js?v=20260901-capsule-index-r2"></script>

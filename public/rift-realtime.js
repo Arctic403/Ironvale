@@ -1,6 +1,6 @@
-import { IronvaleIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
+import { RiftSurvivalIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-export const RIFT_REALTIME_FORMAT = 'ironvale-realtime-client-v2';
+export const RIFT_REALTIME_FORMAT = 'rift-survival-realtime-client-v2';
 
 const MOVEMENT_PATH = '/api/character/position';
 const SOCKET_PATH = '/api/realtime/movement';
@@ -73,19 +73,19 @@ let lastPublishedPosition = null;
 const pendingAcks = new Map();
 
 function record(message, data = null, severity = 'info') {
-  try { window.IronvaleDiagnostics?.record?.('realtime', message, data, severity); } catch (_) {}
+  try { window.RiftSurvivalDiagnostics?.record?.('realtime', message, data, severity); } catch (_) {}
 }
 
 function socketUrl() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = new URL(`${protocol}//${location.host}${SOCKET_PATH}`);
-  const integrity = IronvaleIntegrity.transportParams();
+  const integrity = RiftSurvivalIntegrity.transportParams();
   if (integrity) for (const [key, value] of Object.entries(integrity)) url.searchParams.set(key, value);
   return url.href;
 }
 
 function shouldConnect() {
-  return navigator.onLine !== false && worldScreen?.hidden === false && IronvaleIntegrity.status().attested === true;
+  return navigator.onLine !== false && worldScreen?.hidden === false && RiftSurvivalIntegrity.status().attested === true;
 }
 
 function socketOpen() {
@@ -198,7 +198,7 @@ function applyCorrection(message) {
   state.corrections += 1;
   if (message?.position) rememberPublished(message.position);
   record('Server rejected impossible movement', { reason: message?.reason, seq: message?.seq }, 'warn');
-  window.dispatchEvent(new CustomEvent('ironvale:movement-correction', {
+  window.dispatchEvent(new CustomEvent('rift-survival:movement-correction', {
     detail: { reason: message?.reason, seq: message?.seq, position: message?.position || null }
   }));
 }
@@ -231,7 +231,7 @@ async function dispatchFallbackPosition(position, source = 'direct', keepalive =
   try {
     const response = await baseFetch(MOVEMENT_PATH, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...IronvaleIntegrity.transportHeaders() },
+      headers: { 'Content-Type': 'application/json', ...RiftSurvivalIntegrity.transportHeaders() },
       body: JSON.stringify(packet),
       keepalive
     });
@@ -441,7 +441,7 @@ async function checkpoint(reason = 'client', options = {}) {
     state.checkpointRequests += 1;
     const response = await baseFetch(CHECKPOINT_PATH, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...IronvaleIntegrity.transportHeaders() },
+      headers: { 'Content-Type': 'application/json', ...RiftSurvivalIntegrity.transportHeaders() },
       body: JSON.stringify({ reason: label }),
       keepalive: options?.keepalive === true
     });
@@ -477,7 +477,7 @@ async function requestJson(input, init) {
   return {};
 }
 
-window.fetch = async function ironvaleRealtimeFetch(input, init = undefined) {
+window.fetch = async function riftSurvivalRealtimeFetch(input, init = undefined) {
   const url = requestUrl(input);
   const method = requestMethod(input, init);
 
@@ -501,7 +501,7 @@ window.fetch = async function ironvaleRealtimeFetch(input, init = undefined) {
   let nextInput = input;
   let nextInit = init;
   if (url?.origin === location.origin && url.pathname.startsWith('/api/') && !['/api/integrity/challenge', '/api/integrity/attest'].includes(url.pathname)) {
-    const integrityHeaders = IronvaleIntegrity.transportHeaders();
+    const integrityHeaders = RiftSurvivalIntegrity.transportHeaders();
     if (Object.keys(integrityHeaders).length) {
       if (input instanceof Request) {
         const headers = new Headers(input.headers);
@@ -544,9 +544,9 @@ function realtimeStatus() {
       legacyFetchBridgeCompatibilityOnly: true,
       appLegacyHeartbeatRemoved: true
     },
-    integrity: IronvaleIntegrity.status(),
+    integrity: RiftSurvivalIntegrity.status(),
     zoneAuthorityPolicy: {
-      format: 'ironvale-zone-authority-v1',
+      format: 'rift-survival-zone-authority-v1',
       source: 'zone-durable-object-ram',
       presenceHeartbeatMs: ZONE_PRESENCE_HEARTBEAT_MS,
       movementPacketsDoNotFanOutAt10Hz: true,
@@ -569,7 +569,7 @@ function realtimeStatus() {
 
 function registerDiagnosticsProvider() {
   if (providerRegistered) return;
-  const diagnostics = window.IronvaleDiagnostics;
+  const diagnostics = window.RiftSurvivalDiagnostics;
   if (!diagnostics?.registerProvider) {
     setTimeout(registerDiagnosticsProvider, 100);
     return;
@@ -584,7 +584,7 @@ const observer = new MutationObserver(() => {
 });
 if (worldScreen) observer.observe(worldScreen, { attributes: true, attributeFilter: ['hidden'] });
 
-window.IronvaleRealtimeMovement = Object.freeze({
+window.RiftSurvivalRealtimeMovement = Object.freeze({
   format: RIFT_REALTIME_FORMAT,
   publish: publishMovement,
   checkpoint,
@@ -592,9 +592,9 @@ window.IronvaleRealtimeMovement = Object.freeze({
   status: realtimeStatus
 });
 
-window.addEventListener('ironvale:integrity-ready', connect);
-window.addEventListener('ironvale:integrity-refreshed', () => { closeSocket('integrity-refresh'); queueMicrotask(connect); });
-window.addEventListener('ironvale:integrity-failed', () => closeSocket('integrity-failed'));
+window.addEventListener('rift-survival:integrity-ready', connect);
+window.addEventListener('rift-survival:integrity-refreshed', () => { closeSocket('integrity-refresh'); queueMicrotask(connect); });
+window.addEventListener('rift-survival:integrity-failed', () => closeSocket('integrity-failed'));
 window.addEventListener('online', connect);
 window.addEventListener('offline', () => {
   stopPresenceHeartbeat();

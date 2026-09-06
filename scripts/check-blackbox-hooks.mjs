@@ -30,9 +30,9 @@ if (!failures.length) {
 }
 
 if (failures.length) {
-  console.error('Ironvale black-box hook verification failed:');
+  console.error('RiftSurvival black-box hook verification failed:');
   for (const failure of failures) console.error(` - ${failure}`);
   process.exit(1);
 }
 
-console.log('Ironvale black-box subsystem hooks verified.');
+console.log('RiftSurvival black-box subsystem hooks verified.');

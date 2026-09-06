@@ -4,7 +4,7 @@ import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
-import { IronvaleIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
+import { RiftSurvivalIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
 const APP_DIAGNOSTIC_BUILD = '20260902-terrain-pack-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
@@ -53,11 +53,6 @@ const splineFalloffInput = $('#spline-falloff');
 const splineFalloffValue = $('#spline-falloff-value');
 const reticle = $('#terrain-reticle');
 const altitudeControls = $('#freecam-altitude');
-const combatHud = $('#combat-hud');
-const targetPill = $('#target-pill');
-const targetName = $('#target-name');
-const lockTargetButton = $('#lock-target-button');
-const basicAttackButton = $('#basic-attack-button');
 const lookHint = $('.look-hint');
 const terrainDebugToggle = $('#terrain-debug-toggle');
 const terrainDebugReadout = $('#terrain-debug-readout');
@@ -70,8 +65,8 @@ const sprintButton = $('#sprint-button');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
-const LOCAL_DRAFT_KEY = 'ironvale:terrain:draft:v4';
-const LEGACY_LOCAL_DRAFT_KEYS = ['ironvale:terrain:draft:v3', 'ironvale:terrain:draft:v2'];
+const LOCAL_DRAFT_KEY = 'rift-survival:terrain:draft:v4';
+const LEGACY_LOCAL_DRAFT_KEYS = ['rift-survival:terrain:draft:v3', 'rift-survival:terrain:draft:v2'];
 const MAX_HISTORY = 10;
 const LONG_PRESS_MS = 260;
 const LOOK_START_PX = 9;
@@ -96,10 +91,6 @@ const DEFAULT_ORBIT_DISTANCE = 8.0;
 const ORBIT_MIN_DISTANCE = 1.0;
 const ORBIT_MAX_DISTANCE = 10.0;
 const ORBIT_PINCH_EXPONENT = 0.9;
-const TARGET_TAP_MAX_MS = 260;
-const TARGET_TAP_MAX_PX = 9;
-const TARGET_PICK_MAX_DISTANCE = 80;
-const AUTO_ATTACK_RANGE = 5.5;
 const MOBILE_TERRAIN_PIXEL_RATIO_MAX = 1.5;
 const MOBILE_TERRAIN_PIXEL_RATIO_MIN = 1.0;
 const TERRAIN_PERF_SAMPLE_FRAMES = 90;
@@ -143,16 +134,13 @@ let lastCameraPosition = [320, 16, 338];
 let lastCameraTarget = [320, 0, 320];
 let freecamVertical = 0;
 let joystickActive = false;
-let selectedTargetId = null;
-let hardLockEnabled = false;
 let viewportCameraProfile = '';
 let diagnosticFrameCounter = 0;
 const diagnosticFrameTimings = { sampleEveryFrames: 15, samples: 0, movementMs: 0, animationMs: 0, cameraMs: 0, terrainLodMs: 0, reticleMs: 0, renderMs: 0, totalMs: 0, maxTotalMs: 0 };
-const TERRAIN_EDIT_PERF_FORMAT = 'ironvale-terrain-edit-performance-v1';
+const TERRAIN_EDIT_PERF_FORMAT = 'rift-survival-terrain-edit-performance-v1';
 const TERRAIN_EDIT_SAMPLE_LIMIT = 256;
 const terrainEditSamples = [];
 let terrainEditSequence = 0;
-const combatTargets = new Map();
 
 function terrainEditRound(value) { return Math.round((Math.max(0, Number(value) || 0) + Number.EPSILON) * 1000) / 1000; }
 function terrainEditPercentile(values, percentile) {
@@ -236,14 +224,14 @@ const input = { forward: 0, strafe: 0, keys: new Set() };
 const undoStack = [];
 const redoStack = [];
 
-const IRONVALE_EDITOR_HISTORY_FORMAT = 'ironvale-editor-history-runtime-v1';
-const IRONVALE_EDITOR_HISTORY_SNAPSHOT_FORMAT = 'ironvale-editor-history-snapshot-v1';
+const RIFT_SURVIVAL_EDITOR_HISTORY_FORMAT = 'rift-survival-editor-history-runtime-v1';
+const RIFT_SURVIVAL_EDITOR_HISTORY_SNAPSHOT_FORMAT = 'rift-survival-editor-history-snapshot-v1';
 const editorHistorySnapshots = new Map();
 let editorHistorySnapshotSequence = 0;
 
 function editorHistoryStatus() {
   return {
-    format: IRONVALE_EDITOR_HISTORY_FORMAT,
+    format: RIFT_SURVIVAL_EDITOR_HISTORY_FORMAT,
     undoDepth: undoStack.length,
     redoDepth: redoStack.length,
     retainedSnapshots: editorHistorySnapshots.size
@@ -263,7 +251,7 @@ function captureEditorHistory(label = 'external') {
     editorHistorySnapshots.delete(oldest);
   }
   return {
-    format: IRONVALE_EDITOR_HISTORY_SNAPSHOT_FORMAT,
+    format: RIFT_SURVIVAL_EDITOR_HISTORY_SNAPSHOT_FORMAT,
     token,
     label: String(label || 'external').slice(0, 80),
     undoDepth: undoStack.length,
@@ -288,19 +276,19 @@ function discardEditorHistory(snapshotOrToken) {
   return Boolean(token && editorHistorySnapshots.delete(token));
 }
 
-window.IronvaleEditorHistory = Object.freeze({
-  format: IRONVALE_EDITOR_HISTORY_FORMAT,
+window.RiftSurvivalEditorHistory = Object.freeze({
+  format: RIFT_SURVIVAL_EDITOR_HISTORY_FORMAT,
   capture: captureEditorHistory,
   restore: restoreEditorHistory,
   discard: discardEditorHistory,
   status: editorHistoryStatus
 });
 
-const IRONVALE_PLAYER_STATE_FORMAT = 'ironvale-player-state-runtime-v1';
+const RIFT_SURVIVAL_PLAYER_STATE_FORMAT = 'rift-survival-player-state-runtime-v1';
 
 function playerStateSnapshot(label = 'external') {
   return {
-    format: IRONVALE_PLAYER_STATE_FORMAT,
+    format: RIFT_SURVIVAL_PLAYER_STATE_FORMAT,
     label: String(label || 'external').slice(0, 80),
     x: player.x,
     y: player.y,
@@ -331,18 +319,18 @@ function restorePlayerState(snapshot) {
   return { ok: true, ...playerStateSnapshot('restored') };
 }
 
-window.IronvalePlayerState = Object.freeze({
-  format: IRONVALE_PLAYER_STATE_FORMAT,
+window.RiftSurvivalPlayerState = Object.freeze({
+  format: RIFT_SURVIVAL_PLAYER_STATE_FORMAT,
   capture: playerStateSnapshot,
   restore: restorePlayerState,
   status: () => playerStateSnapshot('status')
 });
 
-const IRONVALE_MOVEMENT_MODE_FORMAT = 'ironvale-movement-mode-v1';
+const RIFT_SURVIVAL_MOVEMENT_MODE_FORMAT = 'rift-survival-movement-mode-v1';
 
 function movementModeStatus() {
   return {
-    format: IRONVALE_MOVEMENT_MODE_FORMAT,
+    format: RIFT_SURVIVAL_MOVEMENT_MODE_FORMAT,
     walkSpeedMps: WALK_SPEED_MPS,
     sprintSpeedMps: SPRINT_SPEED_MPS,
     sprintSpeedRatio: Math.round((SPRINT_SPEED_MPS / WALK_SPEED_MPS) * 100) / 100,
@@ -405,8 +393,8 @@ function toggleSprintMode(source = 'tap') {
   return setSprintMode(true, source);
 }
 
-window.IronvaleMovementMode = Object.freeze({
-  format: IRONVALE_MOVEMENT_MODE_FORMAT,
+window.RiftSurvivalMovementMode = Object.freeze({
+  format: RIFT_SURVIVAL_MOVEMENT_MODE_FORMAT,
   status: movementModeStatus,
   setSprint: (enabled, source = 'api') => setSprintMode(Boolean(enabled), source),
   toggleSprint: (source = 'api') => toggleSprintMode(source),
@@ -432,7 +420,7 @@ diagnostics.registerProvider('native', level => terrain?.getNativeDiagnostics?.(
 diagnostics.registerProvider('movement-mode', () => movementModeStatus());
 diagnostics.registerProvider('terrain-edit-performance', level => terrainEditPerformanceStatus(level >= 3));
 
-window.IronvaleDiagnostics = Object.freeze({
+window.RiftSurvivalDiagnostics = Object.freeze({
   validate: () => diagnostics.runValidation('api'),
   dump: level => diagnostics.exportDump(level || 2, 'api'),
   dumpCompressed: level => diagnostics.exportCompressedDump(level || 2, 'api-compressed'),
@@ -451,7 +439,7 @@ window.IronvaleDiagnostics = Object.freeze({
 document.querySelectorAll('[data-auth-tab]').forEach(button => button.addEventListener('click', () => {
   authMode = button.dataset.authTab;
   document.querySelectorAll('[data-auth-tab]').forEach(tab => tab.classList.toggle('active', tab === button));
-  authSubmit.textContent = authMode === 'register' ? 'Create account' : 'Enter Ironvale';
+  authSubmit.textContent = authMode === 'register' ? 'Create account' : 'Enter World';
   authForm.password.autocomplete = authMode === 'register' ? 'new-password' : 'current-password';
   setAuthStatus('');
 }));
@@ -481,7 +469,7 @@ $('#logout-button').addEventListener('click', async () => {
   showAuth();
 });
 
-window.addEventListener('ironvale:movement-correction', event => {
+window.addEventListener('rift-survival:movement-correction', event => {
   const position = event?.detail?.position;
   const values = [position?.x, position?.y, position?.z, position?.yaw].map(Number);
   if (values.some(value => !Number.isFinite(value))) return;
@@ -502,9 +490,6 @@ window.addEventListener('ironvale:movement-correction', event => {
 
 $('#terrain-tools-button').addEventListener('click', () => { tools.hidden = !tools.hidden; });
 freecamButton.addEventListener('click', () => setFreecam(!freecamEnabled));
-lockTargetButton.addEventListener('click', () => setHardLock(!hardLockEnabled));
-basicAttackButton.addEventListener('click', performBasicAttack);
-document.querySelectorAll('[data-ability-slot]').forEach(button => button.addEventListener('click', () => triggerAbility(Number(button.dataset.abilitySlot) || 0, button)));
 
 document.querySelectorAll('[data-brush]').forEach(button => button.addEventListener('click', () => {
   brushMode = button.dataset.brush;
@@ -635,7 +620,7 @@ refreshEditorLabels();
 updateReticleVisual();
 refreshDiagnosticUi();
 refreshDiagnosticButtons();
-window.addEventListener('ironvale:integrity-failed', event => {
+window.addEventListener('rift-survival:integrity-failed', event => {
   try { stopWorld(); } catch (_) {}
   showAuth();
   setAuthStatus('Integrity access denied: ' + String(event?.detail?.reason || 'runtime integrity failure'), true);
@@ -777,7 +762,7 @@ function buildDiagnosticChecks() {
     diagnosticCheck('terrain.lod-plan', terrainLodPlan.size > 0, terrainLodPlan.size + ' planned sections'),
     diagnosticCheck('terrain.streaming', Boolean(terrainStreamPlan?.render?.size), (terrainStreamPlan?.render?.size || 0) + ' render components'),
     diagnosticCheck('character.visual', Boolean(playerMesh), playerCharacter?.meshes?.length ? 'Rigged visual active' : playerMesh ? 'Fallback/player visual active' : 'No player visual'),
-    diagnosticCheck('player.movement-mode', Boolean(sprintButton) && typeof window.IronvaleMovementMode?.status === 'function', `walk ${WALK_SPEED_MPS}m/s · sprint ${SPRINT_SPEED_MPS}m/s · auto-run hold ${AUTO_RUN_HOLD_MS}ms`),
+    diagnosticCheck('player.movement-mode', Boolean(sprintButton) && typeof window.RiftSurvivalMovementMode?.status === 'function', `walk ${WALK_SPEED_MPS}m/s · sprint ${SPRINT_SPEED_MPS}m/s · auto-run hold ${AUTO_RUN_HOLD_MS}ms`),
     diagnosticCheck('terrain.edit-profiler', typeof terrainEditPerformanceStatus === 'function', `${terrainEditSamples.length} terrain edit timing sample(s) captured`)
   );
   return checks;
@@ -791,9 +776,9 @@ async function buildDiagnosticSnapshot(level = 1) {
   const viewport = engine?.getViewport?.() || null;
   const gl = engine?.gl || null;
   const quick = {
-    app: 'Ironvale',
+    app: 'Android Survival Core',
     appBuild: APP_DIAGNOSTIC_BUILD,
-    diagnostics: 'ironvale-diagnostics-v2',
+    diagnostics: 'rift-survival-diagnostics-v2',
     phase: worldDocument ? 'world' : 'auth',
     worldId: worldDocument?.id || null,
     worldUnits: worldDocument?.units || null,
@@ -836,12 +821,7 @@ async function buildDiagnosticSnapshot(level = 1) {
   };
   if (resolvedLevel === 2) return { quick, runtime };
 
-  let remoteLibraryPointer = null;
   let coreSourceManifest = null;
-  try {
-    const response = await fetch('/assets/remote-library.json', { cache: 'no-store' });
-    remoteLibraryPointer = response.ok ? await response.json() : { error: 'HTTP ' + response.status };
-  } catch (error) { remoteLibraryPointer = { error: String(error?.message || error) }; }
   try {
     const response = await fetch('/rift-core.sources.json', { cache: 'no-store' });
     coreSourceManifest = response.ok ? await response.json() : { error: 'HTTP ' + response.status };
@@ -853,7 +833,6 @@ async function buildDiagnosticSnapshot(level = 1) {
     worldDocument,
     landscapeEdits: terrain?.serializeLandscapeEdits?.() || null,
     localDraft: { key: LOCAL_DRAFT_KEY, bytes: draftText ? new TextEncoder().encode(draftText).byteLength : 0 },
-    remoteLibraryPointer,
     renderer: { webgl: webGlDiagnosticInfo(gl, true), engine: engine?.getDiagnostics?.(true) || { ready: false, boot: getRiftEngineBootTelemetry() } },
     native: terrain?.getNativeDiagnostics?.(true) || null,
     riftCore: { sourceManifest: coreSourceManifest, wasmResource: resources.find(entry => entry.name.includes('rift-core.wasm')) || null, artifact: wasmArtifact },
@@ -864,10 +843,9 @@ async function buildDiagnosticSnapshot(level = 1) {
     serviceWorker,
     resourceTiming: resources,
     loadedModules: resources.filter(entry => /(?:app|rift-[^/]+|styles)\.(?:js|css)/.test(entry.name)),
-    targeting: { registeredTargets: combatTargets.size, selectedTargetId, hardLockEnabled },
     terrainEditPerformance: terrainEditPerformanceStatus(true),
     diagnosticsExtensibility: { registeredProviders: [...diagnostics.providers.keys()], assetAndSceneProvidersSupported: true },
-    moduleContracts: { appBuild: APP_DIAGNOSTIC_BUILD, terrainDraft: 'v4', landscape: worldDocument?.terrain?.landscape?.format || null, scale: worldDocument?.scale?.format || null, diagnostics: 'ironvale-diagnostics-v2', engineTelemetry: 'rift-engine-telemetry-v1', nativeTelemetry: 'riftcore-native-diagnostics-v1' }
+    moduleContracts: { appBuild: APP_DIAGNOSTIC_BUILD, terrainDraft: 'v4', landscape: worldDocument?.terrain?.landscape?.format || null, scale: worldDocument?.scale?.format || null, diagnostics: 'rift-survival-diagnostics-v2', engineTelemetry: 'rift-engine-telemetry-v1', nativeTelemetry: 'riftcore-native-diagnostics-v1' }
   };
   return { quick, runtime, deep };
 }
@@ -899,7 +877,7 @@ async function bootSession() {
   try {
     const data = await api('/api/bootstrap');
     if (!data.ok || !data.authenticated) { showAuth(); return; }
-    const integrity = await IronvaleIntegrity.ensureSession();
+    const integrity = await RiftSurvivalIntegrity.ensureSession();
     if (!integrity?.ok) {
       showAuth();
       setAuthStatus('Integrity check failed: ' + String(integrity?.reason || integrity?.status?.lastError || 'critical client files did not match the approved build'), true);
@@ -912,9 +890,9 @@ async function bootSession() {
     player.z = finiteOr(saved.z, 320);
     player.yaw = finiteOr(saved.yaw, 0);
     orbitCamera.yaw = wrapAngle(player.yaw + Math.PI);
-    await startWorld(data.world?.url || '/world/ironvale-terrain.json');
+    await startWorld(data.world?.url || '/world/rift-survival-terrain.json');
   } catch (error) {
-    console.error('Ironvale world boot failed.', error);
+    console.error('Survival world boot failed.', error);
     const crashDump = await diagnostics.captureCrash(error, 'world-boot').catch(() => null);
     showAuth();
     refreshDiagnosticButtons();
@@ -965,8 +943,6 @@ async function startWorld(url) {
   applyViewportCameraProfile(true);
   updateOrbitCamera();
   reticle.hidden = true;
-  combatHud.hidden = false;
-  refreshCombatHud();
   updateReticleVisual();
   updateReticleTarget();
   const stats = terrain.getStats?.() || {};
@@ -1015,8 +991,6 @@ function stopWorld() {
   redoStack.length = 0;
   freecamEnabled = false;
   freecamVertical = 0;
-  selectedTargetId = null;
-  hardLockEnabled = false;
   viewportCameraProfile = '';
   worldScreen.classList.remove('freecam');
   terrainDebugToggle?.classList.remove('active');
@@ -1026,8 +1000,6 @@ function stopWorld() {
   reticle.hidden = true;
   altitudeControls.hidden = true;
   brushReadout.hidden = true;
-  combatHud.hidden = true;
-  refreshCombatHud();
   worldScreen.hidden = true;
 }
 
@@ -1361,7 +1333,6 @@ function frame(now) {
   markTiming('movementMs');
   updatePlayerCharacterAnimation(dt);
   markTiming('animationMs');
-  if (!freecamEnabled) updateHardLockCamera(dt);
   updateCamera();
   markTiming('cameraMs');
   updateTerrainLod(now);
@@ -1378,7 +1349,7 @@ function frame(now) {
     : `${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`;
 
   if (!freecamEnabled) {
-    window.IronvaleRealtimeMovement?.publish?.({ x: player.x, y: player.y, z: player.z, yaw: player.yaw });
+    window.RiftSurvivalRealtimeMovement?.publish?.({ x: player.x, y: player.y, z: player.z, yaw: player.yaw });
   }
   animationFrame = requestAnimationFrame(frame);
 }
@@ -1556,12 +1527,9 @@ function setFreecam(enabled, { preserveCamera = true } = {}) {
   reticle.hidden = !freecamEnabled;
   altitudeControls.hidden = !freecamEnabled;
   brushReadout.hidden = !freecamEnabled;
-  combatHud.hidden = freecamEnabled;
-  if (freecamEnabled) hardLockEnabled = false;
-  refreshCombatHud();
   lookHint.textContent = freecamEnabled
     ? 'Swipe: look · center reticle: terrain tools'
-    : 'Swipe: look · tap enemy: target';
+    : 'Swipe: look · move with the joystick';
   reticleHit = null;
   if (brushMesh) brushMesh.visible = false;
   editorStatus.textContent = freecamEnabled
@@ -1576,22 +1544,18 @@ function setupCanvasControls() {
   let orbitPointerId = null;
   let orbitLastX = 0;
   let orbitLastY = 0;
-  let orbitDownX = 0;
-  let orbitDownY = 0;
-  let orbitDownAt = 0;
   let orbitTravel = 0;
   let orbitLooking = false;
   const orbitTouches = new Map();
   let orbitPinch = null;
   let orbitGestureWasPinch = false;
 
-  const beginOrbitPointer = (pointerId, x, y, { suppressTarget = false } = {}) => {
+  const beginOrbitPointer = (pointerId, x, y, { resumeLooking = false } = {}) => {
     orbitPointerId = pointerId;
-    orbitLastX = orbitDownX = x;
-    orbitLastY = orbitDownY = y;
-    orbitDownAt = performance.now();
-    orbitTravel = suppressTarget ? LOOK_START_PX + 1 : 0;
-    orbitLooking = Boolean(suppressTarget);
+    orbitLastX = x;
+    orbitLastY = y;
+    orbitTravel = resumeLooking ? LOOK_START_PX + 1 : 0;
+    orbitLooking = Boolean(resumeLooking);
   };
 
   const resetOrbitPointer = () => {
@@ -1747,7 +1711,7 @@ function setupCanvasControls() {
           orbitPinch = null;
           if (orbitTouches.size === 1) {
             const remaining = orbitTouches.values().next().value;
-            beginOrbitPointer(remaining.id, remaining.x, remaining.y, { suppressTarget: true });
+            beginOrbitPointer(remaining.id, remaining.x, remaining.y, { resumeLooking: true });
           } else {
             resetOrbitPointer();
           }
@@ -1761,11 +1725,6 @@ function setupCanvasControls() {
       }
 
       if (event.pointerId !== orbitPointerId) return;
-      const duration = performance.now() - orbitDownAt;
-      const displacement = Math.hypot(event.clientX - orbitDownX, event.clientY - orbitDownY);
-      if (!orbitGestureWasPinch && !orbitLooking && duration <= TARGET_TAP_MAX_MS && displacement <= TARGET_TAP_MAX_PX) {
-        selectCombatTargetAtScreen(event.clientX, event.clientY);
-      }
       resetOrbitPointer();
       if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture?.(event.pointerId);
       return;
@@ -1802,7 +1761,7 @@ function setupCanvasControls() {
       if (orbitTouches.size === 1) {
         const remaining = orbitTouches.values().next().value;
         orbitGestureWasPinch = true;
-        beginOrbitPointer(remaining.id, remaining.x, remaining.y, { suppressTarget: true });
+        beginOrbitPointer(remaining.id, remaining.x, remaining.y, { resumeLooking: true });
       } else if (orbitTouches.size === 0) {
         resetOrbitPointer();
       }
@@ -1905,7 +1864,7 @@ function applyBrushAtReticle(strengthScale = 1, flattenY = null, saveImmediately
 }
 
 function updateReticleVisual() {
-  // RPG interaction contract: the reticle never follows the pointer.
+  // Interaction contract: the terrain reticle never follows the pointer.
   reticle.style.left = '50%';
   reticle.style.top = '50%';
   brushReadout.style.left = '50%';
@@ -1962,233 +1921,6 @@ function raycastTerrainAtReticle() {
 
 
 
-function screenPointRay(clientX, clientY) {
-  if (!engine) return null;
-  const rect = canvas.getBoundingClientRect();
-  const width = Math.max(1, rect.width);
-  const height = Math.max(1, rect.height);
-  const nx = ((clientX - rect.left) / width) * 2 - 1;
-  const ny = 1 - ((clientY - rect.top) / height) * 2;
-  const forward = normalize3(
-    lastCameraTarget[0] - lastCameraPosition[0],
-    lastCameraTarget[1] - lastCameraPosition[1],
-    lastCameraTarget[2] - lastCameraPosition[2]
-  );
-  const right = normalize3(...cross3(forward, [0, 1, 0]));
-  const up = normalize3(...cross3(right, forward));
-  const fov = Number(freecamEnabled ? freecam.fov : orbitCamera.fov) || Math.PI / 3;
-  const tan = Math.tan(fov * .5);
-  const aspect = width / height;
-  const direction = normalize3(
-    forward[0] + right[0] * nx * tan * aspect + up[0] * ny * tan,
-    forward[1] + right[1] * nx * tan * aspect + up[1] * ny * tan,
-    forward[2] + right[2] * nx * tan * aspect + up[2] * ny * tan
-  );
-  return { origin: [...lastCameraPosition], direction };
-}
-
-function targetWorldPosition(target) {
-  if (!target) return null;
-  let source = typeof target.getPosition === 'function' ? target.getPosition() : target.position;
-  if (!source) return null;
-  if (Array.isArray(source)) {
-    const x = Number(source[0]), y = Number(source[1]), z = Number(source[2]);
-    return [x, y, z].every(Number.isFinite) ? [x, y, z] : null;
-  }
-  const x = Number(source.x), y = Number(source.y), z = Number(source.z);
-  return [x, y, z].every(Number.isFinite) ? [x, y, z] : null;
-}
-
-function raySphereDistance(ray, center, radius) {
-  const ox = ray.origin[0] - center[0];
-  const oy = ray.origin[1] - center[1];
-  const oz = ray.origin[2] - center[2];
-  const b = ox * ray.direction[0] + oy * ray.direction[1] + oz * ray.direction[2];
-  const c = ox * ox + oy * oy + oz * oz - radius * radius;
-  const discriminant = b * b - c;
-  if (discriminant < 0) return null;
-  const root = Math.sqrt(discriminant);
-  const near = -b - root;
-  if (near >= 0) return near;
-  const far = -b + root;
-  return far >= 0 ? far : null;
-}
-
-function registerCombatTarget(id, descriptor = {}) {
-  const key = String(id || '').trim();
-  if (!key) throw new Error('Combat target id is required.');
-  combatTargets.set(key, {
-    ...descriptor,
-    id: key,
-    name: String(descriptor.name || key),
-    radius: Math.max(.25, Number(descriptor.radius) || 1),
-    enabled: descriptor.enabled !== false
-  });
-  refreshCombatHud();
-  return () => unregisterCombatTarget(key);
-}
-
-function unregisterCombatTarget(id) {
-  const key = String(id || '');
-  combatTargets.delete(key);
-  if (selectedTargetId === key) clearCombatTarget();
-}
-
-function selectedCombatTarget() {
-  const target = selectedTargetId ? combatTargets.get(selectedTargetId) : null;
-  if (!target || target.enabled === false || !targetWorldPosition(target)) return null;
-  return target;
-}
-
-function setSelectedCombatTarget(target) {
-  selectedTargetId = target?.id && combatTargets.has(target.id) ? target.id : null;
-  if (!selectedTargetId) hardLockEnabled = false;
-  refreshCombatHud();
-  window.dispatchEvent(new CustomEvent('ironvale:target-changed', { detail: { targetId: selectedTargetId, target: selectedCombatTarget() } }));
-}
-
-function clearCombatTarget() {
-  setSelectedCombatTarget(null);
-}
-
-function pickCombatTargetAtScreen(clientX, clientY) {
-  const ray = screenPointRay(clientX, clientY);
-  if (!ray) return null;
-  let best = null;
-  let bestDistance = Infinity;
-  for (const target of combatTargets.values()) {
-    if (target.enabled === false) continue;
-    const center = targetWorldPosition(target);
-    if (!center) continue;
-    const hitDistance = raySphereDistance(ray, center, target.radius);
-    const maxDistance = Math.max(1, Number(target.maxTargetDistance) || TARGET_PICK_MAX_DISTANCE);
-    if (hitDistance == null || hitDistance > maxDistance || hitDistance >= bestDistance) continue;
-    best = target;
-    bestDistance = hitDistance;
-  }
-  return best;
-}
-
-function selectCombatTargetAtScreen(clientX, clientY) {
-  if (freecamEnabled) return null;
-  const target = pickCombatTargetAtScreen(clientX, clientY);
-  setSelectedCombatTarget(target);
-  return target;
-}
-
-function findAutoAttackTarget() {
-  const basis = cameraGroundBasis(orbitCamera.yaw);
-  let best = null;
-  let bestScore = Infinity;
-  for (const target of combatTargets.values()) {
-    if (target.enabled === false) continue;
-    const position = targetWorldPosition(target);
-    if (!position) continue;
-    const dx = position[0] - player.x;
-    const dz = position[2] - player.z;
-    const distance = Math.hypot(dx, dz);
-    const range = Math.max(1, Number(target.autoAttackRange) || AUTO_ATTACK_RANGE);
-    if (distance > range || distance < .001) continue;
-    const facing = (dx / distance) * basis.forwardX + (dz / distance) * basis.forwardZ;
-    if (facing < .1) continue;
-    const score = distance - facing * 1.5;
-    if (score < bestScore) { best = target; bestScore = score; }
-  }
-  return best;
-}
-
-function facePlayerTowardTarget(target) {
-  const position = targetWorldPosition(target);
-  if (!position) return;
-  const dx = position[0] - player.x;
-  const dz = position[2] - player.z;
-  if (Math.hypot(dx, dz) < .001) return;
-  player.yaw = Math.atan2(dx, dz);
-  updatePlayerVisualTransform();
-}
-
-function setHardLock(enabled) {
-  hardLockEnabled = Boolean(enabled) && Boolean(selectedCombatTarget()) && !freecamEnabled;
-  refreshCombatHud();
-}
-
-function updateHardLockCamera(dt) {
-  if (!hardLockEnabled || freecamEnabled) return;
-  const target = selectedCombatTarget();
-  const position = targetWorldPosition(target);
-  if (!target || !position) { setHardLock(false); return; }
-  const dx = position[0] - player.x;
-  const dz = position[2] - player.z;
-  const distance = Math.hypot(dx, dz);
-  if (distance > TARGET_PICK_MAX_DISTANCE || distance < .001) { setHardLock(false); return; }
-  const desiredYaw = cameraAnglesFromDirection([dx, 0, dz]).yaw;
-  orbitCamera.yaw = moveAngleToward(orbitCamera.yaw, desiredYaw, Math.max(.01, dt) * 7.5);
-  player.yaw = Math.atan2(dx, dz);
-  updatePlayerVisualTransform();
-}
-
-function performBasicAttack() {
-  if (freecamEnabled) return;
-  let target = selectedCombatTarget();
-  if (!target) {
-    target = findAutoAttackTarget();
-    if (target) setSelectedCombatTarget(target);
-  }
-  if (!target) {
-    flashTargetStatus('No target nearby');
-    pulseCombatButton(basicAttackButton);
-    return;
-  }
-  facePlayerTowardTarget(target);
-  pulseCombatButton(basicAttackButton);
-  window.dispatchEvent(new CustomEvent('ironvale:basic-attack', { detail: { targetId: target.id, target } }));
-}
-
-function triggerAbility(slot, button) {
-  if (freecamEnabled || !slot) return;
-  const target = selectedCombatTarget();
-  if (!target) {
-    flashTargetStatus('Tap a target first');
-    pulseCombatButton(button);
-    return;
-  }
-  facePlayerTowardTarget(target);
-  pulseCombatButton(button);
-  window.dispatchEvent(new CustomEvent('ironvale:ability', { detail: { slot, targetId: target.id, target } }));
-}
-
-function refreshCombatHud() {
-  if (!targetName || !lockTargetButton || !targetPill) return;
-  const target = selectedCombatTarget();
-  targetName.textContent = target?.name || 'No target';
-  targetPill.classList.toggle('active', Boolean(target));
-  lockTargetButton.disabled = !target || freecamEnabled;
-  lockTargetButton.classList.toggle('active', Boolean(target && hardLockEnabled));
-  lockTargetButton.textContent = hardLockEnabled && target ? 'Locked' : 'Lock';
-}
-
-function flashTargetStatus(message) {
-  if (!targetName) return;
-  targetName.textContent = message;
-  setTimeout(refreshCombatHud, 850);
-}
-
-function pulseCombatButton(button) {
-  if (!button) return;
-  button.classList.remove('pressed');
-  void button.offsetWidth;
-  button.classList.add('pressed');
-  setTimeout(() => button.classList.remove('pressed'), 140);
-}
-
-window.IronvaleTargeting = Object.freeze({
-  register: registerCombatTarget,
-  unregister: unregisterCombatTarget,
-  select: id => setSelectedCombatTarget(combatTargets.get(String(id || '')) || null),
-  clear: clearCombatTarget,
-  getSelected: selectedCombatTarget
-});
-
 function captureTerrainState() {
   return terrain?.captureEditState?.() || null;
 }
@@ -2224,7 +1956,7 @@ function redoTerrain() {
 
 function serializeTerrainEdits() {
   if (!terrain?.serializeLandscapeEdits) return null;
-  return terrain.serializeLandscapeEdits({ worldId: worldDocument?.id || 'ironvale-terrain' });
+  return terrain.serializeLandscapeEdits({ worldId: worldDocument?.id || 'rift-survival-terrain' });
 }
 
 function applySerializedEdits(data) {
@@ -2265,9 +1997,9 @@ async function exportDraft() {
   if (!terrain) return;
   const text = JSON.stringify(serializeTerrainEdits(), null, 2);
   try {
-    const file = new File([text], 'ironvale-landscape-edits.json', { type: 'application/json' });
+    const file = new File([text], 'rift-survival-landscape-edits.json', { type: 'application/json' });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Ironvale Terrain Edits' });
+      await navigator.share({ files: [file], title: 'Survival Terrain Edits' });
       editorStatus.textContent = 'Terrain draft shared.';
       return;
     }
@@ -2276,7 +2008,7 @@ async function exportDraft() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'ironvale-landscape-edits.json';
+  link.download = 'rift-survival-landscape-edits.json';
   document.body.appendChild(link);
   link.click();
   link.remove();

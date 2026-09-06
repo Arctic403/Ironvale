@@ -25,7 +25,7 @@ requireMatch(wrangler, /new_sqlite_classes\s*=\s*\[\s*"PlayerState"\s*\]/, 'SQLi
 requireMatch(html, /rift-realtime\.js\?v=(?:20260902-integrity-v1|20260902-zone-authority-r1)/, 'realtime client reconnect-grace module loaded');
 requireMatch(html, /rift-validator-guard\.js\?v=(?:20260902-integrity-v1|20260902-terrain-pack-r1|20260902-zone-authority-r1)/, 'validator module loaded');
 
-requireMatch(worker, /REALTIME_FORMAT = 'ironvale-realtime-authority-v2'/, 'realtime authority v2');
+requireMatch(worker, /REALTIME_FORMAT = 'rift-survival-realtime-authority-v2'/, 'realtime authority v2');
 requireMatch(worker, /export class PlayerState extends DurableObject/, 'PlayerState Durable Object class');
 requireMatch(worker, /acceptWebSocket\(/, 'hibernatable WebSocket acceptance');
 requireMatch(worker, /serializeAttachment\(/, 'hibernation-safe live state attachment');
@@ -50,17 +50,17 @@ requireMatch(worker, /latestAuthorityState\(\)/, 'freshest RAM authority selecti
 requireMatch(worker, /Carry the freshest RAM authority/, 'reconnect carry-forward contract');
 requireMatch(worker, /this\.httpState && Number\(this\.httpState\.lastAcceptedAt \|\| 0\) > Number\(closing\.lastAcceptedAt \|\| 0\)/, 'disconnect prefers newer HTTP fallback RAM state');
 requireMatch(worker, /this\.httpState && Number\(this\.httpState\.lastAcceptedAt \|\| 0\) > Number\(socketState\.lastAcceptedAt \|\| 0\)/, 'socket error prefers newer HTTP fallback RAM state');
-requireMatch(worker, /checkpointReason = String\(request\.headers\.get\('x-ironvale-checkpoint-reason'\)/, 'explicit checkpoint reason preserved');
-requireMatch(worker, /headers\.set\('x-ironvale-checkpoint-reason', 'logout'\)/, 'logout checkpoint reason');
+requireMatch(worker, /checkpointReason = String\(request\.headers\.get\('x-rift-survival-checkpoint-reason'\)/, 'explicit checkpoint reason preserved');
+requireMatch(worker, /headers\.set\('x-rift-survival-checkpoint-reason', 'logout'\)/, 'logout checkpoint reason');
 requireMatch(worker, /ON CONFLICT\(user_id\) DO UPDATE/, 'single-statement durable checkpoint');
 
-requireMatch(client, /RIFT_REALTIME_FORMAT = 'ironvale-realtime-client-v2'/, 'realtime client v2');
+requireMatch(client, /RIFT_REALTIME_FORMAT = 'rift-survival-realtime-client-v2'/, 'realtime client v2');
 requireMatch(client, /PUBLISH_INTERVAL_MS\s*=\s*100/, '10Hz publish interval');
 requireMatch(client, /POSITION_EPSILON_METERS\s*=\s*0\.02/, 'meaningful position threshold');
 requireMatch(client, /YAW_EPSILON_RADIANS\s*=\s*0\.005/, 'meaningful yaw threshold');
 requireMatch(client, /publisherMode:\s*'direct-meaningful-10hz'/, 'direct publisher telemetry mode');
 requireMatch(client, /function publishMovement\(/, 'direct movement publisher');
-requireMatch(client, /window\.IronvaleRealtimeMovement = Object\.freeze/, 'direct realtime runtime API');
+requireMatch(client, /window\.RiftSurvivalRealtimeMovement = Object\.freeze/, 'direct realtime runtime API');
 requireMatch(client, /publish:\s*publishMovement/, 'publisher exposed to app');
 requireMatch(client, /legacyFetchBridgeCompatibilityOnly:\s*true/, 'legacy fetch path demoted to compatibility only');
 requireMatch(client, /appLegacyHeartbeatRemoved:\s*true/, 'legacy app heartbeat removal exposed');
@@ -73,8 +73,8 @@ requireMatch(client, /durableObjectAlarm:\s*true/, 'alarm checkpoint policy expo
 requireMatch(client, /pagehide/, 'page hide checkpoint');
 requireMatch(client, /visibility-hidden/, 'visibility checkpoint');
 
-requireMatch(app, /IronvaleRealtimeMovement\?\.publish\?\.\(\{ x: player\.x, y: player\.y, z: player\.z, yaw: player\.yaw \}\)/, 'app publishes live transform directly');
-requireMatch(app, /ironvale:movement-correction/, 'app consumes authoritative corrections');
+requireMatch(app, /RiftSurvivalRealtimeMovement\?\.publish\?\.\(\{ x: player\.x, y: player\.y, z: player\.z, yaw: player\.yaw \}\)/, 'app publishes live transform directly');
+requireMatch(app, /rift-survival:movement-correction/, 'app consumes authoritative corrections');
 requireMatch(app, /WALK_SPEED_MPS\s*=\s*7\.2/, 'walk speed contract');
 requireMatch(app, /SPRINT_SPEED_MPS\s*=\s*12/, 'sprint speed contract');
 requireMatch(app, /AUTO_RUN_HOLD_MS\s*=\s*450/, 'mobile auto-run long-hold threshold');
@@ -109,4 +109,4 @@ if (/env\.DB\.(?:prepare|batch)/.test(movementRoute)) {
   throw new Error('Realtime movement route must not write directly to D1.');
 }
 
-console.log('Ironvale direct 10Hz realtime RAM authority verified.');
+console.log('RiftSurvival direct 10Hz realtime RAM authority verified.');

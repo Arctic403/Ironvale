@@ -15,9 +15,9 @@ for (const token of [
   '/api/anticheat/session-status',
   "https://player-state/anticheat-status",
   "url.pathname === '/anticheat-status'",
-  'ironvale-anticheat-session-status-v1',
-  "mode: 'github-oidc-read-only'",
-  'exactWorkflowBound: true',
+  'rift-survival-anticheat-session-status-v1',
+  "mode: 'service-key-read-only'",
+  'repositoryBound: false',
   "writeAuthority: 'admin-only'",
   'serverPrivate: true',
   'stateResidentInRam: Boolean(selected?.state)'
@@ -43,7 +43,7 @@ for (const token of [
 for (const id of [
   'security.anticheat-session',
   'security.authority-policy',
-  'security.ai-review-bridge',
+  'security.reviewer-boundary',
   'security.integrity-binding'
 ]) assert(guard.includes(`'${id}'`), `validator missing ${id}`);
 assert(guard.includes("provider(instance, 'security-smoke', 2)"), 'validator must read security-smoke provider');
@@ -62,4 +62,4 @@ assert(build.includes('node scripts/check-security-smoke-v1.mjs'), 'core build m
 assert(!fs.existsSync('scripts/apply-security-smoke-v1.mjs'), 'temporary security smoke patcher must be removed');
 assert(!fs.existsSync('.github/workflows/apply-security-smoke-v1.yml'), 'temporary security smoke workflow must be removed');
 
-console.log('Ironvale Security Smoke v1 verified: validator + full auto smoke + L3 provider + self-only dynamic RAM anti-cheat health + OIDC bridge contract + client privacy boundary.');
+console.log('RiftSurvival Security Smoke v1 verified: validator + full auto smoke + L3 provider + self-only dynamic RAM anti-cheat health + repository-independent reviewer boundary + client privacy boundary.');

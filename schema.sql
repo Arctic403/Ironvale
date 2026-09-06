@@ -1,15 +1,6 @@
 PRAGMA foreign_keys = ON;
 
--- Hard-cut migration: retire the old gameplay/builder persistence.
-DROP TABLE IF EXISTS ai_builder_drafts;
-DROP TABLE IF EXISTS ironvale_world_flags;
-DROP TABLE IF EXISTS ironvale_quest_progress;
-DROP TABLE IF EXISTS ironvale_equipment;
-DROP TABLE IF EXISTS ironvale_inventory;
-DROP TABLE IF EXISTS ironvale_character_profiles;
-DROP TABLE IF EXISTS ironvale_characters;
-DROP TABLE IF EXISTS audit_log;
-DROP TABLE IF EXISTS system_logs;
+-- Clean survival-core schema. Legacy game tables are intentionally not part of this repository.
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

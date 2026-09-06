@@ -1,4 +1,4 @@
-name = "riftcityv1"
+name = "rift-survival-core"
 main = "src/realtime-entry.js"
 compatibility_date = "2026-08-01"
 
@@ -6,7 +6,7 @@ assets = { directory = "./public", binding = "ASSETS" }
 
 [[d1_databases]]
 binding = "DB"
-database_name = "riftcity-v2"
+database_name = "rift-survival-v2"
 database_id = "118e392b-e9d4-4d81-9a4f-ee2a2b3865cc"
 
 [[durable_objects.bindings]]

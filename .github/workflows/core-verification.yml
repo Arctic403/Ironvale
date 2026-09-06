@@ -1,4 +1,4 @@
-name: Ironvale Core Verification
+name: Android Survival Core Verification
 
 # npm run build includes exact terrain-draft restoration and scalable zone-authority regression verifiers.
 on:
@@ -12,7 +12,6 @@ on:
       - 'package.json'
       - 'schema.sql'
       - '.github/workflows/core-verification.yml'
-      - '.github/workflows/ai-anticheat-review.yml'
   pull_request:
     paths:
       - 'public/**'
@@ -22,14 +21,13 @@ on:
       - 'package.json'
       - 'schema.sql'
       - '.github/workflows/core-verification.yml'
-      - '.github/workflows/ai-anticheat-review.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ironvale-core-${{ github.ref }}
+  group: rift-survival-core-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

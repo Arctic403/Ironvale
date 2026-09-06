@@ -1,9 +1,9 @@
-export const DIAGNOSTIC_DUMP_FORMAT = 'ironvale-diagnostic-dump-v1';
-export const DIAGNOSTIC_RUNTIME_FORMAT = 'ironvale-diagnostics-v2';
+export const DIAGNOSTIC_DUMP_FORMAT = 'rift-survival-diagnostic-dump-v1';
+export const DIAGNOSTIC_RUNTIME_FORMAT = 'rift-survival-diagnostics-v2';
 export const DIAGNOSTIC_LEVELS = Object.freeze({ QUICK: 1, RUNTIME: 2, DEEP: 3 });
 
-const LAST_CRASH_KEY = 'ironvale:diagnostics:last-crash:v1';
-const SETTINGS_KEY = 'ironvale:diagnostics:settings:v1';
+const LAST_CRASH_KEY = 'rift-survival:diagnostics:last-crash:v1';
+const SETTINGS_KEY = 'rift-survival:diagnostics:settings:v1';
 const MAX_EVENTS = 160;
 const MAX_NETWORK_EVENTS = 120;
 const MAX_CONSOLE_EVENTS = 120;
@@ -83,7 +83,7 @@ function validationSummary(checks, reason) {
   const counts = { pass: 0, warn: 0, fail: 0 };
   for (const check of checks) counts[check.status] += 1;
   const status = counts.fail ? 'fail' : counts.warn ? 'warn' : 'pass';
-  return { format: 'ironvale-validation-result-v1', at: isoNow(), reason, status, counts, checks };
+  return { format: 'rift-survival-validation-result-v1', at: isoNow(), reason, status, counts, checks };
 }
 
 export class RiftDiagnostics {
@@ -397,7 +397,7 @@ export class RiftDiagnostics {
   _download(dump, filename = null) {
     const level = clampLevel(dump?.level);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const name = filename || 'ironvale-dump-l' + level + '-' + stamp + '.json';
+    const name = filename || 'rift-survival-dump-l' + level + '-' + stamp + '.json';
     const blob = new Blob([JSON.stringify(dump, null, 2) + '\n'], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -422,7 +422,7 @@ export class RiftDiagnostics {
     if (typeof CompressionStream !== 'function') throw new Error('Lossless GZIP export is not supported by this browser.');
     const level = clampLevel(dump?.level);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const name = filename || 'ironvale-dump-l' + level + '-' + stamp + '.json.gz';
+    const name = filename || 'rift-survival-dump-l' + level + '-' + stamp + '.json.gz';
     const json = JSON.stringify(dump) + '\n';
     const rawBytes = new TextEncoder().encode(json).byteLength;
     const compressedStream = new Blob([json], { type: 'application/json' }).stream().pipeThrough(new CompressionStream('gzip'));
@@ -455,7 +455,7 @@ export class RiftDiagnostics {
   exportLastCrash() {
     const dump = this.getLastCrash();
     if (!dump) return null;
-    this._download(dump, 'ironvale-last-crash-l2.json');
+    this._download(dump, 'rift-survival-last-crash-l2.json');
     this.record('dump', 'Exported last automatic crash dump', { level: 2 });
     return dump;
   }

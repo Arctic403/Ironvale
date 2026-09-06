@@ -1,10 +1,10 @@
-const AUTO_VALIDATION_FORMAT = 'ironvale-auto-validation-v2';
+const AUTO_VALIDATION_FORMAT = 'rift-survival-auto-validation-v2';
 const STEP_DELAY_MS = 90;
 const MOVE_SLICE_MS = 260;
 const SYNTHETIC_POINTER_ID = 9157;
 const SCREENSHOT_MAX_WIDTH = 720;
 const SCREENSHOT_QUALITY = 0.78;
-const TERRAIN_DRAFT_KEY = 'ironvale:terrain:draft:v4';
+const TERRAIN_DRAFT_KEY = 'rift-survival:terrain:draft:v4';
 
 function captureDraftBaseline() {
   try {
@@ -61,7 +61,7 @@ function nowIso() { return new Date().toISOString(); }
 function shortError(error) { return String(error?.message || error || 'unknown error').slice(0, 220); }
 
 function diagnosticsRecord(message, data = null, severity = 'info') {
-  try { window.IronvaleDiagnostics?.record?.('auto-validation', message, data, severity); } catch (_) {}
+  try { window.RiftSurvivalDiagnostics?.record?.('auto-validation', message, data, severity); } catch (_) {}
 }
 
 function setStatus(text, mode = 'idle') {
@@ -124,7 +124,7 @@ function blobFromCanvas(canvas, type, quality) {
 }
 
 function collectVisualUiState() {
-  const layout = window.IronvaleValidatorGuard?.layout?.() || null;
+  const layout = window.RiftSurvivalValidatorGuard?.layout?.() || null;
   return {
     layout,
     freecam: $('#freecam-button')?.classList.contains('active') || false,
@@ -396,8 +396,8 @@ async function restoreUiBaseline(baseline) {
 }
 
 async function restorePlayerBaseline(baseline) {
-  const api = window.IronvalePlayerState;
-  const realtime = window.IronvaleRealtimeMovement;
+  const api = window.RiftSurvivalPlayerState;
+  const realtime = window.RiftSurvivalRealtimeMovement;
   if (!baseline || !api?.restore) throw new Error('Player restoration API unavailable');
   if (!realtime?.publish || !realtime?.checkpoint) throw new Error('Direct realtime publisher unavailable');
   const restored = api.restore(baseline);
@@ -435,22 +435,22 @@ async function runFullAutoValidation() {
   if (bundleButton) bundleButton.disabled = true;
   button.textContent = 'Running Full Auto Test…';
   const uiBaseline = captureUiBaseline();
-  const playerBaseline = window.IronvalePlayerState?.capture?.('auto-validation') || null;
+  const playerBaseline = window.RiftSurvivalPlayerState?.capture?.('auto-validation') || null;
   let draftBaseline = null;
   diagnosticsRecord('Full auto validation started', { runId: state.runId, format: AUTO_VALIDATION_FORMAT });
 
   try {
     await runStep('runtime + diagnostics ready', async () => {
-      if (!window.IronvaleDiagnostics?.validate) throw new Error('IronvaleDiagnostics API unavailable');
-      const validation = await window.IronvaleDiagnostics.validate();
+      if (!window.RiftSurvivalDiagnostics?.validate) throw new Error('RiftSurvivalDiagnostics API unavailable');
+      const validation = await window.RiftSurvivalDiagnostics.validate();
       return { status: validation?.status || 'pass', detail: validation?.status ? `validator=${validation.status}` : 'diagnostics API responded' };
     });
 
     await runStep('baseline integrity snapshot', async () => {
-      if (!window.IronvaleValidatorGuard?.captureIntegrity) throw new Error('Validator guard unavailable');
+      if (!window.RiftSurvivalValidatorGuard?.captureIntegrity) throw new Error('Validator guard unavailable');
       draftBaseline = captureDraftBaseline();
       if (draftBaseline.error) throw new Error('Terrain draft baseline unavailable: ' + draftBaseline.error);
-      state.baselineIntegrity = await window.IronvaleValidatorGuard.captureIntegrity();
+      state.baselineIntegrity = await window.RiftSurvivalValidatorGuard.captureIntegrity();
       return `terrain=${String(state.baselineIntegrity.terrainHash).slice(0, 12)} · undo=${state.baselineIntegrity.editor.undoDepth} redo=${state.baselineIntegrity.editor.redoDepth}`;
     });
 
@@ -562,15 +562,9 @@ async function runFullAutoValidation() {
       return `material ${alternate.value} loaded then restored`;
     }, { optional: true });
 
-    await runStep('combat controls no-target path', async () => {
-      required('#basic-attack-button').click();
-      for (const ability of document.querySelectorAll('[data-ability-slot]')) ability.click();
-      return 'attack + ability 1/2/3 handlers exercised';
-    }, { optional: true });
-
     await runStep('sprint + auto run controls', async () => {
-      const movement = window.IronvaleMovementMode;
-      const playerState = window.IronvalePlayerState;
+      const movement = window.RiftSurvivalMovementMode;
+      const playerState = window.RiftSurvivalPlayerState;
       const button = required('#sprint-button', 'Sprint button');
       if (!movement?.status || !movement?.cancel) throw new Error('Movement mode runtime unavailable');
       if (!playerState?.status) throw new Error('Player state runtime unavailable');
@@ -626,7 +620,7 @@ async function runFullAutoValidation() {
     await runStep('realtime movement + checkpoint path', async () => {
       const freecamButton = required('#freecam-button');
       if (freecamButton.classList.contains('active')) freecamButton.click();
-      const realtime = window.IronvaleRealtimeMovement;
+      const realtime = window.RiftSurvivalRealtimeMovement;
       if (!realtime?.status || !realtime?.checkpoint) throw new Error('Direct realtime publisher unavailable');
       const before = realtime.status();
       await holdKey('w', 300);
@@ -643,7 +637,7 @@ async function runFullAutoValidation() {
     });
 
     await runStep('security authority + anti-cheat session', async () => {
-      const integrityApi = window.IronvaleIntegrity;
+      const integrityApi = window.RiftSurvivalIntegrity;
       const integrity = integrityApi?.status?.();
       const completedAt = nowIso();
       try {
@@ -656,13 +650,13 @@ async function runFullAutoValidation() {
         });
         const body = await response.json().catch(() => ({}));
         if (!response.ok || body?.ok !== true) throw new Error(body?.error || ('security smoke HTTP ' + response.status));
-        if (body?.format !== 'ironvale-anticheat-session-status-v1') throw new Error('Anti-cheat session status format mismatch');
-        if (body?.monitor?.format !== 'ironvale-anticheat-v1' || body?.monitor?.enabled !== true || body?.monitor?.serverPrivate !== true) throw new Error('Server-private anti-cheat monitor unavailable');
+        if (body?.format !== 'rift-survival-anticheat-session-status-v1') throw new Error('Anti-cheat session status format mismatch');
+        if (body?.monitor?.format !== 'rift-survival-anticheat-v1' || body?.monitor?.enabled !== true || body?.monitor?.serverPrivate !== true) throw new Error('Server-private anti-cheat monitor unavailable');
         if (body?.monitor?.stateResidentInRam !== true) throw new Error('Anti-cheat monitor is not attached to live RAM authority');
-        if (body?.authority?.source !== 'live-ram' || body?.authority?.realtimeFormat !== 'ironvale-realtime-authority-v2') throw new Error('RAM authority status mismatch');
+        if (body?.authority?.source !== 'live-ram' || body?.authority?.realtimeFormat !== 'rift-survival-realtime-authority-v2') throw new Error('RAM authority status mismatch');
         if (body?.authority?.integrityStatus !== 'attested' || body?.authority?.integrityBuildId !== integrity.buildId) throw new Error('Integrity ticket is not bound to RAM authority');
         const zoneAuthority = body?.zoneAuthority || {};
-        if (zoneAuthority?.format !== 'ironvale-zone-authority-v1' || zoneAuthority?.enabled !== true || zoneAuthority?.source !== 'zone-durable-object-ram') throw new Error('Zone RAM authority unavailable');
+        if (zoneAuthority?.format !== 'rift-survival-zone-authority-v1' || zoneAuthority?.enabled !== true || zoneAuthority?.source !== 'zone-durable-object-ram') throw new Error('Zone RAM authority unavailable');
         if (zoneAuthority?.storagePolicy !== 'ram-only-ephemeral-presence' || zoneAuthority?.d1Writes !== false || zoneAuthority?.durableStorageWrites !== false || zoneAuthority?.interestManagement !== true) throw new Error('Zone authority persistence policy mismatch');
         const policy = body?.policy || {};
         if (policy.automaticBan !== false || policy.aiAuthority !== 'recommendation-only' || policy.ramAuthority !== 'final' || policy.ordinaryMovementWritesToD1 !== false || policy.suspiciousCaseWritesOnly !== true) throw new Error('Anti-cheat authority policy mismatch');
@@ -670,12 +664,12 @@ async function runFullAutoValidation() {
         if (bridge.mode !== 'github-oidc-read-only' || bridge.exactWorkflowBound !== true || bridge.writeAuthority !== 'admin-only') throw new Error('AI review bridge policy mismatch');
         const nearbyResponse = await fetch('/api/realtime/nearby?radius=96&limit=64', { method: 'GET', cache: 'no-store', credentials: 'same-origin', headers: integrityApi.transportHeaders() });
         const nearby = await nearbyResponse.json().catch(() => ({}));
-        if (!nearbyResponse.ok || nearby?.ok !== true || nearby?.format !== 'ironvale-zone-nearby-v1' || nearby?.authority !== 'ironvale-zone-authority-v1' || nearby?.source !== 'zone-durable-object-ram') throw new Error(nearby?.error || 'Nearby interest-management smoke failed');
+        if (!nearbyResponse.ok || nearby?.ok !== true || nearby?.format !== 'rift-survival-zone-nearby-v1' || nearby?.authority !== 'rift-survival-zone-authority-v1' || nearby?.source !== 'zone-durable-object-ram') throw new Error(nearby?.error || 'Nearby interest-management smoke failed');
         const nearbySummary = { ...nearby };
         delete nearbySummary.nearby;
         nearbySummary.nearbyCount = Array.isArray(nearby.nearby) ? nearby.nearby.length : 0;
         state.securitySmoke = {
-          format: 'ironvale-security-smoke-v1',
+          format: 'rift-survival-security-smoke-v1',
           status: 'pass',
           completedAt,
           httpStatus: response.status,
@@ -689,7 +683,7 @@ async function runFullAutoValidation() {
         };
         return 'RAM anti-cheat active · zone=' + zoneAuthority.zoneId + ' · nearby zones=' + nearby.scannedZones + ' · integrity bound · AI review read-only · samples=' + (body.monitor.observedSamples || 0);
       } catch (error) {
-        state.securitySmoke = { format: 'ironvale-security-smoke-v1', status: 'fail', completedAt, error: shortError(error) };
+        state.securitySmoke = { format: 'rift-survival-security-smoke-v1', status: 'fail', completedAt, error: shortError(error) };
         throw error;
       }
     });
@@ -706,9 +700,9 @@ async function runFullAutoValidation() {
     if (!restoreDraftBaseline(draftBaseline)) throw new Error('Unable to restore exact terrain draft baseline');
     state.playerRestoration = await restorePlayerBaseline(playerBaseline);
     await runStep('post-test restoration integrity', async () => {
-      if (!state.baselineIntegrity || !window.IronvaleValidatorGuard?.captureIntegrity) throw new Error('Baseline integrity snapshot unavailable');
-      state.finalIntegrity = await window.IronvaleValidatorGuard.captureIntegrity();
-      state.restoration = window.IronvaleValidatorGuard.compareIntegrity(state.baselineIntegrity, state.finalIntegrity);
+      if (!state.baselineIntegrity || !window.RiftSurvivalValidatorGuard?.captureIntegrity) throw new Error('Baseline integrity snapshot unavailable');
+      state.finalIntegrity = await window.RiftSurvivalValidatorGuard.captureIntegrity();
+      state.restoration = window.RiftSurvivalValidatorGuard.compareIntegrity(state.baselineIntegrity, state.finalIntegrity);
       const r = state.restoration;
       const playerExact = Number.isFinite(Number(r.playerDistance)) && Number(r.playerDistance) <= 0.001;
       const status = r.terrainMatched === false || r.draftMatched === false || r.terrainSelectionMatched === false || !playerExact ? 'fail' : r.historyMatched === false ? 'warn' : 'pass';
@@ -719,7 +713,7 @@ async function runFullAutoValidation() {
     });
 
     await runStep('final guarded validator', async () => {
-      const result = await window.IronvaleDiagnostics.validate();
+      const result = await window.RiftSurvivalDiagnostics.validate();
       return { status: result?.status || 'fail', detail: `guarded validator=${result?.status || 'unknown'} · ${result?.counts?.pass || 0} pass / ${result?.counts?.warn || 0} warn / ${result?.counts?.fail || 0} fail` };
     });
 
@@ -745,7 +739,7 @@ async function runFullAutoValidation() {
     state.running = false;
 
     try {
-      const post = await window.IronvaleDiagnostics?.validate?.();
+      const post = await window.RiftSurvivalDiagnostics?.validate?.();
       state.postValidation = post ? { status: post.status, counts: post.counts, at: post.at } : null;
       if (post?.status) state.status = strongestStatus(state.status, post.status);
     } catch (error) {
@@ -855,12 +849,12 @@ function downloadBlob(blob, name) {
 async function exportValidationBundle() {
   if (state.running) return;
   if (!state.completedAt) { setStatus('Run Full Auto Test before exporting a bundle.', 'warn'); return; }
-  if (!window.IronvaleValidatorGuard?.createDump) { setStatus('Validator guard bundle API unavailable.', 'fail'); return; }
+  if (!window.RiftSurvivalValidatorGuard?.createDump) { setStatus('Validator guard bundle API unavailable.', 'fail'); return; }
   bundleButton.disabled = true;
   const original = bundleButton.textContent;
   bundleButton.textContent = 'Building Validation Bundle…';
   try {
-    const dump = await window.IronvaleValidatorGuard.createDump(3, 'manual-auto-validation-bundle');
+    const dump = await window.RiftSurvivalValidatorGuard.createDump(3, 'manual-auto-validation-bundle');
     const dumpText = JSON.stringify(dump);
     const packedDump = await gzipText(dumpText);
     const report = {
@@ -878,14 +872,14 @@ async function exportValidationBundle() {
       dumpEncoding: packedDump.encoding
     };
     const files = [
-      { name: `ironvale-dump-l3.${packedDump.extension}`, bytes: packedDump.bytes },
+      { name: `rift-survival-dump-l3.${packedDump.extension}`, bytes: packedDump.bytes },
       { name: 'auto-validation-report.json', bytes: new TextEncoder().encode(JSON.stringify(report, null, 2)) },
-      { name: 'README.txt', bytes: new TextEncoder().encode('Ironvale Full Auto Validation Bundle\nContains the L3 diagnostic dump plus per-step visual evidence. Existing L1/L2/L3 Raw and GZIP exports remain unchanged.\n') }
+      { name: 'README.txt', bytes: new TextEncoder().encode('Rift Survival Full Auto Validation Bundle\nContains the L3 diagnostic dump plus per-step visual evidence. Existing L1/L2/L3 Raw and GZIP exports remain unchanged.\n') }
     ];
     for (const [name, blob] of evidenceFiles) files.push({ name, bytes: new Uint8Array(await blob.arrayBuffer()) });
     const zip = makeStoredZip(files);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const name = `ironvale-validation-${stamp}.zip`;
+    const name = `rift-survival-validation-${stamp}.zip`;
     downloadBlob(new Blob([zip], { type: 'application/zip' }), name);
     diagnosticsRecord('Exported visual validation bundle', { name, files: files.length, bytes: zip.length, screenshots: evidenceFiles.size });
     setStatus(`Validation Bundle exported · ${evidenceFiles.size} screenshots`, state.status === 'fail' ? 'fail' : state.status === 'warn' ? 'warn' : 'pass');
@@ -900,8 +894,8 @@ async function exportValidationBundle() {
 
 function registerProvider() {
   if (providerRegistered) return;
-  if (!window.IronvaleDiagnostics?.registerProvider) { setTimeout(registerProvider, 100); return; }
-  window.IronvaleDiagnostics.registerProvider('auto-validation', level => ({
+  if (!window.RiftSurvivalDiagnostics?.registerProvider) { setTimeout(registerProvider, 100); return; }
+  window.RiftSurvivalDiagnostics.registerProvider('auto-validation', level => ({
     format: state.format,
     running: state.running,
     runId: state.runId,
@@ -940,8 +934,8 @@ function registerProvider() {
       logout: false
     }
   }));
-  window.IronvaleDiagnostics.registerProvider('security-smoke', () => ({
-    format: 'ironvale-security-smoke-v1',
+  window.RiftSurvivalDiagnostics.registerProvider('security-smoke', () => ({
+    format: 'rift-survival-security-smoke-v1',
     status: state.securitySmoke?.status || 'idle',
     completedAt: state.securitySmoke?.completedAt || null,
     result: state.securitySmoke ? { ...state.securitySmoke } : null,
@@ -982,14 +976,14 @@ function installUi() {
   statusNode = document.createElement('small');
   statusNode.id = 'diagnostic-auto-full-status';
   statusNode.dataset.status = 'idle';
-  statusNode.textContent = 'Exercises gameplay/editor/realtime systems and captures visual evidence. L3 Raw stays manual.';
+  statusNode.textContent = 'Exercises terrain, character, movement, editor, realtime and integrity systems. L3 Raw stays manual.';
 
   wrapper.append(button, bundleButton, statusNode);
   const rawLabel = [...tools.querySelectorAll('small')].find(node => node.textContent?.trim() === 'Raw JSON');
   if (rawLabel) tools.insertBefore(wrapper, rawLabel); else tools.appendChild(wrapper);
 }
 
-window.IronvaleAutoValidation = Object.freeze({
+window.RiftSurvivalAutoValidation = Object.freeze({
   run: runFullAutoValidation,
   exportBundle: exportValidationBundle,
   status: () => ({

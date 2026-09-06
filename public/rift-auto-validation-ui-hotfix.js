@@ -10,7 +10,7 @@ async function restoreToolsWhenFinished(runToken, wasOpen) {
   if (!wasOpen) return;
   for (;;) {
     if (runToken !== restoringRun) return;
-    const status = window.IronvaleAutoValidation?.status?.();
+    const status = window.RiftSurvivalAutoValidation?.status?.();
     if (!status?.running) break;
     await sleep(120);
   }
@@ -38,7 +38,7 @@ function install() {
     const wasOpen = tools.hidden === false;
     const token = ++restoringRun;
     setTimeout(() => {
-      const status = window.IronvaleAutoValidation?.status?.();
+      const status = window.RiftSurvivalAutoValidation?.status?.();
       if (status?.running && tools.hidden === false) toolsButton.click();
       void restoreToolsWhenFinished(token, wasOpen);
     }, 0);

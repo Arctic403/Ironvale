@@ -14,21 +14,21 @@ const diagnostics = read('public/rift-diagnostics.js');
 const diagnosticHooks = read('public/rift-diagnostic-hooks.js');
 const html = read('public/index.html');
 const pkg = JSON.parse(read('package.json'));
-const manifest = JSON.parse(read('public/ironvale-integrity-manifest.json'));
+const manifest = JSON.parse(read('public/rift-survival-integrity-manifest.json'));
 const server = read('src/integrity-build.js');
 
-requireToken(client, "ironvale-integrity-chain-v1", 'client format');
+requireToken(client, "rift-survival-integrity-chain-v1", 'client format');
 requireToken(client, "critical-client-file-mismatch", 'launch file mismatch tripwire');
 requireToken(client, "runtime-integrity-contract-mismatch", 'runtime tripwire');
 requireToken(client, "Object.freeze", 'frozen integrity API');
 requireToken(client, "transportParams", 'realtime integrity ticket transport');
 requireToken(client, "integrity-chain", 'diagnostics provider');
 
-requireToken(app, "IronvaleIntegrity.ensureSession", 'world boot integrity gate');
-requireToken(app, "ironvale:integrity-failed", 'runtime integrity failure world gate');
-requireToken(realtime, "IronvaleIntegrity.transportParams", 'WebSocket ticket propagation');
-requireToken(realtime, "IronvaleIntegrity.transportHeaders", 'HTTP/API ticket propagation');
-requireToken(realtime, "ironvale:integrity-refreshed", 'ticket refresh reconnect');
+requireToken(app, "RiftSurvivalIntegrity.ensureSession", 'world boot integrity gate');
+requireToken(app, "rift-survival:integrity-failed", 'runtime integrity failure world gate');
+requireToken(realtime, "RiftSurvivalIntegrity.transportParams", 'WebSocket ticket propagation');
+requireToken(realtime, "RiftSurvivalIntegrity.transportHeaders", 'HTTP/API ticket propagation');
+requireToken(realtime, "rift-survival:integrity-refreshed", 'ticket refresh reconnect');
 
 for (const token of [
   "EXPECTED_INTEGRITY_BUILD_ID",
@@ -37,7 +37,7 @@ for (const token of [
   "verifyIntegrityTransport",
   "integrity-required",
   "integrity-expired",
-  "x-ironvale-integrity-status",
+  "x-rift-survival-integrity-status",
   "mutatingApiRequiresIntegrity"
 ]) requireToken(worker, token, `worker ${token}`);
 
@@ -52,9 +52,9 @@ requireToken(html, '/app.js?v=20260902-terrain-pack-r1', 'app cache bust');
 requireToken(html, '/rift-realtime.js?v=20260902-zone-authority-r1', 'realtime cache bust');
 requireToken(html, '/rift-validator-guard.js?v=20260902-zone-authority-r1', 'validator cache bust');
 
-if (manifest.format !== 'ironvale-integrity-manifest-v1') throw new Error('Integrity manifest format mismatch.');
+if (manifest.format !== 'rift-survival-integrity-manifest-v1') throw new Error('Integrity manifest format mismatch.');
 if (manifest.algorithm !== 'SHA-256') throw new Error('Integrity manifest algorithm mismatch.');
-if (!/^iv-[a-f0-9]{24}$/.test(manifest.buildId || '')) throw new Error('Integrity build id malformed.');
+if (!/^rs-[a-f0-9]{24}$/.test(manifest.buildId || '')) throw new Error('Integrity build id malformed.');
 if (!/^[a-f0-9]{64}$/.test(manifest.digest || '')) throw new Error('Integrity manifest digest malformed.');
 if (!Array.isArray(manifest.files) || manifest.files.length !== manifest.fileCount || manifest.files.length < 15) throw new Error('Integrity critical file coverage too small.');
 for (const required of ['/app.js', '/rift-integrity.js', '/rift-realtime.js', '/rift-core.wasm.gz', '/rift-diagnostics.js', '/rift-diagnostic-hooks.js']) {
@@ -77,4 +77,4 @@ for (const token of ['node --check public/rift-integrity.js', 'node --check src/
   if (!build.includes(token)) throw new Error(`Core build missing ${token}`);
 }
 
-console.log(`Ironvale Integrity Chain v1 verified: ${manifest.buildId} · ${manifest.fileCount} critical files · RAM authority remains final · diagnostic tickets redacted · staging clean.`);
+console.log(`Rift Survival Integrity Chain v1 verified: ${manifest.buildId} · ${manifest.fileCount} critical files · RAM authority remains final · diagnostic tickets redacted · staging clean.`);

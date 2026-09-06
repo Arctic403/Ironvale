@@ -21,4 +21,4 @@ assert(String(pkg.scripts?.build || '').includes('node scripts/check-terrain-mat
 assert(!fs.existsSync('scripts/apply-terrain-pack-v1.mjs'), 'temporary patcher must be removed');
 assert(!fs.existsSync('.github/workflows/apply-terrain-pack-v1.yml'), 'temporary workflow must be removed');
 assert(!fs.existsSync('.github/workflows/retry-terrain-pack-v1.yml'), 'temporary retry workflow must be removed');
-console.log('Ironvale terrain material pack verified: direct WASM→PBR packing + exact-grid material fast path + measured allocation avoidance.');
+console.log('RiftSurvival terrain material pack verified: direct WASM→PBR packing + exact-grid material fast path + measured allocation avoidance.');

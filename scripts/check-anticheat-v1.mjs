@@ -88,4 +88,4 @@ const build = String(pkg.scripts?.build || '');
 assert(build.includes('node --check src/anticheat.js'), 'core build missing anti-cheat syntax check');
 assert(build.includes('node scripts/check-anticheat-v1.mjs'), 'core build missing anti-cheat contract check');
 
-console.log(`Ironvale Anti-Cheat v1 verified: normal=${normalSummary.score}, loop=${botSummary.score}, no auto-ban, sparse suspicious-case persistence, reviewer boundaries locked.`);
+console.log(`RiftSurvival Anti-Cheat v1 verified: normal=${normalSummary.score}, loop=${botSummary.score}, no auto-ban, sparse suspicious-case persistence, reviewer boundaries locked.`);

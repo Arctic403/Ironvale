@@ -1,14 +1,14 @@
 import { RiftEngine } from './rift-engine.js?v=20260901-engine-blackbox-r1';
 
-export const IRONVALE_GEOMETRY_GUARD_FORMAT = 'ironvale-geometry-guard-v2';
+export const RIFT_SURVIVAL_GEOMETRY_GUARD_FORMAT = 'rift-survival-geometry-guard-v2';
 
-const PATCH_MARK = Symbol.for('ironvale.geometry-guard-patched');
+const PATCH_MARK = Symbol.for('rift-survival.geometry-guard-patched');
 const CAPSULE_KIND = 'character-fallback';
 const CAPSULE_LABEL = 'player-capsule';
 const CAPSULE_RADIAL = 12;
 
 const state = {
-  format: IRONVALE_GEOMETRY_GUARD_FORMAT,
+  format: RIFT_SURVIVAL_GEOMETRY_GUARD_FORMAT,
   installedAt: new Date().toISOString(),
   validationCount: 0,
   repairCount: 0,
@@ -41,7 +41,7 @@ function validateIndexBounds(mesh, geometry) {
     const index = Number(indices[offset]);
     if (!Number.isInteger(index) || index < 0 || index >= vertexCount) {
       const error = new Error(`Geometry index out of bounds for ${meshName(mesh)}: index=${index} at offset=${offset}, vertexCount=${vertexCount}`);
-      error.code = 'IRONVALE_GEOMETRY_INDEX_OOB';
+      error.code = 'RIFT_SURVIVAL_GEOMETRY_INDEX_OOB';
       error.index = index;
       error.offset = offset;
       error.vertexCount = vertexCount;
@@ -59,7 +59,7 @@ function validateIndexBounds(mesh, geometry) {
 }
 
 function shouldRepairLegacyCapsule(mesh, geometry, error) {
-  if (error?.code !== 'IRONVALE_GEOMETRY_INDEX_OOB') return false;
+  if (error?.code !== 'RIFT_SURVIVAL_GEOMETRY_INDEX_OOB') return false;
   if (mesh?.kind !== CAPSULE_KIND || mesh?.label !== CAPSULE_LABEL) return false;
   try {
     const { indices, stride, vertexCount } = geometryMetrics(geometry);
@@ -143,11 +143,11 @@ if (proto && !proto[PATCH_MARK]) {
         at: isoNow(),
         mesh: meshName(mesh),
         kind: mesh?.kind || null,
-        code: error?.code || 'IRONVALE_GEOMETRY_INVALID',
+        code: error?.code || 'RIFT_SURVIVAL_GEOMETRY_INVALID',
         error: short(error?.message || error)
       };
       try {
-        window.IronvaleDiagnostics?.record?.('geometry-guard', 'Rejected invalid mesh geometry before WebGL upload', state.lastRejection, 'error');
+        window.RiftSurvivalDiagnostics?.record?.('geometry-guard', 'Rejected invalid mesh geometry before WebGL upload', state.lastRejection, 'error');
       } catch (_) {}
       throw error;
     }
@@ -157,7 +157,7 @@ if (proto && !proto[PATCH_MARK]) {
 let providerRegistered = false;
 function registerProvider() {
   if (providerRegistered) return;
-  const diagnostics = window.IronvaleDiagnostics;
+  const diagnostics = window.RiftSurvivalDiagnostics;
   if (!diagnostics?.registerProvider) { setTimeout(registerProvider, 100); return; }
   diagnostics.registerProvider('geometry-guard', () => ({
     ...state,
@@ -173,4 +173,4 @@ function registerProvider() {
 }
 
 registerProvider();
-window.IronvaleGeometryGuard = Object.freeze({ format: state.format, status: () => ({ ...state }) });
+window.RiftSurvivalGeometryGuard = Object.freeze({ format: state.format, status: () => ({ ...state }) });

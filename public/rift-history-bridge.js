@@ -1,7 +1,7 @@
-export const IRONVALE_HISTORY_BRIDGE_FORMAT = 'ironvale-history-bridge-v3';
+export const RIFT_SURVIVAL_HISTORY_BRIDGE_FORMAT = 'rift-survival-history-bridge-v3';
 
 const state = {
-  format: IRONVALE_HISTORY_BRIDGE_FORMAT,
+  format: RIFT_SURVIVAL_HISTORY_BRIDGE_FORMAT,
   installedAt: new Date().toISOString(),
   runId: null,
   active: false,
@@ -24,13 +24,13 @@ let recoveryTimer = 0;
 function isoNow() { return new Date().toISOString(); }
 function short(error) { return String(error?.message || error || 'unknown error').slice(0, 240); }
 function record(message, data = null, severity = 'info') {
-  try { window.IronvaleDiagnostics?.record?.('history-bridge', message, data, severity); } catch (_) {}
+  try { window.RiftSurvivalDiagnostics?.record?.('history-bridge', message, data, severity); } catch (_) {}
 }
 function currentAutoStatus() {
-  try { return window.IronvaleAutoValidation?.status?.() || null; } catch (_) { return null; }
+  try { return window.RiftSurvivalAutoValidation?.status?.() || null; } catch (_) { return null; }
 }
 function historyRuntime() {
-  return window.IronvaleEditorHistory || null;
+  return window.RiftSurvivalEditorHistory || null;
 }
 function historyStatus() {
   try { return historyRuntime()?.status?.() || null; } catch (_) { return null; }
@@ -70,7 +70,7 @@ function installRecoveryWatch() {
 }
 function captureBaseline(integrity) {
   const runtime = historyRuntime();
-  if (!runtime?.capture || !runtime?.restore) throw new Error('IronvaleEditorHistory runtime API unavailable');
+  if (!runtime?.capture || !runtime?.restore) throw new Error('RiftSurvivalEditorHistory runtime API unavailable');
   state.apiAvailable = true;
   baselineSnapshot = runtime.capture(`auto-validation:${state.runId}`);
   if (!baselineSnapshot?.token) throw new Error('Editor history runtime did not return a snapshot token');
@@ -93,7 +93,7 @@ function restoreHistory(reason = 'integrity') {
   try {
     if (!baselineSnapshot) return { ok: true, skipped: true, ...historyStatus() };
     const runtime = historyRuntime();
-    if (!runtime?.restore) throw new Error('IronvaleEditorHistory restore API unavailable');
+    if (!runtime?.restore) throw new Error('RiftSurvivalEditorHistory restore API unavailable');
     const result = runtime.restore(baselineSnapshot);
     if (!result?.ok) throw new Error(result?.error || 'Editor history restore failed');
     state.restored = true;
@@ -118,7 +118,7 @@ function restoreHistory(reason = 'integrity') {
 }
 function wrapValidatorGuard() {
   if (guardWrapped) return;
-  const guard = window.IronvaleValidatorGuard;
+  const guard = window.RiftSurvivalValidatorGuard;
   if (!guard?.captureIntegrity) { setTimeout(wrapValidatorGuard, 100); return; }
   const nativeCaptureIntegrity = guard.captureIntegrity.bind(guard);
   const replacement = Object.freeze({
@@ -147,12 +147,12 @@ function wrapValidatorGuard() {
       return integrity;
     }
   });
-  window.IronvaleValidatorGuard = replacement;
+  window.RiftSurvivalValidatorGuard = replacement;
   guardWrapped = true;
 }
 function registerProvider() {
   if (providerRegistered) return;
-  const diagnostics = window.IronvaleDiagnostics;
+  const diagnostics = window.RiftSurvivalDiagnostics;
   if (!diagnostics?.registerProvider) { setTimeout(registerProvider, 100); return; }
   diagnostics.registerProvider('history-bridge', () => {
     const runtime = historyStatus();
@@ -179,7 +179,7 @@ function registerProvider() {
 wrapValidatorGuard();
 registerProvider();
 
-window.IronvaleHistoryBridge = Object.freeze({
+window.RiftSurvivalHistoryBridge = Object.freeze({
   format: state.format,
   status: () => ({ ...state, ...historyStatus() }),
   restore: () => restoreHistory('manual')

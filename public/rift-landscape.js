@@ -448,7 +448,7 @@ export class RiftLandscape extends RiftTerrain {
     return true;
   }
 
-  serializeLandscapeEdits({ worldId = 'ironvale-terrain' } = {}) {
+  serializeLandscapeEdits({ worldId = 'rift-survival-terrain' } = {}) {
     return {
       format: RIFT_LANDSCAPE_EDIT_FORMAT,
       schemaVersion: 2,

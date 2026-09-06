@@ -1,6 +1,6 @@
 import { RiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 
-export const RIFT_SUBSYSTEM_DIAGNOSTICS_FORMAT = 'ironvale-subsystem-hooks-v1';
+export const RIFT_SUBSYSTEM_DIAGNOSTICS_FORMAT = 'rift-survival-subsystem-hooks-v1';
 
 const MAX_BACKEND_EVENTS = 80;
 const MAX_ASSET_EVENTS = 120;
@@ -58,7 +58,6 @@ function elementAction(element) {
   if (!element) return null;
   if (element.id) return element.id;
   if (element.dataset?.brush) return `brush:${element.dataset.brush}`;
-  if (element.dataset?.abilitySlot) return `ability:${element.dataset.abilitySlot}`;
   if (element.dataset?.freecamVertical) return `freecam-vertical:${element.dataset.freecamVertical}`;
   return null;
 }
@@ -100,7 +99,7 @@ function captureBackendResource(entry) {
   let url;
   try { url = new URL(entry.name, location.href); } catch (_) { return; }
   if (url.origin !== location.origin || !url.pathname.startsWith('/api/')) return;
-  const total = metricByName(entry, 'ironvale');
+  const total = metricByName(entry, 'rift-survival');
   const db = metricByName(entry, 'd1');
   const auth = metricByName(entry, 'auth');
   if (!total && !db && !auth) return;
@@ -170,8 +169,8 @@ function materialRuntimeState(runtime) {
 
 function patchMaterialRuntime() {
   const proto = RiftTerrainMaterialRuntime?.prototype;
-  if (!proto || proto.__ironvaleDiagnosticHooks) return;
-  Object.defineProperty(proto, '__ironvaleDiagnosticHooks', { value: true });
+  if (!proto || proto.__riftSurvivalDiagnosticHooks) return;
+  Object.defineProperty(proto, '__riftSurvivalDiagnosticHooks', { value: true });
   const nativeLoadLayer = proto.loadLayer;
   const nativeDestroy = proto.destroy;
 
@@ -355,12 +354,12 @@ function registerProviders() {
 }
 
 function connectDiagnostics() {
-  diagnosticsApi = window.IronvaleDiagnostics || null;
+  diagnosticsApi = window.RiftSurvivalDiagnostics || null;
   if (registerProviders()) return;
   let attempts = 0;
   const timer = setInterval(() => {
     attempts += 1;
-    diagnosticsApi = window.IronvaleDiagnostics || null;
+    diagnosticsApi = window.RiftSurvivalDiagnostics || null;
     if (registerProviders() || attempts >= 400) clearInterval(timer);
   }, 25);
 }

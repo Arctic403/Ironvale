@@ -1,13 +1,13 @@
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 
-export const IRONVALE_ARCHITECTURE_GUARD_FORMAT = 'ironvale-architecture-guard-v2';
+export const RIFT_SURVIVAL_ARCHITECTURE_GUARD_FORMAT = 'rift-survival-architecture-guard-v2';
 
-const PATCH = Symbol.for('ironvale.architecture-guard.patched');
-const INSTANCE_PATCH = Symbol('ironvale.architecture-guard.instance');
+const PATCH = Symbol.for('rift-survival.architecture-guard.patched');
+const INSTANCE_PATCH = Symbol('rift-survival.architecture-guard.instance');
 const MOVEMENT_ROUTE = '/api/character/position';
 
 const state = {
-  format: IRONVALE_ARCHITECTURE_GUARD_FORMAT,
+  format: RIFT_SURVIVAL_ARCHITECTURE_GUARD_FORMAT,
   installedAt: new Date().toISOString(),
   runs: 0,
   lastRunAt: null,
@@ -130,7 +130,7 @@ if (!RiftDiagnostics.prototype[PATCH]) {
   };
 }
 
-window.IronvaleArchitectureGuard = Object.freeze({
+window.RiftSurvivalArchitectureGuard = Object.freeze({
   format: state.format,
   status: () => ({
     ...state,

@@ -1,5 +1,5 @@
 {
-  "name": "Ironvale Mobile Codespace",
+  "name": "Android Survival Mobile Codespace",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "forwardPorts": [4173],
   "portsAttributes": {

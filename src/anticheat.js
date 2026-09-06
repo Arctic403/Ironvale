@@ -1,4 +1,4 @@
-export const ANTICHEAT_FORMAT = 'ironvale-anticheat-v1';
+export const ANTICHEAT_FORMAT = 'rift-survival-anticheat-v1';
 export const ANTICHEAT_CASE_MIN_RISK = 60;
 export const ANTICHEAT_DEEP_MIN_RISK = 80;
 export const ANTICHEAT_CRITICAL_MIN_RISK = 95;
@@ -287,7 +287,7 @@ export function antiCheatSummary(inputState) {
 export function antiCheatEvidence(inputState) {
   const state = ensureState(inputState);
   return {
-    format: 'ironvale-anticheat-evidence-v1',
+    format: 'rift-survival-anticheat-evidence-v1',
     retentionPolicy: state.score >= ANTICHEAT_DEEP_MIN_RISK ? 'deep-suspicious-session' : 'summary-suspicious-session',
     routeCells: state.routeCells.slice(-ROUTE_WINDOW),
     patternCounts: Object.fromEntries(state.patternOrder.map(key => [key, state.patternCounts[key] || 0]).filter(([, count]) => count > 1)),

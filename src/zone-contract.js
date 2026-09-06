@@ -1,6 +1,6 @@
-export const ZONE_AUTHORITY_FORMAT = 'ironvale-zone-authority-v1';
-export const ZONE_NEARBY_FORMAT = 'ironvale-zone-nearby-v1';
-export const ZONE_WORLD_ID = 'ironvale-terrain';
+export const ZONE_AUTHORITY_FORMAT = 'rift-survival-zone-authority-v1';
+export const ZONE_NEARBY_FORMAT = 'rift-survival-zone-nearby-v1';
+export const ZONE_WORLD_ID = 'rift-survival-terrain';
 export const ZONE_SIZE_METERS = 128;
 export const ZONE_PRESENCE_TTL_MS = 45_000;
 export const ZONE_MOVEMENT_SYNC_MS = 10_000;
