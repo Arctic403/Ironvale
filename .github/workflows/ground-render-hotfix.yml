@@ -1,0 +1,59 @@
+name: Ground render hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/ground-render-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-verify-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply exact verified hotfix payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf .main-hotfix/payload.tar.gz
+          test -f public/app.js
+          test -f scripts/check-island-runtime.mjs
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dev dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Verify full repository
+        run: npm run build
+
+      - name: Commit verified hotfix directly to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf node_modules package-lock.json .main-hotfix
+          git add public/app.js \
+            public/index.html \
+            public/rift-survival-integrity-manifest.json \
+            scripts/check-island-runtime.mjs \
+            scripts/check-terrain-edit-profiler.mjs \
+            scripts/check-integrity-chain.mjs \
+            scripts/check-security-smoke-v1.mjs \
+            scripts/check-terrain-material-pack.mjs \
+            .main-hotfix
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Terrain: keep spawn ground resident during world boot'
+          git push origin HEAD:main
