@@ -1,4 +1,3 @@
-# payload-attached: ground-render-hotfix-r1
 name: Ground render hotfix
 
 on:
@@ -21,13 +20,30 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Apply exact verified hotfix payload
+      - name: Patch boot order and ground residency
         shell: bash
         run: |
           set -euo pipefail
-          tar -xzf .main-hotfix/payload.tar.gz
-          test -f public/app.js
-          test -f scripts/check-island-runtime.mjs
+          python - <<'PY'
+            from pathlib import Path
+
+            def rep(path, old, new, label, all=False):
+                p=Path(path); s=p.read_text()
+                if old not in s: raise SystemExit(f"missing {label} in {path}")
+                p.write_text(s.replace(old,new) if all else s.replace(old,new,1))
+
+            rep('public/app.js', "const APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r1';", "const APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r2';", 'diagnostic tag')
+            rep('public/app.js', "function updateTerrainMeshVisibility(now = performance.now()) {\n  if (!engine || !terrain) return;\n  let visible = 0;\n  for (const [key, entry] of terrainMeshes) {\n    const section = terrainLodPlan.get(key);\n    if (!section || !sectionIsStreamed(section)) {\n      if (entry.mesh) entry.mesh.visible = false;\n      continue;\n    }\n    const sphere = terrain.sectionRenderSphere?.(section);\n    const inView = sphere ? engine.isSphereVisible(sphere.center, sphere.radius) : true;\n    entry.mesh.visible = inView;\n    if (inView) visible += 1;\n  }\n  if (terrainDebugEnabled && now - lastTerrainDebugUpdate >= TERRAIN_DEBUG_UPDATE_MS) {\n    lastTerrainDebugUpdate = now;\n    rebuildTerrainDebugOverlay();\n    refreshTerrainDebugReadout(visible);\n  }\n}\n", "function updateTerrainMeshVisibility(now = performance.now()) {\n  if (!engine || !terrain) return;\n  let visible = 0;\n  const nearGroundRadius = Math.max(terrain.sectionSize * 1.5, 120);\n  const sectionDistanceToPlayer = section => {\n    const bounds = section?.bounds;\n    if (!bounds) return Infinity;\n    const dx = player.x < bounds.minX ? bounds.minX - player.x : player.x > bounds.maxX ? player.x - bounds.maxX : 0;\n    const dz = player.z < bounds.minZ ? bounds.minZ - player.z : player.z > bounds.maxZ ? player.z - bounds.maxZ : 0;\n    return Math.hypot(dx, dz);\n  };\n  for (const [key, entry] of terrainMeshes) {\n    const section = terrainLodPlan.get(key);\n    if (!section || !sectionIsStreamed(section)) {\n      if (entry.mesh) entry.mesh.visible = false;\n      continue;\n    }\n    // Keep the support surface around the player resident even while the first\n    // third-person camera frame is settling or a stream boundary is crossed.\n    const nearPlayer = sectionDistanceToPlayer(section) <= nearGroundRadius;\n    const sphere = terrain.sectionRenderSphere?.(section);\n    const inView = nearPlayer || (sphere ? engine.isSphereVisible(sphere.center, sphere.radius) : true);\n    entry.mesh.visible = inView;\n    if (inView) visible += 1;\n  }\n  if (terrainDebugEnabled && now - lastTerrainDebugUpdate >= TERRAIN_DEBUG_UPDATE_MS) {\n    lastTerrainDebugUpdate = now;\n    rebuildTerrainDebugOverlay();\n    refreshTerrainDebugReadout(visible);\n  }\n}\n", 'visibility function')
+            rep('public/app.js', "  rebuildTerrainMeshes();\n  playerCharacter = null;\n  playerVisualFeetAnchored = false;\n  playerVisualFeetOffset = 0;\n  playerRig = null;\n  cancelMovementAssist('world-start');\n  playerMoving = false;\n  playerMesh = engine.addMesh(createCapsuleGeometry(), { kind: 'character-fallback', label: 'player-capsule', position: [player.x, player.y, player.z] });\n  snapPlayerToSupport();\n  void installRiggedPlayerVisual();\n  applyViewportCameraProfile(true);\n  updateOrbitCamera();\n", "  // Resolve generated support and the real 5.12 km camera before the first\n  // terrain build/cull pass. RiftEngine otherwise starts on its legacy camera.\n  snapPlayerToSupport();\n  applyViewportCameraProfile(true);\n  updateOrbitCamera();\n  rebuildTerrainMeshes();\n\n  playerCharacter = null;\n  playerVisualFeetAnchored = false;\n  playerVisualFeetOffset = 0;\n  playerRig = null;\n  cancelMovementAssist('world-start');\n  playerMoving = false;\n  playerMesh = engine.addMesh(createCapsuleGeometry(), { kind: 'character-fallback', label: 'player-capsule', position: [player.x, player.y, player.z] });\n  updatePlayerVisualTransform();\n  void installRiggedPlayerVisual();\n", 'world boot order')
+            rep('public/index.html', "/app.js?v=20260906-island-v3-r1", "/app.js?v=20260906-island-v3-r2", 'app cache tag')
+            rep('scripts/check-terrain-edit-profiler.mjs', "index.includes('/app.js?v=20260906-island-v3-r1') ||", "index.includes('/app.js?v=20260906-island-v3-r2') || index.includes('/app.js?v=20260906-island-v3-r1') ||", 'profiler cache assertion')
+            rep('scripts/check-integrity-chain.mjs', "/app.js?v=20260906-island-v3-r1", "/app.js?v=20260906-island-v3-r2", 'integrity app cache')
+            rep('scripts/check-security-smoke-v1.mjs', "/app.js?v=20260906-island-v3-r1", "/app.js?v=20260906-island-v3-r2", 'security app cache', all=True)
+            rep('scripts/check-security-smoke-v1.mjs', "APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r1'", "APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r2'", 'security diagnostic tag')
+            rep('scripts/check-terrain-material-pack.mjs', "index.includes('/app.js?v=20260906-island-v3-r1')", "index.includes('/app.js?v=20260906-island-v3-r2')", 'material app cache')
+            rep('scripts/check-terrain-material-pack.mjs', "APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r1'", "APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r2'", 'material diagnostic tag')
+          PY
+          node scripts/generate-integrity-manifest.mjs
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -48,7 +64,6 @@ jobs:
           git add public/app.js \
             public/index.html \
             public/rift-survival-integrity-manifest.json \
-            scripts/check-island-runtime.mjs \
             scripts/check-terrain-edit-profiler.mjs \
             scripts/check-integrity-chain.mjs \
             scripts/check-security-smoke-v1.mjs \
