@@ -12,6 +12,8 @@ unsigned int rift_terrain_delta_ptr();
 unsigned int rift_terrain_holes_ptr();
 void rift_terrain_reset_flat();
 int rift_terrain_generate_island(int seed, float waterLevel, float coastWidth, float landHeight, float hillHeight, float mountainHeight, float roughness);
+int rift_terrain_generate_island_v2(int seed, float waterLevel, float coastWidth, float landHeight, float hillHeight, float mountainHeight, float roughness);
+int rift_terrain_generate_island_v3(int seed, float waterLevel, float coastWidth, float landHeight, float hillHeight, float mountainHeight, float roughness);
 void rift_terrain_rebuild_from_delta();
 float rift_terrain_sample_height(float x, float z);
 int rift_terrain_sample_normal(float x, float z);

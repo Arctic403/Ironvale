@@ -1,4 +1,4 @@
-import { RiftTerrain } from './rift-terrain.js?v=20260906-island-v1-r1';
+import { RiftTerrain } from './rift-terrain.js?v=20260906-island-v3-r1';
 
 export const RIFT_LANDSCAPE_FORMAT = 'rift-landscape-v3';
 export const RIFT_LANDSCAPE_EDIT_FORMAT = 'rift-landscape-edits-v2';
@@ -127,7 +127,7 @@ export class RiftLandscape extends RiftTerrain {
     this.activeMaterialLayerId = this.materialLayers.has(requestedMaterial)
       ? requestedMaterial
       : (this.materialLayers.has('dirt') ? 'dirt' : this.baseMaterialLayerId);
-    if (this.generator?.id === 'island-v1' && this.generator.autoMaterials) this._applyGeneratedMaterialMasks();
+    if (this.generator?.id?.startsWith('island-v') && this.generator.autoMaterials) this._applyGeneratedMaterialMasks();
     const requestedSpline = cleanId(landscape.activeSpline || '');
     this.activeSplineId = this.splines.some(entry => cleanId(entry.id) === requestedSpline)
       ? requestedSpline
@@ -199,7 +199,7 @@ export class RiftLandscape extends RiftTerrain {
         const beachBand = 1 - smooth01(Math.abs(rel - 0.8) / 4.2);
         const beachSlope = 1 - smooth01((slope - 0.18) / 0.55);
         const rockSlope = smooth01((slope - 0.42) / 0.85);
-        const highRock = smooth01((rel - 28) / 18) * 0.4;
+        const highRock = smooth01((rel - (['island-v2','island-v3'].includes(this.generator?.id) ? 36 : 28)) / (['island-v2','island-v3'].includes(this.generator?.id) ? 26 : 18)) * (['island-v2','island-v3'].includes(this.generator?.id) ? 0.72 : 0.4);
         const dirtSlope = smooth01((slope - 0.12) / 0.5) * (1 - rockSlope);
         const lowMud = rel > 0 ? (1 - smooth01(rel / 5.5)) * (1 - beachBand) * (1 - rockSlope) : 0;
         if (sand) sand.weights[index] = clamp(Math.round(255 * beachBand * beachSlope), 0, 255);
@@ -1025,9 +1025,9 @@ export class RiftLandscape extends RiftTerrain {
   }
 
   planSectionLods(cameraX, cameraZ, previousPlan = null) {
-    const rawPlan = super.planSectionLods(cameraX, cameraZ);
+    const streamPlan = this.planComponentStreaming(cameraX, cameraZ);
+    const rawPlan = super.planSectionLods(cameraX, cameraZ, streamPlan?.render || null);
     if (!previousPlan?.size || this.lodHysteresis <= 0) return rawPlan;
-    const counts = this.sectionCounts();
     const levels = new Map();
 
     for (const [key, raw] of rawPlan) {
@@ -1050,34 +1050,30 @@ export class RiftLandscape extends RiftTerrain {
     let changed = true;
     while (changed) {
       changed = false;
-      for (let z = 0; z < counts.z; z += 1) {
-        for (let x = 0; x < counts.x; x += 1) {
-          const key = this.sectionKey(x, z);
-          let level = levels.get(key) ?? 0;
-          for (const [nx, nz] of [[x, z - 1], [x + 1, z], [x, z + 1], [x - 1, z]]) {
-            if (nx < 0 || nz < 0 || nx >= counts.x || nz >= counts.z) continue;
-            const neighbor = levels.get(this.sectionKey(nx, nz)) ?? 0;
-            if (level > neighbor + 1) {
-              level = neighbor + 1;
-              levels.set(key, level);
-              changed = true;
-            }
+      for (const [key, raw] of rawPlan) {
+        const x = raw.sectionX, z = raw.sectionZ;
+        let level = levels.get(key) ?? raw.lodLevel;
+        for (const [nx, nz] of [[x, z - 1], [x + 1, z], [x, z + 1], [x - 1, z]]) {
+          const neighborKey = this.sectionKey(nx, nz);
+          if (!levels.has(neighborKey)) continue;
+          const neighbor = levels.get(neighborKey);
+          if (level > neighbor + 1) {
+            level = neighbor + 1;
+            levels.set(key, level);
+            changed = true;
           }
         }
       }
     }
 
     const plan = new Map();
-    for (let z = 0; z < counts.z; z += 1) {
-      for (let x = 0; x < counts.x; x += 1) {
-        const key = this.sectionKey(x, z);
-        const level = clamp(levels.get(key) ?? 0, 0, this.lodSteps.length - 1);
-        plan.set(key, {
-          ...this.getSectionDescriptor(x, z, this.lodSteps[level]),
-          lodLevel: level,
-          lodStep: this.lodSteps[level]
-        });
-      }
+    for (const [key, raw] of rawPlan) {
+      const level = clamp(levels.get(key) ?? raw.lodLevel, 0, this.lodSteps.length - 1);
+      plan.set(key, {
+        ...raw,
+        lodLevel: level,
+        lodStep: this.lodSteps[level]
+      });
     }
     return plan;
   }

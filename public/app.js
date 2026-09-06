@@ -1,12 +1,12 @@
 import { RiftEngine, getRiftEngineBootTelemetry } from './rift-engine.js?v=20260901-engine-blackbox-r1';
-import { RiftLandscape } from './rift-landscape.js?v=20260906-island-v1-r1';
+import { RiftLandscape } from './rift-landscape.js?v=20260906-island-v3-r1';
 import { createRiftTerrainMaterialRuntime } from './rift-terrain-materials.js?v=20260901-terrain-lock-r1';
 import { validateWorldScaleContract } from './rift-scale.js?v=20260901-scale-contract-r1';
 import { RiftDiagnostics } from './rift-diagnostics.js?v=20260901-diagnostic-gzip-r3';
 import { loadRiggedCharacterAsset } from './rift-character.js?v=20260901-run-animation-r1';
 import { RiftSurvivalIntegrity } from './rift-integrity.js?v=20260902-integrity-v1';
 
-const APP_DIAGNOSTIC_BUILD = '20260906-island-v1-r1';
+const APP_DIAGNOSTIC_BUILD = '20260906-island-v3-r1';
 const CHARACTER_MODEL_URL = new URL('./assets/characters/quaternius/universal-base-male.glb?v=14697e33502e41ddbc1b7fdbf56bbf0478027700', import.meta.url).href;
 const CHARACTER_ANIMATION_URL = new URL('./assets/characters/quaternius/universal-animation-library.glb?v=4fccf561b9b2ef73f611efe21981ef8739080065', import.meta.url).href;
 
@@ -65,8 +65,8 @@ const sprintButton = $('#sprint-button');
 
 const TERRAIN_LOD_REFRESH_MS = 180;
 const TERRAIN_LOD_FALLBACK_STEP = 2;
-const LOCAL_DRAFT_KEY = 'rift-survival:terrain:draft:v4';
-const LEGACY_LOCAL_DRAFT_KEYS = ['rift-survival:terrain:draft:v3', 'rift-survival:terrain:draft:v2'];
+const LOCAL_DRAFT_KEY = 'rift-survival:terrain:draft:v5';
+const LEGACY_LOCAL_DRAFT_KEYS = ['rift-survival:terrain:draft:v4', 'rift-survival:terrain:draft:v3', 'rift-survival:terrain:draft:v2'];
 const MAX_HISTORY = 10;
 const LONG_PRESS_MS = 260;
 const LOOK_START_PX = 9;
@@ -131,8 +131,8 @@ let lastFrame = performance.now();
 let freecamEnabled = false;
 let brushMode = 'raise';
 let reticleHit = null;
-let lastCameraPosition = [320, 16, 338];
-let lastCameraTarget = [320, 0, 320];
+let lastCameraPosition = [2560, 16, 2578];
+let lastCameraTarget = [2560, 0, 2560];
 let freecamVertical = 0;
 let joystickActive = false;
 let viewportCameraProfile = '';
@@ -218,9 +218,9 @@ function terrainEditPerformanceStatus(deep = false) {
   };
 }
 
-const player = { x: 320, y: .9, z: 320, yaw: 0, vy: 0, grounded: true };
+const player = { x: 2560, y: .9, z: 2560, yaw: 0, vy: 0, grounded: true };
 const orbitCamera = { yaw: Math.PI, pitch: .34, distance: DEFAULT_ORBIT_DISTANCE, fov: Math.PI / 3 };
-const freecam = { x: 320, y: 16, z: 338, yaw: 0, pitch: .6, fov: Math.PI / 3 };
+const freecam = { x: 2560, y: 16, z: 2578, yaw: 0, pitch: .6, fov: Math.PI / 3 };
 const input = { forward: 0, strafe: 0, keys: new Set() };
 const undoStack = [];
 const redoStack = [];
@@ -886,9 +886,9 @@ async function bootSession() {
     }
     characterName.textContent = data.character.displayName || data.user.username;
     const saved = data.character.position || {};
-    player.x = finiteOr(saved.x, 320);
+    player.x = finiteOr(saved.x, 2560);
     player.y = finiteOr(saved.y, .9);
-    player.z = finiteOr(saved.z, 320);
+    player.z = finiteOr(saved.z, 2560);
     player.yaw = finiteOr(saved.yaw, 0);
     orbitCamera.yaw = wrapAngle(player.yaw + Math.PI);
     await startWorld(data.world || { url: '/world/rift-survival-terrain.json' });
@@ -911,7 +911,7 @@ async function startWorld(worldDescriptor) {
   const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Terrain failed to load (${response.status})`);
   worldDocument = await response.json();
-  if (descriptor.generation?.id === 'island-v1') {
+  if (descriptor.generation?.id === worldDocument.terrain?.generator?.id) {
     worldDocument.terrain = { ...worldDocument.terrain, seed: Number(descriptor.generation.seed) || worldDocument.terrain.seed, generator: { ...(worldDocument.terrain.generator || {}), ...descriptor.generation } };
   }
   const worldScaleValidation = validateWorldScaleContract(worldDocument);
@@ -922,9 +922,9 @@ async function startWorld(worldDescriptor) {
   restoreLocalDraft();
   refreshTerrainLayerControls();
   engine = new RiftEngine(canvas);
-  engine.environment.fogNear = 320;
-  engine.environment.fogFar = 1200;
-  if (terrain.generator?.id === 'island-v1') {
+  engine.environment.fogNear = 420;
+  engine.environment.fogFar = 1600;
+  if (terrain.generator?.id?.startsWith('island-v')) {
     waterMesh = engine.addMesh(createWaterPlaneGeometry(terrain), {
       kind: 'water',
       label: 'island-water-plane',
@@ -938,7 +938,7 @@ async function startWorld(worldDescriptor) {
   void terrainMaterialRuntime.loadInitial().then(() => {
     if (terrainMaterialRuntime?.terrain === terrain) terrainStatus.textContent = `${terrainStatus.textContent} · terrain PBR ready`;
   });
-  const spawn = worldDocument?.anchors?.starter_spawn || { x: 320, z: 320 };
+  const spawn = worldDocument?.anchors?.starter_spawn || { x: 2560, z: 2560 };
   if (!terrain.containsXZ(player.x, player.z)) {
     player.x = spawn.x;
     player.z = spawn.z;
@@ -961,7 +961,7 @@ async function startWorld(worldDescriptor) {
   updateReticleTarget();
   const stats = terrain.getStats?.() || {};
   const generator = terrain.getGeneratorInfo?.();
-  terrainStatus.textContent = `RiftLandscape · 640×640 · ${generator ? `${generator.id} seed ${generator.seed} · ` : ''}${stats.components ?? 25} components · ${stats.surfaceSections ?? terrainMeshes.size} sections · ${stats.editLayers ?? 1} edit layer${(stats.editLayers ?? 1) === 1 ? '' : 's'} · adaptive LOD`;
+  terrainStatus.textContent = `RiftLandscape · ${terrain.width}×${terrain.depth} m · ${generator ? `${generator.id} seed ${generator.seed} · ` : ''}${stats.components ?? terrain.componentCounts().x * terrain.componentCounts().z} components · ${stats.surfaceSections ?? terrain.sectionCounts().x * terrain.sectionCounts().z} total sections · ${terrainMeshes.size} resident · ${stats.editLayers ?? 1} edit layer${(stats.editLayers ?? 1) === 1 ? '' : 's'} · streamed adaptive LOD`;
   diagnostics.record('world', 'World boot completed', { worldId: worldDocument?.id, terrainMeshes: terrainMeshes.size });
   void diagnostics.runValidation('world-boot');
   refreshDiagnosticButtons();
@@ -2047,7 +2047,7 @@ function resetTerrain() {
   updateReticleTarget();
   refreshTerrainLayerControls();
   const generator = terrain.getGeneratorInfo?.();
-  terrainStatus.textContent = `640×640 ${generator ? `${generator.id} seed ${generator.seed}` : 'terrain'} reset · ${lodSummary() || 'adaptive LOD'}`;
+  terrainStatus.textContent = `${terrain.width}×${terrain.depth} m ${generator ? `${generator.id} seed ${generator.seed}` : 'terrain'} reset · ${lodSummary() || 'streamed adaptive LOD'}`;
   editorStatus.textContent = generator ? 'Seeded island regenerated; manual terrain edits cleared.' : 'Terrain reset.';
 }
 

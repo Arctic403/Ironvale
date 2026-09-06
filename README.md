@@ -31,11 +31,11 @@ The old repository-bound GitHub OIDC anti-cheat review workflow was also removed
 
 ## Terrain baseline
 
-The active world is a deterministic **640 × 640 m `island-v1`** continuous heightfield with 1 m authoring samples. The native RiftCore generator creates an irregular coastline, submerged ocean floor, beaches, lowlands, rolling hills, ridges, valleys, occasional cliffier coasts and flatter build-friendly regions. Components and sections remain rendering/streaming partitions, not Minecraft-style cells. Negative world Y remains valid.
+The active world is a deterministic **5120 × 5120 m `island-v3`** survival island. A compact 1025 × 1025 native RiftCore heightfield uses 5 m authoritative samples (about 1.05 million samples rather than 26+ million at 1 m), while nearby 80 m sections stream into renderer/GPU memory through 160 m components. The v3 generator scales its macro noise wavelengths with world size so the 5 km island forms broad coastal regions, lowlands, hills, ridges, valleys, highlands, cliffier coasts and flatter build-friendly areas instead of repeating the old 640 m terrain pattern. Negative world Y remains valid.
 
-World identity is `seed + generator version`. The default development seed is `4032026`; the backend owns the active seed through the `WORLD_SEED` Worker variable and returns it in `/api/bootstrap`. The client generates the exact heightfield locally from that authoritative contract. The same seed with `island-v1` reproduces byte-identical terrain; a different seed produces a different island. Future server creation can therefore allocate a seed without storing a full heightmap.
+World identity is `seed + generator version + world size`. The default development seed is `4032026`; the backend owns the active seed through the `WORLD_SEED` Worker variable and returns the 5120 m `island-v3` generation contract in `/api/bootstrap`. The client generates the exact heightfield locally. The same seed with `island-v3` reproduces byte-identical terrain; a different seed produces a different island. Server creation can therefore allocate a seed without storing a full heightmap.
 
-`island-v1` also derives initial material weights from generated height/slope: sand around the shoreline, grass as the base layer, and dirt/rock/gravel/mud transitions where appropriate. These are only starting masks—RiftLandscape manual sculpt and material edit layers remain additive and persistent on top. The runtime draws a simple development water plane at the configured water level so the generated coastline reads as an island before a final water system exists.
+`island-v3` also derives initial material weights from generated height/slope: sand around the shoreline, grass as the base layer, and dirt/rock/gravel/mud transitions where appropriate. These are only starting masks—RiftLandscape manual sculpt and material edit layers remain additive and persistent on top. The runtime draws a simple development water plane at the configured water level so the generated coastline reads as an island before a final water system exists.
 
 Terrain material slots still boot entirely from local fallback color, flat-normal and roughness layers. Proper bundled local terrain textures can be added later without changing the terrain schema.
 
@@ -56,4 +56,4 @@ npm run build
 
 ## Current boundary
 
-This milestone adds only deterministic seeded island generation and its initial terrain/material presentation. It does **not** add trees, rocks/resource nodes, roads, rivers, monuments, loot, harvesting, inventory, crafting, building, weapons or survival meters. Those systems should consume the generated world contract later instead of being baked into `island-v1`.
+This milestone adds only deterministic seeded island generation and its initial terrain/material presentation. It does **not** add trees, rocks/resource nodes, roads, rivers, monuments, loot, harvesting, inventory, crafting, building, weapons or survival meters. Those systems should consume the generated world contract later instead of being baked into `island-v3`.

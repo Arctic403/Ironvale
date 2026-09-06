@@ -4,7 +4,7 @@ const MOVE_SLICE_MS = 260;
 const SYNTHETIC_POINTER_ID = 9157;
 const SCREENSHOT_MAX_WIDTH = 720;
 const SCREENSHOT_QUALITY = 0.78;
-const TERRAIN_DRAFT_KEY = 'rift-survival:terrain:draft:v4';
+const TERRAIN_DRAFT_KEY = 'rift-survival:terrain:draft:v5';
 
 function captureDraftBaseline() {
   try {

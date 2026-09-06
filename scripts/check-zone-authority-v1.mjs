@@ -15,14 +15,15 @@ const assert = (ok, message) => { if (!ok) throw new Error(`Zone authority v1 ch
 
 assert(ZONE_AUTHORITY_FORMAT === 'rift-survival-zone-authority-v1', 'authority format drifted');
 assert(ZONE_NEARBY_FORMAT === 'rift-survival-zone-nearby-v1', 'nearby format drifted');
-assert(ZONE_SIZE_METERS === 128, 'zone size must remain 128m for current 640m world');
+assert(ZONE_SIZE_METERS === 128, 'zone size must remain 128m for the 5.12km world');
 assert(ZONE_PRESENCE_TTL_MS >= ZONE_CLIENT_HEARTBEAT_MS * 2, 'presence TTL must tolerate multiple missed client heartbeats');
 assert(ZONE_MOVEMENT_SYNC_MS >= 5000, 'movement must not fan out to zone authority at high frequency');
 assert(zoneIdForPosition(0, 0) === 'rift-survival-terrain:0:0', 'origin zone mapping wrong');
 assert(zoneIdForPosition(127.999, 127.999) === 'rift-survival-terrain:0:0', 'zone edge mapping wrong');
 assert(zoneIdForPosition(128, 128) === 'rift-survival-terrain:1:1', 'zone handoff mapping wrong');
-assert(zoneIdForPosition(640, 640) === 'rift-survival-terrain:4:4', 'world max must clamp into final zone');
-assert(zoneIdsForInterest(320, 320, 96).length === 9, 'center interest window should touch 3x3 zones');
+assert(zoneIdForPosition(5120, 5120) === 'rift-survival-terrain:39:39', 'world max must clamp into final zone');
+assert(zoneIdsForInterest(2560, 2560, 96).length === 4, 'world-center spawn sits on a zone corner and should touch 2x2 zones');
+assert(zoneIdsForInterest(2624, 2624, 96).length === 9, 'zone-centered interest window should touch 3x3 zones');
 assert(zoneIdsForInterest(4, 4, 96).length === 1, 'corner interest window should clamp to one zone');
 
 const zone = read('src/zone-authority.js');
@@ -104,4 +105,4 @@ assert(!fs.existsSync('.github/workflows/retry-zone-authority-v1.yml'), 'tempora
 assert(!fs.existsSync('.github/workflows/retry-zone-authority-v2.yml'), 'temporary retry v2 workflow must be removed');
 assert(!fs.existsSync('.github/workflows/retry-zone-authority-v3.yml'), 'temporary retry v3 workflow must be removed');
 
-console.log('RiftSurvival Zone Authority v1 verified: 128m RAM zones + immediate handoff + low-rate presence heartbeat + bounded nearby interest + zero D1 movement/presence writes.');
+console.log('RiftSurvival Zone Authority v1 verified: 40×40 128m RAM zones across 5.12km world + immediate handoff + bounded nearby interest + zero D1 movement/presence writes.');

@@ -12,11 +12,11 @@
       0
     ],
     "size": [
-      640,
-      640
+      5120,
+      5120
     ],
-    "sampleSpacing": 1,
-    "chunkSize": 64,
+    "sampleSpacing": 5,
+    "chunkSize": 80,
     "seed": 4032026,
     "baseHeight": 0,
     "maxWalkSlope": 0.82,
@@ -24,8 +24,8 @@
     "holes": [],
     "caves": [],
     "edits": [],
-    "sectionSize": 64,
-    "componentSize": 128,
+    "sectionSize": 80,
+    "componentSize": 160,
     "lod": {
       "steps": [
         1,
@@ -35,10 +35,10 @@
         16
       ],
       "distances": [
-        96,
-        192,
-        320,
-        480
+        120,
+        240,
+        400,
+        640
       ],
       "neighborMaxLevelDelta": 1,
       "refreshMs": 180,
@@ -50,8 +50,8 @@
         2,
         4
       ],
-      "nearDistance": 128,
-      "mediumDistance": 256,
+      "nearDistance": 160,
+      "mediumDistance": 320,
       "authoritativeHeightfield": true
     },
     "landscape": {
@@ -163,7 +163,7 @@
       "lodHysteresis": 0.12,
       "streaming": {
         "enabled": true,
-        "componentRadius": 3,
+        "componentRadius": 2,
         "preloadRing": 0
       },
       "activeMaterialLayer": "dirt",
@@ -176,21 +176,21 @@
       }
     },
     "generator": {
-      "id": "island-v1",
-      "version": 1,
+      "id": "island-v3",
+      "version": 3,
       "waterLevel": 0,
-      "coastWidth": 30,
-      "landHeight": 13,
-      "hillHeight": 12,
-      "mountainHeight": 18,
-      "roughness": 0.85,
+      "coastWidth": 110,
+      "landHeight": 22,
+      "hillHeight": 26,
+      "mountainHeight": 48,
+      "roughness": 0.8,
       "autoMaterials": true
     }
   },
   "anchors": {
     "starter_spawn": {
-      "x": 320,
-      "z": 320,
+      "x": 2560,
+      "z": 2560,
       "facing": 0,
       "terrainSnap": true
     }
@@ -203,8 +203,8 @@
     "blankCanvas": false,
     "negativeWorldY": true,
     "lowerBarrier": false,
-    "description": "Deterministic seeded island-v1 survival terrain with ocean floor, beaches, lowlands, hills, ridges, valleys, cliffs and flatter build-friendly regions. Manual RiftLandscape sculpt/material edit layers remain additive on top.",
-    "terrainOrganization": "RiftLandscape: 128m components / 64m sections / 1m source samples / non-destructive edit layers",
+    "description": "Deterministic seeded island-v3 survival terrain spanning a 5.12 km world with a more compact Rust-style landmass, wider ocean belt, broad coastal regions, lowlands, hills, ridges, valleys, highlands, cliffs and flatter build-friendly areas. Nearby terrain sections stream into GPU memory while a compact 5 m authoritative heightfield remains queryable for collision and backend-consistent world logic.",
+    "terrainOrganization": "RiftLandscape: 160m components / 80m sections / 5m authoritative source samples / streamed nearby render meshes / non-destructive edit layers",
     "adaptiveLod": true,
     "lodSeamStitching": true,
     "nonDestructiveTerrainLayers": true,
@@ -235,9 +235,12 @@
     "nativeWasmTelemetry": true,
     "subsystemFrameTimings": true,
     "generatedIsland": true,
-    "terrainGenerator": "island-v1",
-    "terrainGeneratorVersion": 1,
-    "deterministicSeededTerrain": true
+    "terrainGenerator": "island-v3",
+    "terrainGeneratorVersion": 2,
+    "deterministicSeededTerrain": true,
+    "largeWorldStreaming": true,
+    "worldSizeMeters": 5120,
+    "authoritativeHeightfieldSpacingMeters": 5
   },
   "scale": {
     "format": "rift-scale-v1",

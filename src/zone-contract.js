@@ -9,7 +9,7 @@ export const ZONE_DEFAULT_INTEREST_RADIUS_METERS = 96;
 export const ZONE_MAX_INTEREST_RADIUS_METERS = 192;
 export const ZONE_MAX_NEARBY = 64;
 export const ZONE_WORLD_MIN = 0;
-export const ZONE_WORLD_MAX = 640;
+export const ZONE_WORLD_MAX = 5120;
 
 const ZONE_AXIS_COUNT = Math.ceil((ZONE_WORLD_MAX - ZONE_WORLD_MIN) / ZONE_SIZE_METERS);
 

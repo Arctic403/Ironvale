@@ -6,11 +6,11 @@ import { ZONE_AUTHORITY_FORMAT, ZONE_NEARBY_FORMAT, ZONE_SIZE_METERS, ZONE_PRESE
 export { ZoneState } from './zone-authority.js';
 
 const SESSION_COOKIE = 'rift-survival_session';
-const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
+const DEFAULT_SPAWN = Object.freeze({ x: 2560, y: 0.9, z: 2560, yaw: 0 });
 const WORLD_MIN_X = 0;
-const WORLD_MAX_X = 640;
+const WORLD_MAX_X = 5120;
 const WORLD_MIN_Z = 0;
-const WORLD_MAX_Z = 640;
+const WORLD_MAX_Z = 5120;
 const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_HORIZONTAL_SPEED_MPS = 12;
 const HORIZONTAL_LAG_ALLOWANCE_METERS = 3.5;
@@ -108,6 +108,8 @@ async function loadSessionState(request, env) {
     WHERE s.token_hash = ?
   `).bind(tokenHash).first();
   if (!row || Number(row.is_banned) || Number(row.expires_at) <= Date.now()) return null;
+  const legacyDefaultSpawn = Math.abs(finite(row.position_x, DEFAULT_SPAWN.x) - 320) < 0.001
+    && Math.abs(finite(row.position_z, DEFAULT_SPAWN.z) - 320) < 0.001;
   return {
     userId: String(row.user_id),
     username: String(row.username || 'Player').slice(0, 24),
@@ -115,9 +117,9 @@ async function loadSessionState(request, env) {
     sessionId: String(row.session_id || ''),
     sessionExpiresAt: Number(row.expires_at),
     position: {
-      x: finite(row.position_x, DEFAULT_SPAWN.x),
+      x: legacyDefaultSpawn ? DEFAULT_SPAWN.x : finite(row.position_x, DEFAULT_SPAWN.x),
       y: finite(row.position_y, DEFAULT_SPAWN.y),
-      z: finite(row.position_z, DEFAULT_SPAWN.z),
+      z: legacyDefaultSpawn ? DEFAULT_SPAWN.z : finite(row.position_z, DEFAULT_SPAWN.z),
       yaw: finite(row.yaw, DEFAULT_SPAWN.yaw)
     },
     updatedAt: finite(row.updated_at, Date.now()),
@@ -792,20 +794,32 @@ export class PlayerState extends DurableObject {
     const verticalDistance = Math.abs(y - state.y);
     const horizontalLimit = MAX_HORIZONTAL_SPEED_MPS * elapsedSeconds + HORIZONTAL_LAG_ALLOWANCE_METERS;
     const verticalLimit = MAX_VERTICAL_SPEED_MPS * elapsedSeconds + VERTICAL_LAG_ALLOWANCE_METERS;
+    // A brand-new character is persisted with a placeholder collider Y before the
+    // client has generated its deterministic terrain. Permit exactly one vertical
+    // terrain snap at the default spawn, then normal server-authoritative movement
+    // limits apply. This avoids correcting a correctly snapped player underground.
+    const spawnTerrainSnap = state.accepted === 0 && state.seq === 0
+      && Math.abs(state.x - DEFAULT_SPAWN.x) < 0.01 && Math.abs(state.z - DEFAULT_SPAWN.z) < 0.01
+      && Math.abs(state.y - DEFAULT_SPAWN.y) < 0.01
+      && horizontalDistance <= 6 && y >= -64 && y <= 256;
 
     if (horizontalDistance > horizontalLimit) {
       return { ok: false, reason: 'horizontal-speed', horizontalDistance, horizontalLimit };
     }
-    if (verticalDistance > verticalLimit) {
+    if (verticalDistance > verticalLimit && !spawnTerrainSnap) {
       return { ok: false, reason: 'vertical-speed', verticalDistance, verticalLimit };
     }
 
-    return { ok: true, now, x, y, z, yaw, seq: nextSeq, clientSentAt: finite(packet?.clientSentAt) };
+    return { ok: true, now, x, y, z, yaw, seq: nextSeq, clientSentAt: finite(packet?.clientSentAt), spawnTerrainSnap };
   }
 
   applyAccepted(state, accepted) {
     const moved = Math.hypot(accepted.x - state.x, accepted.y - state.y, accepted.z - state.z) > 0.01 || Math.abs(accepted.yaw - state.yaw) > 0.001;
-    state.antiCheat = observeAcceptedMovement(state.antiCheat, { x: state.x, y: state.y, z: state.z, yaw: state.yaw, lastAcceptedAt: state.lastAcceptedAt }, accepted);
+    if (!accepted.spawnTerrainSnap) {
+      state.antiCheat = observeAcceptedMovement(state.antiCheat, { x: state.x, y: state.y, z: state.z, yaw: state.yaw, lastAcceptedAt: state.lastAcceptedAt }, accepted);
+    } else {
+      state.spawnTerrainSnapAt = accepted.now;
+    }
     state.x = accepted.x;
     state.y = accepted.y;
     state.z = accepted.z;

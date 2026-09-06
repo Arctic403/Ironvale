@@ -2,10 +2,10 @@ const SESSION_COOKIE = 'rift-survival_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 const PASSWORD_ITERATIONS = 100_000;
 const WORLD_MIN_X = 0;
-const WORLD_MAX_X = 640;
+const WORLD_MAX_X = 5120;
 const WORLD_MIN_Z = 0;
-const WORLD_MAX_Z = 640;
-const DEFAULT_SPAWN = Object.freeze({ x: 320, y: 0.9, z: 320, yaw: 0 });
+const WORLD_MAX_Z = 5120;
+const DEFAULT_SPAWN = Object.freeze({ x: 2560, y: 0.9, z: 2560, yaw: 0 });
 const RAW_D1_STATEMENT = Symbol('rift-survival.raw-d1-statement');
 const SQL_D1_STATEMENT = Symbol('rift-survival.sql-d1-statement');
 
@@ -38,9 +38,9 @@ const CORE_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS rift_characters (
     user_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
-    position_x REAL NOT NULL DEFAULT 320,
+    position_x REAL NOT NULL DEFAULT 2560,
     position_y REAL NOT NULL DEFAULT 0.9,
-    position_z REAL NOT NULL DEFAULT 320,
+    position_z REAL NOT NULL DEFAULT 2560,
     yaw REAL NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
@@ -358,18 +358,18 @@ async function bootstrap(request, env) {
       url: '/world/rift-survival-terrain.json',
       foundation: 'rift-landscape-v3',
       terrainFormat: 'rift-terrain-v1',
-      size: [640, 640],
+      size: [5120, 5120],
       negativeWorldY: true,
       generation: {
-        id: 'island-v1',
-        version: 1,
+        id: 'island-v3',
+        version: 3,
         seed: Number.isFinite(Number(env.WORLD_SEED)) ? Math.trunc(Number(env.WORLD_SEED)) : 4032026,
         waterLevel: 0,
-        coastWidth: 30,
-        landHeight: 13,
-        hillHeight: 12,
-        mountainHeight: 18,
-        roughness: 0.85,
+        coastWidth: 110,
+        landHeight: 22,
+        hillHeight: 26,
+        mountainHeight: 48,
+        roughness: 0.8,
         autoMaterials: true
       }
     }
@@ -454,7 +454,18 @@ async function ensureCharacter(user, env) {
     timestamp,
     timestamp
   ).run();
-  return env.DB.prepare('SELECT * FROM rift_characters WHERE user_id = ?').bind(user.id).first();
+  let row = await env.DB.prepare('SELECT * FROM rift_characters WHERE user_id = ?').bind(user.id).first();
+  // One-time large-world migration for characters still sitting on the old
+  // 640m island's default spawn. Preserve every non-default authored position.
+  if (row && Math.abs(Number(row.position_x) - 320) < 0.001 && Math.abs(Number(row.position_z) - 320) < 0.001) {
+    await env.DB.prepare(`
+      UPDATE rift_characters
+      SET position_x = ?, position_z = ?, updated_at = ?
+      WHERE user_id = ? AND ABS(position_x - 320) < 0.001 AND ABS(position_z - 320) < 0.001
+    `).bind(DEFAULT_SPAWN.x, DEFAULT_SPAWN.z, timestamp, user.id).run();
+    row = await env.DB.prepare('SELECT * FROM rift_characters WHERE user_id = ?').bind(user.id).first();
+  }
+  return row;
 }
 
 function publicCharacter(row) {

@@ -130,7 +130,7 @@ async function captureIntegrity() {
   if (!snapshot || snapshot.error) throw new Error(snapshot?.error || 'Deep integrity snapshot unavailable.');
   const runtime = snapshot.runtime || {};
   const edits = normalizeLandscapeEdits(snapshot.deep?.landscapeEdits || null);
-  const draft = (() => { try { return localStorage.getItem('rift-survival:terrain:draft:v4') || ''; } catch (_) { return ''; } })();
+  const draft = (() => { try { return localStorage.getItem('rift-survival:terrain:draft:v5') || ''; } catch (_) { return ''; } })();
   return {
     at: new Date().toISOString(),
     worldId: runtime.world?.id || snapshot.quick?.worldId || null,
@@ -295,8 +295,9 @@ async function buildGuardChecks(instance) {
   const sectionsPerComponent = Math.max(1, Number(stats.sectionsPerComponent) || 1);
   const expectedStreamedMeshes = renderedComponents > 0 ? Math.min(expectedSections, renderedComponents * sectionsPerComponent * sectionsPerComponent) : expectedSections;
   if (expectedSections) {
-    const coverageOk = lodPlan === expectedSections && meshes === expectedStreamedMeshes;
-    checks.push(passFail('terrain.section-coverage', coverageOk, meshes + '/' + expectedStreamedMeshes + ' streamed meshes · ' + lodPlan + '/' + expectedSections + ' LOD entries · ' + (renderedComponents || 'all') + ' render component(s)'));
+    const expectedLodEntries = renderedComponents > 0 ? expectedStreamedMeshes : expectedSections;
+    const coverageOk = lodPlan === expectedLodEntries && meshes === expectedStreamedMeshes;
+    checks.push(passFail('terrain.section-coverage', coverageOk, meshes + '/' + expectedStreamedMeshes + ' streamed meshes · ' + lodPlan + '/' + expectedLodEntries + ' resident LOD entries · ' + expectedSections + ' total sections · ' + (renderedComponents || 'all') + ' render component(s)'));
   }
 
   const viewport = runtime.renderer?.viewport || null;

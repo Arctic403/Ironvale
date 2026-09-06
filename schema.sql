@@ -31,9 +31,9 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS rift_characters (
   user_id TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
-  position_x REAL NOT NULL DEFAULT 320,
+  position_x REAL NOT NULL DEFAULT 2560,
   position_y REAL NOT NULL DEFAULT 0.9,
-  position_z REAL NOT NULL DEFAULT 320,
+  position_z REAL NOT NULL DEFAULT 2560,
   yaw REAL NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,

@@ -54,7 +54,7 @@ export function validateRiftTerrainConfig(config) {
   const size = config?.size || [0, 0];
   if (!(Number(size[0]) > 0 && Number(size[1]) > 0)) failures.push('terrain size must be positive');
   const spacing = Number(config?.sampleSpacing ?? DEFAULT_SAMPLE_SPACING);
-  if (!(spacing > 0 && spacing <= 4)) failures.push('sampleSpacing must be > 0 and <= 4 meters');
+  if (!(spacing > 0 && spacing <= 5)) failures.push('sampleSpacing must be > 0 and <= 5 meters');
   const sectionSize = Number(config?.sectionSize ?? config?.chunkSize ?? DEFAULT_SECTION_SIZE);
   const componentSize = Number(config?.componentSize ?? DEFAULT_COMPONENT_SIZE);
   if (!(sectionSize >= spacing * 4 && sectionSize <= 128)) failures.push('sectionSize must contain at least 4 samples and be <= 128 meters');
@@ -67,8 +67,10 @@ export function validateRiftTerrainConfig(config) {
   const rows = Math.round(Number(size[1]) / spacing) + 1;
   if (columns > 1025 || rows > 1025) failures.push('native RiftCore currently supports up to 1025 samples per terrain axis');
   if (config?.generator != null) {
-    if (config.generator?.id !== 'island-v1') failures.push('terrain generator id must be island-v1');
-    if (!Number.isFinite(Number(config.generator?.version)) || Number(config.generator.version) !== 1) failures.push('island-v1 generator version must be 1');
+    const generatorId = String(config.generator?.id || '');
+    const generatorVersion = Number(config.generator?.version);
+    const supported = (generatorId === 'island-v1' && generatorVersion === 1) || (generatorId === 'island-v2' && generatorVersion === 2) || (generatorId === 'island-v3' && generatorVersion === 3);
+    if (!supported) failures.push('terrain generator must be island-v1/version 1, island-v2/version 2, or island-v3/version 3');
     if (!Number.isFinite(Number(config.seed))) failures.push('seeded terrain requires a finite terrain.seed');
   }
   return { ok: failures.length === 0, failures };
@@ -99,16 +101,21 @@ export class RiftTerrain {
     this.layers = Array.isArray(config.layers) ? config.layers : [];
     this.holes = Array.isArray(config.holes) ? config.holes : [];
     this.caves = Array.isArray(config.caves) ? config.caves : [];
-    this.generator = config.generator?.id === 'island-v1' ? {
-      id: 'island-v1',
-      version: 1,
+    const generatorId = String(config.generator?.id || '');
+    const generatorVersion = Number(config.generator?.version);
+    const isIslandV1 = generatorId === 'island-v1' && generatorVersion === 1;
+    const isIslandV2 = generatorId === 'island-v2' && generatorVersion === 2;
+    const isIslandV3 = generatorId === 'island-v3' && generatorVersion === 3;
+    this.generator = (isIslandV1 || isIslandV2 || isIslandV3) ? {
+      id: generatorId,
+      version: generatorVersion,
       seed: this.seed,
       waterLevel: Number(config.generator.waterLevel) || 0,
-      coastWidth: Math.max(4, Number(config.generator.coastWidth) || 30),
-      landHeight: Math.max(1, Number(config.generator.landHeight) || 13),
-      hillHeight: Math.max(0, Number(config.generator.hillHeight) || 12),
-      mountainHeight: Math.max(0, Number(config.generator.mountainHeight) || 18),
-      roughness: clamp(Number(config.generator.roughness ?? 0.85), 0, 2),
+      coastWidth: Math.max(this.sampleSpacing * 4, Number(config.generator.coastWidth) || ((isIslandV2 || isIslandV3) ? 110 : 30)),
+      landHeight: Math.max(1, Number(config.generator.landHeight) || ((isIslandV2 || isIslandV3) ? 22 : 13)),
+      hillHeight: Math.max(0, Number(config.generator.hillHeight) || ((isIslandV2 || isIslandV3) ? 26 : 12)),
+      mountainHeight: Math.max(0, Number(config.generator.mountainHeight) || ((isIslandV2 || isIslandV3) ? 48 : 18)),
+      roughness: clamp(Number(config.generator.roughness ?? ((isIslandV2 || isIslandV3) ? 0.80 : 0.85)), 0, 2),
       autoMaterials: config.generator.autoMaterials !== false
     } : null;
     this.revision = 1;
@@ -128,9 +135,12 @@ export class RiftTerrain {
     this._bindNativeViews();
 
     if (this.generator) {
-      assertNative(typeof NATIVE.rift_terrain_generate_island === 'function', 'RiftCore island-v1 generator export is unavailable.');
+      const generatorFn = this.generator.id === 'island-v3'
+        ? NATIVE.rift_terrain_generate_island_v3
+        : (this.generator.id === 'island-v2' ? NATIVE.rift_terrain_generate_island_v2 : NATIVE.rift_terrain_generate_island);
+      assertNative(typeof generatorFn === 'function', `RiftCore ${this.generator.id} generator export is unavailable.`);
       assertNative(
-        NATIVE.rift_terrain_generate_island(
+        generatorFn(
           this.generator.seed,
           this.generator.waterLevel,
           this.generator.coastWidth,
@@ -139,7 +149,7 @@ export class RiftTerrain {
           this.generator.mountainHeight,
           this.generator.roughness
         ),
-        'RiftCore failed to generate island-v1 terrain.'
+        `RiftCore failed to generate ${this.generator.id} terrain.`
       );
     } else if (this.layers.length) {
       console.warn('RiftCore: legacy procedural terrain layers are ignored. Use terrain.generator for deterministic world generation or edit layers for authored sculpting.');
@@ -273,50 +283,54 @@ export class RiftTerrain {
     return level;
   }
 
-  planSectionLods(cameraX, cameraZ) {
+  planSectionLods(cameraX, cameraZ, componentFilter = null) {
     const counts = this.sectionCounts();
     const levels = new Map();
+    const candidates = [];
+    const filtered = componentFilter instanceof Set && componentFilter.size > 0;
     for (let z = 0; z < counts.z; z += 1) {
       for (let x = 0; x < counts.x; x += 1) {
+        const componentX = Math.floor(x / this.sectionsPerComponent);
+        const componentZ = Math.floor(z / this.sectionsPerComponent);
+        const componentId = `component-${componentX}-${componentZ}`;
+        if (filtered && !componentFilter.has(componentId)) continue;
         const key = this.sectionKey(x, z);
         const distance = this._distanceToSection(cameraX, cameraZ, this.sectionBounds(x, z));
         levels.set(key, this._desiredLodLevel(distance));
+        candidates.push({ x, z, key });
       }
     }
 
-    // Unreal-style neighbor constraint: an edge may only cross one LOD level.
+    // Neighbor constraint only needs to run inside the streamed working set.
+    // Missing neighbors are outside the resident ring and are stitched using the
+    // current section's fallback LOD when their edge is built.
     let changed = true;
     while (changed) {
       changed = false;
-      for (let z = 0; z < counts.z; z += 1) {
-        for (let x = 0; x < counts.x; x += 1) {
-          const key = this.sectionKey(x, z);
-          let level = levels.get(key);
-          for (const [nx, nz] of [[x, z - 1], [x + 1, z], [x, z + 1], [x - 1, z]]) {
-            if (nx < 0 || nz < 0 || nx >= counts.x || nz >= counts.z) continue;
-            const neighborKey = this.sectionKey(nx, nz);
-            const neighbor = levels.get(neighborKey);
-            if (level > neighbor + 1) {
-              level = neighbor + 1;
-              levels.set(key, level);
-              changed = true;
-            }
+      for (const candidate of candidates) {
+        let level = levels.get(candidate.key);
+        for (const [nx, nz] of [[candidate.x, candidate.z - 1], [candidate.x + 1, candidate.z], [candidate.x, candidate.z + 1], [candidate.x - 1, candidate.z]]) {
+          if (nx < 0 || nz < 0 || nx >= counts.x || nz >= counts.z) continue;
+          const neighborKey = this.sectionKey(nx, nz);
+          if (!levels.has(neighborKey)) continue;
+          const neighbor = levels.get(neighborKey);
+          if (level > neighbor + 1) {
+            level = neighbor + 1;
+            levels.set(candidate.key, level);
+            changed = true;
           }
         }
       }
     }
 
     const plan = new Map();
-    for (let z = 0; z < counts.z; z += 1) {
-      for (let x = 0; x < counts.x; x += 1) {
-        const key = this.sectionKey(x, z);
-        const level = levels.get(key);
-        plan.set(key, {
-          ...this.getSectionDescriptor(x, z, this.lodSteps[level]),
-          lodLevel: level,
-          lodStep: this.lodSteps[level]
-        });
-      }
+    for (const candidate of candidates) {
+      const level = levels.get(candidate.key);
+      plan.set(candidate.key, {
+        ...this.getSectionDescriptor(candidate.x, candidate.z, this.lodSteps[level]),
+        lodLevel: level,
+        lodStep: this.lodSteps[level]
+      });
     }
     return plan;
   }
@@ -690,6 +704,8 @@ export class RiftTerrain {
       components: componentCount,
       lodSteps: [...this.lodSteps],
       collisionLodSteps: [...this.collisionLodSteps],
+      authoritativeHeightfieldBytes: this.heights.byteLength + this.manualDelta.byteLength + this.manualHoles.byteLength,
+      streamedRenderSections: true,
       caves: this._caveCache.length,
       layers: this.layers.length,
       revision: this.revision

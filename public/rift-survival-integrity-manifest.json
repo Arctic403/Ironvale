@@ -4,13 +4,13 @@
   "files": [
     {
       "path": "/app.js",
-      "sha256": "79a92dbb6956ab7a80b8e8091739f6e2f4bdefa711784d26568fd720702a76ce",
-      "size": 114865
+      "sha256": "8b51e4acbbbc8c090b1079d6fc46b33b7fc1918f0049a57ac804dfd662455795",
+      "size": 115148
     },
     {
       "path": "/index.html",
-      "sha256": "fc116b7157f0b9ce9542cd20f18d51a34a26815297885ef087c418058a08c4b0",
-      "size": 9359
+      "sha256": "78ddfa954029974c2996023149418bac0f69a61f2fc90491da7e842ad0ee51ea",
+      "size": 9361
     },
     {
       "path": "/rift-architecture-guard.js",
@@ -24,7 +24,7 @@
     },
     {
       "path": "/rift-auto-validation.js",
-      "sha256": "e096eaa6a21c15abcee00e1603fb984a217cd6f4737c8a3dc50b1f059e5306ed",
+      "sha256": "c013dd5633996419e22ca7de8d1e33f8a5e9a70a280d5c5d8b76cd3785509cc3",
       "size": 48860
     },
     {
@@ -39,8 +39,8 @@
     },
     {
       "path": "/rift-core.wasm.gz",
-      "sha256": "c628dac33ac12b29628119501e28df5cb99409a2bf7ead3f7aad888c006fed1a",
-      "size": 6311
+      "sha256": "666759ed71ea545eeb432089f8ee09bb31fba17f3d4fbf0da4dae07bfd3b0a14",
+      "size": 7514
     },
     {
       "path": "/rift-diagnostic-hooks.js",
@@ -79,8 +79,8 @@
     },
     {
       "path": "/rift-landscape.js",
-      "sha256": "5fb313cce6c28ca9efcab605a32f222ffa67e80a2edc6a34b989e3c925aaf91b",
-      "size": 54490
+      "sha256": "3abcd660f84e3bd36dd3724cf10674078b3e4b1d0440c0d1f5d83ee2f423bb45",
+      "size": 54541
     },
     {
       "path": "/rift-realtime.js",
@@ -99,16 +99,16 @@
     },
     {
       "path": "/rift-terrain.js",
-      "sha256": "8d1b1cdf54614b02ba217bccbf4ff790b87b32e86261bd03128521f516641de4",
-      "size": 29659
+      "sha256": "21f3228c1a57f8b97e61b27dc2e392607452c45c584a3a175672eafa9b72b1e8",
+      "size": 31342
     },
     {
       "path": "/rift-validator-guard.js",
-      "sha256": "2c499b918692a7dd878375db4b4aebc13c5f299bd89736219be3c764b9254ef9",
-      "size": 24327
+      "sha256": "751ddd5ffbeb352945af1af83073d612d536ee966b918c1d3489287eb5f4c0e5",
+      "size": 24482
     }
   ],
-  "buildId": "rs-4379b1b105bddd5ab6414264",
-  "digest": "4379b1b105bddd5ab641426455d89117c2199de730c123bc82ea984616fd7d12",
+  "buildId": "rs-b1ee5cfd7b8fad6fc26000e4",
+  "digest": "b1ee5cfd7b8fad6fc26000e4794d19788d8d3abd3552c985eed8cf2988daf243",
   "fileCount": 21
 }

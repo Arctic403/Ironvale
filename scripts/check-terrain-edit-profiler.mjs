@@ -6,5 +6,5 @@ for(const token of ['rift-survival-terrain-edit-performance-v1','terrain-edit-pe
 assert(terrain.includes('_buildSurfaceSectionNative(sectionX') && terrain.includes('nativeBuildMs') && terrain.includes('copyMs'),'native build/copy telemetry missing');
 assert(validator.includes('expectedStreamedMeshes')&&validator.includes('streamed meshes'),'stream-aware terrain coverage missing');
 assert(app.includes('defaultClips: playerRig.defaultClips'),'character default clip telemetry missing');
-assert(index.includes('/app.js?v=20260906-island-v1-r1') || index.includes('/app.js?v=20260902-terrain-pack-r1') || index.includes('/app.js?v=20260902-integrity-v1') || index.includes('/app.js?v=20260902-dirty-region-r1') || index.includes('/app.js?v=20260901-terrain-profiler-r1'),'recognized app cache tag missing');
+assert(index.includes('/app.js?v=20260906-island-v3-r1') || index.includes('/app.js?v=20260902-terrain-pack-r1') || index.includes('/app.js?v=20260902-integrity-v1') || index.includes('/app.js?v=20260902-dirty-region-r1') || index.includes('/app.js?v=20260901-terrain-profiler-r1'),'recognized app cache tag missing');
 console.log('RiftSurvival terrain edit profiler verification passed.');

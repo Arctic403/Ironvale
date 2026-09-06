@@ -118,6 +118,83 @@ float islandHeightAt(float x,float z,unsigned int seed,float waterLevel,float co
   return waterLevel+shoreRise*(2.0f+interior*(lowland+hillRelief+mountainRelief)+fine);
 }
 
+
+float islandHeightAtScaled(float x,float z,unsigned int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness,float footprintRadius,float edgeMargin,float warpStrength){
+  const float width=(gColumns-1)*gSpacing,depth=(gRows-1)*gSpacing;
+  const float halfW=maxf(gSpacing,width*0.5f),halfD=maxf(gSpacing,depth*0.5f),halfMin=minf(halfW,halfD);
+  const float centerX=gOriginX+halfW,centerZ=gOriginZ+halfD;
+  const float rawNx=(x-centerX)/halfW,rawNz=(z-centerZ)/halfD;
+
+  // v2 deliberately scales its noise wavelengths with world size. This keeps a
+  // 5 km island made of broad regions instead of repeating the 640 m map eight times.
+  const float macroScale=maxf(320.0f,halfMin*0.42f);
+  const float coastScale=maxf(220.0f,halfMin*0.28f);
+  const float coastDetailScale=maxf(90.0f,halfMin*0.095f);
+  const float hillScale=maxf(180.0f,halfMin*0.20f);
+  const float ridgeScale=maxf(220.0f,halfMin*0.25f);
+  const float flatScale=maxf(360.0f,halfMin*0.46f);
+  const float fineScale=maxf(55.0f,halfMin*0.052f);
+
+  const float warpX=fbm(x+131.0f,z-79.0f,macroScale*0.92f,seed^0x68bc21ebU)*warpStrength;
+  const float warpZ=fbm(x-47.0f,z+193.0f,macroScale,seed^0x02e5be93U)*warpStrength;
+  float nx=(rawNx+warpX)*0.96f;
+  float nz=(rawNz+warpZ)*1.04f;
+  const float radial=sqrtf_fast(nx*nx+nz*nz);
+
+  const float coastNoise=
+    fbm(x,z,coastScale,seed^0xa511e9b3U)*0.14f+
+    fbm(x+83.0f,z-61.0f,coastDetailScale,seed^0x63d83595U)*0.045f;
+  float islandField=footprintRadius-radial+coastNoise;
+
+  // Keep a guaranteed ocean moat around all four world edges for every seed.
+  const float edgeNorm=minf(1.0f-absf(rawNx),1.0f-absf(rawNz));
+  const float edgeLimit=(edgeNorm-edgeMargin)*1.65f;
+  islandField=minf(islandField,edgeLimit);
+
+  const float coastNorm=maxf(gSpacing/halfMin,coastWidth/halfMin);
+  if(islandField<=0.0f){
+    const float sea=smoothstepf(clampf((-islandField)/(coastNorm*3.1f),0.0f,1.0f));
+    const float seabedNoise=fbm(x,z,maxf(75.0f,fineScale*0.8f),seed^0x9e3779b9U)*2.2f;
+    return waterLevel-1.8f-sea*15.0f+seabedNoise*sea;
+  }
+
+  const float broadRise=smoothstepf(clampf(islandField/coastNorm,0.0f,1.0f));
+  const float cliffSelector=smoothstepf(clampf((fbm(x+211.0f,z+37.0f,coastScale*0.9f,seed^0x51ed270bU)-0.16f)/0.40f,0.0f,1.0f));
+  const float cliffRise=smoothstepf(clampf(islandField/(coastNorm*0.30f),0.0f,1.0f));
+  const float shoreRise=lerpf(broadRise,cliffRise,cliffSelector*0.52f);
+  const float interior=smoothstepf(clampf(islandField/(coastNorm*4.0f),0.0f,1.0f));
+
+  // Broad continental-scale shaping first.
+  const float macro=0.5f+0.5f*fbm(x,z,macroScale,seed^0x7f4a7c15U);
+  const float secondary=0.5f+0.5f*fbm(x-451.0f,z+337.0f,macroScale*0.62f,seed^0x4f1bbcdcU);
+  const float hills=0.5f+0.5f*fbm(x+57.0f,z-103.0f,hillScale,seed^0x94d049bbU);
+  const float ridgeNoise=fbm(x-149.0f,z+89.0f,ridgeScale,seed^0xd1b54a35U);
+  float ridges=1.0f-absf(ridgeNoise); ridges=ridges*ridges;
+
+  const float mountainZone=smoothstepf(clampf((macro*0.72f+secondary*0.28f-0.52f)/0.34f,0.0f,1.0f))*interior;
+  const float flatSelector=smoothstepf(clampf((fbm(x+301.0f,z-217.0f,flatScale,seed^0x165667b1U)-0.10f)/0.42f,0.0f,1.0f))*interior;
+  const float valleySelector=smoothstepf(clampf((0.18f-fbm(x-517.0f,z+223.0f,macroScale*0.48f,seed^0x8cb92baaU))/0.48f,0.0f,1.0f))*interior;
+  const float reliefDamp=clampf(1.0f-flatSelector*0.68f-valleySelector*0.28f,0.22f,1.0f);
+
+  const float lowland=3.0f+landHeight*(0.24f+macro*0.52f+secondary*0.24f);
+  const float hillRelief=hillHeight*hills*interior*reliefDamp;
+  const float mountainRelief=mountainHeight*ridges*mountainZone*reliefDamp;
+  const float valleyCut=valleySelector*landHeight*0.24f;
+  const float fine=fbm(x+17.0f,z+29.0f,fineScale,seed^0x27d4eb2fU)*2.0f*clampf(roughness,0.0f,2.0f)*interior*reliefDamp;
+
+  return waterLevel+shoreRise*(2.5f+interior*(lowland+hillRelief+mountainRelief-valleyCut)+fine);
+}
+
+float islandHeightAtV2(float x,float z,unsigned int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness){
+  return islandHeightAtScaled(x,z,seed,waterLevel,coastWidth,landHeight,hillHeight,mountainHeight,roughness,0.84f,0.055f,0.11f);
+}
+
+float islandHeightAtV3(float x,float z,unsigned int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness){
+  // v3 preserves the 5.12 km world while shrinking the land footprint so the
+  // ocean is a meaningful part of the map instead of a thin border.
+  return islandHeightAtScaled(x,z,seed,waterLevel,coastWidth,landHeight,hillHeight,mountainHeight,roughness,0.70f,0.09f,0.13f);
+}
+
 float sample(float x,float z){
   if(!contains(x,z)) return 1.0e30f;
   float gx=clampf((x-gOriginX)/gSpacing,0.0f,(float)(gColumns-1));
@@ -220,6 +297,28 @@ int rift_terrain_generate_island(int seed,float waterLevel,float coastWidth,floa
   const unsigned int useSeed=(unsigned int)(seed==0?1:seed); int n=gColumns*gRows,c=(gColumns-1)*(gRows-1);
   for(int iz=0;iz<gRows;iz++)for(int ix=0;ix<gColumns;ix++){
     int idx=hidx(ix,iz); float generated=islandHeightAt(worldX(ix),worldZ(iz),useSeed,waterLevel,coastWidth,landHeight,hillHeight,mountainHeight,roughness);
+    gGeneratedBase[idx]=generated; gDelta[idx]=0.0f; gHeights[idx]=generated;
+  }
+  for(int i=0;i<c;i++)gHoles[i]=0; gMeshVertexFloats=0; gMeshIndexCount=0; return n>0?1:0;
+}
+int rift_terrain_generate_island_v2(int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness){
+  if(!ready())return 0;
+  coastWidth=clampf(coastWidth,gSpacing*6.0f,minf((gColumns-1)*gSpacing,(gRows-1)*gSpacing)*0.18f);
+  landHeight=clampf(landHeight,1.0f,120.0f); hillHeight=clampf(hillHeight,0.0f,120.0f); mountainHeight=clampf(mountainHeight,0.0f,180.0f); roughness=clampf(roughness,0.0f,2.0f);
+  const unsigned int useSeed=(unsigned int)(seed==0?1:seed); int n=gColumns*gRows,c=(gColumns-1)*(gRows-1);
+  for(int iz=0;iz<gRows;iz++)for(int ix=0;ix<gColumns;ix++){
+    int idx=hidx(ix,iz); float generated=islandHeightAtV2(worldX(ix),worldZ(iz),useSeed,waterLevel,coastWidth,landHeight,hillHeight,mountainHeight,roughness);
+    gGeneratedBase[idx]=generated; gDelta[idx]=0.0f; gHeights[idx]=generated;
+  }
+  for(int i=0;i<c;i++)gHoles[i]=0; gMeshVertexFloats=0; gMeshIndexCount=0; return n>0?1:0;
+}
+int rift_terrain_generate_island_v3(int seed,float waterLevel,float coastWidth,float landHeight,float hillHeight,float mountainHeight,float roughness){
+  if(!ready())return 0;
+  coastWidth=clampf(coastWidth,gSpacing*6.0f,minf((gColumns-1)*gSpacing,(gRows-1)*gSpacing)*0.18f);
+  landHeight=clampf(landHeight,1.0f,120.0f); hillHeight=clampf(hillHeight,0.0f,120.0f); mountainHeight=clampf(mountainHeight,0.0f,180.0f); roughness=clampf(roughness,0.0f,2.0f);
+  const unsigned int useSeed=(unsigned int)(seed==0?1:seed); int n=gColumns*gRows,c=(gColumns-1)*(gRows-1);
+  for(int iz=0;iz<gRows;iz++)for(int ix=0;ix<gColumns;ix++){
+    int idx=hidx(ix,iz); float generated=islandHeightAtV3(worldX(ix),worldZ(iz),useSeed,waterLevel,coastWidth,landHeight,hillHeight,mountainHeight,roughness);
     gGeneratedBase[idx]=generated; gDelta[idx]=0.0f; gHeights[idx]=generated;
   }
   for(int i=0;i<c;i++)gHoles[i]=0; gMeshVertexFloats=0; gMeshIndexCount=0; return n>0?1:0;

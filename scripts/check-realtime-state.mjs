@@ -42,6 +42,8 @@ requireMatch(worker, /storage\.setAlarm\(Date\.now\(\) \+ CHECKPOINT_INTERVAL_MS
 requireMatch(worker, /periodic-alarm/, 'periodic alarm D1 checkpoint reason');
 requireMatch(worker, /MAX_HORIZONTAL_SPEED_MPS\s*=\s*12/, 'movement speed authority matches runtime');
 requireMatch(worker, /horizontal-speed/, 'server-side jump/speed rejection');
+requireMatch(worker, /spawnTerrainSnap/, 'one-time generated-terrain spawn height synchronization');
+requireMatch(worker, /Math\.abs\(state\.y - DEFAULT_SPAWN\.y\) < 0\.01/, 'spawn snap is restricted to untouched placeholder Y');
 requireMatch(worker, /url\.pathname === '\/api\/character\/position'/, 'legacy compatibility route remains RAM-authoritative');
 requireMatch(worker, /routePositionFallback/, 'Durable Object HTTP movement fallback');
 requireMatch(worker, /url\.pathname === '\/api\/realtime\/checkpoint'/, 'explicit lifecycle checkpoint route');

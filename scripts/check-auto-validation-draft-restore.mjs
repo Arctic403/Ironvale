@@ -7,7 +7,7 @@ const pkg = JSON.parse(read('package.json'));
 const assert = (ok, message) => { if (!ok) throw new Error('Auto-validation draft restore check failed: ' + message); };
 
 for (const token of [
-  "const TERRAIN_DRAFT_KEY = 'rift-survival:terrain:draft:v4'",
+  "const TERRAIN_DRAFT_KEY = 'rift-survival:terrain:draft:v5'",
   'function captureDraftBaseline()',
   'function restoreDraftBaseline(baseline)',
   'draftBaseline = captureDraftBaseline()',

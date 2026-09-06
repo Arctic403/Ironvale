@@ -48,7 +48,7 @@ requireToken(validator, "integrity.runtime-watchdog", 'validator runtime watchdo
 requireToken(diagnostics, '|token|ticket|', 'diagnostic object/string ticket redaction');
 requireToken(diagnosticHooks, 'token|ticket|secret', 'diagnostic resource URL ticket redaction');
 
-requireToken(html, '/app.js?v=20260906-island-v1-r1', 'app cache bust');
+requireToken(html, '/app.js?v=20260906-island-v3-r1', 'app cache bust');
 requireToken(html, '/rift-realtime.js?v=20260902-zone-authority-r1', 'realtime cache bust');
 requireToken(html, '/rift-validator-guard.js?v=20260902-zone-authority-r1', 'validator cache bust');
 
